@@ -186,11 +186,28 @@ Window {
         openTools = {}
         info = ""
         review = null
+        reviewFor = ""
+        reviewLoading = false
         commitOpen = false
+        commitText.text = ""   // (the chat before's message: this one's comes with its review)
+        commitEdited = false
         undoAsk = ""
         replyBox.text = ""
+        askHow = false
+        answering = 0
+        answerStale.stop()
+        outputText = ""
+        outputHtml = ""
+        outputError = ""
+        // (what's still on its way for the chat before is left out when it
+        // comes, handle(): this one's is read now)
+        loading = false
+        loadAgain = false
+        const wasTab = tab
         tab = chat.tab || "chat"
         Qt.callLater(load)
+        if (tab === "review" && wasTab === "review")
+            Qt.callLater(loadReview)   // (the tab stays: onTabChanged doesn't read this one's)
     }
     property bool ready: false   // (nothing runs while the window is being made)
     onChatIdChanged: if (ready) reset()
@@ -271,21 +288,26 @@ Window {
     function run(kind, args) {
         const cmd = "python3 -I " + root.shellQuote(root.codeDir + "pane.py") + " " + args
                     + (kind === "conversation" || kind === "logs" ? "" : " # " + Date.now())   // (read again and again: one name)
-        runs[cmd] = kind
+        runs[cmd] = { kind: kind, chat: chatId, host: host, target: row || chat }
         runner.connectSource(cmd)
     }
-    property var runs: ({})
+    property var runs: ({})   // command -> {kind, chat: the chat it's for, host, target: its row (openRow)}
+    // A command whose answer never came (plasmashell lost it) is given up
+    // after this, and a read runs again (hub/Exec.qml; a host's goes over ssh)
+    readonly property int staleMs: 120000
     property bool loading: false
+    property real loadingSince: 0
     property bool loadAgain: false   // (something changed while it was read: read it again then)
 
     function load() {
         if (!chatId)
             return
-        if (loading) {
+        if (loading && Date.now() - loadingSince < staleMs) {
             loadAgain = true
             return
         }
         loading = true
+        loadingSince = Date.now()
         run("conversation", "--conversation " + root.shellQuote(chatId) + " --limit " + limit
             + (stamp ? " --if-changed " + root.shellQuote(stamp) : "") + paneArgs())
     }
@@ -450,7 +472,32 @@ Window {
         return true
     }
 
-    function handle(kind, result) {
+    // asked: the run it answers ({kind, chat, host, target}: run())
+    function handle(kind, result, asked) {
+        // An answer for the chat shown before (another one was opened since,
+        // reset()): none of it goes into this one's conversation, review, box
+        // or buttons. A message sent there still goes where it was going.
+        if (asked.chat !== chatId) {
+            if (kind === "send" || kind === "later") {
+                if (result.ok && result.how === "vscode" && result.link)
+                    Qt.openUrlExternally(result.link)
+                else if (result.ok && result.how === "copy" && result.copied)
+                    root.openRow(asked.target, asked.host)
+                else if (!result.ok || result.how === "ask" || result.how === "copy") {
+                    // (it didn't go, and the box it was in is this chat's now: said here)
+                    info = i18n("Your message to %1 didn't go: %2", asked.target && asked.target.name ? asked.target.name : i18n("the chat before"),
+                                result.message || i18n("its terminal takes no text"))
+                    infoBad = true
+                    infoTimer.restart()
+                }
+            }
+            if (kind !== "conversation" && kind !== "review" && kind !== "complete" && kind !== "logs") {
+                root.refresh()   // (what was done there shows in the popup)
+                if (asked.host)
+                    root.pollHost(asked.host)
+            }
+            return
+        }
         if (kind === "complete") {
             if (result.ok)
                 offers = { commands: result.commands || [], files: result.files || [], history: result.history || [] }
@@ -494,6 +541,7 @@ Window {
         if (kind === "review") {
             reviewLoading = false
             review = result.ok ? result : null
+            reviewFor = result.ok ? asked.chat : ""
             reviewError = result.ok ? "" : (result.message || "")
             if (result.ok && !commitEdited)
                 commitText.text = result.message || ""
@@ -537,11 +585,12 @@ Window {
 
     Exec {
         id: runner
+        staleMs: pane.staleMs - 30000   // (less: the read load() gives up on runs again, not taken for one still running)
         onNewData: (source, data) => {
             disconnectSource(source)
-            const kind = pane.runs[source] || ""
+            const asked = pane.runs[source] || { kind: "", chat: "", host: "", target: null }
             delete pane.runs[source]
-            pane.handle(kind, root.helperResult(data))
+            pane.handle(asked.kind, root.helperResult(data), asked)
         }
     }
 
@@ -664,12 +713,23 @@ Window {
 
     property int answering: 0   // answers on their way
 
-    // answers: a question's, {question: [labels or text]} (decision "answer")
+    // (answers that never come back: the buttons work again after a while)
+    Timer {
+        id: answerStale
+        interval: pane.staleMs
+        onTriggered: pane.answering = 0
+    }
+
+    // answers: a question's, {question: [labels or text]} (decision "answer").
+    // It answers what the pane shows only: the hook's request, or in tmux
+    // the tool call it asks about (--expect: if it asks something else now,
+    // nothing is pressed, and the pane says so)
     function answer(decision, note, answers) {
         const p = permission
         if (!p || (p.answer !== "hook" && p.answer !== "keys"))
             return
         answering += 1
+        answerStale.restart()
         if (p.answer === "hook")
             run(decision === "deny" ? "deny" : "answer", "--answer " + root.shellQuote(p.request) + " --decision " + decision
                 + (note ? " --note " + root.shellQuote(note) : "")
@@ -677,12 +737,15 @@ Window {
                 + (host ? " --host " + root.shellQuote(host) : "") + root.configDirArgs)
         else if (p.answer === "keys")
             run(decision === "deny" ? "deny" : "answer", "--keys " + root.shellQuote(sessionId) + " --decision " + decision
-                + (note ? " --note " + root.shellQuote(note) : "") + paneArgs())
+                + (note ? " --note " + root.shellQuote(note) : "")
+                + (p.toolUse ? " --expect " + root.shellQuote(p.toolUse) : "") + paneArgs())
     }
 
     // ---------------------------------------------------------------- review
 
     property var review: null
+    property string reviewFor: ""   // the chat that review is of: Undo and Commit act on that one only
+    readonly property bool reviewIsThis: review !== null && reviewFor !== "" && reviewFor === chatId
     property bool reviewLoading: false
     property string reviewError: ""
     property var openFiles: ({})
@@ -735,6 +798,8 @@ Window {
 
     function undo(path) {
         undoAsk = ""
+        if (!reviewIsThis)
+            return   // (the files shown aren't this chat's: its own review comes first)
         run("undo", "--undo " + root.shellQuote(chatId) + (path !== "*" ? " --file " + root.shellQuote(path) : "") + paneArgs())
     }
 
@@ -1988,7 +2053,7 @@ Window {
                                 onClicked: pane.commitOpen = false
                             }
                             PlasmaComponents3.Button {
-                                enabled: commitText.text.trim() !== "" && pane.review && pane.review.repos.length > 0
+                                enabled: commitText.text.trim() !== "" && pane.reviewIsThis && pane.review.repos.length > 0
                                 icon.name: "vcs-commit"
                                 text: i18n("Commit")
                                 onClicked: pane.run("commit", "--commit " + root.shellQuote(pane.chatId) + " --message "
@@ -2021,13 +2086,13 @@ Window {
                     Layout.fillWidth: true
                 }
                 PlasmaComponents3.Button {
-                    enabled: pane.review !== null && pane.review.files.length > 0
+                    enabled: pane.reviewIsThis && pane.review.files.length > 0
                     icon.name: "edit-undo"
                     text: i18n("Undo all…")
                     onClicked: pane.undoAsk = "*"
                 }
                 PlasmaComponents3.Button {
-                    enabled: pane.review !== null && pane.review.files.length > 0 && pane.review.repos.length > 0
+                    enabled: pane.reviewIsThis && pane.review.files.length > 0 && pane.review.repos.length > 0
                     icon.name: "vcs-commit"
                     text: i18n("Commit these files…")
                     onClicked: pane.commitOpen = !pane.commitOpen

@@ -18,6 +18,9 @@ KCM.SimpleKCM {
         cfg_newChatEffort = Plasmoid.configuration.newChatEffort
         cfg_newChatMode = Plasmoid.configuration.newChatMode
         cfg_sshHosts = Plasmoid.configuration.sshHosts
+        cfg_focusView = Plasmoid.configuration.focusView
+        cfg_paneTextPercent = Plasmoid.configuration.paneTextPercent
+        cfg_diffSideBySide = Plasmoid.configuration.diffSideBySide
     }
 
     property alias cfg_pollInterval: pollInterval.value

@@ -4,7 +4,8 @@
 // its own memory, so one poll never decides for another.
 
 import { duration, petKeyOf, plural, reasonText, stopOf } from "./shared/model";
-import type { Group, PetEventKind, Session, SessionState, Stop } from "./shared/types";
+import { sameAsk, shownAsk } from "./shared/pane";
+import type { AskShown, Group, PetEventKind, Session, SessionState, Stop } from "./shared/types";
 
 export interface Notice {
   key: string; // the row: one notification per row at a time
@@ -82,7 +83,7 @@ export class TransitionTracker {
   private lastEnded = new Map<string, Map<string, number>>(); // the turns that ended at the last poll, told as finished: how long they took
   private lastWaitingAlert = new Map<string, number>();
   private lastWindows = new Map<string, number>();
-  private toldAsks = new Set<string>(); // chats told about with Allow / Deny buttons while they wait
+  private toldAsks = new Map<string, AskShown>(); // chats told about with Allow / Deny buttons while they wait: the prompt told
 
   track(source: string, groups: Group[], nowMs: number, host: string | undefined, opts: NotifyOptions): Changes {
     const changes: Changes = { notices: [], petEvents: [], sound: "", finished: [] };
@@ -119,11 +120,15 @@ export class TransitionTracker {
         }
         const asks = s.state === "waiting" && !!s.permission && (s.permission.answer === "hook" || s.permission.answer === "keys");
         if (s.state !== "waiting") this.toldAsks.delete(sid);
-        if (prev === "waiting" && asks && !this.toldAsks.has(sid) && opts.notifyWaiting) {
-          // (the hook's request came a poll after the chat began to wait: now with its buttons)
-          this.toldAsks.add(sid);
-          changes.notices.push({ key: sid, kind: "waiting", title: askTitle(s),
-                                 body: `${askText(s)} · ${s.cwdShort}${where}`, session: s, host });
+        const told = this.toldAsks.get(sid);
+        if (prev === "waiting" && asks) {
+          // the hook's request came a poll after the chat began to wait, or it
+          // asks something else now (answered in the chat, then the next
+          // prompt): told, with buttons that answer this prompt
+          if ((!told || !sameAsk(told, s.permission!)) && opts.notifyWaiting)
+            changes.notices.push({ key: sid, kind: "waiting", title: askTitle(s),
+                                   body: `${askText(s)} · ${s.cwdShort}${where}`, session: s, host });
+          this.toldAsks.set(sid, shownAsk(s.permission)!); // (as it's known now: with the request that came for it, say)
         }
         if (prev === s.state) continue;
         const pk = petKeyOf(s, host);
@@ -132,7 +137,7 @@ export class TransitionTracker {
           if (nowMs - (this.lastWaitingAlert.get(sid) ?? 0) < WAITING_QUIET_MS) continue;
           this.lastWaitingAlert.set(sid, nowMs);
           changes.petEvents.push({ kind: "waiting", text: `${s.name} needs you!`, key: pk });
-          if (asks) this.toldAsks.add(sid);
+          if (asks) this.toldAsks.set(sid, shownAsk(s.permission)!);
           if (opts.notifyWaiting) {
             changes.notices.push({
               key: sid,

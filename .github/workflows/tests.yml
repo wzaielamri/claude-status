@@ -50,6 +50,52 @@ jobs:
         run: |
           gnome/build.sh
           python3 -m zipfile -l gnome/build/talpy-den@wzaielamri.github.io.shell-extension.zip | grep -E 'metadata.json|schemas/gschemas.compiled|code/talpy_den.py'
+      # GNOME Shell 43/44 (Debian 12): install.sh builds this converted copy
+      # there, and port43.py stops on any API it can't convert
+      - name: Build the extension for GNOME Shell 43/44
+        run: |
+          gnome/build.sh --gnome43 "$RUNNER_TEMP/gnome43"
+          python3 -m zipfile -l "$RUNNER_TEMP/gnome43/talpy-den@wzaielamri.github.io.shell-extension.zip" | grep -E 'compat43.js|compat43prefs.js|metadata.json'
+          for f in $(find "$RUNNER_TEMP/gnome43/talpy-den@wzaielamri.github.io" -name '*.js'); do
+            gjs -c "new Function(new TextDecoder().decode(imports.gi.GLib.file_get_contents('$f')[1]))" || { echo "doesn't parse: $f"; exit 1; }
+          done
+
+  # The Plasma widget (package/): its QML passes Qt 6's qmllint (a syntax
+  # error in any file or function, an id twice in one file: Plasma wouldn't
+  # load it), its JavaScript modules parse, and its metadata and config
+  # schema are well-formed. Plasma's own QML modules aren't here: what needs
+  # them is only a warning. (Its Python is the tests above.)
+  plasma:
+    name: Plasma widget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Qt 6's qmllint (with PySide6)
+        run: pip install "PySide6-Essentials==6.12.0"
+      - name: QML
+        run: |
+          # (the binary itself: the pyside6-qmllint wrapper exits 0 whatever it finds)
+          qmllint="$(python -c 'import os, PySide6; print(os.path.join(os.path.dirname(PySide6.__file__), "qmllint"))')"
+          "$qmllint" --version
+          mapfile -d '' files < <(find package/contents/ui -name '*.qml' -print0 | sort -z)
+          if "$qmllint" "${files[@]}" > qmllint.log 2>&1; then
+            echo "${#files[@]} files, no errors ($(grep -c '^Warning' qmllint.log) warnings: mostly Plasma's modules, not installed here)"
+          else
+            grep -A2 -E '^Error|\[syntax' qmllint.log || tail -50 qmllint.log
+            exit 1
+          fi
+      - name: JavaScript modules
+        run: find package/contents/ui -name '*.mjs' -print0 | xargs -0 -n1 node --check
+      - name: Metadata and config schema
+        run: |
+          python -m json.tool package/metadata.json > /dev/null
+          python -c "import sys, xml.dom.minidom; [xml.dom.minidom.parse(f) for f in sys.argv[1:]]" package/contents/config/main.xml
 
   # The VS Code extension (vscode/): type check, tests, and that it packs
   vscode:

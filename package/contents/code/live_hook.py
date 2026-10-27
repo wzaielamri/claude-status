@@ -23,7 +23,10 @@ import re
 import sys
 import time
 
-VERSION = 1
+VERSION = 1  # (of the live files it writes)
+# This file's version: a status check brings an older copy of it in
+# ~/.local/share/talpy-den up to date (talpy_den.refresh_hooks)
+HOOK_REVISION = 2
 STEPS = 8  # the last steps a live file keeps
 AGENTS = 20
 TEXT = 70  # characters of a step's words
@@ -32,6 +35,36 @@ KEEP_S = 3 * 86400  # live files of chats not heard from for this long go
 SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 # tools that ask you something (their permission request is the question)
 ASKS = {"AskUserQuestion": "question", "ExitPlanMode": "plan"}
+# Shells that may stand between Claude and the hook: Claude runs a hook's
+# command with sh -c, and dash (Debian's and Ubuntu's sh) stays as the
+# command's parent unless the command starts with exec (older entries in
+# settings.json don't)
+SHELLS = frozenset(("sh", "dash", "bash", "zsh", "ksh", "ksh93", "mksh", "lksh", "pdksh", "ash", "busybox", "yash",
+                    "posh"))
+
+
+def parent_of(pid):
+    """(parent pid, command name) of a process, from Linux's /proc, or None."""
+    try:
+        with open("/proc/%d/stat" % pid, "rb") as f:
+            stat = f.read().decode("utf-8", "replace")
+        end = stat.rindex(")")  # (the name may have spaces and parentheses)
+        return int(stat[end + 2:].split()[1]), stat[stat.index("(") + 1:end]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def claude_pid():
+    """The Claude process the hook runs for: its parent, or, when that's the
+    shell Claude ran the command with, the shell's parent. Without /proc
+    (not Linux), its parent."""
+    pid = os.getppid()
+    for _ in range(4):
+        found = parent_of(pid)
+        if found is None or found[1] not in SHELLS or found[0] <= 1:
+            break
+        pid = found[0]
+    return pid
 
 
 def folder():
@@ -237,7 +270,7 @@ def main():
             if view is None:
                 return 0
             if event.get("hook_event_name") != "SessionEnd":
-                view["pid"] = os.getppid()  # Claude (its hooks are its children); gone by SessionEnd
+                view["pid"] = claude_pid()  # Claude (its hooks are its children); gone by SessionEnd
             for key in ("cwd", "transcript_path"):
                 if isinstance(event.get(key), str):
                     view["transcript" if key == "transcript_path" else key] = event[key]

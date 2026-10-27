@@ -10,8 +10,8 @@ import type { ChatPanes } from "./chatPane";
 import { cacheDir, settings } from "./config";
 import { gnomeSoundTheme } from "./desktop";
 import type { Digest } from "./away";
-import { oneChoice, questionsOf } from "./shared/pane";
-import type { Answers, ChatRef, Question, Session } from "./shared/types";
+import { oneChoice, questionsOf, shownAsk } from "./shared/pane";
+import type { Answers, AskShown, ChatRef, Question, Session } from "./shared/types";
 import type { Changes } from "./transitions";
 
 export function chatRef(s: Session, host?: string): ChatRef {
@@ -94,8 +94,10 @@ export class Notifier implements vscode.Disposable {
       const chat = chatRef(n.session, n.host);
       const p = n.kind === "waiting" ? n.session.permission : null;
       const asks = !!p && (p.answer === "hook" || p.answer === "keys") && !!this.panes;
+      // its buttons answer the prompt this notification shows, never one the chat asks after it
+      const shown = shownAsk(p);
       if (asks && questionsOf(p).length) {
-        this.askQuestions(text, show, chat, n.session);
+        this.askQuestions(text, show, chat, n.session, shown);
         continue;
       }
       // a plan: approve it (accepting edits or not), or plan on with a note
@@ -104,11 +106,11 @@ export class Notifier implements vscode.Disposable {
         void show(planText, "Approve, accept edits", "Approve", "Keep planning…", "Open").then(async (choice) => {
           const panes = this.panes;
           if (!panes) return;
-          if (choice === "Approve, accept edits") await panes.answer(chat, "approve-edits");
-          else if (choice === "Approve") await panes.answer(chat, "approve");
+          if (choice === "Approve, accept edits") this.told(chat, await panes.answer(chat, "approve-edits", shown));
+          else if (choice === "Approve") this.told(chat, await panes.answer(chat, "approve", shown));
           else if (choice === "Keep planning…") {
             const note = await vscode.window.showInputBox({ title: `Keep planning: ${n.session.name}`, prompt: "What should change in the plan? (optional)", ignoreFocusOut: true });
-            if (note !== undefined) await panes.answer(chat, "keep", note.trim());
+            if (note !== undefined) this.told(chat, await panes.answer(chat, "keep", shown, note.trim()));
           } else if (choice === "Open") panes.open(chat, "chat");
         });
         continue;
@@ -124,10 +126,10 @@ export class Notifier implements vscode.Disposable {
           if (panes && settings.clickOpensPane()) panes.open(chat, "chat");
           else this.open(chat);
         } else if (panes && (choice === "Allow once" || choice === "Always allow" || choice === "Deny")) {
-          await panes.answer(chat, choice === "Allow once" ? "allow" : choice === "Always allow" ? "always" : "deny");
+          this.told(chat, await panes.answer(chat, choice === "Allow once" ? "allow" : choice === "Always allow" ? "always" : "deny", shown));
         } else if (panes && choice === "Deny with a note…") {
           const note = await vscode.window.showInputBox({ title: `Deny ${n.session.name}`, prompt: "What should Claude do instead? (optional)", ignoreFocusOut: true });
-          if (note !== undefined) await panes.answer(chat, "deny", note.trim());
+          if (note !== undefined) this.told(chat, await panes.answer(chat, "deny", shown, note.trim()));
         } else if (panes && choice === "Reply…") {
           const reply = await vscode.window.showInputBox({ title: `Reply to ${n.session.name}`, prompt: "Sent the way the chat takes it", ignoreFocusOut: true });
           if (reply?.trim()) await panes.reply(chat, reply);
@@ -145,7 +147,7 @@ export class Notifier implements vscode.Disposable {
   // Claude's questions: one with one answer has a button per option, then
   // Other… (your own words); else Answer… goes through them one by one
   // (VS Code's pickers); Open shows the chat
-  private askQuestions(text: string, show: typeof vscode.window.showWarningMessage, chat: ChatRef, s: Session): void {
+  private askQuestions(text: string, show: typeof vscode.window.showWarningMessage, chat: ChatRef, s: Session, shown: AskShown | null): void {
     const choices = oneChoice(s.permission);
     const items: (vscode.MessageItem & { run: () => Promise<Answers | null | "open"> })[] = [
       ...choices.map((o) => ({ title: o.label, run: async () => ({ [questionsOf(s.permission)[0].question]: [o.label] }) })),
@@ -161,7 +163,18 @@ export class Notifier implements vscode.Disposable {
       if (answer === "open") {
         if (settings.clickOpensPane()) panes.open(chat, "chat");
         else this.open(chat);
-      } else await panes.answer(chat, "answer", "", answer);
+      } else this.told(chat, await panes.answer(chat, "answer", shown, "", answer));
+    });
+  }
+
+  // An answer from a notification that didn't go through (the chat asks
+  // something else now, or the helper failed): said, with the chat to open
+  private told(chat: ChatRef, answer: { ok: boolean; message: string }): void {
+    if (answer.ok) return;
+    void vscode.window.showWarningMessage(`Talpy Den: couldn't answer ${chat.name}: ${answer.message}`, "Open").then((choice) => {
+      if (choice !== "Open") return;
+      if (this.panes && settings.clickOpensPane()) this.panes.open(chat, "chat");
+      else this.open(chat);
     });
   }
 

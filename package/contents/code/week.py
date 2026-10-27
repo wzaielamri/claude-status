@@ -494,8 +494,50 @@ def edit_lines(name, inp):
     return added, removed
 
 
+def utc_offset_ms(ts):
+    """The local clock's offset from UTC at ts (ms), in ms."""
+    try:
+        return (time.localtime(ts / 1000).tm_gmtoff or 0) * 1000
+    except (AttributeError, OverflowError, OSError, ValueError):
+        return 0
+
+
+def hour_start(ts):
+    """When the local clock hour of ts (ms) began, in ms: in a half-hour or
+    45-minute time zone (India, Nepal, …) half or three quarters past a UTC
+    hour, so its replies count for the day they came on; in a whole-hour one
+    the UTC hour's start."""
+    offset = utc_offset_ms(ts)
+    start = ts - (ts + offset) % HOUR_MS
+    if utc_offset_ms(start) != offset:
+        # The clock was changed within that hour (summer time by half an
+        # hour, Lord Howe Island): the hour began then, found to the second
+        lo, hi = start // 1000, -(-ts // 1000)
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if utc_offset_ms(mid * 1000) == offset:
+                hi = mid
+            else:
+                lo = mid
+        start = max(start, min(ts, hi * 1000))
+    return start
+
+
+def hour_key(start):
+    """A chat's hour as its "hours" key: when it began, in hours since the
+    epoch. In a whole-hour time zone a whole number (the UTC hour, as these
+    keys always were), in another one a fraction ("490000.5")."""
+    return str(start // HOUR_MS) if start % HOUR_MS == 0 else repr(start / HOUR_MS)
+
+
+def hour_ms(h):
+    """When the hour of an "hours" key began (ms); a cache's older keys are
+    UTC hours (also in a half-hour time zone: they stay as they were read)."""
+    return int(round(float(h) * HOUR_MS))
+
+
 def hour_agg(data, ts):
-    h = str(ts // HOUR_MS)
+    h = hour_key(hour_start(ts))
     agg = data["hours"].get(h)
     if agg is None:
         agg = data["hours"][h] = new_hour()
@@ -638,7 +680,7 @@ def take_reply(e, ts, rec, counted):
         a[W_ON] += input_w * min(1.0, on / prompt)
     if large and prompt:
         a[W_BIG] += input_w * min(1.0, large / prompt)
-    bucket = str((ts // BUCKET_MS) % (HOUR_MS // BUCKET_MS))
+    bucket = str((ts - hour_ms(h)) // BUCKET_MS)  # (its 5 minutes in the hour)
     agg["b"][bucket] = agg["b"].get(bucket, 0) + w
     count_tools(data, h, uses)
     if not rec["sub"]:
@@ -837,7 +879,7 @@ def first_activity(cache):
         if not isinstance(data, dict):
             continue
         times = [t[0] for t in data.get("turns", [])[:1]] + data.get("prompts", [])[:1] + [
-            int(h) * HOUR_MS for h in data.get("hours", {})]
+            hour_ms(h) for h in data.get("hours", {})]
         if times:
             first = min(times) if first is None else min(first, min(times))
     return first
@@ -959,7 +1001,6 @@ def chats_between(cache, profiles, since, until, home):
     of the profiles' chats between since and until (ms), with the turns going on."""
     by_profile, _ = account_ids(profiles)
     roots = {}
-    first_hour, last_hour = since // HOUR_MS, until // HOUR_MS
     chats = {}
     for rec in cache.get("files", {}).values():
         data = rec.get("data") if isinstance(rec, dict) else None
@@ -973,7 +1014,7 @@ def chats_between(cache, profiles, since, until, home):
             if p not in c["profiles"]:
                 c["profiles"].append(p)
         for h, agg in data["hours"].items():
-            if first_hour <= int(h) <= last_hour:
+            if since - HOUR_MS < hour_ms(h) <= until:  # (an hour that overlaps [since, until])
                 merge_hour(c["hours"].setdefault(h, {k: v for k, v in new_hour().items() if k != "m"}), agg)
         if rec.get("sub"):
             continue
@@ -1243,7 +1284,7 @@ def recap(sources, back, account, now_ms, home, usage=None, added=(), span="week
         cost, tokens = 0.0, dict.fromkeys(USAGE_KEYS, 0)
         for c in chats:
             for h, agg in c["hours"].items():
-                if lo <= int(h) * HOUR_MS < hi:
+                if lo <= hour_ms(h) < hi:
                     for key, t in agg["t"].items():
                         cost += request_cost(key, t)
                         for i, name in enumerate(USAGE_KEYS):
@@ -1256,7 +1297,7 @@ def recap(sources, back, account, now_ms, home, usage=None, added=(), span="week
             return out
         out.update(turns=turns, limits=limit_episodes(limits), tokens=tokens, longestTurn=longest,
                    chats=sum(1 for c in chats if worked.get(c["key"]) or any(lo <= p < hi for p in c["prompts"])
-                             or any(lo <= int(h) * HOUR_MS < hi for h in c["hours"])))
+                             or any(lo <= hour_ms(h) < hi for h in c["hours"])))
         return out, {"stretches": stretches, "waits": waits, "yours": yours, "worked": worked}
 
     total, parts = period(w0, w1, True)
@@ -1304,7 +1345,7 @@ def recap(sources, back, account, now_ms, home, usage=None, added=(), span="week
         row["workedMs"] = int(sum(w * max(0, min(b, de) - max(a, ds)) for a, b, _, w in parts["stretches"]))
         row["waitMs"] = int(covered(clipped(parts["waits"], ds, de)))
         row["prompts"] = sum(1 for c in chats for p in c["prompts"] if ds <= p < de)
-        used = [(k, t) for c in chats for h, a in c["hours"].items() if ds <= int(h) * HOUR_MS < de for k, t in a["t"].items()]
+        used = [(k, t) for c in chats for h, a in c["hours"].items() if ds <= hour_ms(h) < de for k, t in a["t"].items()]
         row["cost"] = round(sum(request_cost(k, t) for k, t in used), 4)
         row["tokenTotal"] = sum(sum(t[:TOKEN_KINDS]) for _, t in used)
         row["chats"] = chats_of(chats, parts["stretches"], ds, de, home)
@@ -1320,7 +1361,7 @@ def recap(sources, back, account, now_ms, home, usage=None, added=(), span="week
     for c in chats:
         cost = 0.0
         for h, agg in c["hours"].items():
-            if w0 <= int(h) * HOUR_MS < w1:
+            if w0 <= hour_ms(h) < w1:
                 for key, t in agg["t"].items():
                     cost += request_cost(key, t)
                     saved += cache_saving(key, t)
@@ -1404,7 +1445,7 @@ def chats_of(chats, stretches, lo, hi, home):
         work[key] = work.get(key, 0) + rate * max(0, min(b, hi) - max(a, lo))
     rows = []
     for c in chats:
-        cost = sum(request_cost(k, t) for h, agg in c["hours"].items() if lo <= int(h) * HOUR_MS < hi for k, t in agg["t"].items())
+        cost = sum(request_cost(k, t) for h, agg in c["hours"].items() if lo <= hour_ms(h) < hi for k, t in agg["t"].items())
         prompts = sum(1 for p in c["prompts"] if lo <= p < hi)
         if work.get(c["key"], 0) >= 60_000 or cost >= 0.01 or prompts:
             rows.append(chat_row(c, home, work.get(c["key"], 0), cost, prompts))
@@ -1430,7 +1471,7 @@ def spending(chats, chat_rows, lo, hi, home):
     cold, cold_cost, by_chat = 0, 0.0, {}
     for c in chats:
         for h, agg in c["hours"].items():
-            if not lo <= int(h) * HOUR_MS < hi:
+            if not lo <= hour_ms(h) < hi:
                 continue
             for ts, key, w5, w1 in agg.get("c", []):
                 p, _ = prices_of(key)
@@ -1460,7 +1501,7 @@ def claude_did(chats, lo, hi):
     searches = 0
     for c in chats:
         for h, agg in c["hours"].items():
-            if not lo <= int(h) * HOUR_MS < hi:
+            if not lo <= hour_ms(h) < hi:
                 continue
             for name, n in agg.get("u", {}).items():
                 label = "MCP: " + name.split("__")[1] if name.startswith("mcp__") and name.count("__") >= 2 else name
@@ -1616,7 +1657,7 @@ def permission_prompts(chats, lo, hi, home, added=()):
     for c in chats:
         folder = c.get("folder") or ""
         for h, agg in c["hours"].items():
-            if not lo <= int(h) * HOUR_MS < hi:
+            if not lo <= hour_ms(h) < hi:
                 continue
             for ts, tool, what, reason, wait, allowed in agg.get("p", []):
                 answered += 1
@@ -2151,7 +2192,7 @@ def tips(chats, w0, w1, total, waits):
     for c in chats:
         mine, hours = [0.0] * W_SIZE, set()
         for h, agg in c["hours"].items():
-            hm = int(h) * HOUR_MS
+            hm = hour_ms(h)
             if not (w0 <= hm < w1):
                 continue
             for i, v in enumerate(agg["w"][:W_SIZE]):
@@ -2159,7 +2200,7 @@ def tips(chats, w0, w1, total, waits):
             if agg["w"][W_ALL]:
                 hours.add(h)
             for b, v in agg["b"].items():
-                buckets.setdefault(int(h) * 12 + int(b), {})[c["key"]] = v
+                buckets.setdefault(hm // BUCKET_MS + int(b), {})[c["key"]] = v
             for k, v in agg["a"].items():
                 attrs[k] = attrs.get(k, 0) + v
             for k, (n, size) in agg["g"].items():

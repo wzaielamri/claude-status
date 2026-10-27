@@ -16,12 +16,14 @@ import { openComparison } from "./changes";
 import { configDirArgs } from "./config";
 import type { Dashboard } from "./dashboard";
 import { chatRefOf, doingText, liveOf, recentRef, stateText } from "./shared/model";
-import { answersOf, PICTURE_TYPES, queuedReply, reviewPending, textScale, type PaneChat, type PaneHostMessage, type PaneMessage, type TermRun, type TermStyle } from "./shared/pane";
-import type { Answers, ChatRef, Decision, RecentChat, Session, ViewState } from "./shared/types";
+import { answersOf, askShownOf, PICTURE_TYPES, queuedReply, reviewPending, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage, type TermRun, type TermStyle } from "./shared/pane";
+import type { Answers, AskShown, ChatRef, Decision, RecentChat, Session, ViewState } from "./shared/types";
 import { isDecision } from "./shared/types";
 import { localAncestors, type Terminals } from "./terminals";
 
+export const ASKS_SOMETHING_ELSE = "It asks something else now"; // (pane.py --keys --expect says the same)
 const TEXT_MAX = 100_000; // (as a queued task's prompt may be)
+type DictationState = Extract<PaneHostMessage, { type: "dictation" }>["state"];
 const LIMIT = 120;
 const LIMIT_MAX = 2000;
 
@@ -61,24 +63,34 @@ export class ChatPanes implements vscode.Disposable {
     created.onClosed(() => this.panes.delete(key));
   }
 
-  // An answer to what a waiting chat asks (its row, the tab, a notification):
-  // through the hook's request, or with keys in its tmux pane; Claude's
-  // questions: decision "answer" with the answers
-  async answer(chat: ChatRef, decision: Decision, note = "", answers?: Answers): Promise<{ ok: boolean; message: string }> {
+  // An answer to what a waiting chat asks (its row, the tab, a notification),
+  // to the prompt that was shown there (shown) and no other: a chat that asks
+  // something else now isn't answered. Through the hook's request shown, or
+  // with keys in its tmux pane, which pane.py presses only while the chat
+  // still asks about that tool use (--expect); Claude's questions: decision
+  // "answer" with the answers. changed: it asks something else now.
+  async answer(chat: ChatRef, decision: Decision, shown: AskShown | null, note = "", answers?: Answers): Promise<{ ok: boolean; message: string; changed?: boolean }> {
     const host = chat.host ?? "";
     const { session } = findPaneRow(this.dash.state(), host, chat.chatId || chat.sessionId);
     const p = session?.state === "waiting" ? session.permission : null;
     if (!session || !p || (p.answer !== "hook" && p.answer !== "keys")) return { ok: false, message: "It isn't asking anything you can answer from here" };
-    const args =
-      p.answer === "hook" && p.request
-        ? ["--answer", p.request]
-        : ["--keys", session.sessionId, ...(session.profileDir ? ["--profile", session.profileDir] : [])];
+    if (!shown || !sameAsk(shown, p)) {
+      this.dash.setActionError(`Couldn't answer ${session.name}: ${ASKS_SOMETHING_ELSE}`);
+      this.refresh(host);
+      return { ok: false, message: ASKS_SOMETHING_ELSE, changed: true };
+    }
     const given = decision === "answer" ? answersOf(answers) : null;
     if (decision === "answer" && !given) return { ok: false, message: "Choose your answers first" };
+    // (the request shown; one that came for that same prompt after it was shown, else)
+    const request = p.answer === "hook" ? (shown.request ?? p.request) : null;
+    const toolUse = shown.toolUse ?? p.toolUse ?? null;
+    const args = request
+      ? ["--answer", request]
+      : ["--keys", session.sessionId, ...(session.profileDir ? ["--profile", session.profileDir] : []), ...(toolUse ? ["--expect", toolUse] : [])];
     const r = await this.backend.pane([...args, "--decision", decision, ...(note.trim() ? ["--note", note.trim()] : []),
                                         ...(given ? ["--answers", JSON.stringify(given)] : []),
                                         ...(host ? ["--host", host] : configDirArgs())], 60000);
-    const answer = { ok: !!r.ok, message: String(r.message ?? "") };
+    const answer = { ok: !!r.ok, message: String(r.message ?? ""), ...(r.changed === true ? { changed: true } : {}) };
     if (!answer.ok) this.dash.setActionError(`Couldn't answer ${session.name}: ${answer.message}`);
     this.refresh(host);
     return answer;
@@ -98,11 +110,28 @@ export class ChatPanes implements vscode.Disposable {
   // Your message to a chat: typed into this window's terminal it runs in, or
   // as pane.py --send does (tmux, its Claude Code tab's input, the background).
   // how "enter" (Enter in the tab): auto, but a terminal that takes no text
-  // gets the copy, so Claude there never quits on an Enter
+  // gets the copy, so Claude there never quits on an Enter. One message to a
+  // chat at a time (its tab, a notification's Reply…): one sent while another
+  // is still on its way isn't sent.
   async send(chat: ChatRef, text: string, how: "auto" | "background" | "copy" | "enter", afterTurn: boolean): Promise<{ ok: boolean; message: string; ask?: boolean }> {
     text = text.trim();
     if (!text) return { ok: false, message: "Write your message first" };
     if (text.length > TEXT_MAX) return { ok: false, message: "That message is too long" };
+    const key = `${chat.host ?? ""}|${chat.chatId || chat.sessionId}`;
+    if (this.sending.has(key)) return { ok: false, message: "Your last message to it is still being sent: try again in a moment" };
+    this.sending.add(key);
+    try {
+      return await this.sendNow(chat, text, how, afterTurn);
+    } catch (e) {
+      return { ok: false, message: `Couldn't send it: ${e instanceof Error ? e.message : String(e)}` };
+    } finally {
+      this.sending.delete(key);
+    }
+  }
+
+  private sending = new Set<string>(); // "<host>|<chat id>": a message on its way
+
+  private async sendNow(chat: ChatRef, text: string, how: "auto" | "background" | "copy" | "enter", afterTurn: boolean): Promise<{ ok: boolean; message: string; ask?: boolean }> {
     const host = chat.host ?? "";
     const chatId = chat.chatId || chat.sessionId;
     const { session } = findPaneRow(this.dash.state(), host, chatId);
@@ -200,7 +229,8 @@ class Pane implements vscode.Disposable {
     this.panel.iconPath = vscode.Uri.joinPath(uri, "media", "talpy.svg");
     this.panel.webview.html = this.html(tab);
     this.disposables.push(
-      this.panel.webview.onDidReceiveMessage((m: unknown) => void this.receive(m)),
+      this.panel.webview.onDidReceiveMessage((m: unknown) =>
+        void this.receive(m).catch((e) => this.owner.ext.log?.warn?.(`The chat tab's request failed: ${e instanceof Error ? e.message : String(e)}`))),
       this.panel.onDidChangeViewState(() => this.schedule()),
       this.panel.onDidDispose(() => this.dispose()),
       owner.ext.dash.onState(() => void this.pushChat()),
@@ -208,7 +238,7 @@ class Pane implements vscode.Disposable {
       owner.ext.dash.onLive((e) => {
         if (this.host || !this.chat.sessionId || !e.changed.includes(this.chat.sessionId)) return;
         void this.pushChat();
-        if (this.panel.visible) void this.load();
+        if (!this.disposed && this.panel.visible) void this.load();
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("talpyDen.chatTextScale")) this.post({ type: "textSize", scale: Pane.textScale() });
@@ -226,6 +256,7 @@ class Pane implements vscode.Disposable {
   }
 
   reveal(tab: "chat" | "review"): void {
+    if (this.disposed) return;
     this.panel.reveal();
     if (tab === "review") void this.loadReview();
     this.post({ type: "result", kind: "tab:" + tab, ok: true, message: "" });
@@ -236,17 +267,21 @@ class Pane implements vscode.Disposable {
     else this.pendingDraft = text;
   }
 
+  // (nothing once the tab is closed: its panel's webview, title and visible throw then)
   private post(m: PaneHostMessage): void {
+    if (this.disposed) return;
     void this.panel.webview.postMessage(m);
   }
 
   // The chat as the tab shows it, from the extension's state now
   private async pushChat(): Promise<void> {
+    if (this.disposed) return;
     const state = this.owner.ext.dash.state();
     const { session, recent } = findPaneRow(state, this.host, this.chatId);
     if (session) this.chat = chatRefOf(session, this.host || undefined);
     else if (recent) this.chat = recentRef(recent, this.host || undefined);
     this.terminalHere = session ? await this.owner.routeHere(session, this.host) : false;
+    if (this.disposed) return; // (closed meanwhile)
     const item = session ?? (recent ? { ...recent, chatId: recent.sessionId, state: "done" as const } : undefined);
     const queued = queuedReply(state.status, this.chatId, this.host || undefined);
     const chat: PaneChat = {
@@ -282,12 +317,13 @@ class Pane implements vscode.Disposable {
   private schedule(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
-    if (!this.panel.visible) return;
+    if (this.disposed || !this.panel.visible) return; // (closed: the reading stops)
     const every = this.host || this.owner.ext.dash.liveHook ? 5000 : 1500;
     this.timer = setTimeout(() => void this.load().finally(() => this.schedule()), every);
   }
 
   private async load(): Promise<void> {
+    if (this.disposed) return;
     if (this.loading) {
       this.loadAgain = true; // (something changed while it was read: read it again then)
       return;
@@ -298,14 +334,14 @@ class Pane implements vscode.Disposable {
         "--conversation", this.chatId, "--limit", String(this.limit), ...(this.stamp ? ["--if-changed", this.stamp] : []),
         ...(this.chat.profileDir ? ["--profile", this.chat.profileDir] : []), ...(this.host ? ["--host", this.host] : configDirArgs()),
       ], this.host ? 60000 : 30000);
-      if (r.ok && r.unchanged) return;
+      if (this.disposed || (r.ok && r.unchanged)) return;
       if (r.ok && typeof r.stamp === "string") this.stamp = r.stamp;
       this.post({ type: "conversation", answer: r as never });
     } finally {
       this.loading = false;
       if (this.loadAgain) {
         this.loadAgain = false;
-        void this.load();
+        if (!this.disposed) void this.load();
       }
     }
   }
@@ -359,7 +395,7 @@ class Pane implements vscode.Disposable {
       }
       case "answer":
         if (isDecision(m.decision))
-          this.result("answer", await this.owner.answer(this.chat, m.decision, typeof m.note === "string" ? m.note : "",
+          this.result("answer", await this.owner.answer(this.chat, m.decision, askShownOf(m.shown), typeof m.note === "string" ? m.note : "",
                                                         answersOf(m.answers) ?? undefined));
         break;
       case "review":
@@ -479,50 +515,80 @@ class Pane implements vscode.Disposable {
   // The microphone: record, then whisper (whisper.cpp, or the faster-whisper dictate.py sets up)
   // writes it down on this computer; only when this window runs here (else the microphone would be
   // the remote's)
-  private recording = "";
+  private recording = ""; // the recording's id while it records
+  // Where dictating is: "starting" (--status, --start on their way: no second
+  // recorder meanwhile), "recording", "writing" (--stop), "model", "setup"
+  private dictation: DictationState = "";
+  private cancelStart = false; // cancelled (or the tab closed) while it started: stopped once it has
   private lastJob = ""; // (the background session the Output tab reads)
   private async dictate(action: "toggle" | "cancel" | "getModel" | "setup"): Promise<void> {
     const { backend } = this.owner.ext;
-    const tell = (m: Omit<Extract<import("./shared/pane").PaneHostMessage, { type: "dictation" }>, "type">) => this.post({ type: "dictation", ...m });
+    const tell = (m: Omit<Extract<PaneHostMessage, { type: "dictation" }>, "type">) => this.post({ type: "dictation", ...m });
     if (vscode.env.remoteName) {
       tell({ state: "", message: "Dictating works in a window that runs on this computer (not over Remote)" });
       return;
     }
     if (action === "cancel") {
-      if (this.recording) await backend.dictate(["--cancel", this.recording]);
-      this.recording = "";
-      tell({ state: "" });
-    } else if (action === "getModel") {
-      tell({ state: "model" });
-      const r = await backend.dictate(["--get-model", "base"], 900000);
-      tell({ state: "", message: String(r.message ?? "") });
-    } else if (action === "setup") {
-      tell({ state: "setup" });
-      const r = await backend.dictate(["--setup"], 3600000);
-      tell({ state: "", message: String(r.message ?? "") });
-    } else if (this.recording) {
+      if (this.dictation === "starting") {
+        this.cancelStart = true; // (the start sees it)
+        return;
+      }
       const id = this.recording;
       this.recording = "";
+      if (this.dictation === "recording") this.dictation = "";
+      if (id) await backend.dictate(["--cancel", id]);
+      tell({ state: this.dictation });
+      return;
+    }
+    // a step still on its way (a click the page sent twice, say): the page hears where it is
+    if (this.dictation !== "" && !(action === "toggle" && this.dictation === "recording")) {
+      tell({ state: this.dictation });
+      return;
+    }
+    if (action === "getModel" || action === "setup") {
+      this.dictation = action === "getModel" ? "model" : "setup";
+      tell({ state: this.dictation });
+      const r = action === "getModel" ? await backend.dictate(["--get-model", "base"], 900000) : await backend.dictate(["--setup"], 3600000);
+      this.dictation = "";
+      tell({ state: "", message: String(r.message ?? "") });
+    } else if (this.dictation === "recording") {
+      const id = this.recording;
+      this.recording = "";
+      this.dictation = "writing";
       tell({ state: "writing" });
       const language = vscode.workspace.getConfiguration("talpyDen").get<string>("dictateLanguage") || "auto";
       const r = await backend.dictate(["--stop", id, "--language", language], 600000);
+      this.dictation = "";
       tell({ state: "", text: r.ok ? String(r.text ?? "") : "", message: r.ok ? "" : String(r.message ?? "") });
     } else {
-      const st = await backend.dictate(["--status"]);
-      if (!st.ok) {
-        if (st.recorder && st.canSetup) tell({ state: "", offerSetup: true, setupMb: Number(st.setupMb) || 612 });
-        else if (st.recorder && st.tool && !st.model) tell({ state: "", offerModel: true, engine: String(st.engine ?? "whisper") });
-        else tell({ state: "", message: `To dictate, install ${(Array.isArray(st.missing) ? st.missing : []).join(" and ")}.` });
-        return;
-      }
+      this.dictation = "starting";
+      this.cancelStart = false;
+      tell({ state: "starting" });
       const id = `r${Date.now()}`;
-      const r = await backend.dictate(["--start", id]);
-      if (!r.ok) {
-        tell({ state: "", message: String(r.message ?? "") });
-        return;
+      let started = false;
+      try {
+        const st = await backend.dictate(["--status"]);
+        if (this.disposed || this.cancelStart) return tell({ state: "" });
+        if (!st.ok) {
+          if (st.recorder && st.canSetup) tell({ state: "", offerSetup: true, setupMb: Number(st.setupMb) || 612 });
+          else if (st.recorder && st.tool && !st.model) tell({ state: "", offerModel: true, engine: String(st.engine ?? "whisper") });
+          else tell({ state: "", message: `To dictate, install ${(Array.isArray(st.missing) ? st.missing : []).join(" and ")}.` });
+          return;
+        }
+        const r = await backend.dictate(["--start", id]);
+        if (r.ok && (this.disposed || this.cancelStart)) {
+          // closed (or cancelled) while it started: it stops now, and its recording is deleted
+          await backend.dictate(["--cancel", id]);
+          return tell({ state: "" });
+        }
+        if (!r.ok) return tell({ state: "", message: String(r.message ?? "") });
+        started = true;
+        this.recording = id;
+        tell({ state: "recording" });
+      } finally {
+        this.dictation = started ? "recording" : "";
+        this.cancelStart = false;
       }
-      this.recording = id;
-      tell({ state: "recording" });
     }
   }
 
@@ -575,7 +641,8 @@ class Pane implements vscode.Disposable {
   dispose(): void {
     if (this.disposed) return; // (closing the panel calls this again)
     this.disposed = true;
-    if (this.recording) void this.owner.ext.backend.dictate(["--cancel", this.recording]); // (the tab closed while it listened)
+    // (the tab closed while it listened; one still starting is stopped once it has: dictate sees disposed)
+    if (this.recording) void this.owner.ext.backend.dictate(["--cancel", this.recording]);
     this.recording = "";
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;

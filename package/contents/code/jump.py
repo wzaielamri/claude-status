@@ -16,6 +16,7 @@ a new chat (used by the Talpy Den widget).
     python3 -I jump.py --undismiss-all           (show hidden ones again)
     python3 -I jump.py --resume SESSION_ID --profile PROFILE    (reopen a chat there)
     python3 -I jump.py --resume SESSION_ID --profile PROFILE --vscode   (in VS Code's Claude extension)
+    python3 -I jump.py --resume SESSION_ID [--profile PROFILE] --print-command   (the command that reopens it)
     python3 -I jump.py --remote-resume-vscode HOST SESSION_ID [--cwd FOLDER_ON_HOST]   (the same on an SSH host)
     python3 -I jump.py --continue SESSION_ID --profile PROFILE  (share it if needed, reopen it there)
     python3 -I jump.py --share SESSION_ID                       (share it with every account)
@@ -1722,7 +1723,9 @@ def chat_comparison(home, extra_dirs, session_id, profile_dir=None, turn=False):
         if backup is None:
             original = b""  # it didn't exist yet
         elif backup is False:
-            original = git_original(full)  # no backup on record: git's last commit
+            # no backup on record: git's last commit (a file git doesn't have
+            # may have been there before the chat: unknown, not new)
+            original = git_original(full, missing=None)
         else:
             original = backup_content(profiles, rec["sessions"], backup)
             if original is None:
@@ -1733,7 +1736,7 @@ def chat_comparison(home, extra_dirs, session_id, profile_dir=None, turn=False):
             unknown += 1
             continue
         current = read_bytes(full)
-        if current == original or (current is None and original == b""):
+        if current == original or (current is None and original == b"" and backup is None):
             continue  # unchanged (or made and removed again)
         if folder is None:
             folder = changes_folder(home)
@@ -1741,7 +1744,7 @@ def chat_comparison(home, extra_dirs, session_id, profile_dir=None, turn=False):
         copy.parent.mkdir()
         copy.write_bytes(original)
         items.append({"label": cs.file_label(full, cwd, home), "path": full, "original": str(copy),
-                      "created": backup is None or (original == b"" and backup is False),
+                      "created": backup is None,  # (one git has empty was there, empty)
                       "deleted": current is None})
     what = "in its last turn" if turn else "since it started"
     if not items:
@@ -1986,6 +1989,21 @@ def resume(home, extra_dirs, session_id, profile_dir=None):
     return resume_chat(profile, path, session_id, home)
 
 
+def resume_command_of(home, extra_dirs, session_id, profile_dir=None):
+    """The same, but hand back the command that reopens it instead of opening
+    a terminal (the VS Code extension runs it in one of its own, for a chat
+    the Recap names that its status has no command for): (ok, message,
+    command or None)."""
+    profile, path = find_chat(home, extra_dirs, session_id, profile_dir)
+    if profile is None:
+        return False, "That chat isn't on this account", None
+    claude = claude_in_terminal(home)
+    if claude is None:
+        return False, NO_CLAUDE, None
+    folder = cs.chat_folder(path)
+    return True, "", cs.in_folder(folder, resume_command(profile, session_id, home, folder, claude))
+
+
 def continue_on(home, extra_dirs, session_id, profile_dir, end_first=False):
     """Continue a chat on another account: share it with that account if it
     doesn't have it yet, then reopen it there in a terminal. end_first: a
@@ -2202,6 +2220,7 @@ USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile P
          "               [--prompt TEXT] [--plan SLUG [--plan-profile PROFILE]] [--config-dir DIR]...\n"
          "               [--model MODEL] [--effort LEVEL] [--permission-mode MODE]   (also with --queue)\n"
          "       jump.py --resume|--continue|--unshare SESSION_ID --profile PROFILE\n"
+         "       jump.py --resume SESSION_ID [--profile PROFILE] --print-command   (the command that reopens it)\n"
          "       jump.py --continue SESSION_ID --profile PROFILE [--end-first] [--print-command]\n"
          "               (share it and reopen it there, or print the command; --end-first: quit an idle session first)\n"
          "       jump.py --open-plan|--edit-plan|--share-plan|--unshare-plan SLUG [--profile PROFILE] [--to PROFILE]\n"
@@ -2400,7 +2419,7 @@ def main(argv=None):
         sys.exit(USAGE)
     if not session_id or (action in (continue_on, unshare, unshare_plan, queue_continue, keep_going) and not profile_dir):
         sys.exit(USAGE)
-    if print_command and action not in (continue_on, send_plan_feedback):
+    if print_command and (action not in (continue_on, send_plan_feedback, resume) or (action is resume and vscode)):
         sys.exit(USAGE)
     if (action is send_plan_feedback) != (feedback_plan is not None) or (comments and action is not send_plan_feedback):
         sys.exit(USAGE)
@@ -2430,6 +2449,8 @@ def main(argv=None):
             ok, message, extra_out = send_plan_feedback(Path.home(), extra, feedback_plan, profile_dir, session_id,
                                                         comments, print_command)
             command = extra_out.pop("command", None)
+        elif print_command and action is resume:
+            ok, message, command = resume_command_of(Path.home(), extra, session_id, profile_dir)
         elif print_command:
             ok, message, command = continue_command(Path.home(), extra, session_id, profile_dir, end_first)
         elif action is continue_on:

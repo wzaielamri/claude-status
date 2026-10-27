@@ -276,3 +276,42 @@ test("the Recap's card draws the period shown, the projects named only when aske
   drawCard(canvas, recap, true);
   assert.ok(texts.some((t) => t.includes(recap.projects[0].name)));
 });
+
+test("the Recap's card is copied from a folder of its own, removed after; a failure is said, not thrown", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { Actions } = await import("../src/actions");
+  const { recorded } = await import("./vscode-stub");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "talpy-den-cards-"));
+  const saved = process.env.TMPDIR;
+  process.env.TMPDIR = tmp; // (os.tmpdir())
+  try {
+    const name = "claude-week-2026-10-20.png";
+    fs.writeFileSync(path.join(tmp, name), "someone else's"); // (another user's card of that day)
+    const copied: { file: string; bytes: string }[] = [];
+    let answer = { ok: true, message: "Copied" };
+    const backend = { copyImage: async (file: string) => (copied.push({ file, bytes: fs.readFileSync(file, "utf8") }), answer) };
+    const actions = new Actions(backend as never, {} as never, {} as never, { warn() {} } as never, {} as never);
+    const png = Buffer.from("PNG!").toString("base64");
+    await actions.shareCard("copy", name, png);
+    assert.equal(copied[0].bytes, "PNG!");
+    assert.equal(path.basename(copied[0].file), name);
+    assert.ok(path.dirname(copied[0].file).startsWith(path.join(tmp, "talpy-den-card-")), copied[0].file);
+    assert.equal(fs.existsSync(path.dirname(copied[0].file)), false, "its folder is removed");
+    assert.equal(fs.readFileSync(path.join(tmp, name), "utf8"), "someone else's", "another's file is left alone");
+    assert.match(recorded.messages.at(-1)!, /The card is copied/);
+    answer = { ok: false, message: "To copy pictures, install wl-clipboard (or xclip)" };
+    await actions.shareCard("copy", name, png);
+    assert.equal(recorded.messages.at(-1), "Talpy Den: couldn't copy the card: To copy pictures, install wl-clipboard (or xclip)");
+    assert.equal(fs.existsSync(path.dirname(copied[1].file)), false);
+    process.env.TMPDIR = path.join(tmp, "gone"); // (nowhere to write it)
+    await actions.shareCard("copy", name, png);
+    assert.match(recorded.messages.at(-1)!, /^Talpy Den: couldn't copy the card: ENOENT/);
+    assert.equal(copied.length, 2);
+  } finally {
+    if (saved === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = saved;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

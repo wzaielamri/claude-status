@@ -5,6 +5,8 @@
 # POSIX sh, so it works in sh (dash), bash and
 # zsh scripts. The profile dir comes from the transcript path
 # (<cfg>/projects/<project>/<session>.jsonl), else CLAUDE_CONFIG_DIR, links resolved.
+# The snapshot is filed under the folder's name and names the folder itself
+# (talpyDenConfigDir), so two folders of one name keep theirs apart.
 # Runs in a subshell so the private umask and variables stay local.
 (
   umask 077
@@ -19,7 +21,8 @@
   case "$cw_sid" in ''|*[!A-Za-z0-9_-]*) ;; *)
     cw_dir="${XDG_CACHE_HOME:-$HOME/.cache}/talpy-den/statusline/${cw_cfg##*/}"
     mkdir -p "$cw_dir" &&
-      printf '%s' "$input" > "$cw_dir/.$cw_sid.tmp" &&
+      { printf '%s' "$input" | jq -c --arg d "$cw_cfg" '. + {talpyDenConfigDir: $d}' > "$cw_dir/.$cw_sid.tmp" ||
+        printf '%s' "$input" > "$cw_dir/.$cw_sid.tmp"; } &&
       mv -f "$cw_dir/.$cw_sid.tmp" "$cw_dir/$cw_sid.json"
   ;; esac
 ) 2>/dev/null || :

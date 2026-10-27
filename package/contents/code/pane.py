@@ -23,9 +23,15 @@ its permission prompt and its review.
   --answer REQUEST --decision allow|always|deny|answer|approve|approve-edits|keep [--note T] [--answers JSON]
         answer a permission request the hook relayed (permission_hook.py);
         Claude's questions (AskUserQuestion): answer, with JSON {question:
-        [chosen labels, or what you typed]}, or deny (decline, with a note)
-  --keys CHAT --decision allow|always|deny [--note T] [--profile P]
-        answer a permission prompt of a chat in tmux with its keys
+        [chosen labels, or what you typed]}, or deny (decline, with a note).
+        A request that's gone (answered in the chat): "changed": true
+  --keys CHAT --decision allow|always|deny [--note T] [--profile P] [--expect TOOL_USE]
+        answer a permission prompt of a chat in tmux with its keys (CHAT: its
+        session id). --expect: the id of the tool call the prompt you answered
+        is about (its row's permission "toolUse"); when the chat asks about
+        another one by the time a key would be pressed, or about none, no key
+        is pressed: {"ok": false, "message": "It asks something else now",
+        "changed": true}
   --review CHAT [--profile P]
         what the chat changed: each file with its added and removed lines
         and a diff (against the file before the chat, from Claude's own
@@ -67,6 +73,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -496,9 +503,13 @@ def plan_decision(decision, note, inp):
     return out
 
 
+NOT_ASKING = "It isn't asking any more (answered in the chat?)"
+
+
 def answer_request(cache_root, request_id, decision, note="", answers=None):
     """Answer a relayed request: (ok, message). A question takes "answer"
-    (answers: {question: [labels or text]}) or "deny"."""
+    (answers: {question: [labels or text]}) or "deny". One that's gone:
+    (False, NOT_ASKING)."""
     if decision not in DECISIONS + PLAN_DECISIONS:
         return False, f"Not an answer: {decision}"
     if not re.fullmatch(r"[0-9]+-[0-9a-f]{8}", request_id or ""):
@@ -506,7 +517,7 @@ def answer_request(cache_root, request_id, decision, note="", answers=None):
     folder = cs.requests_dir(cache_root)
     req = cs.read_json(folder / (request_id + ".json"))
     if not isinstance(req, dict) or not cs.pid_alive(req.get("hookPid")):
-        return False, "It isn't asking any more (answered in the chat?)"
+        return False, NOT_ASKING
     inp, given = None, None
     plan = req.get("tool") == cs.PLAN_TOOL
     if plan != (decision in PLAN_DECISIONS) and not (plan and decision == "deny"):
@@ -1132,9 +1143,14 @@ def dialog_options(screen):
     return options
 
 
-def answer_with_keys(entry, decision, note=""):
+ASKS_ELSE = "It asks something else now"
+
+
+def answer_with_keys(entry, decision, note="", still=None):
     """Answer the permission dialog of a chat in tmux by pressing its option's
-    number (Deny with a note: No, then the note as your next message)."""
+    number (Deny with a note: No, then the note as your next message). still:
+    a check, made just before a key is pressed, that the chat still asks what
+    you answered (else nothing is pressed: (False, ASKS_ELSE))."""
     if decision not in DECISIONS:
         return False, f"Not an answer: {decision}"
     if decision == "answer":
@@ -1156,6 +1172,8 @@ def answer_with_keys(entry, decision, note=""):
         key = next((n for n, t in sorted(options.items()) if t == "No" or t.startswith("No,") or t.startswith("No ")), None)
     if key is None:
         return False, "That answer isn't one of the choices it shows"
+    if still is not None and not still():
+        return False, ASKS_ELSE
     ok, out = tmux_run(base, ["send-keys", "-t", target, key])
     if not ok:
         return False, out
@@ -1348,10 +1366,10 @@ def backup_content(profiles, sessions, name):
 
 
 def tool_originals(transcripts, wanted):
-    """{file: its content before the chat's first Edit or Write of it (b""
-    for one a Write made)} for the files in wanted, from what those calls
-    gave back (toolUseResult: type "create", else originalFile), oldest
-    first. A first call that gave neither leaves the file out."""
+    """{file: (its content before the chat's first Edit or Write of it,
+    whether that call made it (then b""))} for the files in wanted, from what
+    those calls gave back (toolUseResult: type "create", else originalFile),
+    oldest first. A first call that gave neither leaves the file out."""
     found, seen = {}, set()
     for t in transcripts:
         try:
@@ -1374,9 +1392,9 @@ def tool_originals(transcripts, wanted):
                     continue
                 seen.add(full)
                 if r.get("type") == "create":
-                    found[full] = b""
+                    found[full] = (b"", True)
                 elif isinstance(r.get("originalFile"), str):
-                    found[full] = r["originalFile"].encode("utf-8")
+                    found[full] = (r["originalFile"].encode("utf-8"), False)  # ("": it was there, empty)
     return found
 
 
@@ -1397,14 +1415,17 @@ def originals(profiles, path, cwd):
             continue
         backup = first[0]
         if backup is None:
-            original = b""  # it didn't exist yet
+            original, created = b"", True  # it didn't exist yet
         elif backup is False:  # no backup on record: what its first call gave back, else git's last commit
-            original = told[full] if full in told else git_original(full)
+            # (a file git doesn't have may have been there before the chat:
+            # unknown, not new, so Undo never deletes it; one git has empty
+            # was there, empty)
+            original, created = told[full] if full in told else (git_original(full, missing=None), False)
         else:
-            original = backup_content(profiles, rec["sessions"], backup)
+            original, created = backup_content(profiles, rec["sessions"], backup), False
             if original is None:  # Claude removed the backup since
                 original = git_original(full, missing=None)
-        out[full] = (original, backup is None or (original == b"" and backup is False))
+        out[full] = (original, created)
     return [(f, o, c) for f, (o, c) in sorted(out.items())]
 
 
@@ -1473,7 +1494,7 @@ def chat_review(home, extra_dirs, chat_id, profile_key=None, reviewed_at=None):
     files, repos = [], set()
     for full, original, created in originals(profiles, path, cwd):
         current = read_bytes(full)
-        if original is not None and (current == original or (current is None and original == b"")):
+        if original is not None and (current == original or (current is None and original == b"" and created)):
             continue  # unchanged (or made and removed again)
         label = cs.file_label(full, cwd, home)
         item = {"label": label, "path": full, "created": created, "deleted": current is None,
@@ -1605,7 +1626,7 @@ def mark_reviewed(cache_root, chat_id, host="", on=True, now_ms=None):
 # each step of each chat as it happens). Each runs from a copy in
 # ~/.local/share/talpy-den, named in the hook list of each of its events.
 
-HOOK_FILE = "permission-hook.py"
+HOOK_FILE = cs.PERMISSION_HOOK_FILE
 HOOK_TIMEOUT_S = 86400
 # the events the live hook folds (live_hook.py); Claude doesn't wait for it (async)
 LIVE_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure",
@@ -1621,7 +1642,13 @@ HOOKS = {
 
 
 def hook_command(path, kind="relay"):
-    return f"python3 {HOOKS[kind]['python']} {path}"
+    """The hook's command in settings.json. Claude runs it with sh -c: exec
+    has the shell give way to the hook, so Claude is the hook's parent (dash,
+    Debian's and Ubuntu's sh, would stay in between); the path is quoted (a
+    folder name may have a space). An entry written before (python3 … PATH,
+    no exec, no quotes) is still the hook's (is_ours): turning it on again
+    replaces it."""
+    return f"exec python3 {HOOKS[kind]['python']} {shlex.quote(str(path))}"
 
 
 def settings_files(home, extra_dirs):
@@ -1774,7 +1801,7 @@ def main(argv=None):
     action, target = None, None
     profile, how, note, decision, message, name = None, "auto", "", None, "", ""
     session, text, stamp, limit, files, config_dirs, answers = None, None, None, PANE_ITEMS, [], [], None
-    after, off, remote, pretty, source = False, False, False, False, None
+    after, off, remote, pretty, source, expect = False, False, False, False, None, None
     actions = ("--conversation", "--send", "--answer", "--keys", "--review", "--undo", "--commit", "--reviewed",
                "--relay", "--live", "--oldest", "--shortcuts", "--complete", "--logs")
     osd = False
@@ -1796,6 +1823,8 @@ def main(argv=None):
             note = args.pop(0)
         elif arg == "--decision" and args:
             decision = args.pop(0)
+        elif arg == "--expect" and args:
+            expect = args.pop(0)
         elif arg == "--answers" and args:
             try:
                 answers = json.loads(args.pop(0))
@@ -1869,7 +1898,8 @@ def main(argv=None):
                     result = copy_answer((text or "").strip(), ENTER_COPIES)
         elif action == "--answer":
             ok, said = answer_request(cache_root, target, decision, note, answers)
-            result = {"ok": ok, "message": said}
+            # (changed: the request you answered is gone; the chat may ask something else now)
+            result = {"ok": ok, "message": said, **({"changed": True} if not ok and said == NOT_ASKING else {})}
         elif action == "--logs":
             result = job_screen(home, config_dirs, target, profile)
         elif action == "--complete":
@@ -1884,8 +1914,12 @@ def main(argv=None):
             result = {"ok": ok, "message": said} if target != "status" else {"ok": ok, "on": said == "on"}
         elif action == "--keys":
             entry = cs.find_chat_entry(home, config_dirs, target, profile)
-            ok, said = answer_with_keys(entry, decision, note) if entry else (False, "That chat isn't running any more")
-            result = {"ok": ok, "message": said}
+            # (--expect: the tool call the prompt you answered was about; it
+            # may have been answered in the chat since, and another one asks)
+            still = (lambda: cs.chat_tool_use(home, config_dirs, target, profile) == expect) if expect else None
+            ok, said = answer_with_keys(entry, decision, note, still) if entry \
+                else (False, "That chat isn't running any more")
+            result = {"ok": ok, "message": said, **({"changed": True} if not ok and said == ASKS_ELSE else {})}
         elif action == "--review":
             result = chat_review(home, config_dirs, target, profile,
                                  cs.load_reviewed(cache_root).get(cs.review_key(target)) if not remote else None)

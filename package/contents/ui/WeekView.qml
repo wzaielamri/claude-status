@@ -1154,7 +1154,7 @@ PlasmaComponents3.ScrollView {
                         }
                     }
                     Item {
-                        id: track
+                        id: laneTrack
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.round(view.gu * 0.75)
 
@@ -1168,9 +1168,9 @@ PlasmaComponents3.ScrollView {
                             delegate: Rectangle {
                                 required property int index
                                 readonly property var part: laneRow.lane.parts[index] || [0, 0, "w"]
-                                x: (part[0] - lanesBox.t0) / lanesBox.span * track.width
-                                width: Math.max(1.5, (part[1] - part[0]) / lanesBox.span * track.width)
-                                height: track.height
+                                x: (part[0] - lanesBox.t0) / lanesBox.span * laneTrack.width
+                                width: Math.max(1.5, (part[1] - part[0]) / lanesBox.span * laneTrack.width)
+                                height: laneTrack.height
                                 radius: 2
                                 color: lanesBox.color(part[2])
                             }

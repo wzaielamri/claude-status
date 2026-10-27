@@ -528,6 +528,7 @@ class Stage {
             x_expand: true, height: Math.round((hero ? 6 : 4.5) * gu), clip_to_allocation: true,
         });
         this._width = 0;   // as last allocated
+        this._toSay = null;   // [pet, text] said before it could be placed
         this.actor.connect('notify::width', () => {
             this._width = this.actor.get_allocation_box().get_width();
             this.layout();
@@ -695,8 +696,12 @@ class Stage {
 
     // Places what isn't animated: the floor, stars, headline, standing pets
     layout() {
+        // (not while detached, as while the list is rebuilt: even reading its
+        // height then asks St for a size it can't give)
+        if (this.gone || !this.actor.get_stage())
+            return;
         const w = this.width, h = this.actor.height, s = this.size;
-        if (w <= 0 || this.gone || !this.actor.get_stage())   // detached while the list is rebuilt
+        if (w <= 0)
             return;
         // (a chat's name tag goes under its burrow's mound)
         const ground = this.hero ? h - s.gu * 0.55 : h - s.tag - s.box * 6 / 64 - 4;
@@ -726,6 +731,12 @@ class Stage {
             this.floor.set_position(Math.round(s.gu * 0.6), Math.round(ground));
             this.floor.width = Math.round(w - s.gu * 1.2);
             this.more.set_position(Math.round(w - this.more.width - 6), 4);
+        }
+        if (this._toSay) {
+            const [pet, text] = this._toSay;
+            this._toSay = null;
+            if (!pet.gone)
+                this.say(pet, text);
         }
     }
 
@@ -814,6 +825,11 @@ class Stage {
     say(pet, text) {
         if (!this.live || !text || this.gone)
             return;
+        if (this.width <= 0 || !this.actor.get_stage()) {
+            this._toSay = [pet, text];   // once it's laid out (layout()), where it can be placed
+            return;
+        }
+        this._toSay = null;
         const s = this.size;
         this.bubble.text = text;
         this.bubble.set_width(-1);   // measure the new text, not the last width
@@ -847,6 +863,7 @@ class Stage {
         if (!live) {
             this.timers.stopAll();
             this.bubble.hide();
+            this._toSay = null;
         } else {
             this.pets.updateTheme(this.actor);
         }

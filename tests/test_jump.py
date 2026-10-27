@@ -1142,7 +1142,7 @@ class SharedChatActionTests(unittest.TestCase):
                   f"    out.append([*jump.share(home, [], {self.CHAT!r}), chat.is_file()])\n"
                   f"    out.append([*jump.unshare(home, [], {self.CHAT!r}, keep), chat.is_file()])\n"
                   "print(json.dumps(out))\n")
-        r = subprocess.run(["unshare", "-rm", sys.executable, "-I", "-c", script], capture_output=True, text=True)
+        r = subprocess.run(["unshare", "-rm", sys.executable, "-I", "-B", "-c", script], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         steps = json.loads(r.stdout)
         self.assertEqual(steps[0], [False, "This chat isn't shared", True])
@@ -1219,6 +1219,22 @@ class SharedChatActionTests(unittest.TestCase):
         out = subprocess.run([sys.executable, "-I", str(CODE / "jump.py"), "--share", self.CHAT, "--print-command"],
                              capture_output=True, text=True)
         self.assertIn("usage", out.stderr)  # only with --continue
+
+    def test_resume_can_hand_back_the_command(self):
+        """For the VS Code extension (a chat the Recap names): no terminal
+        opened, the command --resume would have opened one with."""
+        (ok, msg, command), opened = self.run_action(jump.resume_command_of, ".claude")
+        self.assertEqual((ok, msg, opened), (True, "", []))
+        (ok, _), opened = self.run_action(jump.resume, ".claude")
+        self.assertTrue(ok)
+        self.assertEqual(opened, [(str(self.folder), command.split("; ", 1)[1])])
+        self.assertTrue(command.startswith(f"cd {self.folder} 2>/dev/null; "), command)
+        self.assertIn(f"--resume {self.CHAT}", command)
+        (ok, msg, command), _ = self.run_action(jump.resume_command_of, ".claude-work")
+        self.assertEqual((ok, msg, command), (False, "That chat isn't on this account", None))
+        out = subprocess.run([sys.executable, "-I", "-B", str(CODE / "jump.py"), "--resume", self.CHAT, "--vscode",
+                              "--profile", ".claude", "--print-command"], capture_output=True, text=True)
+        self.assertIn("usage", out.stderr)  # (not with --vscode: that opens it there)
 
     def test_command_line(self):
         out = subprocess.run([sys.executable, "-I", str(CODE / "jump.py"), "--continue", self.CHAT],
@@ -1485,12 +1501,20 @@ class ChangesTests(Fixture):
         self.assertIn("4 more with no earlier version to compare with", message)  # edited, same, gone, notes
 
     def test_a_removed_backup_of_a_file_git_doesnt_have(self):
-        # it was there before the chat (Claude backed it up): not empty then
+        # it was there before the chat (Claude backed it up): not empty then;
+        # nor was notes.md (no backup, edited: it was there) new
         (self.backups / "e@v1").unlink()
         with Patch(git_original=lambda path, missing=b"": missing):
             ok, message, comparison = self.compare()
-        self.assertEqual([i["label"] for i in comparison["items"]], ["notes.md", "src/gone.py", "src/new.py"])
-        self.assertEqual(message, "3 changed files since it started; 1 more with no earlier version to compare with")
+        self.assertEqual([i["label"] for i in comparison["items"]], ["src/gone.py", "src/new.py"])
+        self.assertEqual(message, "2 changed files since it started; 2 more with no earlier version to compare with")
+
+    def test_a_file_git_has_empty_was_there(self):
+        # notes.md (no backup) is empty in git's last commit: there, empty, not new
+        with Patch(git_original=lambda path, missing=b"": b"" if path.endswith("notes.md") else missing):
+            ok, message, comparison = self.compare()
+        items = {i["label"]: i for i in comparison["items"]}
+        self.assertEqual((items["notes.md"]["created"], items["src/new.py"]["created"]), (False, True))
 
     def test_real_git_fallback(self):
         if not shutil.which("git"):

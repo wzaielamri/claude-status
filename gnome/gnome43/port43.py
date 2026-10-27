@@ -33,17 +33,30 @@ PATCHES = [
     ("notifier.js", "source.addNotification(", "source.showNotification(", 1),
     # libadwaita 1.2 and GTK 4.8
     ("prefs.js", "Adw.SpinRow.new_with_range(", "Compat.SpinRow.new_with_range(", 1),
-    ("prefs.js", "new Adw.SwitchRow(", "new Compat.SwitchRow(", 1),
+    ("prefs.js", "new Adw.SwitchRow(", "new Compat.SwitchRow(", 2),
+    ("prefs.js", "new Adw.AlertDialog(", "new Compat.AlertDialog(", 1),
     ("prefs.js", "new Gtk.FileDialog(", "new Compat.FileDialog(", 1),
 ]
 
-# APIs that must not be left in the converted code
+# APIs that must not be left in the converted code: newer GNOME Shell,
+# libadwaita (1.3+), GTK (4.10+) and JavaScript (gjs 1.74 is SpiderMonkey
+# 102) than GNOME 43/44 have
 FORBIDDEN = [
-    "Clutter.Orientation", ".set_child(", ".vadjustment", ".hadjustment",
-    "Adw.SpinRow", "Adw.SwitchRow", "Adw.ButtonRow", "Adw.PreferencesDialog", "Adw.AlertDialog",
-    "Gtk.FileDialog", "Gtk.AlertDialog", "addNotification(", "import.meta",
+    "Clutter.Orientation", ".set_child(", ".vadjustment", ".hadjustment", "Cogl.Color",
+    "global.compositor", "addNotification(", "import.meta",
+    "Adw.SpinRow", "Adw.SwitchRow", "Adw.ButtonRow", "Adw.PreferencesDialog", "Adw.AlertDialog", "Adw.Dialog",
+    "Adw.Banner", "Adw.Spinner", "Adw.WrapBox", "Adw.ToggleGroup", "Adw.NavigationPage", "Adw.NavigationView",
+    "Adw.ToolbarView", "Adw.BottomSheet", "Adw.MultiLayoutView", "Adw.ShortcutsDialog",
+    "Gtk.FileDialog", "Gtk.AlertDialog", "Gtk.UriLauncher", "Gtk.FileLauncher", "Gtk.ColorDialog", "Gtk.FontDialog",
     ".findLast(", ".findLastIndex(", ".toSorted(", ".toReversed(", ".toSpliced(", "Object.groupBy(",
-    "structuredClone(",
+    "Map.groupBy(", "structuredClone(", "Promise.withResolvers(", "Promise.try(", "Array.fromAsync(",
+    "Iterator.from(", "Intl.Segmenter", "Intl.DurationFormat", "RegExp.escape(", "Math.sumPrecise(",
+    ".isWellFormed(", ".toWellFormed(", ".union(", ".intersection(", ".symmetricDifference(",
+    ".isSubsetOf(", ".isSupersetOf(", ".isDisjointFrom(", ".difference(", ".with(",
+]
+# ...and iterator helpers (SpiderMonkey 131): keys()/values()/entries() then map(), filter()...
+FORBIDDEN_RE = [
+    re.compile(r"\.(?:keys|values|entries)\(\)\.(?:map|filter|take|drop|flatMap|reduce|toArray|forEach|some|every|find)\("),
 ]
 
 GI = re.compile(r"^import (\w+) from 'gi://(\w+)(?:\?version=[\d.]+)?';$")
@@ -147,6 +160,9 @@ def convert(root, file):
     for bad in FORBIDDEN:
         if bad in text:
             fail(f"{rel}: still uses {bad} after conversion; the GNOME 43 port needs updating")
+    for bad in FORBIDDEN_RE:
+        if m := bad.search(text):
+            fail(f"{rel}: still uses {m[0]} after conversion; the GNOME 43 port needs updating")
     file.write_text(text, encoding="utf-8")
 
 

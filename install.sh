@@ -196,9 +196,10 @@ apply_statusline() {
 
 # The GNOME extension: built from this repo (gnome/build.sh), then installed
 # and turned on. A running GNOME Shell only loads new extension code at the
-# next login.
-install_gnome() {
-  local zip="$here/gnome/build/$uuid.shell-extension.zip" major
+# next login. It's built first, before anything is replaced: a GNOME Shell
+# it doesn't run on, or a build that fails, leaves the installed one as it was.
+build_gnome() {
+  local major
   # GNOME Shell 43/44 load extensions the older way: build a converted copy
   major="$(gnome-shell --version 2>/dev/null | sed -nE 's/^GNOME Shell ([0-9]+).*/\1/p')"
   if [ -n "$major" ] && [ "$major" -ge 45 ] && [ "$major" -le 48 ]; then
@@ -214,6 +215,10 @@ install_gnome() {
   else
     "$here/gnome/build.sh" >/dev/null
   fi
+}
+
+install_gnome() {
+  local zip="$here/gnome/build/$uuid.shell-extension.zip"
   if [ -d "$HOME/.local/share/gnome-shell/extensions/$uuid" ]; then upgraded=1; else upgraded=0; fi
   gnome-extensions install --force "$zip"
   if gnome-extensions enable "$uuid" 2>/dev/null; then
@@ -450,6 +455,7 @@ fi
 # 1. Widget (without Python bytecode caches a test run may have left in it)
 find "$here/package" -name __pycache__ -type d -prune -exec rm -rf {} +
 if [ "$target" = gnome ]; then
+  build_gnome
   remove_legacy
   install_gnome
 else
@@ -510,9 +516,9 @@ if [ "$target" = gnome ]; then
   if [ "$upgraded" = 1 ]; then
     echo "Extension upgraded. GNOME Shell loads the new version when you log out and back in."
   elif [ "$enabled" = 1 ]; then
-    echo "Extension installed and turned on: look for the ✳ in the top bar."
+    echo "Extension installed and turned on: look for Talpy in the top bar."
   else
-    echo "Extension installed. Log out and back in: the ✳ then shows in the top bar."
+    echo "Extension installed. Log out and back in: Talpy then shows in the top bar."
   fi
 elif [ "$moved" != 0 ]; then
   echo "Widget installed in place of Claude Status."

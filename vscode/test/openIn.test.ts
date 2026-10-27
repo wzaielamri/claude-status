@@ -170,8 +170,9 @@ test("a chat running in a terminal can move to a Claude Code tab, when Claude Co
 // Actions for this computer's chats on the work account (Claude Code's), with
 // what they ran: helpers (jump.py, without the --config-dir of the machine
 // the tests run on), terminals, and what failed
-function actionsHere(answers: { ok: boolean; message: string }[] = []) {
-  const work = { id: "w", title: "work", profileKeys: ["work"], sessions: [] } as unknown as Group;
+// (claudeCode: false, Claude Code isn't here; recent, starred: what the account lists)
+function actionsHere(answers: { ok: boolean; message: string; command?: string }[] = [], opts: { claudeCode?: boolean; recent?: unknown[]; starred?: unknown[] } = {}) {
+  const work = { id: "w", title: "work", profileKeys: ["work"], sessions: [], recent: opts.recent ?? [], starred: opts.starred ?? [] } as unknown as Group;
   const helpers: string[][] = [];
   const runs: string[] = [];
   const failures: string[] = [];
@@ -179,7 +180,7 @@ function actionsHere(answers: { ok: boolean; message: string }[] = []) {
     demo: false,
     currentHost: undefined,
     state: () => ({ status: { groups: [work], cli: { installed: true } }, hosts: [] }),
-    claudeCodeInfo: () => ({ available: true, profileKey: "work" }),
+    claudeCodeInfo: () => (opts.claudeCode === false ? { available: false, profileKey: null } : { available: true, profileKey: "work" }),
     setActionError: (m: string) => void failures.push(m),
     setActionInfo: () => undefined,
     isVisible: () => true,
@@ -265,5 +266,59 @@ test("moving a chat to a Claude Code tab stops it first, a working one only once
     assert.deepEqual(t.helpers, []);
   } finally {
     (stub.window as { showWarningMessage: unknown }).showWarningMessage = ask;
+  }
+});
+
+test("a chat the Recap names that isn't running reopens: with the command its account lists, else the one jump.py has for it", async () => {
+  const { overrides } = await import("./vscode-stub");
+  const desktop = process.env.XDG_CURRENT_DESKTOP;
+  process.env.XDG_CURRENT_DESKTOP = "XFCE"; // (nothing here brings other windows up)
+  const id = "c76cd817-da30";
+  const listed = { key: `work/${id}/recent`, sessionId: id, name: "Ports", cwd: "/w/app", profileDir: "work", lastActive: 0,
+                   openCommand: `cd /w/app 2>/dev/null; claude --resume ${id}` };
+  try {
+    // not listed anywhere (older than the recent chats): the command jump.py has for it, in VS Code's
+    // terminal too; it isn't "in a terminal outside this window"
+    const resumed = `cd /w/app 2>/dev/null; claude --resume ${id}`;
+    let t = actionsHere([{ ok: true, message: "", command: resumed }], { claudeCode: false });
+    await t.actions.openWeekChat(id, "work", "Ports", "/w/app");
+    assert.deepEqual(t.helpers, [["--resume", id, "--profile", "work", "--print-command"]]);
+    assert.deepEqual(t.runs, [resumed]);
+    assert.deepEqual(t.failures, []);
+    // one jump.py can't reopen (gone from that account): said
+    t = actionsHere([{ ok: false, message: "That chat isn't on this account" }], { claudeCode: false });
+    await t.actions.openWeekChat(id, "work", "Ports", "/w/app");
+    assert.deepEqual(t.runs, []);
+    assert.deepEqual(t.failures, ["Couldn't reopen Ports: That chat isn't on this account"]);
+    // one of its account's recent or starred chats: their command, in VS Code's terminal
+    for (const where of [{ recent: [listed] }, { starred: [listed] }]) {
+      t = actionsHere([], { claudeCode: false, ...where });
+      await t.actions.openWeekChat(id, "work", "Ports", "/w/app");
+      assert.deepEqual(t.runs, [listed.openCommand]);
+      assert.deepEqual(t.helpers, []);
+    }
+    // where the switch says: a Claude Code tab
+    overrides.set("reopenIn", "claudeCode");
+    t = actionsHere();
+    await t.actions.openWeekChat(id, "work", "Ports", "/w/app");
+    assert.deepEqual(t.helpers, [["--resume", id, "--profile", "work", "--vscode"]]);
+    assert.deepEqual(t.runs, []);
+    overrides.delete("reopenIn");
+    // talpyDen.openIn "system": the widget's way, also for one that's listed
+    overrides.set("openIn", "system");
+    t = actionsHere([], { claudeCode: false, recent: [listed] });
+    await t.actions.openWeekChat(id, "work", "Ports", "/w/app");
+    assert.deepEqual(t.helpers, [[id, "--profile", "work"]]);
+    assert.deepEqual(t.runs, []);
+    overrides.delete("openIn");
+    // an SSH host's chat with no command to reopen it: said as it is
+    t = actionsHere([], { claudeCode: false });
+    await t.actions.open({ host: "lab", key: "k", sessionId: "c1", chatId: "c1", profileDir: ".claude", name: "Ports", cwd: "", kind: "chat", pid: null, openCommand: null });
+    assert.deepEqual(t.helpers, []);
+    assert.match(t.failures[0], /^Ports isn't running on lab, and there's no command here to reopen it/);
+  } finally {
+    overrides.clear();
+    if (desktop === undefined) delete process.env.XDG_CURRENT_DESKTOP;
+    else process.env.XDG_CURRENT_DESKTOP = desktop;
   }
 });

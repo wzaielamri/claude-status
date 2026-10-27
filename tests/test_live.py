@@ -2,6 +2,7 @@
 turning it on and off (pane.py --live) and the rows that carry it."""
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -170,6 +171,84 @@ def live_hook_steps():
     return mod.STEPS
 
 
+class ThroughAShellTests(HookFixture):
+    """Claude runs a hook's command with sh -c (Claude Code 2.1.311: its
+    spawn with shell: true). dash, Debian's and Ubuntu's sh, stays as the
+    hook's parent unless the command execs: an entry written before the
+    command had exec doesn't. Either way the live file names Claude (here,
+    this test), so its row carries it."""
+
+    def run_as(self, shell, command):
+        env = {"HOME": str(self.home), "PATH": os.environ.get("PATH", "/usr/bin")}
+        done = subprocess.run([shell, "-c", command], input=json.dumps(event("UserPromptSubmit", prompt="go")),
+                              env=env, capture_output=True, text=True, timeout=20)
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""))
+        return self.view()
+
+    def test_old_and_new_commands(self):
+        import shlex
+        script = shlex.quote(str(CODE / "live_hook.py"))
+        python = shlex.quote(sys.executable)
+        for shell in [s for s in ("sh", "dash", "bash") if shutil.which(s)]:
+            for command in (f"{python} -I -S {script}", f"exec {python} -I -S {script}"):
+                with self.subTest(shell=shell, command=command[:4]):
+                    v = self.run_as(shell, command)
+                    self.assertEqual((v["state"], v["pid"]), ("working", os.getpid()))
+                    self.assertEqual(cs.live_view(self.home / ".cache/talpy-den", SID, os.getpid())["state"], "working")
+
+
+class HookRefreshTests(unittest.TestCase):
+    """A widget updated while a hook is on: the hook's copy that Claude's
+    settings name comes up to date at the next status check
+    (talpy_den.refresh_hooks), only ever to a newer one, and one that's off
+    stays off."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name) / "home"
+        self.data = self.home / ".local/share/talpy-den"
+        self.data.mkdir(parents=True)
+        p = mock.patch.dict(os.environ, {"XDG_DATA_HOME": ""})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_an_older_copy_is_replaced(self):
+        live_copy = self.data / "live-hook.py"
+        live_copy.write_text("# the live hook, as an older version had it\n")
+        live_copy.chmod(0o640)
+        self.assertEqual(cs.refresh_hooks(self.home), ["live-hook.py"])
+        self.assertEqual(live_copy.read_bytes(), (CODE / "live_hook.py").read_bytes())
+        self.assertEqual(live_copy.stat().st_mode & 0o777, 0o640)
+        self.assertFalse((self.data / "permission-hook.py").exists())   # (off: not turned on)
+        self.assertEqual(sorted(p.name for p in self.data.iterdir()), ["live-hook.py"])
+        self.assertEqual(cs.refresh_hooks(self.home), [])   # (up to date)
+
+    def test_never_an_older_one(self):
+        newer = "HOOK_REVISION = %d\n# from a newer version\n" % (cs.hook_revision((CODE / "permission_hook.py").read_bytes()) + 1)
+        (self.data / "permission-hook.py").write_text(newer)
+        self.assertEqual(cs.refresh_hooks(self.home), [])
+        self.assertEqual((self.data / "permission-hook.py").read_text(), newer)
+        self.assertEqual(cs.hook_revision(b"no line"), 1)
+        for name in ("permission_hook.py", "live_hook.py"):
+            self.assertGreaterEqual(cs.hook_revision((CODE / name).read_bytes()), 2)
+
+    def test_at_a_status_check(self):
+        (self.data / "permission-hook.py").write_text("# older\n")
+        env = dict(os.environ, HOME=str(self.home), XDG_CACHE_HOME=str(self.home / ".cache"), XDG_DATA_HOME="")
+        out = subprocess.run([sys.executable, "-I", str(CODE / "talpy_den.py"), "--no-tokens"], env=env,
+                             capture_output=True, text=True, timeout=60)
+        self.assertTrue(json.loads(out.stdout)["ok"], out.stdout)
+        self.assertEqual((self.data / "permission-hook.py").read_bytes(), (CODE / "permission_hook.py").read_bytes())
+        # on an SSH host the script comes on stdin, without the hooks: their copies stay as they are
+        (self.data / "permission-hook.py").write_text("# older\n")
+        out = subprocess.run([sys.executable, "-I", "-", "--remote", "--no-tokens"], env=env, capture_output=True,
+                             text=True, timeout=60, input=(CODE / "talpy_den.py").read_text())
+        self.assertTrue(json.loads(out.stdout.split(cs.REMOTE_MARK)[1])["ok"])
+        self.assertEqual((self.data / "permission-hook.py").read_text(), "# older\n")
+
+
 class WaitTests(unittest.TestCase):
     def setUp(self):
         import tempfile
@@ -260,7 +339,7 @@ class LiveSwitchTests(Fixture):
         hook = self.home / ".local/share/talpy-den/live-hook.py"
         self.assertEqual(hook.read_text(), (CODE / "live_hook.py").read_text())
         self.assertEqual(sorted(hooks), sorted(set(pane.LIVE_EVENTS)))
-        mine = {"type": "command", "command": f"python3 -I -S {hook}", "async": True, "timeout": 10}
+        mine = {"type": "command", "command": f"exec python3 -I -S {hook}", "async": True, "timeout": 10}
         self.assertEqual(hooks["SessionStart"], [guard, {"hooks": [mine]}])
         self.assertEqual(hooks["PreToolUse"], [dict(guard, matcher="*"), {"matcher": "*", "hooks": [mine]}])
         self.assertEqual(len(hooks["PermissionRequest"]), 2)  # (the permission hook stays)
@@ -283,6 +362,20 @@ class LiveSwitchTests(Fixture):
         self.assertFalse(hook.exists())
         self.assertFalse(cs.live_hook_on(self.home))
         self.assertTrue(pane.relay_status(self.home, [], "relay")["on"])
+
+    def test_an_entry_written_before_is_replaced(self):
+        # python3 -I -S PATH (no exec): still the live hook's, replaced once
+        settings = self.home / ".claude-work/settings.json"
+        older = "python3 -I -S %s" % (self.home / ".local/share/talpy-den/live-hook.py")
+        write(settings, {"hooks": {e: [{"hooks": [{"type": "command", "command": older, "async": True, "timeout": 10}]}]
+                                   for e in pane.LIVE_EVENTS}})
+        self.assertTrue(pane.relay_status(self.home, [], "live")["some"])
+        pane.live(self.home, [], True)
+        hooks = json.loads(settings.read_text())["hooks"]
+        self.assertEqual({e: [h["command"] for g in groups for h in g["hooks"]] for e, groups in hooks.items()},
+                         {e: ["exec " + older] for e in pane.LIVE_EVENTS})
+        pane.live(self.home, [], False)
+        self.assertNotIn("hooks", json.loads(settings.read_text()))
 
     def test_command_line(self):
         import contextlib

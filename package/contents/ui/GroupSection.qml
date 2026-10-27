@@ -383,7 +383,7 @@ ColumnLayout {
                     icon.name: "media-playback-start"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Start it now")
-                    enabled: !root.startingTasks[queuedLine.task.id]
+                    enabled: !root.isStarting(queuedLine.task.id)
                     Layout.preferredHeight: queuedName.implicitHeight
                     Layout.preferredWidth: Layout.preferredHeight
                     onClicked: root.startQueued(queuedLine.task)

@@ -8,8 +8,17 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
+sys.dont_write_bytecode = True  # keep __pycache__ out of the plasmoid package
 CODE = Path(__file__).resolve().parent.parent / "package/contents/code"
+sys.path.insert(0, str(CODE))
+import dictate  # noqa: E402
+
+# Whether this Python can make an environment (Debian and Ubuntu leave venv
+# out until python3-venv is installed): dictate.py run here offers the setup then
+CAN_VENV = dictate.can_venv()
+NO_VENV = "Python's venv, to set up dictation (Debian, Ubuntu: sudo apt install python3-venv)"
 
 # Records until it's interrupted (SIGINT), as pw-record does: a WAV file
 FAKE_RECORDER = """#!{python}
@@ -90,8 +99,8 @@ class DictateTests(unittest.TestCase):
         self.assertFalse(got["ok"])
         self.assertIsNone(got["engine"])
         self.assertIsNone(got["model"])
-        self.assertTrue(got["canSetup"])
-        self.assertEqual(got["missing"], [])
+        self.assertEqual(got["canSetup"], CAN_VENV)
+        self.assertEqual(got["missing"], [] if CAN_VENV else [NO_VENV])
         self.assertEqual([m["name"] for m in got["models"]], ["tiny", "base", "base.en", "small", "medium", "large-v3-turbo"])
         self.assertFalse(any(m["installed"] for m in got["models"]))
         self.assertEqual(self.run_it("--get-model", "base"), {"ok": False, "message": "Set up dictation first"})
@@ -187,14 +196,60 @@ class FasterWhisperTests(DictateTests):
         self.assertEqual((got["modelName"], got["chosen"]), ("small", "auto"))
         self.assertTrue(self.run_it("--remove-setup", model=False)["ok"])
         got = self.run_it("--status", model=False)
-        self.assertEqual((got["engine"], got["setUp"], got["canSetup"]), (None, False, True))
+        self.assertEqual((got["engine"], got["setUp"], got["canSetup"]), (None, False, CAN_VENV))
         self.assertEqual(sorted(p.name for p in self.whisper.iterdir()), [".busy"])
 
     def test_setup_once_set_up_only_brings_the_model(self):
+        # (its environment is made already: Python's venv isn't needed for it)
         got = self.run_it("--setup", model=False)
         self.assertTrue(got["ok"], got)
         self.assertTrue((self.whisper / "models/base/model.bin").is_file())
         self.assertEqual(self.log.read_text().count("base "), 1)
+
+    def in_process(self):
+        env = mock.patch.dict(os.environ, {"HOME": str(self.home), "XDG_DATA_HOME": str(self.home / "data")})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_set_up_without_pythons_venv(self):
+        # set up once (an environment made then): a model comes without venv
+        self.in_process()
+        with mock.patch.object(dictate, "can_venv", return_value=False), \
+                mock.patch.object(dictate, "fetch_fw", return_value={"ok": True}) as fetched:
+            got = dictate.setup("small")
+        self.assertTrue(got["ok"], got)
+        fetched.assert_called_once_with("small")
+        # not set up: venv is what it needs
+        (self.whisper / "venv/.ready").unlink()
+        with mock.patch.object(dictate, "can_venv", return_value=False), \
+                mock.patch.object(dictate.subprocess, "run") as ran:
+            got = dictate.setup("base")
+        self.assertEqual(got, {"ok": False, "message": "To set up dictation, install Python's venv "
+                                                       "(Debian, Ubuntu: sudo apt install python3-venv)"})
+        ran.assert_not_called()
+        self.assertTrue((self.whisper / "venv/bin/python").is_file())   # (nothing was removed)
+
+    def test_a_setup_makes_the_environment(self):
+        # The steps of a first setup, in order (the environment, pip's install
+        # and the model stood in for: nothing is downloaded, no venv needed here)
+        self.in_process()
+        (self.whisper / "venv/.ready").unlink()
+        calls = []
+
+        def run(cmd, **kw):
+            calls.append(cmd)
+            if cmd[1:3] == ["-m", "venv"]:
+                (Path(cmd[3]) / "bin").mkdir(parents=True)
+                (Path(cmd[3]) / "bin/python").write_text("")
+            return subprocess.CompletedProcess(cmd, 0, b"", b"")
+        with mock.patch.object(dictate, "can_venv", return_value=True), \
+                mock.patch.object(dictate.subprocess, "run", side_effect=run), \
+                mock.patch.object(dictate, "fetch_fw", return_value={"ok": True}):
+            got = dictate.setup("base")
+        self.assertTrue(got["ok"], got)
+        self.assertEqual([c[1:3] for c in calls], [["-m", "venv"], ["-I", "-m"], ["-I", "-c"]])
+        self.assertEqual(calls[1][0], str(self.whisper / "venv/bin/python"))
+        self.assertTrue((self.whisper / "venv/.ready").is_file())
 
     def test_one_download_at_a_time(self):
         import fcntl

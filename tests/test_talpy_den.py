@@ -398,6 +398,46 @@ class LimitTests(Fixture):
         self.usage_cache(fetched_ago=60, account="someone-else")
         self.assertIsNone(self.group(self.collect(with_tokens=False), "personal")["limits"])
 
+    def two_of_one_name(self):
+        """/data/.claude, an account of its own (--config-dir), next to ~/.claude."""
+        other = Path(self.tmp.name) / "data/.claude"
+        write(other / ".claude.json", {"oauthAccount": {"accountUuid": "acct-data", "organizationType": "claude_max"}})
+        (other / "projects").mkdir(parents=True)
+        return other
+
+    def test_two_folders_of_one_name_keep_their_usage_apart(self):
+        other = self.two_of_one_name()
+        self.snapshot(".claude", "theirs", {"talpyDenConfigDir": str(other),
+                                            "rate_limits": {"five_hour": {"used_percentage": 97}}}, age=10)
+        self.snapshot(".claude", "mine", {"talpyDenConfigDir": str(self.home / ".claude"),
+                                          "rate_limits": {"five_hour": {"used_percentage": 12}}}, age=300)
+        r = cs.collect(self.home, self.cache, [str(other)], with_tokens=False, now=self.now)
+        self.assertEqual(self.group(r, "personal")["limits"]["windows"][0]["pct"], 12)
+        self.assertEqual(self.group(r, "claude")["limits"]["windows"][0]["pct"], 97)
+        # a folder named through a link is that folder
+        (Path(self.tmp.name) / "data-link").symlink_to(other.parent)
+        self.snapshot(".claude", "theirs", {"talpyDenConfigDir": str(Path(self.tmp.name) / "data-link/.claude"),
+                                            "rate_limits": {"five_hour": {"used_percentage": 98}}}, age=5)
+        r = cs.collect(self.home, self.cache, [str(other)], with_tokens=False, now=self.now)
+        self.assertEqual(self.group(r, "personal")["limits"]["windows"][0]["pct"], 12)
+        self.assertEqual(self.group(r, "claude")["limits"]["windows"][0]["pct"], 98)
+        # an older snippet's (no folder named) counts for both, as it always did
+        self.snapshot(".claude", "older", {"rate_limits": {"five_hour": {"used_percentage": 50}}}, age=1)
+        r = cs.collect(self.home, self.cache, [str(other)], with_tokens=False, now=self.now)
+        self.assertEqual([self.group(r, n)["limits"]["windows"][0]["pct"] for n in ("personal", "claude")], [50, 50])
+
+    def test_a_sessions_context_from_its_own_folder(self):
+        other = self.two_of_one_name()
+        write(other / "sessions/40.json", session("theirs", status="busy"))
+        write(self.home / ".claude/sessions/41.json", session("theirs2", status="busy"))
+        self.snapshot(".claude", "theirs", {"talpyDenConfigDir": str(other), "context_window": {"used_percentage": 40}})
+        self.snapshot(".claude", "theirs2", {"talpyDenConfigDir": str(other), "context_window": {"used_percentage": 60}})
+        r = cs.collect(self.home, self.cache, [str(other)], with_tokens=False, now=self.now)
+        rows = {s["sessionId"]: s for g in r["groups"] for s in g["sessions"]}
+        self.assertEqual((rows["theirs"]["context"], rows["theirs2"]["context"]), (40, None))
+        self.assertTrue(cs.snapshot_of({"talpyDenConfigDir": "relative/.claude"}, [other]))   # (not a folder it can name)
+        self.assertTrue(cs.snapshot_of(None, [other]))
+
     def test_newest_snapshot_across_group_profiles(self):
         self.snapshot(".claude", "a", {"rate_limits": {"five_hour": {"used_percentage": 10}}}, age=300)
         self.snapshot(".claude-personal", "b", {"rate_limits": {"five_hour": {"used_percentage": 20}}}, age=10)
@@ -609,6 +649,25 @@ class SnippetTests(unittest.TestCase):
     def test_rejects_unsafe_session_id(self):
         out, err, files = self.run_snippet({"session_id": "../../evil"}, "/x/.claude")
         self.assertEqual((out, err, files), ("ok\n", "", []))
+
+    def test_a_snapshot_names_its_folder(self):
+        # (two folders of one name, ~/.claude and /data/.claude, file theirs in
+        # one place: what each one is of tells them apart)
+        with tempfile.TemporaryDirectory() as tmp:
+            real = Path(tmp) / "it's data/.claude"
+            real.mkdir(parents=True)
+            (Path(tmp) / "link").symlink_to(real.parent)
+            payload = {"session_id": "s4", "transcript_path": f"{tmp}/link/.claude/projects/-h/s4.jsonl",
+                       "rate_limits": {"five_hour": {"used_percentage": 7}}, "model": {"display_name": "Opus"}}
+            for shell in SHELLS:
+                with tempfile.TemporaryDirectory() as out:
+                    script = 'set -eu\ninput=$(cat)\n' + (ROOT / "statusline-snippet.sh").read_text() + 'echo ok\n'
+                    env = {**os.environ, "HOME": out, "XDG_CACHE_HOME": out + "/cache"}
+                    done = subprocess.run([shell, "-c", script], input=json.dumps(payload), env=env,
+                                          capture_output=True, text=True, check=True)
+                    self.assertEqual((done.stdout, done.stderr), ("ok\n", ""))
+                    snap = json.loads(Path(out, "cache/talpy-den/statusline/.claude/s4.json").read_text())
+                    self.assertEqual(snap, dict(payload, talpyDenConfigDir=str(real)), shell)
 
 
 class AgentTests(Fixture):

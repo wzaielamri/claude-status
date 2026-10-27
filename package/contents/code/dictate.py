@@ -241,13 +241,16 @@ def status():
 def setup(name="base"):
     if name not in MODELS:
         return {"ok": False, "message": "Not a model: " + str(name)}
-    if not can_venv():
+    # (Python's venv only makes the environment: one made already brings the model)
+    if not (venv_dir() / READY).is_file() and not can_venv():
         return {"ok": False, "message": "To set up dictation, install Python's venv (Debian, Ubuntu: sudo apt install python3-venv)"}
     with busy() as free:
         if not free:
             return {"ok": False, "message": "Dictation is being set up or a model downloaded already"}
         venv = venv_dir()
         if not (venv / READY).is_file():
+            if not can_venv():  # (its environment was removed meanwhile)
+                return {"ok": False, "message": "To set up dictation, install Python's venv (Debian, Ubuntu: sudo apt install python3-venv)"}
             shutil.rmtree(venv, ignore_errors=True)
             python = str(venv / "bin" / "python")
             for cmd, what in (([sys.executable, "-m", "venv", str(venv)], "make faster-whisper's environment"),

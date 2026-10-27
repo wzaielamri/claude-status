@@ -6,7 +6,7 @@
 
 import { render } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer, type TermRun, type TermStyle } from "../src/shared/pane";
+import { droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer, type TermRun, type TermStyle } from "../src/shared/pane";
 import { AskBox } from "./components/AskBox";
 import { Diff, Listing, TermScreen, ToolDetail } from "./components/CodeView";
 import type { Answers, Decision } from "../src/shared/types";
@@ -114,6 +114,10 @@ function ChatApp() {
   const [askHow, setAskHow] = useState(false);
   const [info, setInfo] = useState<{ ok: boolean; message: string } | null>(null);
   const [answering, setAnswering] = useState(0);
+  // A message on its way (until its result): no second one meanwhile, so a
+  // second Enter doesn't send it twice (the ref: two keys before a redraw)
+  const [sending, setSending] = useState(false);
+  const sendingNow = useRef(false);
   const [review, setReview] = useState<ReviewAnswer | null>(null);
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -193,7 +197,7 @@ function ChatApp() {
   };
 
   // The microphone: record, then whisper writes it down on this computer
-  const [dictating, setDictating] = useState<"" | "recording" | "writing" | "model" | "setup">("");
+  const [dictating, setDictating] = useState<"" | "starting" | "recording" | "writing" | "model" | "setup">("");
   const [recordedAt, setRecordedAt] = useState(0);
   const [offerModel, setOfferModel] = useState(""); // (the engine that needs one)
   const [offerSetup, setOfferSetup] = useState(0); // (MB it downloads)
@@ -354,6 +358,10 @@ function ChatApp() {
           return;
         }
         if (m.kind === "answer") setAnswering((n) => Math.max(0, n - 1));
+        if (m.kind === "send" || m.kind === "later") {
+          sendingNow.current = false;
+          setSending(false);
+        }
         if (m.kind === "send" && m.ask) {
           setAskHow(true);
           return;
@@ -403,12 +411,15 @@ function ChatApp() {
   }, [items, chat?.activity]);
 
   const send = (how: "auto" | "background" | "copy" | "enter", afterTurn: boolean) => {
-    if (!text.trim()) return;
+    if (!text.trim() || sendingNow.current) return;
+    sendingNow.current = true;
+    setSending(true);
     post({ type: "send", text, how, afterTurn });
   };
+  // (to the prompt shown now: if the chat asks something else by then, it isn't answered)
   const answer = (decision: Decision, note: string, answers?: Answers) => {
     setAnswering((n) => n + 1);
-    post({ type: "answer", decision, note, answers });
+    post({ type: "answer", decision, note, answers, shown: shownAsk(chat?.permission) });
   };
 
   const terminal = chat?.route === "terminal" || askHow;
@@ -660,10 +671,14 @@ function ChatApp() {
           <div class="pane-hint">{chat ? routeHint(chat.route, chat.state !== "done" || !!chat.busy, "", chat.host) : ""}</div>
           <div class="pane-buttons">
             <button type="button" class={"btn secondary pane-mic" + (dictating === "recording" ? " on" : "")}
-              disabled={dictating === "writing" || dictating === "model" || dictating === "setup"}
+              disabled={dictating === "starting" || dictating === "writing" || dictating === "model" || dictating === "setup"}
               title="Dictate: say your reply, click again to stop, and it's written down where you're typing. On this computer only (whisper): what you say doesn't leave it. The speech model: Talpy Den: Dictation Models."
-              onClick={() => post({ type: "dictate", action: "toggle" })}>
+              onClick={() => {
+                if (dictating === "") setDictating("starting"); // (until it records, or says why not: no second recorder)
+                post({ type: "dictate", action: "toggle" });
+              }}>
               {dictating === "recording" ? `■ Stop: write it down · ${Math.max(1, Math.round((Date.now() - recordedAt) / 1000))}s`
+                : dictating === "starting" ? "Starting the microphone…"
                 : dictating === "writing" ? "Writing it down…" : dictating === "model" ? "Downloading the speech model…"
                 : dictating === "setup" ? "Setting up dictation (a few minutes)…" : "Dictate"}
             </button>
@@ -680,7 +695,7 @@ function ChatApp() {
               Screenshot…
             </button>
             {terminal ? (
-              <button type="button" class="btn secondary" disabled={!text.trim()} onClick={() => send("copy", false)}>
+              <button type="button" class="btn secondary" disabled={!text.trim() || sending} onClick={() => send("copy", false)}>
                 Copy and open its terminal
               </button>
             ) : null}
@@ -688,7 +703,7 @@ function ChatApp() {
               <button
                 type="button"
                 class="btn secondary"
-                disabled={!text.trim()}
+                disabled={!text.trim() || sending}
                 title="Kept, and sent once Claude's turn is over."
                 onClick={() => send(terminal ? "background" : "auto", true)}
               >
@@ -698,10 +713,10 @@ function ChatApp() {
             <button
               type="button"
               class="btn"
-              disabled={!text.trim() || (terminal && !!chat?.busy) || (!!chat?.permission && chat.route === "tmux")}
+              disabled={!text.trim() || sending || (terminal && !!chat?.busy) || (!!chat?.permission && chat.route === "tmux")}
               onClick={() => send(terminal ? "background" : "auto", false)}
             >
-              {terminal ? "Send, go on in the background" : "Send"}
+              {sending ? "Sending…" : terminal ? "Send, go on in the background" : "Send"}
             </button>
           </div>
         </>

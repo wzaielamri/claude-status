@@ -27,7 +27,7 @@ import {
   tasksTitle,
   usageLevel,
 } from "../../src/shared/model";
-import { reviewPending, testsText } from "../../src/shared/pane";
+import { reviewPending, shownAsk, testsText } from "../../src/shared/pane";
 import type { Group, Session } from "../../src/shared/types";
 import { post } from "../env";
 import { pets } from "../pets";
@@ -324,7 +324,8 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
         ) : null}
 
         {s.state === "waiting" && s.permission ? (
-          <AskBox ask={s.permission} max={6} compact onAnswer={(decision, note, answers) => post({ type: "answerPermission", chat, decision, note, answers })}
+          <AskBox ask={s.permission} max={6} compact
+            onAnswer={(decision, note, answers) => post({ type: "answerPermission", chat, decision, note, answers, shown: shownAsk(s.permission) })}
             onWholePlan={() => post({ type: "openPane", chat, tab: "chat" })} />
         ) : null}
 

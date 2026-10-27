@@ -10,6 +10,49 @@
   reply on the clipboard and opens the chat's terminal, to paste it there;
   Claude there never quits on an Enter. **Send, go on in the background**
   still moves it to the background.
+- **Allow answers only what it showed:** Allow, Deny and the other answers
+  in a notification, a chat's row or its tab answered whatever the chat
+  asked by then: a chat answered in its terminal that asked something else
+  right after got no new notification, and the old one's Allow approved the
+  new prompt, one you never saw. An answer now goes only to the prompt it
+  showed (in tmux, `pane.py --keys … --expect`): when the chat asks
+  something else, nothing is answered, you're told, and the new prompt gets
+  a notification of its own.
+- **A message goes once:** Enter pressed twice, or Enter and then Send, in a
+  chat tab sent your message twice (in tmux typed in twice, in the
+  background two runs). The box says *Sending…* until it has gone, and a
+  chat takes one message at a time.
+- **Chats in the Recap and Projects tabs reopen:** clicking one that wasn't
+  running and wasn't among the account's recent chats said it *runs in a
+  terminal outside this VS Code window* and opened nothing (where windows
+  can't be brought up: GNOME without the Talpy Den extension, XFCE, macOS).
+  It reopens in VS Code's terminal now (in a Claude Code tab where the
+  switch says so), with the account's recent or starred chats' command, else
+  the one `jump.py --resume --print-command` gives.
+- **The microphone stops with the tab:** a second click on Dictate while the
+  microphone was starting started a second recording, and closing the tab
+  (or ×) then left that one recording for up to 5 minutes. A click while it
+  starts does nothing now, and a closed tab stops a recording that's
+  starting.
+- **No errors after closing a chat tab:** a tab closed while it was reading
+  its chat (seconds, for an SSH host's) logged *Webview is disposed* errors
+  and went on reading. Nothing more is read or sent once it's closed.
+- **Copying the Recap's card** used a file of a fixed name in the temp
+  folder: on a computer you share, another user's card of the same day made
+  it fail without a word. It's copied from a private folder of its own now,
+  and a failure is said.
+- **A setting checks again only what it changes:** every change to a Talpy
+  Den setting (the chat tab's text size, a sound) checked every SSH host
+  again. Now only one that changes what the checks run with does.
+- **From the Plasma widget's fixes** (the same Python helpers): answering
+  permission prompts and live mode work on Debian and Ubuntu, whose `sh` is
+  dash, and with a space in your home folder's name; two Claude folders of
+  one name (`~/.claude`, `/data/.claude`) no longer show each other's plan
+  usage; in half-hour time zones (India, Nepal) the Recap counts tokens and
+  cost on the right day; and Undo no longer deletes a file that was there
+  before the chat when no earlier copy of it was kept.
+- **Development:** fast-uri, markdown-it and undici (packages of the build
+  tools) updated for their security fixes.
 
 ## 1.16.0
 

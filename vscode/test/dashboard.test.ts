@@ -137,3 +137,40 @@ test("the Claude Code extension starting after this one is found without a reloa
     mock.timers.reset();
   }
 });
+
+test("a setting checks again only what it changes: the chat tab's text size or a sound just redraws", async () => {
+  const { changeSettings, overrides } = await import("./vscode-stub");
+  const backend = { status: async () => ({ status: demoState(NOW).status! }), hostStatus: async () => ({ ok: false, error: "x" }) } as unknown as Backend;
+  const log = { warn() {}, info() {}, error() {} } as unknown as vscode.LogOutputChannel;
+  const dash = new Dashboard(backend, { handle() {}, isLeader: () => true } as unknown as Notifier, log);
+  const checks: string[] = [];
+  const d = dash as unknown as { scheduleLocal(delay?: number): void; scheduleHosts(delay?: number): void };
+  d.scheduleLocal = (delay?: number) => void checks.push(`here ${delay ?? "at its pace"}`);
+  d.scheduleHosts = (delay?: number) => void checks.push(`hosts ${delay ?? "at their pace"}`);
+  let redraws = 0;
+  dash.onState(() => redraws++);
+  const change = (key: string, value: unknown) => {
+    overrides.set(key, value);
+    changeSettings(`talpyDen.${key}`);
+    const done = checks.splice(0);
+    return done;
+  };
+  try {
+    for (const [key, value] of [["chatTextScale", 1.5], ["diffSideBySide", false], ["soundVolume", 20], ["showPet", false], ["notifyDone", false], ["sshUsage", "all"]] as const)
+      assert.deepEqual(change(key, value), [], key);
+    assert.equal(redraws, 6, "the view and the status bar take the new settings");
+    assert.deepEqual(change("keepDoneHours", 48), ["here 0", "hosts 0"]);
+    assert.deepEqual(change("showTokens", false), ["here 0", "hosts 0"]);
+    assert.deepEqual(change("usageCap", 80), ["here 0"]);
+    assert.deepEqual(change("extraConfigDirs", ["/srv/claude-team"]), ["here 0"]);
+    assert.deepEqual(change("sshHosts", ["lab"]), ["hosts 0"]);
+    assert.deepEqual(change("includeCurrentRemote", false), [], "(no window host here)");
+    assert.deepEqual(change("pollInterval", 5000), ["here at its pace"]);
+    assert.deepEqual(change("remotePollSeconds", 60), ["hosts at their pace"]);
+    assert.deepEqual(change("pythonPath", "/usr/bin/python3.12"), ["here 0", "hosts 0"]);
+    assert.deepEqual(change("pythonPath", "/usr/bin/python3.12"), [], "set again as it was");
+  } finally {
+    overrides.clear();
+    dash.dispose();
+  }
+});

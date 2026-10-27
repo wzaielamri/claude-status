@@ -168,15 +168,43 @@ export function nameLine(name, tags, end) {
     return line;
 }
 
+// A bar's parts, placed as the bar is allocated: place(width, height) gives
+// [actor, x, y, w, h] for each of them. (Sizing them on notify::width
+// instead laid them out again in the middle of a layout pass: GNOME 43 then
+// logged "Can't update stage views actor … needs an allocation" for each
+// bar, at every refresh.) Its size comes from the bar's style and expand.
+const BarLayout = GObject.registerClass(
+class ClaudeBarLayout extends Clutter.LayoutManager {
+    _init(place) {
+        super._init();
+        this._place = place;
+    }
+
+    vfunc_get_preferred_width(_container, _forHeight) {
+        return [0, 0];
+    }
+
+    vfunc_get_preferred_height(_container, _forWidth) {
+        return [0, 0];
+    }
+
+    vfunc_allocate(container, box) {
+        for (const [actor, x, y, w, h] of this._place(box.get_width(), box.get_height())) {
+            const childBox = new Clutter.ActorBox();
+            childBox.set_origin(box.x1 + x, box.y1 + y);
+            childBox.set_size(Math.max(0, w), Math.max(0, h));
+            actor.allocate(childBox);
+        }
+    }
+});
+
 // A bar filled to pct% in the color class (working, waiting, bad)
 export function meter(pct, colorClass, styleClass = 'claude-meter') {
-    const trough = new St.BoxLayout({style_class: styleClass, x_expand: true, y_align: Clutter.ActorAlign.CENTER});
-    const fill = new St.Widget({style_class: `claude-meter-fill claude-bg-${colorClass}`, y_expand: true});
-    trough.add_child(fill);
     const share = Math.min(100, Math.max(0, pct)) / 100;
-    trough.connect('notify::width', () => {
-        fill.width = Math.round(trough.width * share);
-    });
+    const fill = new St.Widget({style_class: `claude-meter-fill claude-bg-${colorClass}`});
+    const trough = new St.Widget({style_class: styleClass, x_expand: true, y_align: Clutter.ActorAlign.CENTER,
+        layout_manager: new BarLayout((w, h) => [[fill, 0, 0, Math.round(w * share), h]])});
+    trough.add_child(fill);
     return trough;
 }
 
@@ -184,34 +212,30 @@ export function meter(pct, colorClass, styleClass = 'claude-meter') {
 // the window resets at your pace (projected, e.g. talpy_den.py's
 // forecast.atReset), and a thin tick where an even pace would be by now
 export function usageMeter(pct, colorClass, projected = pct, projectedClass = colorClass, evenPct = null) {
-    const trough = new St.Widget({style_class: 'claude-meter', x_expand: true, y_align: Clutter.ActorAlign.CENTER});
     const share = v => Math.min(100, Math.max(0, v)) / 100;
     const ahead = projected > pct
         ? new St.Widget({style_class: `claude-meter-fill claude-bg-${projectedClass}`, opacity: 90}) : null;
     const fill = new St.Widget({style_class: `claude-meter-fill claude-bg-${colorClass}`});
     const tick = evenPct !== null && evenPct !== undefined ? new St.Widget({style_class: 'claude-meter-tick'}) : null;
+    const place = (w, h) => {
+        const filled = Math.round(w * share(pct));
+        const parts = [];
+        if (ahead) {
+            // under the fill's rounded end, so there's no gap between them
+            const from = Math.max(0, filled - h);
+            parts.push([ahead, from, 0, Math.round(w * share(projected)) - from, h]);
+        }
+        parts.push([fill, 0, 0, filled, h]);
+        if (tick)   // sticks out above and below, so it shows over the fill too
+            parts.push([tick, Math.max(0, Math.round(w * share(evenPct)) - 1), -3, 2, h + 6]);
+        return parts;
+    };
+    const trough = new St.Widget({style_class: 'claude-meter', x_expand: true, y_align: Clutter.ActorAlign.CENTER,
+        layout_manager: new BarLayout(place)});
     for (const part of [ahead, fill, tick]) {
         if (part)
             trough.add_child(part);
     }
-    const layout = () => {
-        const [w, h] = [trough.width, trough.height];
-        const filled = Math.round(w * share(pct));
-        fill.set_position(0, 0);
-        fill.set_size(filled, h);
-        if (ahead) {
-            // under the fill's rounded end, so there's no gap between them
-            const from = Math.max(0, filled - h);
-            ahead.set_position(from, 0);
-            ahead.set_size(Math.max(0, Math.round(w * share(projected)) - from), h);
-        }
-        if (tick) {   // sticks out above and below, so it shows over the fill too
-            tick.set_position(Math.max(0, Math.round(w * share(evenPct)) - 1), -3);
-            tick.set_size(2, h + 6);
-        }
-    };
-    trough.connect('notify::width', layout);
-    trough.connect('notify::height', layout);
     return trough;
 }
 

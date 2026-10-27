@@ -20,7 +20,7 @@ PlasmoidItem {
     // "needs input" one can be closed.
     property var lastStates: ({})
     property var turnStarts: ({})
-    property var lastEnded: ({})   // the turns that ended at the last check, told as finished: {chat key: how long it took}
+    property var lastEnded: ({})   // the turns that ended lately (a minute, while idle or done), told as finished: {chat key: {took: how long it took, at: when}}
     property var notifications: ({})
     property var primedSources: ({})
     property string actionError: ""
@@ -936,7 +936,8 @@ PlasmoidItem {
             property string host
             property string openCommand
             property var session: null
-            property var row: null
+            property var row: null         // the chat as it asked: the buttons answer that only (root.answerPermission)
+            property string asked          // what it asked (root.askId): a check that finds it asks something else makes it anew
             readonly property bool withAlways: !!row && !!row.permission
                                                && (row.permission.answer === "keys" || row.permission.always !== "")
             readonly property var questions: row && row.permission && row.permission.questions ? row.permission.questions : []
@@ -1325,14 +1326,22 @@ PlasmoidItem {
                     // Claude writes its transcript a moment after the turn ends, so
                     // the usage limit that ended it can show a check later: it
                     // didn't finish after all
-                    turnEnded(sid, s, host, ended[sid], true)
+                    turnEnded(sid, s, host, ended[sid].took, true)
                     continue
                 }
+                // (a check or two later too, with checks coming quickly: for a
+                // minute, while it stays idle or done)
+                if (sid in ended && (s.state === "idle" || s.state === "done") && nowMs - ended[sid].at < 60000)
+                    ends[sid] = ended[sid]
+                // A "needs you" notification that's out of date: the hook's request
+                // came a check after the chat began to wait (now with its buttons),
+                // or the chat asks something else now than what its buttons answer
+                // (that was answered in the chat, and the next prompt came before a
+                // check saw it at work)
                 const told = notifications[sid]
-                if (prev === "waiting" && s.state === "waiting" && told && told.kind === "waiting" && told.allowAction === undefined
-                        && s.permission && (s.permission.answer === "hook" || s.permission.answer === "keys")) {
-                    // (the hook's request came a check after the chat began to wait: now with its buttons)
-                    const asks = askText(s)
+                if (prev === "waiting" && s.state === "waiting" && told && told.kind === "waiting"
+                        && (told.allowAction === undefined ? canAnswerAsk(s) : told.asked !== askId(s))) {
+                    const asks = s.permission ? askText(s) : [i18n("%1 needs your input", s.name), s.detail || reasonText(s.reason)]
                     notify(sid, s, "waiting", asks[0], asks[1] + "\n" + s.cwdShort + where, "dialog-warning", host)
                 }
                 if (prev === s.state)
@@ -1357,7 +1366,7 @@ PlasmoidItem {
                     const took = (s.since || nowMs) - (sid in startedAt ? startedAt[sid] : nowMs)
                     turnEnded(sid, s, host, took, false)
                     if (!stop)
-                        ends[sid] = took
+                        ends[sid] = { took: took, at: nowMs }
                 }
             }
         }
@@ -1439,12 +1448,12 @@ PlasmoidItem {
         }
     }
 
-    function notify(key, session, kind, title, body, icon, host) {
+    // plain: no buttons (no Allow / Deny, no Reply), whatever the chat asks
+    function notify(key, session, kind, title, body, icon, host, plain) {
         // One notification per row: a newer one replaces the previous.
         closeNotification(key, notifications[key] ? notifications[key].kind : "")
         // (a chat waiting for a permission the widget can answer: Allow / Deny buttons)
-        const asks = kind === "waiting" && session && session.permission
-                     && (session.permission.answer === "hook" || session.permission.answer === "keys")
+        const asks = !plain && kind === "waiting" && canAnswerAsk(session)
         // With the pet on, notifications show Talpy in a matching pose.
         const summary = kind === "digest"   // while you were away: someone waits for you, or all went well
         const pose = kind === "done" && session && session.reason === "failed" ? "sad"
@@ -1452,16 +1461,19 @@ PlasmoidItem {
                    : { waiting: "oncall", overlap: "oncall", done: "trophy", reset: "trophy", started: "trophy", error: "error",
                        limit: "limit", login: "error" }[kind]
 
-        const n = (asks ? askNotificationComponent : notificationComponent).createObject(root, {
+        const props = {
             sessionId: session ? session.sessionId : "", profileDir: session ? session.profileDir || "" : "",
             host: host || "", openCommand: session && session.openCommand ? session.openCommand : "",
             session: host && session ? session : null, row: session && session.sessionId !== undefined ? session : null,
             kind: kind, title: title, text: escapeHtml(body.trim()),   // Plasma shows markup in the text
             iconName: Plasmoid.configuration.showPet && pose ? petsDir + "notify-" + pose + ".svg" : icon
-        })
+        }
+        if (asks)
+            props.asked = askId(session)   // (what its buttons answer)
+        const n = (asks ? askNotificationComponent : notificationComponent).createObject(root, props)
         if (!n)
             return
-        if (!asks && session && session.sessionId && (kind === "done" || kind === "waiting")
+        if (!plain && !asks && session && session.sessionId && (kind === "done" || kind === "waiting")
                 && !(session.permission && kind === "waiting")) {
             // reply in the notification (pane.py --send, as the chat takes one)
             n.replyAction.label = i18n("Reply")
@@ -1929,13 +1941,16 @@ PlasmoidItem {
             return  // unticked while its check was running
         const answer = helperResult(data)
         if (answer.ok && answer.result) {
-            const result = toLocalClock(answer.result, Date.now() - (answer.result.generatedAt || Date.now()))
+            const offset = Date.now() - (answer.result.generatedAt || Date.now())
+            const result = toLocalClock(answer.result, offset)
             trackTransitions("ssh:" + host, result.groups, result.generatedAt, host)
             trackLimitStops("ssh:" + host, result.groups, host)
             trackOverlaps("ssh:" + host, result.groups, host)
             celebrateResets("ssh:" + host, result.groups)
+            // clockOffset: what its times were moved by (0: not moved), for
+            // the ones left on its clock (reviewPending)
             setRemote(host, { loading: false, ok: true, error: "", result: result, updatedAt: Date.now(),
-                              login: false, loggedIn: !!answer.loggedIn })
+                              login: false, loggedIn: !!answer.loggedIn, clockOffset: result === answer.result ? 0 : offset })
         } else {
             // keep the last answer to show (dimmed) with the error
             setRemote(host, { loading: false, ok: false, error: answer.error || answer.message || i18n("no answer"),
@@ -2376,7 +2391,16 @@ PlasmoidItem {
     // which takes it out of the queue first: one start, whoever asks).
 
     property bool taskQueued: false    // the new-chat box: start after the limit resets
-    property var startingTasks: ({})   // task id -> true while it's being started
+    property var startingTasks: ({})   // task id -> when it was started (startQueued), until its answer comes
+    // (an answer that never comes: after this it can be started again, which
+    // jump.py does once whoever asks)
+    readonly property int startStaleMs: 300000
+
+    // A queued task being started now (its answer hasn't come)
+    function isStarting(id) {
+        const at = startingTasks[id]
+        return !!at && now - at < startStaleMs
+    }
 
     // When the usage limit this account is at resets ({at, label}), or null:
     // the latest of its full windows (or of one at the usage cap), else of
@@ -2513,13 +2537,16 @@ PlasmoidItem {
             if (t.afterTurn) {   // a reply for when the chat's turn ends: now it has (or the chat isn't listed)
                 const known = !t.host || (remote[t.host] && remote[t.host].result)
                 const s = known ? listedRow(t.chat, t.profile, t.host || "") : null
-                if (known && !t.error && !startingTasks[t.id] && (!s || (s.state !== "working" && s.state !== "waiting")))
+                if (known && !t.error && !isStarting(t.id) && (!s || (s.state !== "working" && s.state !== "waiting")))
                     startQueued(t)
                 continue
             }
-            if (!t.due || startingTasks[t.id])
+            if (!t.due || isStarting(t.id))
                 continue
-            const group = hostGroups(t.host || "").find(g => g.profileKeys.indexOf(t.profile) >= 0)
+            // (its account as its section shows it: with the newest plan usage
+            // of any machine it's on, withUsage, as the new-chat box queued it by)
+            const group = hostGroups(t.host || "").map(g => withUsage(g, t.host || ""))
+                .find(g => g.profileKeys.indexOf(t.profile) >= 0)
             const reset = group ? limitReset(group, t.host || "") : null
             if (reset)
                 runHelper("--requeue " + shellQuote(t.id) + " --at " + Math.round(reset.at + 60000))
@@ -2529,7 +2556,7 @@ PlasmoidItem {
     }
 
     function startQueued(t) {
-        startingTasks = Object.assign({}, startingTasks, { [t.id]: true })
+        startingTasks = Object.assign({}, startingTasks, { [t.id]: Date.now() })
         const cmd = "python3 -I " + shellQuote(codeDir + "jump.py") + " --start-queued " + shellQuote(t.id) + configDirArgs
                     + " # " + Date.now()
         queueRuns[cmd] = t
@@ -2769,7 +2796,11 @@ PlasmoidItem {
         const id = s.chatId || s.sessionId
         const mark = marks[host ? host + "|" + id : id]
         const seen = mark === 0 ? 0 : Math.max(mark || 0, status && status.reviewedSince ? status.reviewedSince : 0)
-        return seen < s.review.editedAt
+        // (the marks and reviewedSince are this computer's, also an SSH host's
+        // chat's: pane.py marks it here. Its last edit is on the host's clock,
+        // which toLocalClock leaves its review on: moved to ours here)
+        const offset = host && remote[host] ? remote[host].clockOffset || 0 : 0
+        return seen < s.review.editedAt + offset
     }
 
     // The message waiting to be sent when the chat's turn ends (pane.py --send --after-turn)
@@ -2788,20 +2819,45 @@ PlasmoidItem {
         return [i18n("%1 asks for a permission", s.name), p.command || (p.file ? i18n("Change %1", p.file) : p.line)]
     }
 
+    // Whether the widget can answer what a waiting chat asks (its permission:
+    // through the hook, or with keys in tmux)
+    function canAnswerAsk(s) {
+        const p = s ? s.permission : null
+        return !!p && (p.answer === "hook" || p.answer === "keys")
+    }
+
+    // What a waiting chat asks, to tell one prompt from the next: the hook's
+    // request, else the tool call it's about (talpy_den.py: note_permissions);
+    // "" when there's nothing to tell them apart by
+    function askId(s) {
+        const p = s ? s.permission : null
+        if (!p)
+            return ""
+        if (p.answer === "hook")
+            return p.request ? "request:" + p.request : ""
+        return p.toolUse ? "tool:" + p.toolUse : ""
+    }
+
     // An answer to what a chat asks, from its row or a notification (pane.py
-    // --answer / --keys); a question's: decision "answer", answers {question: [labels or text]}
+    // --answer / --keys); a question's: decision "answer", answers {question: [labels or text]}.
+    // s is the chat as that row or notification shows it, and the answer goes
+    // to what it shows only: the hook's request, or in tmux the tool call it
+    // asks about (--expect: if it asks something else now, nothing is pressed)
     function answerPermission(s, host, decision, note, answers) {
         const p = s ? s.permission : null
         if (!p || (p.answer !== "hook" && p.answer !== "keys"))
             return
         const args = p.answer === "hook"
             ? "--answer " + shellQuote(p.request)
-            : "--keys " + shellQuote(s.sessionId) + profileArg(s.profileDir)
-        paneActions.connectSource("python3 -I " + shellQuote(codeDir + "pane.py") + " " + args + " --decision " + decision
-                                  + (note ? " --note " + shellQuote(note) : "")
-                                  + (answers ? " --answers " + shellQuote(JSON.stringify(answers)) : "")
-                                  + (host ? " --host " + shellQuote(host) : "") + configDirArgs + " # " + Date.now())
+            : "--keys " + shellQuote(s.sessionId) + profileArg(s.profileDir) + (p.toolUse ? " --expect " + shellQuote(p.toolUse) : "")
+        const cmd = "python3 -I " + shellQuote(codeDir + "pane.py") + " " + args + " --decision " + decision
+                    + (note ? " --note " + shellQuote(note) : "")
+                    + (answers ? " --answers " + shellQuote(JSON.stringify(answers)) : "")
+                    + (host ? " --host " + shellQuote(host) : "") + configDirArgs + " # " + Date.now()
+        answerFor[cmd] = { session: s, host: host || "" }
+        paneActions.connectSource(cmd)
     }
+    property var answerFor: ({})   // command -> {session, host}: the chat an answer is for
 
     // Other…, from a question's notification: the chat's pane, the field to answer in your own words ready
     function answerInPane(s, host) {
@@ -2842,10 +2898,21 @@ PlasmoidItem {
             disconnectSource(source)
             const draft = root.replyDrafts[source]
             delete root.replyDrafts[source]
+            const asked = root.answerFor[source]
+            delete root.answerFor[source]
             const result = root.helperResult(data)
             if (!result.ok) {
                 root.actionError = result.message
                 actionErrorTimer.restart()
+                // (in tmux it asks something else now, or nothing: nothing was
+                // pressed. Said in a notification while the popup is closed; the
+                // next check makes that the notification of what it asks now)
+                if (asked && result.changed === true && !root.dashboardShown) {
+                    const s = asked.session
+                    root.notify(root.petKeyOf(s, asked.host), s, "waiting", i18n("%1 doesn't ask that any more", s.name),
+                                i18n("Nothing was answered. Open it to see what it asks now.") + "\n" + (s.cwdShort || "")
+                                + (asked.host ? " · " + asked.host : ""), "dialog-warning", asked.host, true)
+                }
             } else if (draft && result.how === "ask") {
                 root.openPane(draft.session, draft.host, "chat")   // (its terminal takes no text: you choose there)
                 root.paneDraft = draft.text
@@ -2859,6 +2926,8 @@ PlasmoidItem {
                 }
             }
             root.refresh()
+            if (asked && asked.host)
+                root.pollHost(asked.host)   // (what it asks now there, as the pane does)
         }
     }
     property string paneDraft: ""   // (a reply the pane takes into its box)
@@ -3179,21 +3248,32 @@ PlasmoidItem {
         onTriggered: root.loadPerms()
     }
 
+    property string permsAsked: ""   // the read whose answer is awaited (one given up on is left out)
+    property real permsAskedAt: 0
+    property bool permsAgain: false  // read again once that's in (a rule changed meanwhile)
+    // (a read or a change whose answer never comes is given up after this)
+    readonly property int permsStaleMs: 300000
+
     function loadPerms() {
-        if (popupTab !== "perms" || permsBusy)
+        if (popupTab !== "perms" || (permsBusy && Date.now() - permsAskedAt < permsStaleMs))
             return
         permsBusy = true
+        permsAgain = false
         let cmd = "python3 -I " + shellQuote(codeDir + "week.py") + " --permissions"
         for (const host of shownHosts)   // (the ones that answered their last check: no waiting on one out of reach)
             if (remote[host] && remote[host].result && !remote[host].error)
                 cmd += " --host " + shellQuote(host)
-        permsReader.connectSource(cmd + configDirArgs + " # " + Date.now())
+        permsAsked = cmd + configDirArgs + " # " + Date.now()
+        permsAskedAt = Date.now()
+        permsReader.connectSource(permsAsked)
     }
 
     Exec {
         id: permsReader
         onNewData: (source, data) => {
             disconnectSource(source)
+            if (source !== root.permsAsked)
+                return   // a read given up on: a newer one is on its way
             root.permsBusy = false
             const result = root.helperResult(data)
             if (result.ok) {
@@ -3202,6 +3282,8 @@ PlasmoidItem {
             } else {
                 root.permsError = result.message || result.error || i18n("no answer")
             }
+            if (root.permsAgain)
+                root.loadPerms()
         }
     }
 
@@ -3218,7 +3300,7 @@ PlasmoidItem {
         ruleHost = host || ""
         ruleMessage = ""
         ruleRevoked = false
-        ruleWriter.connectSource(cmd + " # " + Date.now())
+        writeRule(cmd + " # " + Date.now())
     }
 
     // Takes one of the permissions you gave (what lets chats go without
@@ -3228,17 +3310,36 @@ PlasmoidItem {
         ruleHost = host || ""
         ruleMessage = ""
         ruleRevoked = true
-        ruleWriter.connectSource("python3 -I " + shellQuote(codeDir + "week.py") + " --revoke " + shellQuote(grant.id)
-                                 + (host ? " --on " + shellQuote(host) : configDirArgs) + " # " + Date.now())
+        writeRule("python3 -I " + shellQuote(codeDir + "week.py") + " --revoke " + shellQuote(grant.id)
+                  + (host ? " --on " + shellQuote(host) : configDirArgs) + " # " + Date.now())
+    }
+
+    property string ruleAsked: ""   // the change whose answer is awaited (ruleBusy)
+
+    function writeRule(cmd) {
+        ruleAsked = cmd
+        ruleStale.restart()
+        ruleWriter.connectSource(cmd)
+    }
+
+    // (a change whose answer never comes: the buttons work again)
+    Timer {
+        id: ruleStale
+        interval: root.permsStaleMs
+        onTriggered: root.ruleBusy = ""
     }
 
     Exec {
         id: ruleWriter
         onNewData: (source, data) => {
             disconnectSource(source)
-            root.ruleBusy = ""
-            const result = root.helperResult(data)
-            root.ruleMessage = result.ok ? result.message || "" : i18n("Nothing changed: %1", result.message || i18n("no answer"))
+            if (source === root.ruleAsked) {   // (not one given up on: it says nothing of the one now)
+                root.ruleBusy = ""
+                ruleStale.stop()
+                const result = root.helperResult(data)
+                root.ruleMessage = result.ok ? result.message || "" : i18n("Nothing changed: %1", result.message || i18n("no answer"))
+            }
+            root.permsAgain = true   // (a read on its way may have read the file before)
             root.loadPerms()
         }
     }

@@ -8,6 +8,7 @@ import io
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,7 @@ sys.dont_write_bytecode = True  # keep __pycache__ out of the plasmoid package
 CODE = Path(__file__).resolve().parent.parent / "package/contents/code"
 sys.path.insert(0, str(CODE))
 import pane  # noqa: E402
+import permission_hook  # noqa: E402
 
 cs = pane.cs
 
@@ -529,6 +531,85 @@ class KeysTests(unittest.TestCase):
         self.assertIn("no permission question", message)
 
 
+class ToolUseTests(PaneFixture):
+    """The tool call a row's prompt is about ("toolUse"), and keys pressed
+    only while the chat still asks about it (pane.py --keys --expect)."""
+
+    def setUp(self):
+        super().setUp()
+        write(self.home / ".claude-work/sessions/30.json",
+              session("tmuxed", status="waiting", waitingFor="permission prompt", tmux="s:1.%3"))
+        self.path = self.home / ".claude-work/projects/-tmp-proj-tmuxed/tmuxed.jsonl"
+        write(self.path, lines(prompt("deploy", self.now - 5), tool_use("toolu_1", "Bash", {"command": "make deploy"}, self.now - 4)))
+
+    def test_rows_name_it(self):
+        rows = self.rows()
+        self.assertEqual((rows["tmuxed"]["permission"]["toolUse"], rows["tmuxed"]["permission"]["answer"]), ("toolu_1", "keys"))
+        self.assertEqual(cs.chat_tool_use(self.home, [], "tmuxed"), "toolu_1")
+        self.assertEqual(cs.chat_tool_use(self.home, [], "tmuxed", ".claude-work"), "toolu_1")
+        self.assertIsNone(cs.chat_tool_use(self.home, [], "tmuxed", ".claude-personal"))
+        self.assertIsNone(cs.chat_tool_use(self.home, [], "no-such-chat"))
+        # through the hook: what its request names (null: Claude named none)
+        hook = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        self.addCleanup(lambda: (hook.kill(), hook.wait()))
+        for rid, tool_use_id in (("123-abcdef01", None), ("124-abcdef02", "toolu_9")):
+            write(self.cache / f"permissions/{rid}.json",
+                  {"id": rid, "at": int(self.now * 1000), "hookPid": hook.pid, "sessionId": "tmuxed", "tool": "Bash",
+                   "input": {"command": "make deploy"}, "suggestions": [], "cwd": "/tmp", "toolUse": tool_use_id})
+            permission = self.rows()["tmuxed"]["permission"]
+            self.assertEqual((permission["answer"], permission["request"], permission["toolUse"]), ("hook", rid, tool_use_id))
+            (self.cache / f"permissions/{rid}.json").unlink()
+        # every row's permission has it, even one a stand-in view leaves out
+        row = {"state": "waiting", "waitingFor": "permission prompt", "sessionId": "x", "tmux": "s:1.%3"}
+        with mock.patch.object(cs, "pending_permission", return_value=cs.permission_view("Bash", {"command": "ls"}, "")):
+            cs.note_permissions([{"sessions": [row]}], mock.Mock(profiles=[]), {})
+        self.assertIsNone(row["permission"]["toolUse"])
+
+    def keys(self, *args, meanwhile=None):
+        """pane.py --keys tmuxed … with tmux stood in for: (its answer, the keys sent)."""
+        sent = []
+
+        def run(base, argv, data=None):
+            if argv[0] == "capture-pane":
+                if meanwhile:
+                    with open(self.path, "a") as f:
+                        f.write(lines(*meanwhile))
+                return True, SCREEN
+            sent.append(argv[-1])
+            return True, ""
+        with mock.patch.object(pane, "tmux_base", return_value=(["tmux"], "%3")), \
+                mock.patch.object(pane, "tmux_run", side_effect=run), mock.patch.object(pane.time, "sleep"):
+            return self.cli("--keys", "tmuxed", "--profile", ".claude-work", "--decision", "allow", *args), sent
+
+    def test_keys_for_the_call_it_asks_about(self):
+        self.assertEqual(self.keys("--expect", "toolu_1"), ({"ok": True, "message": "Allowed"}, ["1"]))
+
+    def test_no_keys_once_it_asks_something_else(self):
+        # answered in the chat while you clicked, and the next call asks
+        nxt = [tool_result("toolu_1", self.now - 3), tool_use("toolu_2", "Bash", {"command": "rm -rf build"}, self.now - 2, "m3")]
+        self.assertEqual(self.keys("--expect", "toolu_1", meanwhile=nxt),
+                         ({"ok": False, "message": "It asks something else now", "changed": True}, []))
+        # or it asks nothing now
+        write(self.path, lines(prompt("deploy", self.now - 5), tool_use("toolu_1", "Bash", {"command": "make deploy"}, self.now - 4)))
+        self.assertEqual(self.keys("--expect", "toolu_1", meanwhile=[tool_result("toolu_1", self.now - 3)]),
+                         ({"ok": False, "message": "It asks something else now", "changed": True}, []))
+
+    def test_without_expect_as_before(self):
+        nxt = [tool_result("toolu_1", self.now - 3), tool_use("toolu_2", "Bash", {"command": "rm -rf build"}, self.now - 2, "m3")]
+        with mock.patch.object(cs, "chat_tool_use") as looked:
+            self.assertEqual(self.keys(meanwhile=nxt), ({"ok": True, "message": "Allowed"}, ["1"]))
+            self.assertEqual(self.keys("--expect", "")[1], ["1"])   # (an empty one: no check)
+        looked.assert_not_called()
+
+    def test_on_a_host(self):
+        with mock.patch("remote.host_answer", return_value={"ok": False, "message": "It asks something else now",
+                                                             "changed": True}) as asked:
+            answer = self.cli("--keys", "tmuxed", "--decision", "allow", "--expect", "toolu_1", "--host", "gpu")
+        self.assertTrue(answer["changed"])
+        self.assertEqual(asked.call_args[0][1], ["--keys", "tmuxed", "--decision", "allow", "--expect", "toolu_1"])
+        self.assertEqual(asked.call_args[1], {"name": "pane.py"})
+
+
 class HookTests(unittest.TestCase):
     """permission_hook.py, run as Claude runs it (this test is its Claude)."""
 
@@ -580,6 +661,12 @@ class HookTests(unittest.TestCase):
         ok, message = pane.answer_request(self.cache / "talpy-den", request["id"], "allow")
         self.assertFalse(ok)
         self.assertIn("isn't asking any more", message)
+        # the front ends hear it may ask something else now (as with --keys --expect)
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"HOME": str(self.home), "XDG_CACHE_HOME": str(self.cache)}), \
+                contextlib.redirect_stdout(out):
+            pane.main(["--answer", request["id"], "--decision", "allow"])
+        self.assertEqual(json.loads(out.getvalue()), {"ok": False, "message": message, "changed": True})
 
     def test_decisions(self):
         self.assertEqual(pane.decision_of("deny", " use make test ", []),
@@ -710,6 +797,68 @@ class HookTests(unittest.TestCase):
             self.assertEqual(pane.shortcuts(self.home, False), (True, "Keyboard answers are off"))
             self.assertFalse(path.exists())
             self.assertIn("unregister \"org.wzaielamri.talpyden.answers.desktop\" \"deny\"", log.read_text())
+
+    def test_the_tool_call_it_asks_about(self):
+        # (Claude Code 2.1.311 names none in a permission request: null then)
+        hook, request = self.start()
+        self.assertIsNone(request["toolUse"])
+        self.assertIsNone(cs.request_view(request)["toolUse"])
+        hook.kill()
+        hook.wait()
+        named = subprocess.Popen([sys.executable, "-I", str(CODE / "permission_hook.py")], stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, env=self.env())
+        self.addCleanup(lambda: (named.poll() is None and named.kill(), named.wait(), named.stdout.close()))
+        named.stdin.write(json.dumps({"session_id": "named", "tool_name": "Bash", "tool_use_id": "toolu_7",
+                                      "tool_input": {"command": "ls"}}).encode())
+        named.stdin.close()
+        deadline = time.time() + 5
+        while time.time() < deadline and "named" not in cs.permission_requests(self.cache / "talpy-den"):
+            time.sleep(0.05)
+        request = cs.permission_requests(self.cache / "talpy-den")["named"]
+        self.assertEqual((request["toolUse"], cs.request_view(request)["toolUse"]), ("toolu_7", "toolu_7"))
+
+    def test_run_through_a_shell_it_finds_its_claude(self):
+        # Claude runs a hook's command with sh -c; dash, Debian's and
+        # Ubuntu's sh, stays between them unless the command execs (an
+        # entry written before doesn't): the hook still finds this Claude,
+        # and waits while it shows its dialog (not just NO_DIALOG_S)
+        shells = [s for s in ("sh", "dash", "bash") if shutil.which(s)]
+        python, script = shlex.quote(sys.executable), shlex.quote(str(CODE / "permission_hook.py"))
+        for shell in shells:
+            with self.subTest(shell):
+                hook = subprocess.Popen([shell, "-c", f"{python} -I {script}"], stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE, env=self.env())
+                self.addCleanup(lambda h=hook: (h.poll() is None and h.kill(), h.wait(), h.stdout.close()))
+                hook.stdin.write(json.dumps({"session_id": SID, "tool_name": "Bash", "tool_input": {"command": "make"},
+                                             "cwd": "/tmp", "permission_suggestions": []}).encode())
+                hook.stdin.close()
+                deadline = time.time() + 5
+                while time.time() < deadline and not cs.permission_requests(self.cache / "talpy-den"):
+                    time.sleep(0.05)
+                (request,) = cs.permission_requests(self.cache / "talpy-den").values()
+                self.assertEqual(request["pid"], os.getpid())
+                if shell == shells[0]:
+                    time.sleep(permission_hook.NO_DIALOG_S + 1)
+                    self.assertIsNone(hook.poll())   # (its Claude still asks)
+                self.assertEqual(pane.answer_request(self.cache / "talpy-den", request["id"], "allow"), (True, "Allowed"))
+                self.assertEqual(json.loads(hook.stdout.read())["hookSpecificOutput"]["decision"], {"behavior": "allow"})
+                hook.wait(5)
+
+    def test_claudes_process_through_shells(self):
+        # its parent; the parent of the shell that ran it (one that stays:
+        # a command after it); without /proc, its parent
+        probe = (f"import sys; sys.path.insert(0, {str(CODE)!r}); import permission_hook, live_hook; "
+                 "print(permission_hook.claude_pid(), live_hook.claude_pid())")
+        command = f"{shlex.quote(sys.executable)} -I -B -c {shlex.quote(probe)}"   # (-B: no __pycache__ in the package)
+        runs = [("itself", [sys.executable, "-I", "-B", "-c", probe])]
+        runs += [(s, [s, "-c", command + "; :"]) for s in ("sh", "dash", "bash") if shutil.which(s)]
+        for name, argv in runs:
+            with self.subTest(name):
+                out = subprocess.run(argv, capture_output=True, text=True, timeout=30)
+                self.assertEqual(out.stdout.split(), [str(os.getpid())] * 2, out.stderr)
+        with mock.patch.object(permission_hook, "parent_of", return_value=None):
+            self.assertEqual(permission_hook.claude_pid(), os.getppid())
+        self.assertEqual(permission_hook.parent_of(os.getpid())[0], os.getppid())
 
     def test_a_permission_takes_no_answers(self):
         hook, request = self.start()
@@ -922,6 +1071,55 @@ class ReviewTests(PaneFixture):
         self.assertEqual(files["~/notes/plan.md"]["diff"], ["@@ -1,2 +1,2 @@", " step 1", "-step 2", "+step 2 done"])
         self.assertEqual((files["~/notes/odd.md"]["unknown"], files["~/notes/odd.md"]["now"]), (True, ["a", "b"]))
 
+    @unittest.skipUnless(HAVE_GIT, "needs git")
+    def test_a_file_git_doesnt_have_isnt_taken_for_new(self):
+        # Changed with no backup and no earlier content in its tool's result
+        # (a notebook edit): in the repository but not committed (nb.ipynb),
+        # or in one with no commit yet (fresh/notes.txt). They were there
+        # before the chat: unknown, so Undo leaves them
+        t = self.now - 50
+        nb, fresh = self.folder / "nb.ipynb", self.home / "fresh/notes.txt"
+        write(nb, '{"cells": ["mine and the chat\'s"]}')
+        write(fresh, "mine, then the chat's\n")
+        subprocess.run(["git", "init", "-q", str(fresh.parent)], check=True, capture_output=True)
+        edit = {"cell_id": "c1", "new_source": "x"}
+        with open(self.transcript, "a") as f:
+            f.write(lines(tool_use("nb1", "NotebookEdit", dict(edit, notebook_path=str(nb)), t, "nb1"),
+                          tool_result("nb1", t + 1),
+                          tool_use("fr1", "NotebookEdit", dict(edit, notebook_path=str(fresh)), t + 2, "fr1"),
+                          tool_result("fr1", t + 3)))
+        files = {f["label"]: f for f in self.cli("--review", SID)["files"]}
+        for label in ("nb.ipynb", "~/fresh/notes.txt"):
+            self.assertEqual((files[label]["created"], files[label]["unknown"], files[label]["deleted"]), (False, True, False))
+        self.assertEqual(self.cli("--undo", SID)["message"], "Put back 2 files as before the chat (2 with no earlier version kept)")
+        self.assertEqual(nb.read_text(), '{"cells": ["mine and the chat\'s"]}')   # (still there)
+        self.assertEqual(fresh.read_text(), "mine, then the chat's\n")
+
+    @unittest.skipUnless(HAVE_GIT, "needs git")
+    def test_a_file_that_was_empty_comes_back_empty(self):
+        # Empty before the chat (git has it empty; an Edit's result said so):
+        # Undo empties it again, it doesn't delete it
+        t = self.now - 50
+        init, blank = self.folder / "pkg/__init__.py", self.home / "notes/blank.md"
+        write(init, "")
+        self.git("add", "pkg/__init__.py")
+        self.git("commit", "-qm", "pkg")
+        write(init, "VERSION = 2\n")
+        write(blank, "filled in\n")
+        filled = tool_result("bl1", t + 3)
+        filled["toolUseResult"] = {"filePath": str(blank), "originalFile": "", "structuredPatch": []}
+        with open(self.transcript, "a") as f:
+            f.write(lines(tool_use("in1", "NotebookEdit", {"notebook_path": str(init), "new_source": "x"}, t, "in1"),
+                          tool_result("in1", t + 1),
+                          tool_use("bl1", "Edit", {"file_path": str(blank), "old_string": "", "new_string": "x"}, t + 2, "bl1"),
+                          filled))
+        files = {f["label"]: f for f in self.cli("--review", SID)["files"]}
+        self.assertEqual((files["pkg/__init__.py"]["created"], files["pkg/__init__.py"]["added"]), (False, 1))
+        self.assertEqual((files["~/notes/blank.md"]["created"], files["~/notes/blank.md"]["unknown"]), (False, False))
+        ok, said = pane.undo(self.home, [], SID, None, {str(init), str(blank)})
+        self.assertEqual((ok, said), (True, "Put back 2 files as before the chat"))
+        self.assertEqual((init.read_text(), blank.read_text()), ("", ""))
+
     def test_undo(self):
         ok, message = pane.undo(self.home, [], SID, None, {str(self.folder / "new.py")})
         self.assertEqual((ok, message), (True, "Put back 1 file as before the chat"))
@@ -1013,7 +1211,7 @@ class RelayTests(PaneFixture):
         groups = json.loads(shared.read_text())["hooks"]["PermissionRequest"]
         hook = self.home / ".local/share/talpy-den/permission-hook.py"
         self.assertEqual(groups[0], mine)
-        self.assertEqual(groups[1]["hooks"][0], {"type": "command", "command": f"python3 -I {hook}",
+        self.assertEqual(groups[1]["hooks"][0], {"type": "command", "command": f"exec python3 -I {hook}",
                                                  "timeout": pane.HOOK_TIMEOUT_S})
         self.assertEqual(hook.read_text(), (CODE / "permission_hook.py").read_text())
         self.assertTrue(self.cli("--relay", "status")["on"])
@@ -1024,6 +1222,57 @@ class RelayTests(PaneFixture):
         self.assertEqual((data["hooks"]["PermissionRequest"], data["model"]), ([mine], "opus"))
         self.assertFalse(hook.exists())
         self.assertFalse(self.cli("--relay", "status")["some"])
+
+    def test_an_entry_written_before_is_replaced_not_added_to(self):
+        # Before: python3 -I PATH (no exec, unquoted), also in the folder of
+        # the first name. Still the hook's: on, it's replaced (once); off, it goes
+        settings = self.home / ".claude-work/settings.json"
+        data = self.home / ".local/share"
+        older = [f"python3 -I {data}/talpy-den/permission-hook.py", f"python3 -I {data}/claude-widget/permission-hook.py"]
+        mine = {"matcher": "Bash", "hooks": [{"type": "command", "command": "mine"}]}
+        write(settings, {"hooks": {"PermissionRequest": [mine] + [
+            {"matcher": "*", "hooks": [{"type": "command", "command": c, "timeout": 86400}]} for c in older]}})
+        self.assertTrue(self.cli("--relay", "status")["some"])
+        self.assertEqual(pane.relay(self.home, [], True), (True, "Permission prompts can be answered from the widget"))
+        groups = json.loads(settings.read_text())["hooks"]["PermissionRequest"]
+        hook = pane.hook_path(self.home, "relay")
+        self.assertEqual(groups, [mine, {"matcher": "*", "hooks": [
+            {"type": "command", "command": f"exec python3 -I {hook}", "timeout": pane.HOOK_TIMEOUT_S}]}])
+        self.assertEqual(pane.relay(self.home, [], True)[1],
+                         "Permission prompts can be answered from the widget (they could already)")
+        # off takes an older one out too
+        write(settings, {"hooks": {"PermissionRequest": [mine, {"matcher": "*", "hooks": [{"type": "command", "command": older[1]}]}]}})
+        pane.relay(self.home, [], False)
+        self.assertEqual(json.loads(settings.read_text())["hooks"]["PermissionRequest"], [mine])
+
+    def test_a_folder_name_with_a_space(self):
+        # The command Claude runs (sh -c) finds the hook, and the hook is
+        # Claude's child (exec): here, this test's
+        data = Path(self.tmp.name) / "it's my data"
+        with mock.patch.dict(os.environ, {"XDG_DATA_HOME": str(data)}):
+            pane.relay(self.home, [], True)
+            pane.live(self.home, [], True)
+        hooks = json.loads((self.home / ".claude-work/settings.json").read_text())["hooks"]
+        relay = hooks["PermissionRequest"][0]["hooks"][0]["command"]
+        live_hook = hooks["SessionStart"][0]["hooks"][0]["command"]
+        self.assertEqual(shlex.split(relay), ["exec", "python3", "-I", str(data / "talpy-den/permission-hook.py")])
+        self.assertEqual(shlex.split(live_hook), ["exec", "python3", "-I", "-S", str(data / "talpy-den/live-hook.py")])
+        cache = Path(self.tmp.name) / "c"
+        env = dict(os.environ, HOME=str(self.home), XDG_CACHE_HOME=str(cache), PATH=f"{Path(sys.executable).parent}:/usr/bin:/bin")
+        event = {"session_id": SID, "hook_event_name": "UserPromptSubmit", "cwd": "/tmp"}
+        done = subprocess.run(["/bin/sh", "-c", live_hook], input=json.dumps(event), env=env, capture_output=True,
+                              text=True, timeout=30)
+        self.assertEqual((done.returncode, done.stderr), (0, ""))
+        self.assertEqual(json.loads((cache / f"talpy-den/live/{SID}.json").read_text())["pid"], os.getpid())
+        hook = subprocess.Popen(["/bin/sh", "-c", relay], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+        self.addCleanup(lambda: (hook.poll() is None and hook.kill(), hook.wait(), hook.stdout.close()))
+        hook.stdin.write(json.dumps({"session_id": SID, "tool_name": "Bash", "tool_input": {"command": "ls"}}).encode())
+        hook.stdin.close()
+        deadline = time.time() + 5
+        while time.time() < deadline and not cs.permission_requests(cache / "talpy-den"):
+            time.sleep(0.05)
+        (request,) = cs.permission_requests(cache / "talpy-den").values()
+        self.assertEqual((request["pid"], request["hookPid"]), (os.getpid(), hook.pid))   # (exec: the shell is the hook)
 
     def test_on_a_host_it_gets_the_hook(self):
         with mock.patch("remote.host_answer", return_value={"ok": True, "message": "ok"}) as asked:

@@ -23,10 +23,43 @@ import signal
 import sys
 import time
 
+# This file's version: a status check brings an older copy of it in
+# ~/.local/share/talpy-den up to date (talpy_den.refresh_hooks)
+HOOK_REVISION = 2
 POLL_S = 0.3
 STATE_EVERY_S = 1.0
 NO_DIALOG_S = 5.0  # a chat that isn't waiting by then asks only after its hooks: let it
 LONGEST_S = 23 * 3600  # (the settings give it 24 h; it ends before Claude would cut it off)
+# Shells that may stand between Claude and the hook: Claude runs a hook's
+# command with sh -c, and dash (Debian's and Ubuntu's sh) stays as the
+# command's parent unless the command starts with exec (older entries in
+# settings.json don't)
+SHELLS = frozenset(("sh", "dash", "bash", "zsh", "ksh", "ksh93", "mksh", "lksh", "pdksh", "ash", "busybox", "yash",
+                    "posh"))
+
+
+def parent_of(pid):
+    """(parent pid, command name) of a process, from Linux's /proc, or None."""
+    try:
+        with open("/proc/%d/stat" % pid, "rb") as f:
+            stat = f.read().decode("utf-8", "replace")
+        end = stat.rindex(")")  # (the name may have spaces and parentheses)
+        return int(stat[end + 2:].split()[1]), stat[stat.index("(") + 1:end]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def claude_pid():
+    """The Claude process the hook runs for: its parent, or, when that's the
+    shell Claude ran the command with, the shell's parent. Without /proc
+    (not Linux), its parent."""
+    pid = os.getppid()
+    for _ in range(4):
+        found = parent_of(pid)
+        if found is None or found[1] not in SHELLS or found[0] <= 1:
+            break
+        pid = found[0]
+    return pid
 
 
 def cache_root():
@@ -92,7 +125,7 @@ def main():
         return 0
     if not isinstance(request, dict):
         return 0
-    claude = os.getppid()
+    parent, claude = os.getppid(), claude_pid()
     folder = cache_root()
     try:
         os.makedirs(folder, mode=0o700, exist_ok=True)
@@ -116,6 +149,8 @@ def main():
             "cwd": request.get("cwd"), "mode": request.get("permission_mode"),
             "tool": request.get("tool_name"), "input": request.get("tool_input"),
             "suggestions": request.get("permission_suggestions") or [],
+            # the tool call it's about, if Claude names it (2.1.311 doesn't)
+            "toolUse": request.get("tool_use_id") if isinstance(request.get("tool_use_id"), str) else None,
         })
     except OSError:
         return 0
@@ -137,7 +172,7 @@ def main():
         now = time.time()
         if now - checked >= STATE_EVERY_S:
             checked = now
-            if not alive(claude) or os.getppid() != claude:
+            if not alive(claude) or os.getppid() != parent:
                 leave()
             status = session_status(session) if session else None
             if status == "waiting":

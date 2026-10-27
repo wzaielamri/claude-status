@@ -10,8 +10,23 @@ export const recorded = {
   uriHandlers: [] as unknown[],
   statusBarItems: [] as { text: string; tooltip: unknown; backgroundColor: unknown; show(): void; dispose(): void }[],
   messages: [] as string[],
-  panels: [] as { sent: unknown[]; receive(m: unknown): void }[],
+  panels: [] as { sent: unknown[]; receive(m: unknown): void; show(visible: boolean): void; dispose(): void; readonly disposed: boolean }[],
 };
+
+// Listeners of a kind of event, each with a disposable that takes it off
+function listeners<T>() {
+  const list = new Set<(e: T) => void>();
+  return {
+    on: (l: (e: T) => void) => (list.add(l), { dispose: () => void list.delete(l) }),
+    fire: (e: T) => [...list].forEach((l) => l(e)),
+  };
+}
+
+// A change of settings, as VS Code tells it: keys like "talpyDen.chatTextScale"
+const configChanges = listeners<{ affectsConfiguration(section: string): boolean }>();
+export function changeSettings(...keys: string[]): void {
+  configChanges.fire({ affectsConfiguration: (section) => keys.some((k) => k === section || k.startsWith(section + ".")) });
+}
 
 // settings a test sets (key -> value); the rest read as their defaults
 export const overrides = new Map<string, unknown>();
@@ -20,7 +35,7 @@ export const workspace = {
   getConfiguration: () => ({ get: <T>(key: string, fallback: T) => (overrides.has(key) ? (overrides.get(key) as T) : fallback), update: async () => undefined }),
   workspaceFolders: undefined,
   workspaceFile: undefined,
-  onDidChangeConfiguration: disposable,
+  onDidChangeConfiguration: configChanges.on,
   onDidChangeWorkspaceFolders: disposable,
   registerTextDocumentContentProvider: disposable,
 };
@@ -57,27 +72,62 @@ export const window = {
     return disposable();
   },
   // an editor tab with a page: what the page is sent, and a way to send it
-  // what a page would (panel.receive)
+  // what a page would (panel.receive), to show or hide it (panel.show) and to
+  // close it (panel.dispose). As VS Code's, once it's closed its webview,
+  // title and visible throw.
   createWebviewPanel: () => {
     const sent: unknown[] = [];
     let onMessage: (m: unknown) => void = () => undefined;
+    const viewState = listeners<unknown>();
+    const closed = listeners<void>();
+    let disposed = false;
+    let title = "";
+    let visible = false;
+    const alive = () => {
+      if (disposed) throw new Error("Webview is disposed");
+    };
+    const webview = {
+      html: "",
+      cspSource: "vscode-webview:",
+      asWebviewUri: (u: unknown) => u,
+      postMessage: async (m: unknown) => (disposed ? false : (sent.push(m), true)),
+      onDidReceiveMessage: (l: (m: unknown) => void) => ((onMessage = l), disposable()),
+    };
     const panel = {
-      title: "",
+      get title() {
+        alive();
+        return title;
+      },
+      set title(t: string) {
+        alive();
+        title = t;
+      },
       iconPath: undefined as unknown,
-      visible: false,
+      get visible() {
+        alive();
+        return visible;
+      },
+      get disposed() {
+        return disposed;
+      },
+      get webview() {
+        alive();
+        return webview;
+      },
       sent,
       receive: (m: unknown) => onMessage(m),
-      webview: {
-        html: "",
-        cspSource: "vscode-webview:",
-        asWebviewUri: (u: unknown) => u,
-        postMessage: async (m: unknown) => (sent.push(m), true),
-        onDidReceiveMessage: (l: (m: unknown) => void) => ((onMessage = l), disposable()),
+      show(v: boolean) {
+        visible = v;
+        viewState.fire(undefined);
       },
-      onDidChangeViewState: disposable,
-      onDidDispose: disposable,
+      onDidChangeViewState: viewState.on,
+      onDidDispose: closed.on,
       reveal() {},
-      dispose() {},
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        closed.fire();
+      },
     };
     recorded.panels.push(panel);
     return panel;
@@ -86,6 +136,7 @@ export const window = {
   showInformationMessage: async (m: string) => void recorded.messages.push(m),
   showWarningMessage: async (m: string) => void recorded.messages.push(m),
   showErrorMessage: async (m: string) => void recorded.messages.push(m),
+  setStatusBarMessage: (m: string) => (recorded.messages.push(m), disposable()),
   withProgress: async <T>(_o: unknown, task: (p: { report(): void }) => Promise<T>) => task({ report() {} }),
 };
 

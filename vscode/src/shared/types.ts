@@ -274,7 +274,19 @@ export interface PermissionAsk {
   // older backends leave it out
   plan?: PlanAsk | null;
   request: string | null; // the hook's request, which the extension can answer
+  // the id of the tool use it asks about (pane.py --keys --expect checks it's
+  // still the one asked), or null; older backends leave it out
+  toolUse?: string | null;
   answer: "hook" | "keys" | ""; // how it can be answered from here ("": only in the chat)
+}
+
+// The prompt an answer is to (shared/pane.ts: shownAsk): its hook request,
+// its tool use and its line, as the notification, row or tab showed them. An
+// answer goes only to that prompt, never to one that came after it.
+export interface AskShown {
+  request: string | null;
+  toolUse: string | null;
+  line: string;
 }
 
 export interface PlanAsk {
@@ -853,7 +865,7 @@ export type WebviewMessage =
   | { type: "open"; chat: ChatRef }
   | { type: "openPane"; chat: ChatRef; tab?: "chat" | "review" } // the chat's tab: its conversation, a reply box, its review
   | { type: "openWindow"; chat: ChatRef } // its own terminal or Claude Code tab, whatever a click does
-  | { type: "answerPermission"; chat: ChatRef; decision: Decision; note?: string; answers?: Answers } // what a waiting chat asks
+  | { type: "answerPermission"; chat: ChatRef; decision: Decision; note?: string; answers?: Answers; shown: AskShown | null } // what a waiting chat asks (shown: the prompt you answer)
   | { type: "openInClaudeCode"; chat: ChatRef }
   | { type: "moveToClaudeCode"; chat: ChatRef } // a chat in a terminal: Claude quits there, the chat reopens in a Claude Code tab
   | { type: "setReopenIn"; where: ReopenIn }

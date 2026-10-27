@@ -72,6 +72,7 @@ export class Dashboard implements vscode.Disposable {
     private log: vscode.LogOutputChannel,
   ) {
     this.windowHost = currentRemoteHost(vscode);
+    this.polledWith = this.pollSettings();
     this.away = new AwayWatch((now, lastUse) => this.cameBack(now, lastUse));
     this.live = new LiveWatch(
       ({ urgent, views }) => {
@@ -96,9 +97,7 @@ export class Dashboard implements vscode.Disposable {
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (!e.affectsConfiguration("talpyDen")) return;
         if (e.affectsConfiguration("talpyDen.recapHistory")) void this.setRecapHistory(settings.recapHistory());
-        this.syncHosts();
-        this.scheduleLocal(0);
-        this.scheduleHosts(0);
+        this.settingsChanged();
       }),
       // the Claude Code extension installed, removed or (in a new folder) enabled
       vscode.extensions.onDidChange(() => void this.checkClaudeCode()),
@@ -107,6 +106,7 @@ export class Dashboard implements vscode.Disposable {
         const host = currentRemoteHost(vscode);
         if (host !== this.windowHost) {
           this.windowHost = host;
+          this.polledWith = { ...this.polledWith, hosts: this.pollSettings().hosts };
           this.syncHosts();
           this.scheduleHosts(0);
         }
@@ -208,6 +208,33 @@ export class Dashboard implements vscode.Disposable {
 
   isVisible(): boolean {
     return this.visible;
+  }
+
+  // What the checks run with: this computer's (Python, its config dirs, the
+  // status's arguments, the usage cap), the hosts' (Python, the arguments,
+  // which hosts), and their pace. A setting that changes none of them (the
+  // chat tab's text size, a sound, …) only redraws.
+  private pollSettings() {
+    const status = statusArgs();
+    return {
+      local: JSON.stringify([settings.python(), configDirArgs(), status, settings.usageCap()]),
+      hosts: JSON.stringify([settings.python(), status, this.shownHosts()]),
+      localPace: JSON.stringify([settings.pollInterval(), settings.idlePollInterval()]),
+      hostPace: String(settings.remotePollSeconds()),
+    };
+  }
+
+  private polledWith: ReturnType<Dashboard["pollSettings"]>; // (what the last checks ran with)
+
+  private settingsChanged(): void {
+    const now = this.pollSettings();
+    const was = this.polledWith;
+    this.polledWith = now;
+    this.syncHosts(); // (also redraws: the view's settings, the status bar's)
+    if (now.local !== was.local) this.scheduleLocal(0);
+    else if (now.localPace !== was.localPace) this.scheduleLocal(); // (the next check at the new pace)
+    if (now.hosts !== was.hosts) this.scheduleHosts(0);
+    else if (now.hostPace !== was.hostPace) this.scheduleHosts();
   }
 
   // The hosts to check: the window's own host first, then the picked ones

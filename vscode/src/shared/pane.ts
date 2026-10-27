@@ -3,7 +3,7 @@
 // waits for a permission, and its review (what it changed, Undo, Commit,
 // Mark reviewed). Shared by the extension and the tab's page.
 
-import type { Answers, Decision, PermissionAsk, Question, QueuedTask, RecentChat, Review, Session, SessionState, Status } from "./types";
+import type { Answers, AskShown, Decision, PermissionAsk, Question, QueuedTask, RecentChat, Review, Session, SessionState, Status } from "./types";
 
 // One item of a chat's conversation (pane.py: conversation_items)
 export interface PaneItem {
@@ -99,12 +99,12 @@ export type PaneHostMessage =
   | { type: "picture"; id: string; path: string; error: string } // a pasted picture, saved (path: where the chat opens it)
   | { type: "file"; id: string; path: string } // a file dropped on the tab: named in the reply (@path)
   | { type: "offers"; offers: Offers } // what the reply box offers as you type (pane.py --complete)
-  // dictating: "recording", "writing", "model" (downloading one), "setup" (setting it up), "" (done:
+  // dictating: "starting" (the microphone, not recording yet), "recording", "writing", "model" (downloading one), "setup" (setting it up), "" (done:
   // text written down, or why not); offerModel: whisper is there but no speech model (engine: which
   // one), offerSetup: nothing writes it down yet (setupMb: what setting up downloads); the tab asks
   // before either
   | { type: "output"; lines: string[]; runs?: TermRun[][]; styles?: TermStyle[]; error: string } // a background session's screen (pane.py --logs)
-  | { type: "dictation"; state: "" | "recording" | "writing" | "model" | "setup"; text?: string; message?: string; offerModel?: boolean;
+  | { type: "dictation"; state: "" | "starting" | "recording" | "writing" | "model" | "setup"; text?: string; message?: string; offerModel?: boolean;
       engine?: string; offerSetup?: boolean; setupMb?: number };
 
 // tab -> extension
@@ -113,7 +113,7 @@ export type PaneMessage =
   | { type: "more" } // older items too
   | { type: "send"; text: string; how: "auto" | "background" | "copy" | "enter"; afterTurn: boolean }
   | { type: "unqueue" } // the reply waiting for the turn to end
-  | { type: "answer"; decision: Decision; note: string; answers?: Answers }
+  | { type: "answer"; decision: Decision; note: string; answers?: Answers; shown: AskShown | null } // shown: the prompt you answer
   | { type: "review" }
   | { type: "diff"; path: string } // a file's change in VS Code's diff editor
   | { type: "undo"; path: string } // "*": all of them
@@ -232,6 +232,34 @@ export function answersOf(x: unknown): Answers | null {
     out[q] = v as string[];
   }
   return out;
+}
+
+const ASK_ID_CHARS = 200;
+const ASK_LINE_CHARS = 2000;
+
+// The prompt a notification, row or tab shows, as its answer names it (null: none)
+export function shownAsk(p: PermissionAsk | null | undefined): AskShown | null {
+  if (!p) return null;
+  return { request: p.request ?? null, toolUse: p.toolUse ?? null, line: p.line ?? "" };
+}
+
+// What a page says it showed: an AskShown, else null
+export function askShownOf(x: unknown): AskShown | null {
+  if (typeof x !== "object" || x === null || Array.isArray(x)) return null;
+  const { request, toolUse, line } = x as Record<string, unknown>;
+  const id = (v: unknown) => v === null || (typeof v === "string" && v.length > 0 && v.length <= ASK_ID_CHARS);
+  if (!id(request) || !id(toolUse) || typeof line !== "string" || line.length > ASK_LINE_CHARS) return null;
+  return { request: request as string | null, toolUse: toolUse as string | null, line };
+}
+
+// Is what the chat asks now the prompt that was shown? By its tool use when
+// both know it, else by the hook's request when both have one, else by its
+// line (an older backend's, with neither)
+export function sameAsk(shown: AskShown, now: PermissionAsk): boolean {
+  const toolUse = now.toolUse ?? null;
+  if (shown.toolUse && toolUse) return shown.toolUse === toolUse;
+  if (shown.request && now.request) return shown.request === now.request;
+  return shown.line === (now.line ?? "");
 }
 
 // The key of a chat's mark in status.reviewed

@@ -188,6 +188,18 @@ export class Actions {
       await this.terminals.run(`${host ?? ""}|${chat.key}`, chat.name, chat.openCommand, this.place(host));
       return;
     }
+    // Not running, and no command for it (a chat the Recap names, an older
+    // status): this computer's reopens in VS Code's terminal too, with the
+    // command jump.py has for it (claude --resume, in its folder); an SSH
+    // host's can't from here
+    if (!chat.pid && !chat.jobId) {
+      if (host) return this.fail(`${chat.name} isn't running on ${host}, and there's no command here to reopen it: find it with Find a Chat.`);
+      const profile = chat.profileDir ? ["--profile", chat.profileDir] : [];
+      const answer = await this.backend.action("jump.py", ["--resume", chat.chatId || chat.sessionId, ...profile, "--print-command", ...configDirArgs()]);
+      if (!answer.ok || !answer.command) return this.fail(`Couldn't reopen ${chat.name}: ${answer.message || "no command for it"}`);
+      await this.terminals.run(`|${chat.key}`, chat.name, answer.command, this.place(host));
+      return;
+    }
     // It runs in a terminal outside VS Code (or in another VS Code window)
     if (await canRaiseWindows()) return this.openSystem(chat);
     const where = host && chat.vscodeTerminal ? `a terminal of a VS Code window connected to ${host}` : `a terminal outside this VS Code window${host ? ` on ${host}` : ""}`;
@@ -780,8 +792,10 @@ export class Actions {
     });
   }
 
-  // A chat the search found: its row's chat when it's listed, else reopened
-  // (in a terminal or a Claude Code tab, as the switch of Recent chats says)
+  // A chat the search (or the Recap) found: its row's chat when it's listed,
+  // else reopened (in a terminal or a Claude Code tab, as the switch of Recent
+  // chats says) with the command its account's recent or starred chats have
+  // for it, or the one the search found, else as open() does without one
   private async openFound(found: FoundChat, host?: string): Promise<void> {
     const machine = machineStatus(this.dash.state(), host);
     let other: { s: Session } | null = null;
@@ -792,18 +806,22 @@ export class Actions {
           other = other ?? { s };
         }
     if (other) return this.open(chatRefOf(other.s, host));
+    // (its own account's listing first)
+    const listed = (machine?.groups ?? [])
+      .flatMap((g) => [...(g.recent ?? []), ...(g.starred ?? [])].filter((c) => c.sessionId === found.sessionId).map((c) => ({ c, g })))
+      .sort((a, b) => Number((b.g.profileKeys ?? []).includes(found.profileDir)) - Number((a.g.profileKeys ?? []).includes(found.profileDir)))[0];
     const group = (machine?.groups ?? []).find((g) => g.id === found.groupId || (g.profileKeys ?? []).includes(found.profileDir));
     const chat: ChatRef = {
       host,
       key: found.key,
       sessionId: found.sessionId,
       chatId: found.sessionId,
-      profileDir: found.profileDir,
+      profileDir: listed?.c.profileDir || found.profileDir,
       name: found.name,
-      cwd: found.cwd,
+      cwd: found.cwd || listed?.c.cwd || "",
       kind: "chat",
       pid: null,
-      openCommand: found.openCommand ?? null,
+      openCommand: found.openCommand ?? listed?.c.openCommand ?? null,
       shared: found.shared,
     };
     if (group && reopensInClaudeCode(settings.reopenIn(), this.cliOn(host), claudeCodeHere({ ...group, host }, this.dash.claudeCodeInfo())))
@@ -1315,10 +1333,20 @@ export class Actions {
       }
       return;
     }
-    const file = path.join(os.tmpdir(), name);
-    await fs.writeFile(file, data);
-    const r = await this.backend.copyImage(file);
-    if (r.ok) void vscode.window.setStatusBarMessage("$(check) The card is copied: paste it anywhere", 5000);
-    else void vscode.window.showErrorMessage(`Talpy Den: couldn't copy the card: ${r.message}`);
+    // (in a folder of its own, which nobody else can have made: the name is the
+    // same for everyone that day; jump.py has read it when it answers)
+    let folder = "";
+    try {
+      folder = await fs.mkdtemp(path.join(os.tmpdir(), "talpy-den-card-"));
+      const file = path.join(folder, name);
+      await fs.writeFile(file, data, { mode: 0o600 });
+      const r = await this.backend.copyImage(file);
+      if (r.ok) void vscode.window.setStatusBarMessage("$(check) The card is copied: paste it anywhere", 5000);
+      else void vscode.window.showErrorMessage(`Talpy Den: couldn't copy the card: ${r.message}`);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Talpy Den: couldn't copy the card: ${(e as Error).message}`);
+    } finally {
+      if (folder) await fs.rm(folder, { recursive: true, force: true }).catch(() => undefined);
+    }
   }
 }

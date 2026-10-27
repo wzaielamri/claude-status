@@ -20,7 +20,7 @@ test("a permission prompt's notification lists Allow once, Always allow, Deny, D
   window.showInputBox = async () => note;
   const answers: [string, string][] = [];
   const notifier = new Notifier({ sound() {} } as never, () => undefined);
-  notifier.panes = { answer: async (_c: unknown, d: string, n = "") => (answers.push([d, n]), { ok: true, message: "" }) } as never;
+  notifier.panes = { answer: async (_c: unknown, d: string, _shown: unknown, n = "") => (answers.push([d, n]), { ok: true, message: "" }) } as never;
   const ask = (p: Partial<PermissionAsk>): Session => ({
     ...demoState(Date.now()).status!.groups[0].sessions[0], state: "waiting", name: "deploy",
     permission: { tool: "Bash", line: "Bash: npm publish", command: "npm publish", file: "", diff: [], always: "", request: "r1", answer: "hook", ...p },
@@ -65,7 +65,7 @@ test("a plan's notification: Approve, accept edits / Approve / Keep planning…"
   window.showInputBox = async () => note;
   const answers: [string, string][] = [];
   const notifier = new Notifier({ sound() {} } as never, () => undefined);
-  notifier.panes = { answer: async (_c: unknown, d: string, n = "") => (answers.push([d, n]), { ok: true, message: "" }), open() {} } as never;
+  notifier.panes = { answer: async (_c: unknown, d: string, _shown: unknown, n = "") => (answers.push([d, n]), { ok: true, message: "" }), open() {} } as never;
   const s = {
     ...demoState(Date.now()).status!.groups[0].sessions[0], state: "waiting", name: "parser",
     permission: { tool: "ExitPlanMode", line: "Plan: Fix it", command: "", file: "", diff: [], always: "", request: "r2", answer: "hook",
@@ -110,7 +110,7 @@ test("a question's notification: its options, Other…; several questions: Answe
   };
   const answers: unknown[] = [];
   const notifier = new Notifier({ sound() {} } as never, () => undefined);
-  notifier.panes = { answer: async (_c: unknown, d: string, n: string, a: unknown) => (answers.push([d, n, a]), { ok: true, message: "" }) } as never;
+  notifier.panes = { answer: async (_c: unknown, d: string, _shown: unknown, n: string, a: unknown) => (answers.push([d, n, a]), { ok: true, message: "" }) } as never;
   const crust = { question: "Which crust?", header: "Crust", multiSelect: false,
                   options: [{ label: "Thin", description: "crispy" }, { label: "Deep dish", description: "" }] };
   const toppings = { question: "Which toppings?", header: "Toppings", multiSelect: true,
@@ -154,5 +154,45 @@ test("a question's notification: its options, Other…; several questions: Answe
     ["answer", "", { "Which crust?": ["half and half"] }],
     ["answer", "", { "Which crust?": ["Thin"], "Which toppings?": ["Cheese", "Olives", "basil"] }],
   ]);
+  notifier.dispose();
+});
+
+// Its buttons answer the prompt the notification shows: when the chat asks
+// something else by then, nothing is answered and it says so (Open shows it)
+test("a notification's buttons answer the prompt it shows; when the chat asks something else by then, it says so", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const vscode = (await import("vscode")) as unknown as typeof import("./vscode-stub");
+  process.env.XDG_CACHE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "talpy-den-notify-"));
+  const { Notifier } = await import("../src/notify");
+  const window = vscode.window as unknown as Record<string, unknown>;
+  const shown: [string, string[]][] = [];
+  let pick = "Allow once";
+  window.showWarningMessage = async (m: string, ...buttons: string[]) => (shown.push([m, buttons]), m.startsWith("Talpy Den:") ? "Open" : pick);
+  window.showInputBox = async () => "";
+  const answers: unknown[] = [];
+  const opened: unknown[] = [];
+  let result = { ok: true, message: "" };
+  const notifier = new Notifier({ sound() {} } as never, () => undefined);
+  notifier.panes = { answer: async (_c: unknown, d: string, s: unknown) => (answers.push([d, s]), result), open: (c: unknown) => void opened.push(c) } as never;
+  const s = {
+    ...demoState(Date.now()).status!.groups[0].sessions[0], state: "waiting", name: "deploy",
+    permission: { tool: "Bash", line: "Bash: npm publish", command: "npm publish", file: "", diff: [], always: "", request: "r1", toolUse: "toolu_A", answer: "hook" },
+  } as Session;
+  const notify = async () => {
+    notifier.handle({ notices: [{ key: s.key, kind: "waiting", title: "deploy asks", body: "", session: s }], petEvents: [], sound: "", finished: [] });
+    await new Promise((r) => setTimeout(r, 10));
+  };
+  await notify();
+  assert.deepEqual(answers, [["allow", { request: "r1", toolUse: "toolu_A", line: "Bash: npm publish" }]]);
+  pick = "Deny with a note…";
+  await notify();
+  assert.deepEqual(answers[1], ["deny", { request: "r1", toolUse: "toolu_A", line: "Bash: npm publish" }]);
+  result = { ok: false, message: "It asks something else now" };
+  pick = "Allow once";
+  await notify();
+  assert.deepEqual(shown.at(-1), ["Talpy Den: couldn't answer deploy: It asks something else now", ["Open"]]);
+  assert.equal(opened.length, 1, "Open shows the chat, with what it asks now");
   notifier.dispose();
 });

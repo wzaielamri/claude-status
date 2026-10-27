@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { ChatPanes } from "../src/chatPane";
 import { demoState } from "../src/shared/demo";
 import { chatRefOf } from "../src/shared/model";
-import { answersOf, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, testsText, textScale, TEXT_SCALES, withoutPicture } from "../src/shared/pane";
+import { answersOf, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, withoutPicture } from "../src/shared/pane";
 import type { ViewState } from "../src/shared/types";
 import { ViewHost } from "../src/view";
 import { clipboardWrites, overrides, recorded } from "./vscode-stub";
@@ -44,13 +44,13 @@ test("an answer goes to the hook's request the state names, else to the chat's k
   const state = waitingState("hook");
   const row = state.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
   const { p, calls } = panes(state);
-  assert.deepEqual(await p.answer(chatRefOf(row), "deny", " use make "), { ok: true, message: "Allowed" });
+  assert.deepEqual(await p.answer(chatRefOf(row), "deny", shownAsk(row.permission), " use make "), { ok: true, message: "Allowed" });
   assert.deepEqual(calls[0], ["--answer", "1792957203525-37d298fb", "--decision", "deny", "--note", "use make"]);
 
   const keys = waitingState("keys");
   const row2 = keys.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
   const two = panes(keys);
-  await two.p.answer(chatRefOf(row2), "always");
+  await two.p.answer(chatRefOf(row2), "always", shownAsk(row2.permission));
   assert.deepEqual(two.calls[0], ["--keys", row2.sessionId, "--profile", row2.profileDir, "--decision", "always"]);
 });
 
@@ -59,9 +59,9 @@ test("a question's answers go to the hook's request as JSON; none chosen, nothin
   const row = state.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
   row.permission!.questions = [{ question: "Which crust?", header: "Crust", multiSelect: false, options: [{ label: "Thin", description: "" }] }];
   const { p, calls } = panes(state);
-  await p.answer(chatRefOf(row), "answer", "", { "Which crust?": ["Thin"] });
+  await p.answer(chatRefOf(row), "answer", shownAsk(row.permission), "", { "Which crust?": ["Thin"] });
   assert.deepEqual(calls[0], ["--answer", "1792957203525-37d298fb", "--decision", "answer", "--answers", '{"Which crust?":["Thin"]}']);
-  assert.equal((await p.answer(chatRefOf(row), "answer", "", {})).ok, false);
+  assert.equal((await p.answer(chatRefOf(row), "answer", shownAsk(row.permission), "", {})).ok, false);
   assert.equal(calls.length, 1);
 });
 
@@ -81,8 +81,9 @@ test("nothing is answered for a chat that doesn't ask, or that only its own dial
   const state = waitingState("");
   const rows = state.status!.groups.flatMap((g) => g.sessions);
   const { p, calls } = panes(state);
-  assert.equal((await p.answer(chatRefOf(rows.find((x) => x.state === "waiting")!), "allow")).ok, false);
-  assert.equal((await p.answer(chatRefOf(rows.find((x) => x.state !== "waiting")!), "allow")).ok, false);
+  const waiting = rows.find((x) => x.state === "waiting")!;
+  assert.equal((await p.answer(chatRefOf(waiting), "allow", shownAsk(waiting.permission))).ok, false);
+  assert.equal((await p.answer(chatRefOf(rows.find((x) => x.state !== "waiting")!), "allow", shownAsk(waiting.permission))).ok, false);
   assert.deepEqual(calls, []);
 });
 
@@ -133,9 +134,10 @@ test("a click on a chat opens its tab, unless clicks open the chat itself; answe
   } finally {
     overrides.delete("clickOpensPane");
   }
-  receive({ type: "answerPermission", chat: { key: row.key }, decision: "always", note: "" });
+  receive({ type: "answerPermission", chat: { key: row.key }, decision: "always", note: "", shown: shownAsk(row.permission) });
   assert.equal(calls[2].name, "panes.answer");
   assert.equal(calls[2].args[1], "always");
+  assert.deepEqual(calls[2].args[2], shownAsk(row.permission)); // (the prompt the row showed goes with it)
   receive({ type: "answerPermission", chat: { key: row.key }, decision: "rm -rf", note: "" });
   receive({ type: "openPane", chat: { key: "not-a-row" } });
   assert.equal(calls.length, 3);
@@ -335,4 +337,256 @@ test("the microphone: recorded, then written down; a missing model or setup is o
   assert.deepEqual(calls, [["--setup"]]);
   status = { ok: false, engine: null, tool: null, model: null, recorder: null, canSetup: true, missing: ["a recorder (pw-record, from PipeWire)"] };
   assert.equal(((await say("toggle")) as { message?: string }).message, "To dictate, install a recorder (pw-record, from PipeWire).");
+});
+
+// ---------------------------------------------------------------- answers to the prompt shown
+
+test("an answer goes to the prompt that was shown, never to one the chat asks after it", async () => {
+  // the hook: a chat that asks something else now (answered in its terminal, then the next command) isn't answered
+  const state = waitingState("hook");
+  const row = state.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
+  row.permission!.toolUse = "toolu_A";
+  const shown = shownAsk(row.permission)!;
+  const { p, calls } = panes(state);
+  row.permission = { ...row.permission!, line: "Bash: rm -rf build", command: "rm -rf build", request: "1792957203600-0b1c2d3e", toolUse: "toolu_B" };
+  assert.deepEqual(await p.answer(chatRefOf(row), "allow", shown), { ok: false, message: "It asks something else now", changed: true });
+  assert.equal((await p.answer(chatRefOf(row), "always", null)).ok, false, "nothing shown: nothing answered");
+  assert.deepEqual(calls, []);
+  // the same prompt (its tool use), whose hook request came after it was shown: that request
+  row.permission = { ...row.permission!, line: "Bash: git tag v2.0.0", command: "git tag v2.0.0", request: "1792957203525-37d298fb", toolUse: "toolu_A" };
+  await p.answer(chatRefOf(row), "allow", { ...shown, request: null });
+  assert.deepEqual(calls[0], ["--answer", "1792957203525-37d298fb", "--decision", "allow"]);
+  // the request shown, even when the state has a newer one for that tool use (pane.py answers that request only)
+  row.permission = { ...row.permission!, request: "1792957203700-99aa88bb" };
+  await p.answer(chatRefOf(row), "deny", shown);
+  assert.deepEqual(calls[1], ["--answer", "1792957203525-37d298fb", "--decision", "deny"]);
+
+  // keys (tmux): pressed only while it still asks about that tool use
+  const keys = waitingState("keys");
+  const k = keys.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
+  k.permission!.toolUse = "toolu_K";
+  const two = panes(keys);
+  await two.p.answer(chatRefOf(k), "deny", shownAsk(k.permission));
+  assert.deepEqual(two.calls[0], ["--keys", k.sessionId, "--profile", k.profileDir, "--expect", "toolu_K", "--decision", "deny"]);
+  const moved = panes(keys, { ok: false, message: "It asks something else now", changed: true }); // (pane.py found it moved on)
+  assert.deepEqual(await moved.p.answer(chatRefOf(k), "allow", shownAsk(k.permission)), { ok: false, message: "It asks something else now", changed: true });
+
+  // an older backend's prompt (no tool use): by its line
+  const old = waitingState("keys");
+  const o = old.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
+  const three = panes(old);
+  assert.equal((await three.p.answer(chatRefOf(o), "allow", { ...shownAsk(o.permission)!, line: "Bash: npm publish" })).ok, false);
+  await three.p.answer(chatRefOf(o), "allow", shownAsk(o.permission));
+  assert.deepEqual(three.calls, [["--keys", o.sessionId, "--profile", o.profileDir, "--decision", "allow"]]);
+});
+
+test("what a page says it showed is taken only in its shape; the chat tab's answer carries it", async () => {
+  const { askShownOf } = await import("../src/shared/pane");
+  assert.deepEqual(askShownOf({ request: "1-a", toolUse: null, line: "Bash: make" }), { request: "1-a", toolUse: null, line: "Bash: make" });
+  for (const bad of [null, "x", [], { request: 1, toolUse: null, line: "" }, { request: null, toolUse: "", line: "" },
+                     { request: null, toolUse: null }, { request: "x".repeat(201), toolUse: null, line: "" }])
+    assert.equal(askShownOf(bad), null);
+
+  const state = waitingState("hook");
+  const row = state.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
+  const calls: string[][] = [];
+  const backend = { pane: async (args: string[]) => (calls.push(own(args)), args[0] === "--conversation" ? { ok: true, unchanged: true } : { ok: true, message: "Allowed" }) };
+  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
+  p.open(chatRefOf(row));
+  const panel = recorded.panels.at(-1)!;
+  const results = () => panel.sent.filter((m) => (m as { type: string }).type === "result");
+  panel.receive({ type: "answer", decision: "allow", note: "", shown: shownAsk(row.permission) });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(calls.at(-1), ["--answer", "1792957203525-37d298fb", "--decision", "allow"]);
+  panel.receive({ type: "answer", decision: "allow", note: "", shown: { request: "1792957100000-00000000", toolUse: null, line: "Bash: make" } });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(results().at(-1), { type: "result", kind: "answer", ok: false, message: "It asks something else now" });
+});
+
+test("a chat that asks something else while it waits is told again, with buttons for that prompt; its request coming late isn't news", async () => {
+  const { TransitionTracker } = await import("../src/transitions");
+  const opts = { notifyWaiting: true, notifyDone: true, notifyDoneMinSeconds: 0 };
+  const g = demoState(NOW).status!.groups[0];
+  const row = (state: "working" | "waiting", permission: unknown) => [{ ...g, sessions: [{ ...g.sessions[0], key: "k", chatId: "k", sessionId: "k", name: "k", state, permission } as never] }];
+  const ask = (toolUse: string, request: string | null, command: string) =>
+    ({ tool: "Bash", line: `Bash: ${command}`, command, file: "", diff: [], always: "", request, toolUse, answer: "hook" });
+  const told = (c: { notices: { body: string; session: { permission?: { request: string | null } | null } }[] }) =>
+    c.notices.map((n) => [n.body.split(" · ")[0], n.session.permission?.request]);
+  const t = new TransitionTracker();
+  t.track("", row("working", null), NOW, undefined, opts);
+  assert.deepEqual(told(t.track("", row("waiting", ask("toolu_A", "1-a", "npm test")), NOW + 2000, undefined, opts)), [["npm test", "1-a"]]);
+  // answered in its terminal; by the next check it asks for the next command (no working in between)
+  assert.deepEqual(told(t.track("", row("waiting", ask("toolu_B", "2-b", "rm -rf build")), NOW + 4000, undefined, opts)), [["rm -rf build", "2-b"]]);
+  assert.deepEqual(told(t.track("", row("waiting", ask("toolu_B", "2-b", "rm -rf build")), NOW + 6000, undefined, opts)), []);
+  // the same command asked again (a new tool use) is a new prompt too
+  assert.deepEqual(told(t.track("", row("waiting", ask("toolu_C", "3-c", "rm -rf build")), NOW + 8000, undefined, opts)), [["rm -rf build", "3-c"]]);
+  // the hook's request coming a check after the prompt: the same prompt, told once
+  const t2 = new TransitionTracker();
+  t2.track("", row("working", null), NOW, undefined, opts);
+  assert.equal(t2.track("", row("waiting", ask("toolu_D", null, "make")), NOW + 2000, undefined, opts).notices.length, 1);
+  assert.deepEqual(t2.track("", row("waiting", ask("toolu_D", "4-d", "make")), NOW + 4000, undefined, opts).notices, []);
+});
+
+// ---------------------------------------------------------------- one message at a time
+
+test("one message to a chat at a time: one sent while the last is on its way isn't sent; the tab always hears back", async () => {
+  const state = demoState(NOW);
+  const row = state.status!.groups.flatMap((g) => g.sessions)[0];
+  const calls: string[][] = [];
+  const waiting: ((answer: unknown) => void)[] = [];
+  const release = (answer: unknown) => waiting.splice(0).forEach((r) => r(answer));
+  let fail = false;
+  const backend = {
+    pane: (args: string[]) => {
+      if (args[0] === "--conversation") return Promise.resolve({ ok: true, unchanged: true });
+      calls.push(args);
+      return fail ? Promise.reject(new Error("the helper fell over")) : new Promise((r) => waiting.push(r));
+    },
+  };
+  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {},
+                 onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { open: async () => undefined } as never,
+                          { find: async () => undefined } as never, {} as never);
+  const busy = { ok: false, message: "Your last message to it is still being sent: try again in a moment" };
+  const first = p.send(chatRefOf(row), "fix the parser", "auto", false);
+  const second = p.send(chatRefOf(row), "fix the parser", "enter", false); // (a second Enter)
+  const later = p.send(chatRefOf(row), "and the docs", "background", true);
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(calls.length, 1, "sent once");
+  assert.deepEqual(await second, busy);
+  assert.deepEqual(await later, busy);
+  release({ ok: true, message: "Sent" });
+  assert.deepEqual(await first, { ok: true, message: "Sent" });
+  const next = p.send(chatRefOf(row), "and the docs", "auto", false); // (once it's sent, the next one goes)
+  await new Promise((r) => setTimeout(r, 10));
+  release({ ok: true, message: "Sent" });
+  assert.equal((await next).ok, true);
+  assert.equal(calls.length, 2);
+  // the tab hears back about every send, even one that failed on the way (its Send button comes back)
+  fail = true;
+  p.open(chatRefOf(row));
+  const panel = recorded.panels.at(-1)!;
+  panel.receive({ type: "send", text: "hello", how: "auto", afterTurn: false });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(panel.sent.filter((m) => (m as { type: string }).type === "result"),
+                   [{ type: "result", kind: "send", ok: false, message: "Couldn't send it: the helper fell over" }]);
+});
+
+// ---------------------------------------------------------------- the microphone, starting
+
+test("the microphone: no second recorder while one starts; one still starting when the tab closes, or × is pressed, is stopped", async () => {
+  const calls: string[][] = [];
+  let started: () => void = () => undefined;
+  const backend = {
+    pane: async () => ({ ok: true, unchanged: true }),
+    dictate: (args: string[]) => {
+      calls.push(args);
+      if (args[0] === "--start") return new Promise((r) => (started = () => r({ ok: true, message: "Recording" })));
+      return Promise.resolve(args[0] === "--status" ? { ok: true, tool: "/usr/bin/whisper-cli", model: "/m.bin" } : { ok: true, message: "" });
+    },
+  };
+  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
+  const tick = () => new Promise((r) => setTimeout(r, 10));
+  const tab = (id: string) => {
+    p.open({ chatId: id, sessionId: id, profileDir: ".claude", name: "x" } as never);
+    return recorded.panels.at(-1)!;
+  };
+  const told = (panel: { sent: unknown[] }) => panel.sent.filter((m) => (m as { type: string }).type === "dictation").map((m) => (m as { state: string }).state);
+
+  let panel = tab("mic-2");
+  panel.receive({ type: "dictate", action: "toggle" });
+  await tick();
+  panel.receive({ type: "dictate", action: "toggle" }); // (clicked again before it records)
+  await tick();
+  assert.deepEqual(calls.map((c) => c[0]), ["--status", "--start"]);
+  started();
+  await tick();
+  assert.deepEqual(told(panel), ["starting", "starting", "recording"]);
+
+  // the tab closes while it starts: stopped as soon as it has, its recording deleted
+  calls.length = 0;
+  panel = tab("mic-3");
+  panel.receive({ type: "dictate", action: "toggle" });
+  await tick();
+  const id = calls[1][1];
+  panel.dispose();
+  started();
+  await tick();
+  assert.deepEqual(calls, [["--status"], ["--start", id], ["--cancel", id]]);
+
+  // × while it starts: the same
+  calls.length = 0;
+  panel = tab("mic-4");
+  panel.receive({ type: "dictate", action: "toggle" });
+  await tick();
+  const id2 = calls[1][1];
+  panel.receive({ type: "dictate", action: "cancel" });
+  await tick();
+  started();
+  await tick();
+  assert.deepEqual(calls, [["--status"], ["--start", id2], ["--cancel", id2]]);
+  assert.equal(told(panel).at(-1), "");
+});
+
+// ---------------------------------------------------------------- a tab closed while it works
+
+test("a tab closed while it reads its chat, or looks up its row, does nothing more with it (no \"Webview is disposed\")", async () => {
+  const rejections: unknown[] = [];
+  const onRejection = (e: unknown) => void rejections.push(e);
+  process.on("unhandledRejection", onRejection);
+  try {
+    const state = demoState(NOW);
+    const row = state.status!.groups.flatMap((g) => g.sessions).find((s) => !!s.pid && s.entrypoint !== "claude-vscode" && s.kind !== "bg" && !s.tmux)!;
+    assert.ok(row, "a row in a terminal (its terminal is looked up)");
+    const calls: string[][] = [];
+    let read: (answer: unknown) => void = () => undefined;
+    let found: (t: undefined) => void = () => undefined;
+    let lookUp = false;
+    const backend = { pane: (args: string[]) => (calls.push(args), new Promise((r) => (read = r))) };
+    const terminals = { find: () => (lookUp ? new Promise((r) => (found = r)) : Promise.resolve(undefined)) };
+    const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+    const warnings: string[] = [];
+    const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { canMoveToClaudeCode: () => false } as never,
+                            terminals as never, { warn: (m: string) => void warnings.push(m) } as never);
+    const tick = () => new Promise((r) => setTimeout(r, 10));
+
+    // closed while its conversation is read
+    p.open(chatRefOf(row));
+    let panel = recorded.panels.at(-1)!;
+    panel.show(true);
+    panel.receive({ type: "ready" });
+    await tick();
+    assert.equal(calls.length, 1);
+    panel.dispose();
+    read({ ok: true, items: [], stamp: "s1" });
+    await tick();
+    // closed while its row's terminal is looked up
+    lookUp = true;
+    p.open(chatRefOf(row));
+    panel = recorded.panels.at(-1)!;
+    panel.show(true);
+    panel.receive({ type: "ready" });
+    await tick();
+    panel.dispose();
+    found(undefined);
+    await new Promise((r) => setTimeout(r, 1600)); // (past when the next read would come)
+    assert.equal(calls.length, 1, "nothing read after it closed");
+    // closed while its review is read: what comes back goes nowhere
+    lookUp = false;
+    p.open(chatRefOf(row));
+    panel = recorded.panels.at(-1)!;
+    panel.receive({ type: "review" });
+    await tick();
+    assert.deepEqual(calls.at(-1)?.slice(0, 2), ["--review", row.chatId || row.sessionId]);
+    panel.dispose();
+    read({ ok: true, message: "", files: [], tests: null, editedAt: null, repos: [] });
+    await tick();
+    assert.deepEqual(warnings, []);
+    assert.deepEqual(rejections, []);
+  } finally {
+    process.off("unhandledRejection", onRejection);
+  }
 });

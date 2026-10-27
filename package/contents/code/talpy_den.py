@@ -456,10 +456,26 @@ def valid_id(value):
     return isinstance(value, str) and value != "" and "/" not in value and value not in (".", "..")
 
 
+# The Claude folder a status-line snapshot is of (statusline-snippet.sh
+# writes it into each one): snapshots are filed under the folder's name, which
+# two folders can share (~/.claude and /data/.claude).
+SNAPSHOT_FOLDER = "talpyDenConfigDir"
+
+
+def snapshot_of(snap, reals):
+    """Is a status-line snapshot one of these (real) Claude folders'? One of a
+    folder of the same name isn't; one an older snippet wrote names no folder
+    and counts, as it always did."""
+    folder = snap.get(SNAPSHOT_FOLDER) if isinstance(snap, dict) else None
+    if not isinstance(folder, str) or not folder.startswith("/"):
+        return True
+    return os.path.realpath(folder) in {str(r) for r in reals}
+
+
 def snapshot_paths(snapshot_root, profile, ids):
     """(mtime, path) of this profile's status-line snapshots of these session
     ids, newest first, leaving out ones filed under a link's name before the
-    link was last switched."""
+    link was last switched, and those of another folder of the same name."""
     found = []
     for name, since in profile.snapshot_sources.items():
         for sid in ids:
@@ -467,7 +483,7 @@ def snapshot_paths(snapshot_root, profile, ids):
                 continue
             path = snapshot_root / name / f"{sid}.json"
             t = mtime(path)
-            if t is not None and t >= since:
+            if t is not None and t >= since and snapshot_of(read_json(path), [profile.real]):
                 found.append((t, path))
     found.sort(reverse=True)
     return found
@@ -2260,10 +2276,40 @@ def pending_tool(path):
     return None
 
 
+def tool_use_id(value):
+    """A tool call's id (a tool_use block's, or one a request names), or None."""
+    return value if isinstance(value, str) and value else None
+
+
 def pending_permission(path, cwd):
-    """permission_view of what a waiting chat asks, from its transcript, or None."""
+    """permission_view of what a waiting chat asks, from its transcript, or
+    None; "toolUse": the id of the tool call it's about."""
     use = pending_tool(path) if path is not None else None
-    return permission_view(use.get("name"), use.get("input"), cwd) if use else None
+    if not use:
+        return None
+    return dict(permission_view(use.get("name"), use.get("input"), cwd), toolUse=tool_use_id(use.get("id")))
+
+
+def chat_tool_use(home, extra_dirs, session_id, profile_key=None):
+    """The id of the tool call a running chat asks about now: pending_tool of
+    the transcript its row shows (finish_row's chatId, which note_permissions
+    reads), found as find_chat_entry finds the chat; None when it asks
+    nothing (or isn't running)."""
+    profiles = discover_profiles(home, extra_dirs)
+    for entry, runs_on, holder in live_entries_all(profiles):
+        if entry.get("sessionId") != session_id or entry.get("kind") not in SESSION_KINDS \
+                or entry.get("spare") or entry.get("parkedJobId"):
+            continue
+        if profile_key and profile_key not in (runs_on.key, holder.key):
+            continue
+        job_id = entry.get("jobId") if valid_id(entry.get("jobId")) else None
+        job = read_job(dict.fromkeys([runs_on, holder]), job_id) if job_id else None
+        row = {"sessionId": session_id, "cwd": entry.get("cwd") if isinstance(entry.get("cwd"), str) else ""}
+        ctx = Context(profiles=profiles, links=LinkCache(cache_dir(home) / "links.json"))
+        chat, _ = chat_link(row, job, runs_on, ctx)
+        use = pending_tool(transcript_path(runs_on, chat))
+        return tool_use_id(use.get("id")) if use else None
+    return None
 
 
 def requests_dir(cache_root):
@@ -2316,14 +2362,17 @@ def request_view(req):
     """A relayed request as a row carries it: permission_view plus its id."""
     view = permission_view(req.get("tool"), req.get("input"), req.get("cwd") or "", req.get("suggestions"))
     view["request"] = req.get("id")
+    view["toolUse"] = tool_use_id(req.get("toolUse"))  # (if Claude named the call: 2.1.311 doesn't)
     return view
 
 
 def note_permissions(groups, ctx, requests):
     """A chat waiting for a permission (or with a question for you) gets
     "permission": what it asks (request_view, or pending_permission without
-    the hook) and "answer": how the widget can answer it ("hook", "keys" in
-    tmux, or ""; a question: "hook" or "")."""
+    the hook), "answer": how the widget can answer it ("hook", "keys" in
+    tmux, or ""; a question: "hook" or "") and "toolUse": the id of the tool
+    call it's about, or None (pane.py --keys --expect checks it's still the
+    one asked about before it presses a key)."""
     for g in groups:
         for s in g["sessions"]:
             s["permission"] = None
@@ -2333,7 +2382,8 @@ def note_permissions(groups, ctx, requests):
             req = requests.get(s["sessionId"])
             if req is not None:
                 if wait != QUESTION_WAIT or req.get("tool") == ASK_TOOL:
-                    s["permission"] = dict(request_view(req), answer="hook")
+                    view = request_view(req)
+                    s["permission"] = dict(view, answer="hook", toolUse=view.get("toolUse"))
                 continue
             profile = next((p for p in ctx.profiles if p.key == s.get("profileDir")), None)
             path = transcript_path(profile, s.get("chatId") or s["sessionId"]) if profile is not None else None
@@ -2341,7 +2391,7 @@ def note_permissions(groups, ctx, requests):
             if view is not None and (wait != QUESTION_WAIT or view["tool"] == ASK_TOOL):
                 question = view["tool"] == ASK_TOOL
                 keys = s.get("tmux") and not question and view["tool"] != PLAN_TOOL   # (a plan's dialog differs by account)
-                s["permission"] = dict(view, request=None, answer="keys" if keys else "")
+                s["permission"] = dict(view, request=None, answer="keys" if keys else "", toolUse=view.get("toolUse"))
 
 
 QUESTION_WAIT = "input needed"  # (also an MCP server's question: only AskUserQuestion's count)
@@ -2359,13 +2409,66 @@ PERMISSION_WAITS = ("permission prompt", QUESTION_WAIT)
 
 LIVE = "live"
 LIVE_HOOK_FILE = "live-hook.py"
+PERMISSION_HOOK_FILE = "permission-hook.py"
 LIVE_FIELDS = ("state", "doing", "asks", "at", "turnAt", "steps", "agents", "said", "saidAt", "failed")
+# The hooks' copies (pane.py --relay/--live on) and the files they're copies of
+HOOK_SOURCES = {PERMISSION_HOOK_FILE: "permission_hook.py", LIVE_HOOK_FILE: "live_hook.py"}
+HOOK_REVISION = re.compile(rb"^HOOK_REVISION = ([0-9]+)", re.M)
+
+
+def hooks_dir(home):
+    """Where pane.py --relay/--live on keeps the hooks' copies that Claude's settings name."""
+    return Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share") / "talpy-den"
 
 
 def live_hook_on(home):
     """Whether the live hook is on (pane.py --live on keeps its copy here)."""
-    data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share")
-    return (data / "talpy-den" / LIVE_HOOK_FILE).is_file()
+    return (hooks_dir(home) / LIVE_HOOK_FILE).is_file()
+
+
+def hook_revision(code):
+    """A hook's version (its HOOK_REVISION line; 1 for one from before that line)."""
+    m = HOOK_REVISION.search(code)
+    return int(m.group(1)) if m else 1
+
+
+def refresh_hooks(home, code_dir=None):
+    """Bring the hooks that are on up to date: a copy older than the hook
+    next to this file (code_dir) is replaced by it, so what a new version of
+    a hook fixes reaches the settings that already name it. Only ever newer
+    (several front ends of other versions may run this), never one that's
+    off. The names of the copies that changed."""
+    if code_dir is None:
+        here = globals().get("__file__")
+        if not here or not os.path.isfile(here):
+            return []  # (on an SSH host this file comes on stdin, without the hooks)
+        code_dir = Path(here).resolve().parent
+    changed = []
+    for name, source in HOOK_SOURCES.items():
+        target = hooks_dir(home) / name
+        try:
+            with open(target, "rb") as f:
+                installed = f.read()
+                mode = os.fstat(f.fileno()).st_mode & 0o777
+            with open(Path(code_dir) / source, "rb") as f:
+                new = f.read()
+        except OSError:
+            continue  # off (no copy), or no hook here to take it from
+        if hook_revision(new) <= hook_revision(installed):
+            continue
+        tmp = target.with_name(f".{name}.{os.getpid()}.tmp")
+        try:
+            with open(tmp, "wb") as f:
+                f.write(new)
+            os.chmod(tmp, mode)
+            os.replace(tmp, target)
+            changed.append(name)
+        except OSError:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    return changed
 
 
 def live_view(cache_root, sid, pid):
@@ -5538,8 +5641,8 @@ def plan_limits(snapshot_root, profiles, now_ms):
             break  # (newest first: the others are older still)
         snap = read_json(path)
         limits = snap.get("rate_limits") if isinstance(snap, dict) else None
-        if not isinstance(limits, dict) or not limits:
-            continue
+        if not isinstance(limits, dict) or not limits or not snapshot_of(snap, [p.real for p in profiles]):
+            continue  # (no plan usage in it, or another account's folder of the same name)
         windows = [limit_window(key, w["used_percentage"], w.get("resets_at"), now_ms)
                    for key, w in limits.items()
                    if isinstance(w, dict) and number(w.get("used_percentage")) is not None]
@@ -7178,6 +7281,10 @@ def main(argv=None):
             if remote:
                 result["host"] = os.uname().nodename
                 add_remote_commands(result, home, config_dirs, claude)
+            try:  # (a widget updated since the hooks went on: their copies too)
+                refresh_hooks(home)
+            except Exception as exc:
+                result["errors"].append(f"hooks: {exc}")
         except Exception as exc:  # the widget must always get parseable output
             result = {"ok": False, "error": f"{type(exc).__name__}: {exc}", "generatedAt": int(time.time() * 1000)}
     # ASCII only: a lone surrogate (half an emoji cut off in a title) can't be

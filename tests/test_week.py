@@ -566,6 +566,116 @@ class TipTests(Home):
         self.assertNotIn("long_context", keys)  # (150k is the limit, not over it)
 
 
+class time_zone:
+    """The local time zone for a while (TZ, time.tzset); skipped where its tz data isn't."""
+
+    def __init__(self, test, name):
+        if name != "UTC" and not os.path.exists(os.path.join("/usr/share/zoneinfo", name)):
+            test.skipTest("no time zone data for " + name)
+        self.name = name
+
+    def __enter__(self):
+        self.old = os.environ.get("TZ")
+        os.environ["TZ"] = self.name
+        time.tzset()
+
+    def __exit__(self, *exc):
+        if self.old is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = self.old
+        time.tzset()
+
+
+class LocalHourTests(Home):
+    """A chat's hours are the local clock's (week.hour_start): in a half-hour
+    (India) or 45-minute (Nepal) time zone, what a reply cost counts for the
+    day it came on; in a whole-hour one the keys are what they always were."""
+
+    def every_5_minutes(self, start, hours):
+        return range(start, start + hours * week.HOUR_MS, week.BUCKET_MS)
+
+    def test_whole_hour_zones_keep_their_keys_across_dst(self):
+        # Berlin and New York leave summer time on 2026-10-25 and 2026-11-01, enter it on 2026-03-29 and 2026-03-08
+        for name, utc in (("UTC", (2026, 10, 24, 22)), ("Europe/Berlin", (2026, 10, 24, 22)),
+                          ("Europe/Berlin", (2026, 3, 28, 22)), ("America/New_York", (2026, 11, 1, 3)),
+                          ("America/New_York", (2026, 3, 8, 4))):
+            start = int(datetime(*utc, tzinfo=timezone.utc).timestamp() * 1000)
+            with time_zone(self, name), self.subTest(name=name, at=utc):
+                for ts in self.every_5_minutes(start, 6):
+                    h = week.hour_key(week.hour_start(ts))
+                    self.assertEqual(h, str(ts // week.HOUR_MS))
+                    self.assertEqual((ts - week.hour_ms(h)) // week.BUCKET_MS, (ts // week.BUCKET_MS) % 12)
+
+    def test_half_and_three_quarter_hour_zones(self):
+        # Lord Howe Island: +10:30, and +11 in summer (half an hour: from
+        # 2026-10-04 02:00 to 2026-04-05 02:00, back to 01:30)
+        def clock_hour(ms):
+            local = datetime.fromtimestamp(ms / 1000)
+            return local.date(), local.hour, local.fold   # (fold: an hour the clock went through twice)
+        for name, fraction, local_start in (("Asia/Kolkata", ".5", (2026, 10, 23, 20)),
+                                            ("Asia/Kathmandu", ".25", (2026, 10, 23, 20)),
+                                            ("Australia/Lord_Howe", None, (2026, 10, 3, 20)),
+                                            ("Australia/Lord_Howe", None, (2026, 4, 4, 20))):
+            with time_zone(self, name), self.subTest(name=name, at=local_start):
+                for ts in self.every_5_minutes(int(datetime(*local_start).timestamp() * 1000), 12):
+                    h = week.hour_key(week.hour_start(ts))
+                    begun = week.hour_ms(h)
+                    # the first moment of the clock's hour ts is in
+                    self.assertTrue(0 <= ts - begun < week.HOUR_MS)
+                    self.assertEqual(clock_hour(begun), clock_hour(ts), (datetime.fromtimestamp(ts / 1000), h))
+                    self.assertNotEqual(clock_hour(begun - 1000), clock_hour(ts))
+                    if fraction:
+                        self.assertTrue(h.endswith(fraction), h)
+                        local = datetime.fromtimestamp(ts / 1000)
+                        self.assertEqual(begun, int(local.replace(minute=0, second=0, microsecond=0).timestamp() * 1000))
+
+    def test_a_reply_after_midnight_counts_for_its_day(self):
+        with time_zone(self, "Asia/Kolkata"):
+            self.now = int(datetime(2026, 10, 24, 12, 0).timestamp() * 1000)
+            t = int(datetime(2026, 10, 24, 0, 15).timestamp() * 1000)
+            self.write(Transcript().prompt(t - MIN).reply(t, "a").duration(t + MIN, 2 * MIN))
+            once = 5 + 100 + 1000
+            day = self.recap(span="day")
+            self.assertEqual((day["from"], day["sum"]["tokenTotal"], day["previous"]["tokenTotal"]), ("2026-10-24", once, 0))
+            self.assertGreater(day["sum"]["cost"], 0)
+            self.assertEqual([c["cost"] > 0 for c in day["days"][0]["chats"]], [True])
+            self.assertEqual(self.recap(span="day", back=1)["sum"]["tokenTotal"], 0)
+            # its 5 minutes: the ones it came in (how many chats ran at once)
+            (rec,) = [r for r in self.scan()["files"].values() if not r.get("sub")]
+            ((h, agg),) = rec["data"]["hours"].items()
+            ((b, _),) = agg["b"].items()
+            self.assertEqual(week.hour_ms(h) // week.BUCKET_MS + int(b), t // week.BUCKET_MS)
+
+    def test_an_older_cache_is_read_as_it_was(self):
+        # Hours read before (UTC hours, in any zone) still count: the history stays
+        t = int(datetime(2026, 10, 24, 6, 15, tzinfo=timezone.utc).timestamp() * 1000)   # (11:45 in India)
+        tr = Transcript().prompt(t - MIN).reply(t, "a")
+        self.write(tr)
+        with time_zone(self, "UTC"):
+            cache = self.scan()
+        self.assertEqual(list(next(iter(cache["files"].values()))["data"]["hours"]), [str(t // week.HOUR_MS)])
+        with time_zone(self, "Asia/Kolkata"):
+            self.write(tr.reply(t + 2 * MIN, "b").duration(t + 3 * MIN, 4 * MIN))
+            cache = self.scan(cache)   # (what was added: its reply in a local hour, 11:00 there)
+            hours = next(iter(cache["files"].values()))["data"]["hours"]
+            self.assertEqual(sorted(hours), sorted([str(t // week.HOUR_MS), "498005.5"]))
+            self.assertEqual(week.hour_ms("498005.5"), int(datetime(2026, 10, 24, 11, 0).timestamp() * 1000))
+            chats = week.chats_between(cache, self.profiles(), t - week.DAY_MS, t + week.DAY_MS, self.home)
+            self.assertEqual(sorted(chats["chat-a"]["hours"]), sorted(hours))
+            self.assertEqual(week.first_activity(cache), week.hour_ms("498005.5"))   # (its earliest hour began then)
+            once = 5 + 100 + 1000
+            self.now = t + week.HOUR_MS
+            self.assertEqual(self.recap(span="day")["sum"]["tokenTotal"], 2 * once)
+
+    def test_hours_that_overlap_the_span(self):
+        hours = {"100": {}, "100.5": {}, "101": {}, "99.75": {}}
+        cache = {"files": {"f": {"chat": "c", "profiles": [], "data": {
+            "hours": {h: dict(week.new_hour()) for h in hours}, "turns": [], "prompts": [], "limits": []}}}}
+        got = week.chats_between(cache, [], 100 * week.HOUR_MS + 1, 101 * week.HOUR_MS - 1, self.home)
+        self.assertEqual(sorted(got["c"]["hours"]), ["100", "100.5", "99.75"])   # (not 101: it starts after)
+
+
 class SpendTests(Home):
     def test_the_costliest_turns_and_cold_resumes(self):
         t0, hour = self.t0, 3600_000

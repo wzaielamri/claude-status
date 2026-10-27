@@ -200,11 +200,47 @@ class InstallTests(unittest.TestCase):
         self.assertIn("gnome-extensions uninstall claude-status@wzaielamri.github.io", self.log.read_text())
 
     def test_gnome_45_to_48_refused(self):
+        legacy = self.home / ".local/share/gnome-shell/extensions/claude-status@wzaielamri.github.io"
+        legacy.mkdir(parents=True)
         self.stub("gnome-shell", "#!/bin/sh\necho 'GNOME Shell 46.0'\n")
         out = self.install("--gnome")
         self.assertEqual(out.returncode, 1)
         self.assertIn("GNOME Shell 46 isn't supported", out.stderr)
-        self.assertNotIn("gnome-extensions install", self.log.read_text() if self.log.exists() else "")
+        log = self.log.read_text() if self.log.exists() else ""
+        self.assertNotIn("gnome-extensions install", log)
+        # the extension of the first name is left as it was
+        self.assertTrue(legacy.is_dir())
+        self.assertNotIn("claude-status", log)
+
+    def test_a_failed_build_leaves_the_installed_extension(self):
+        legacy = self.home / ".local/share/gnome-shell/extensions/claude-status@wzaielamri.github.io"
+        legacy.mkdir(parents=True)
+        self.stub("gnome-shell", "#!/bin/sh\necho 'GNOME Shell 43.9'\n")
+        self.stub("glib-compile-schemas", "#!/bin/sh\nexit 1\n")
+        self.stub("dconf", STUB)
+        out = self.install("--gnome")
+        self.assertNotEqual(out.returncode, 0)
+        log = self.log.read_text() if self.log.exists() else ""
+        self.assertTrue(legacy.is_dir())
+        self.assertNotIn("Replaced the old Claude Status extension.", out.stdout)
+        self.assertNotIn("claude-status", log)
+        self.assertNotIn("gnome-extensions install", log)
+
+    def test_gnome_43_gets_the_converted_extension(self):
+        legacy = self.home / ".local/share/gnome-shell/extensions/claude-status@wzaielamri.github.io"
+        legacy.mkdir(parents=True)
+        self.stub("gnome-shell", "#!/bin/sh\necho 'GNOME Shell 43.9'\n")
+        self.stub("glib-compile-schemas", STUB)
+        self.stub("dconf", STUB)
+        out = self.install("--gnome")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("Replaced the old Claude Status extension.", out.stdout)
+        log = self.log.read_text()
+        self.assertIn("gnome-extensions uninstall claude-status@wzaielamri.github.io", log)
+        self.assertIn("gnome-extensions install --force", log)
+        built = ROOT / "gnome/build/talpy-den@wzaielamri.github.io"
+        self.assertEqual(json.loads((built / "metadata.json").read_text())["shell-version"], ["43", "44"])
+        self.assertTrue((built / "compat43prefs.js").is_file())
 
 
 if __name__ == "__main__":
