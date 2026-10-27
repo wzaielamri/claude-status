@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.16.1
 
 - **Enter on a chat in a terminal copies your reply:** for a chat whose
   terminal takes no text from outside, the first Enter in the chat tab
