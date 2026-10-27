@@ -170,11 +170,14 @@ Item {
         }
     }
 
+    // (Removed once its frame is over: the leave ends in Talpy's tick, inside
+    // its view's frame, and removing it there destroyed the view under it:
+    // "attempted to evaluate a function in an invalid context")
     function goAway() {
         react("leave", ok => {
             if (ok && pet.leaving) {
                 pet.departed = true
-                pet.gone()
+                Qt.callLater(pet.gone)
             }
         })
     }

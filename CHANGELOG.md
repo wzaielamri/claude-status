@@ -5,6 +5,7 @@
 - **The widget no longer stops refreshing:** a status check that lost its answer could still leave the popup and the panel showing what they saw last, **Refresh** too, until plasmashell restarted: what 1.16.0 does with such a check failed on it at each try (*a check didn't start* in the journal, every few seconds). Such a check now runs again at the next check instead of a minute later, and nothing can keep it from running.
 - **Refresh while a check runs checks again:** a click while a check was running did nothing; now another check runs right after it, so what you just did (stopped a chat, queued a task) shows. A check asked for because a chat changed while one ran is now really run too: it got the answer of the check before back from Plasma, so the change showed only at the next check.
 - **Less work each time a chat changes:** the watcher that notices a chat start, end, work or wait (and with live mode, each step it takes) got its own answer back from Plasma about 90 times in a row after each change, each a status check for every copy of the widget. It now answers once per change (Plasma).
+- **No error when a chat's pet digs away:** each pet that left after its chat ended put two errors in the journal (*attempted to evaluate a function in an invalid context*, *TalpyView.qml:121: … 'showWanted' … is not a function*): it was taken off the stage in the middle of drawing its last picture. It's now taken off right after (Plasma).
 
 ## 1.16.0 (2026-10-27)
 

@@ -44,6 +44,11 @@ NEEDS_PLASMA5SUPPORT = unittest.skipUnless(shutil.which("python3") and subproces
     ["python3", "-c", "import PySide6.QtQuick, PySide6.QtCore as c, os; os.stat(os.path.join("
      "c.QLibraryInfo.path(c.QLibraryInfo.LibraryPath.QmlImportsPath), 'org/kde/plasma/plasma5support'))"],
     capture_output=True).returncode == 0, "needs PySide6 and Plasma's plasma5support QML module")
+NEEDS_PLASMA_QML = unittest.skipUnless(shutil.which("python3") and subprocess.run(
+    ["python3", "-c", "import PySide6.QtQuick, PySide6.QtCore as c, os; q = c.QLibraryInfo.path("
+     "c.QLibraryInfo.LibraryPath.QmlImportsPath); [os.stat(os.path.join(q, m)) for m in "
+     "('org/kde/plasma/components', 'org/kde/plasma/core', 'org/kde/kirigami')]"],
+    capture_output=True).returncode == 0, "needs PySide6 and Plasma's and Kirigami's QML modules")
 
 
 def run_hub(body, ms):
@@ -1145,8 +1150,94 @@ class PetLifeTests(unittest.TestCase):
         # leave, which waves before it digs in, and only then is the pet gone
         pet = (ROOT / "ui/Pet.qml").read_text()
         self.assertRegex(pet, r"onLeavingChanged: \{\n\s+if \(leaving && !held\)\n\s+goAway\(\)")
-        self.assertRegex(pet, r'react\("leave", ok => \{\n\s+if \(ok && pet\.leaving\) \{\n\s+pet\.departed = true\n\s+pet\.gone\(\)')
+        self.assertRegex(pet, r'react\("leave", ok => \{\n\s+if \(ok && pet\.leaving\) \{\n\s+pet\.departed = true\n\s+Qt\.callLater\(pet\.gone\)')
         actions = (TALPY / "actions.mjs").read_text()
         leave = actions[actions.index("    leave: {"):]
         leave = leave[:leave.index("}] }")]
         self.assertLess(leave.index("arms: 'wave'"), leave.index("depth: 'gone'"))
+
+    @NEEDS_PLASMA_QML
+    def test_a_pet_that_dug_away_is_removed_after_its_frame(self):
+        # Its leave ends in Talpy's tick, inside its view's frame; removed
+        # right there (PetStrip's removePet), the view was destroyed under the
+        # rest of the frame: "attempted to evaluate a function in an invalid
+        # context" and "TalpyView.qml:121: TypeError: Property 'showWanted'
+        # … is not a function" in the journal for each chat that left
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp) / "stage.qml"
+            stage.write_text(f'import QtQuick\nimport "{(ROOT / "ui").as_uri()}"\n' + """Item {
+    id: root
+    width: 400; height: 200
+    signal petFrame(real now)
+    readonly property real petFrameMs: 16.7
+    property string petMood: "idle"
+    property int agentsRunning: 0
+    property string waitingName: ""
+    property string highUsageText: ""
+    property string contextFullText: ""
+    property int maxFiveHour: 0
+    property int removed: 0
+    function stateText(c) { return "" }
+    function jumpTo() {}
+    function remoteShow() {}
+    function i18n(s) { return s }
+    function i18nc(c, s) { return s }
+    function i18np(a, b, n) { return n === 1 ? a : b }
+    // as PetStrip's
+    function removePet() { petModel.remove(0); removed++; done.start() }
+    Timer { interval: 16; repeat: true; running: true; onTriggered: root.petFrame(Date.now()) }
+    Timer { interval: 300; running: true; onTriggered: petModel.setProperty(0, "leaving", true) }
+    Timer { id: done; interval: 300; onTriggered: Qt.quit() }
+    Item {
+        id: stage
+        anchors.fill: parent
+        property real gu: 8
+        property real boxSize: 60
+        property real bodyWidth: 40
+        property real bodyHeight: 40
+        property real loneGround: 150
+        property real chatGround: 150
+        property real tagWidth: 100
+        property bool live: true
+        property bool playing: true
+        property real cursorX: -1
+        property bool firstShown: true
+        function say(pet, text) {}
+        ListModel { id: petModel; ListElement { petKey: "a"; leaving: false } }
+        Repeater {
+            model: petModel
+            delegate: Pet {
+                required property var model
+                strip: stage
+                petKey: model.petKey
+                leaving: model.leaving
+                label: "a"
+                chat: ({ state: "working" })
+                homeX: 200
+                onGone: root.removePet()
+            }
+        }
+    }
+}
+""")
+            script = (
+                "import sys\n"
+                "from PySide6.QtCore import QUrl, QTimer\n"
+                "from PySide6.QtGui import QGuiApplication\n"
+                "from PySide6.QtQuick import QQuickView\n"
+                "app = QGuiApplication(sys.argv)\n"
+                "view = QQuickView()\n"
+                "view.engine().quit.connect(app.quit)\n"
+                "view.setSource(QUrl.fromLocalFile(sys.argv[1]))\n"
+                "view.show()\n"
+                "QTimer.singleShot(15000, app.quit)\n"
+                "app.exec()\n"
+                "print(view.rootObject().property('removed'))\n")
+            out = subprocess.run(["python3", "-c", script, str(stage)], capture_output=True, text=True, timeout=60,
+                                 env=dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
+                                          QT_FORCE_STDERR_LOGGING="1"))
+        self.assertEqual(out.stdout.split()[-1:], ["1"], out.stderr[-2000:])
+        self.assertNotIn("invalid context", out.stderr)
+        self.assertNotRegex(out.stderr, r"TalpyView\.qml:\d+: TypeError")
