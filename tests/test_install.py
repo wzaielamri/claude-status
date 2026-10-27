@@ -226,6 +226,10 @@ class InstallTests(unittest.TestCase):
         self.assertNotIn("claude-status", log)
         self.assertNotIn("gnome-extensions install", log)
 
+    # (gnome/gnome43/port43.py, which install.sh runs there, needs Python 3.8;
+    # the systems with GNOME 43 and 44 have 3.10 or newer)
+    @unittest.skipIf(subprocess.run(["python3", "-c", "import sys; sys.exit(sys.version_info < (3, 8))"]).returncode,
+                     "python3 is older than 3.8")
     def test_gnome_43_gets_the_converted_extension(self):
         legacy = self.home / ".local/share/gnome-shell/extensions/claude-status@wzaielamri.github.io"
         legacy.mkdir(parents=True)
