@@ -40,6 +40,55 @@ def run_node(script):
     return json.loads(out.stdout)
 
 
+NEEDS_PLASMA5SUPPORT = unittest.skipUnless(shutil.which("python3") and subprocess.run(
+    ["python3", "-c", "import PySide6.QtQuick, PySide6.QtCore as c, os; os.stat(os.path.join("
+     "c.QLibraryInfo.path(c.QLibraryInfo.LibraryPath.QmlImportsPath), 'org/kde/plasma/plasma5support'))"],
+    capture_output=True).returncode == 0, "needs PySide6 and Plasma's plasma5support QML module")
+
+
+def run_hub(body, ms):
+    """Runs hub/Hub.qml offscreen for ms, with body added to an Item (t) whose
+    t.command (a status check) and t.live (a live.py) count their runs; another
+    DataSource holds Plasma's executable engine all along, as in plasmashell.
+    Returns (status answers the copies got, runs of t.command, runs of t.live,
+    answers of the live watcher, stderr)."""
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        for name, wait, answer in (("check", "0.15", '{"ok": true}'), ("live", "0.3", '{"ok": true, "sessions": true}')):
+            (tmp / f"{name}.sh").write_text(f"#!/bin/sh\necho x >> {tmp}/{name}.runs\nsleep {wait}\necho '{answer}'\n")
+        (tmp / "t.qml").write_text(
+            f'import QtQuick\nimport "{(ROOT / "ui/hub").as_uri()}"\nItem {{\n  id: t\n'
+            '  property int outputs: 0\n  property int liveAnswers: 0\n'
+            f'  readonly property string command: "sh {tmp}/check.sh"\n'
+            f'  readonly property string live: "sh {tmp}/live.sh"\n'
+            '  Connections { target: Hub; function onOutput(c, out, err) { t.outputs++ } }\n'
+            '  Connections { target: Hub.liveRunner; function onNewData(s, d) { t.liveAnswers++ } }\n'
+            '  Exec { Component.onCompleted: connectSource("sleep 30") }\n'
+            f'{body}\n}}\n')
+        script = (
+            "import sys\n"
+            "from PySide6.QtCore import QUrl, QTimer\n"
+            "from PySide6.QtGui import QGuiApplication\n"
+            "from PySide6.QtQuick import QQuickView\n"
+            "app = QGuiApplication(sys.argv)\n"
+            "view = QQuickView()\n"
+            "view.setSource(QUrl.fromLocalFile(sys.argv[1]))\n"
+            "r = view.rootObject()\n"
+            "QTimer.singleShot(int(sys.argv[2]), app.quit)\n"
+            "app.exec()\n"
+            "print(r.property('outputs'), r.property('liveAnswers'))\n")
+        out = subprocess.run(["python3", "-c", script, str(tmp / "t.qml"), str(ms)], capture_output=True, text=True,
+                             timeout=60, env=dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_FORCE_STDERR_LOGGING="1"))
+        runs = [len((tmp / f"{name}.runs").read_text().split()) if (tmp / f"{name}.runs").exists() else 0
+                for name in ("check", "live")]
+    if not out.stdout.split():
+        raise AssertionError(out.stderr[-2000:])
+    outputs, live_answers = (int(n) for n in out.stdout.split()[-2:])
+    return outputs, runs[0], runs[1], live_answers, out.stderr
+
+
 # A canvas that draws nothing, for running Talpy's drawing code (and one
 # that counts what it's asked to draw)
 CALL_COUNTER = """
@@ -796,10 +845,7 @@ class SeveralCopiesTests(unittest.TestCase):
         self.assertRegex(main, r'ScreenSaver\.GetActive"\)')
         self.assertIn('(kind === "conversation" || kind === "logs" ? "" : " # " + Date.now())', (ROOT / "ui/ChatPane.qml").read_text())
 
-    @unittest.skipUnless(shutil.which("python3") and subprocess.run(
-        ["python3", "-c", "import PySide6.QtQuick, PySide6.QtCore as c, os; os.stat(os.path.join("
-         "c.QLibraryInfo.path(c.QLibraryInfo.LibraryPath.QmlImportsPath), 'org/kde/plasma/plasma5support'))"],
-        capture_output=True).returncode == 0, "needs PySide6 and Plasma's plasma5support QML module")
+    @NEEDS_PLASMA5SUPPORT
     def test_a_command_costs_the_same_after_thousands(self):
         # 20 idle copies beside one that runs 1500 commands with new names:
         # a DataSource each took 0.8 ms a command at first and 112 ms at the
@@ -836,6 +882,42 @@ class SeveralCopiesTests(unittest.TestCase):
         costs = [float(line) for line in out.stdout.split()]
         self.assertEqual(len(costs), 5, out.stderr[-2000:])
         self.assertLess(costs[-1], 2 * costs[0] + 1, costs)
+
+    @NEEDS_PLASMA5SUPPORT
+    def test_a_check_whose_datasource_is_gone_runs_again(self):
+        # A check's DataSource gone with no answer counted as running: each
+        # try to run it again threw ("Property 'destroy' of object … is not
+        # a function") before it was replaced, for good, and the widget
+        # showed what it saw last until plasmashell restarted, Refresh too
+        # (2026-10-27). It runs again at the next check, not a minute later.
+        outputs, runs, _, _, stderr = run_hub(
+            '  Component.onCompleted: Hub.want("c0", "status", t.command, 500, true)\n'
+            '  Timer { interval: 60; running: true; onTriggered:'
+            ' { for (const c in Hub.poller.running) Hub.poller.running[c].source.destroy() } }', 2500)
+        self.assertNotIn("check didn't start", stderr)
+        self.assertGreaterEqual(outputs, 2, stderr[-2000:])
+
+    @NEEDS_PLASMA5SUPPORT
+    def test_a_check_asked_for_while_one_runs_runs_after_it(self):
+        # Refresh while a check ran did nothing, and a check run again once
+        # it answered (a chat changed meanwhile) got that answer back, which
+        # Plasma keeps a moment: nothing ran
+        for ask in ("Hub.refresh(t.command)", "Hub.checkNow()"):
+            outputs, runs, _, _, stderr = run_hub(
+                '  Component.onCompleted: Hub.want("c0", "status", t.command, 60000, true)\n'
+                f'  Timer {{ interval: 60; running: true; onTriggered: {ask} }}', 1500)
+            self.assertEqual((outputs, runs), (2, 2), ask)
+
+    @NEEDS_PLASMA5SUPPORT
+    def test_the_live_watcher_answers_once_a_run(self):
+        # Started again the moment it answered, live.py's watcher got that
+        # answer back from Plasma ~90 times in a row, each a status check
+        outputs, runs, live_runs, live_answers, stderr = run_hub(
+            '  Component.onCompleted: { Hub.want("c0", "status", t.command, 60000, true); Hub.wantLive("c0", t.live) }',
+            2500)
+        self.assertGreater(live_runs, 3, stderr[-2000:])
+        self.assertLessEqual(live_answers, live_runs)
+        self.assertLessEqual(outputs, runs)
 
     def test_looping_animations_stop_under_a_window(self):
         # Every repeating timer and endless animation of the pets runs only

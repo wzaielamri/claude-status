@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **The widget no longer stops refreshing:** a status check that lost its answer could still leave the popup and the panel showing what they saw last, **Refresh** too, until plasmashell restarted: what 1.16.0 does with such a check failed on it at each try (*a check didn't start* in the journal, every few seconds). Such a check now runs again at the next check instead of a minute later, and nothing can keep it from running.
+- **Refresh while a check runs checks again:** a click while a check was running did nothing; now another check runs right after it, so what you just did (stopped a chat, queued a task) shows. A check asked for because a chat changed while one ran is now really run too: it got the answer of the check before back from Plasma, so the change showed only at the next check.
+- **Less work each time a chat changes:** the watcher that notices a chat start, end, work or wait (and with live mode, each step it takes) got its own answer back from Plasma about 90 times in a row after each change, each a status check for every copy of the widget. It now answers once per change (Plasma).
+
 ## 1.16.0 (2026-10-27)
 
 - **Now Talpy Den:** the widget, the GNOME extension and the VS Code extension are called **Talpy Den**, and the pet is **Talpy**. The ids changed with the name (Plasma `org.wzaielamri.talpyden`, GNOME `talpy-den@wzaielamri.github.io`, VS Code `wzaielamri.talpy-den` with `talpyDen.*` settings), so `./install.sh` replaces the old widget or extension: each Claude Status widget in your panel, on your desktop or in the system tray becomes Talpy Den where it is, with its settings (Plasma's panel and desktop restart once for it; the layout before is kept as a backup next to `plasma-org.kde.plasma.desktop-appletsrc`), and the GNOME extension keeps its settings too. The folders `~/.cache/claude-widget` and `~/.local/share/claude-widget` moved to `talpy-den` by themselves with everything in them (history, stars, keep-going, hooks); a link under the old name stays so an older status-line snippet and hooks keep working until `./install.sh` updates them. Shared chats' folders (`~/.local/share/claude-status`) stay where they are. In the popup the app's name is the first tab (your chats), where the title *Claude Code* and a *Chats* tab were; notifications and the panel tooltip say Talpy Den too.

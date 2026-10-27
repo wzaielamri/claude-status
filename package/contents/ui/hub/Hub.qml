@@ -73,8 +73,9 @@ QtObject {
         pickLive()
     }
 
+    // (Refresh: one running now may have read the chats before you clicked)
     function refresh(command) {
-        run(command)
+        run(command, true)
     }
 
     // ---------------------------------------------------------------- live
@@ -87,6 +88,7 @@ QtObject {
     property var liveWanted: ({})     // copy id -> its live.py command
     property string liveCommand: ""   // the one that runs: the longest-running copy's
     property bool liveRunning: false
+    property string liveLine: ""      // what runs (liveCommand --as …)
     property real liveStartedAt: 0
     property bool liveHealthy: false
     property int liveFailures: 0
@@ -119,7 +121,8 @@ QtObject {
             return
         liveRunning = true
         liveStartedAt = Date.now()
-        liveRunner.connectSource(liveCommand + " --as " + shellQuote(instanceName))
+        liveLine = liveCommand + " --as " + shellQuote(instanceName)
+        liveRunner.connectSource(liveLine)
     }
 
     // Each status check of the copies now; one that runs is run again when it's done
@@ -218,12 +221,12 @@ QtObject {
     function run(command, urgent) {
         for (const line in running) {
             if (running[line] === command) {
-                if (Date.now() - (lastStart[command] || 0) < staleMs) {
+                if (Date.now() - (lastStart[command] || 0) < staleMs && poller.has(line)) {
                     if (urgent)
                         again[command] = true
                     return   // a still-running check: don't stack another
                 }
-                delete running[line]   // (no answer for too long: it's given up)
+                delete running[line]   // (no answer for too long, or none can come: it's given up)
             }
         }
         const named = wantsOf(command).some(w => w.named)
@@ -243,8 +246,8 @@ QtObject {
     property Timer ticker: Timer {
         repeat: true
         onTriggered: {
-            if (hub.liveRunning && Date.now() - hub.liveStartedAt > hub.liveStaleMs) {
-                hub.liveRunning = false   // (its watcher never answered: the next one starts)
+            if (hub.liveRunning && (Date.now() - hub.liveStartedAt > hub.liveStaleMs || !hub.liveRunner.has(hub.liveLine))) {
+                hub.liveRunning = false   // (its watcher never answered, or can't: the next one starts)
                 hub.runLive()
             }
             const due = {}

@@ -1914,7 +1914,7 @@ PlasmoidItem {
     }
 
     function pollHost(host) {
-        Hub.refresh(hostCommand(host))   // (not while its last check still runs)
+        Hub.refresh(hostCommand(host))   // (one still running is run again once it's done)
     }
 
     function setRemote(host, patch) {
