@@ -1128,8 +1128,9 @@ PlasmoidItem {
     }
 
     // The focus view (FocusView.qml): the Chats tab with only what needs you
-    // (oldest first), what finished while you looked away and one line for
-    // each chat at work; the rest counted, each account's 5-hour usage
+    // (oldest first), the turns that finished and you haven't looked at yet
+    // (newest first) and one line for each chat at work; the rest counted,
+    // each account's 5-hour usage
     readonly property bool focusView: Plasmoid.configuration.focusView
     function setFocusView(on) {
         Plasmoid.configuration.focusView = on
@@ -1154,13 +1155,14 @@ PlasmoidItem {
                     needs.push(item)
                 else if (s.state === "working")
                     working.push(item)
-                else if (unseen[key] === "done")
+                else if (finishedUnopened[key])
                     finished.push(item)
                 else
                     rest[atLimit(s) ? "limit" : s.state === "idle" ? "idle" : "done"] += 1
             }
         }
         needs.sort((a, b) => (a.session.since || 0) - (b.session.since || 0))
+        finished.sort((a, b) => (b.session.since || 0) - (a.session.since || 0))
         working.sort((a, b) => (a.session.since || 0) - (b.session.since || 0))
         const parts = []
         if (rest.idle)
@@ -1435,6 +1437,8 @@ PlasmoidItem {
                 awayEvents = awayEvents.slice(0, i).concat(awayEvents.slice(i + 1))
         } else if (!stop && long) {
             markUnseen(sid, "done")
+            if (!paneChat || petKeyOf(paneChat, paneChat.host) !== sid)   // (its pane shows it: you're looking)
+                finishedUnopened = Object.assign({}, finishedUnopened, { [sid]: true })
         }
         noteAway(stop || (s.reason === "failed" || s.reason === "stopped" ? s.reason : "done"), s.name + where, sid)
         if (Plasmoid.configuration.phoneFinished && long)
@@ -1628,6 +1632,22 @@ PlasmoidItem {
             const next = Object.assign({}, unseen)
             delete next[sid]
             unseen = next
+        }
+        if (kind !== "waiting")
+            forgetFinished(sid)   // (at work again, gone, or it didn't finish after all)
+    }
+
+    // Chats that finished a turn you haven't looked at yet (the focus view's
+    // "Finished" lines; the turns that are told as finished): key -> true,
+    // until you open that chat (its pane or its window). Unlike unseen,
+    // opening the popup leaves them.
+    property var finishedUnopened: ({})
+
+    function forgetFinished(key) {
+        if (key in finishedUnopened) {
+            const next = Object.assign({}, finishedUnopened)
+            delete next[key]
+            finishedUnopened = next
         }
     }
 
@@ -2113,6 +2133,7 @@ PlasmoidItem {
     // open in a terminal (ssh); one running there shows where it runs here (its
     // VS Code window, the terminal of one, or the terminal tab with the ssh connection)
     function remoteShow(host, session) {
+        forgetFinished(petKeyOf(session, host))
         const cwd = session.cwd ? " --cwd " + shellQuote(session.cwd) : ""
         if (session.openCommand)
             remoteOpen(host, session.openCommand)
@@ -2325,6 +2346,9 @@ PlasmoidItem {
     }
 
     function jumpTo(sessionId, profileDir) {
+        const row = listedRow(sessionId, profileDir, "")
+        if (row)
+            forgetFinished(petKeyOf(row, ""))
         // Trailing comment keeps repeated clicks from being deduplicated by the engine.
         jumper.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " " + shellQuote(sessionId)
                              + profileArg(profileDir) + configDirArgs + " # " + Date.now())
@@ -2727,6 +2751,7 @@ PlasmoidItem {
 
     // s: a session row or a recent chat (sessionId is its chat then); tab: "chat" or "review"
     function openPane(s, host, tab) {
+        forgetFinished(petKeyOf(s, host))
         paneChat = { chatId: s.chatId || s.sessionId, sessionId: s.sessionId || "", profileDir: s.profileDir || "",
                      host: host || "", name: s.name || "", cwd: s.cwd || "", tab: tab || "chat", at: Date.now(), key: s.key || "" }
     }
@@ -3088,6 +3113,7 @@ PlasmoidItem {
         newChatFolder = { groupKey: key, path: project.folder, short: project.folderShort, newChatCommand: "" }
         planComposer = ""
         newChatGroup = key
+        setFocusView(false)   // (the box is in its account's section, which the focus view leaves out)
         searchOpen = false
         searchQuery = ""
         searchResults = ({})
@@ -3205,6 +3231,7 @@ PlasmoidItem {
         newChatFolder = { groupKey: g.id, path: project.path, short: project.short, newChatCommand: "" }
         planComposer = ""
         newChatGroup = g.id
+        setFocusView(false)   // (the box is in its account's section, which the focus view leaves out)
     }
 
     function loadWeek() {

@@ -6,7 +6,7 @@ import org.kde.kirigami as Kirigami
 
 // The focus view (the header's filter button, root.focusView): only what
 // needs you, as full rows (their questions, Allow / Deny, Go on), the chats
-// that finished while you looked away, one line for each chat at work with
+// that finished a turn you haven't looked at yet, one line for each chat at work with
 // what it does now, and how the rest stands; Show everything goes back to
 // the whole dashboard.
 ColumnLayout {
@@ -38,7 +38,7 @@ ColumnLayout {
         }
     }
 
-    // Finished while you looked away: one line each (click: its pane)
+    // Finished, and you haven't looked at it yet: one line each (click: its pane)
     Repeater {
         model: fv.lists.finished.length
         delegate: FocusLine {

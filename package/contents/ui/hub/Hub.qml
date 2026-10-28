@@ -188,8 +188,15 @@ QtObject {
         return ms
     }
 
+    // The ticker's step: each interval wanted is a whole number of steps
+    // (ticking at the shortest one, a host wanted every 30 s was checked
+    // every 40 s next to a status wanted every 20 s)
+    function gcd(a, b) {
+        return b ? gcd(b, a % b) : a
+    }
+
     function update() {
-        let leader = "", since = 0, shortest = 0
+        let leader = "", since = 0, shortest = 0, step = 0
         const wanted = {}
         for (const id in copies) {
             const c = copies[id]
@@ -201,10 +208,11 @@ QtObject {
                 wanted[c.wants[key].command] = true
                 if (!shortest || c.wants[key].interval < shortest)
                     shortest = c.wants[key].interval
+                step = gcd(Math.round(c.wants[key].interval), step)
             }
         }
         leaderId = leader
-        ticker.interval = Math.max(1000, shortest || 2000)
+        ticker.interval = Math.max(1000, step || 2000)
         ticker.running = shortest > 0
         // Forget the answers no copy asks for any more
         for (const command in lastOutput)

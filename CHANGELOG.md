@@ -28,6 +28,13 @@
 - **A chat that can't start keeps what you wrote:** when a new chat or a background task failed to start, or to be queued, the task you had typed was gone. It's back in its box now, with its options, unless you've begun another.
 - **An SSH host's starred chats and plans show their right age:** with a host whose clock is off from yours, a starred chat or plan showed its age (and a starred chat its limit's reset) by the host's clock, so a chat under both Recent and Starred showed two ages.
 - **Every copy of the widget follows the Monday recap setting:** with the widget on the panel and on the desktop, turning off the Monday recap in the copy that doesn't send the notifications changed nothing. That setting, the Recap's currency and the chat pane's (side-by-side changes, text size, dictation language) are shared by the copies now, as the others are.
+- **The focus view lists the chats that finished:** its *Finished: results to look at* lines were cleared the moment the popup opened, so they never showed and those chats only counted under *Also: … done*. They now list the chats that finished a turn you haven't looked at yet, newest first, until you open that chat (its pane or its window).
+- **New chat here with the focus view on:** *New chat here* on the Projects tab, or a project folder picked in the search, opened its box in a part of the popup the focus view hides, so nothing seemed to happen. They show everything now, with the box open.
+- **Refresh on the Permissions and Projects tabs:** the header's Refresh reread every chat but not what those tabs show; it does now.
+- **The popup's header at its narrowest:** resized to its smallest, the popup cut off its Refresh button and half the SSH hosts button. It can't get narrower than its tabs and buttons now.
+- **SSH hosts are checked every 30 seconds, as the setting says:** with no chat of this computer at work, a host was checked every 40 seconds (a check runs only at the widget's own beat, every 20 seconds then).
+- **A computer that only watches SSH hosts:** with no Claude Code here and hosts shown, a big *No Claude Code config found* sat under the hosts' chats as if something were wrong. One quiet line says it now; the big message stays for a widget with nothing to show at all.
+- **The hero's ticker rests while the popup is closed:** it went on taking turns between the chats at work (a timer twice a second) with nobody to see it, and on the desktop while a window covered it.
 
 ## 1.16.1 (2026-10-27)
 

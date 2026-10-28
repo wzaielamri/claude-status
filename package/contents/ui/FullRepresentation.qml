@@ -9,7 +9,8 @@ import org.kde.kirigami as Kirigami
 PlasmaExtras.Representation {
     id: full
 
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 22
+    // (no narrower than the header's tabs and buttons, which went off its right edge)
+    Layout.minimumWidth: Math.max(Kirigami.Units.gridUnit * 22, header.implicitWidth)
     Layout.minimumHeight: Kirigami.Units.gridUnit * 14
     Layout.preferredWidth: Kirigami.Units.gridUnit * 28
     Layout.preferredHeight: Kirigami.Units.gridUnit * 30
@@ -71,6 +72,7 @@ PlasmaExtras.Representation {
             PlasmaComponents3.Label {
                 textFormat: Text.PlainText
                 Layout.fillWidth: true
+                Layout.preferredWidth: 0   // (what's left: it elides rather than widen the popup)
                 horizontalAlignment: Text.AlignRight
                 text: hero.visible ? "" : root.summaryText()   // the big Talpy's headline says it
                 opacity: 0.8
@@ -90,7 +92,7 @@ PlasmaExtras.Representation {
                     anchors.fill: parent
                     mainText: root.focusView ? i18n("Show everything") : i18n("Focus")
                     subText: root.focusView ? i18n("Back to every account, chat, pet and usage bar.")
-                                            : i18n("Only what needs you, the chats that finished while you looked away, and one line for each chat at work.")
+                                            : i18n("Only what needs you, the chats that finished a turn you haven't looked at yet, and one line for each chat at work.")
                 }
             }
             PlasmaComponents3.ToolButton {
@@ -133,6 +135,9 @@ PlasmaExtras.Representation {
                     for (const host of root.shownHosts)
                         root.pollHost(host)
                     root.loadWeek()   // (on the Recap tab)
+                    root.loadPerms()  // (on the Permissions tab)
+                    if (root.popupTab === "projects")
+                        root.loadProjects()
                 }
 
                 PlasmaCore.ToolTipArea {
@@ -321,6 +326,18 @@ PlasmaExtras.Representation {
                     }
                 }
 
+                // No account here, but SSH hosts shown: one quiet line where this
+                // computer's accounts go (a computer that only watches its hosts is fine)
+                PlasmaComponents3.Label {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    Layout.margins: Kirigami.Units.smallSpacing
+                    visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length > 0 && !root.focusView
+                    text: i18n("No Claude Code config on this computer")
+                    opacity: 0.6
+                    elide: Text.ElideRight
+                }
+
                 // SSH hosts you picked, after this computer's accounts
                 Repeater {
                     model: root.shownHosts.length
@@ -335,7 +352,7 @@ PlasmaExtras.Representation {
                 PlasmaExtras.PlaceholderMessage {
                     Layout.fillWidth: true
                     Layout.margins: Kirigami.Units.gridUnit
-                    visible: root.status !== null && root.groups.length === 0
+                    visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length === 0
                     iconName: "dialog-information"
                     text: i18n("No Claude Code config found")
                     explanation: i18n("Looked for ~/.claude and ~/.claude-*. Add other dirs in the widget settings.")

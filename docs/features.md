@@ -34,7 +34,7 @@
 - **See what a chat changed:** **±3** next to a chat counts the files it changed. Click it to compare them in VS Code, side by side: each file as it was before the chat first changed it, and as it is now. The box under a chat also compares only its last turn.
 - **A shortcut to the chat that needs you:** give the widget a key (its settings → Keyboard Shortcuts). It brings up the chat that has waited longest for you, then one that finished while you weren't looking; press it again for the next one. With none, it opens the popup.
 - **Recent chats** per account, to reopen older conversations: in a terminal or in VS Code, with the same switch at the top of the list.
-- **Notifications** when a session needs you or finishes a long turn, with sounds from your sound theme (quiet during Do Not Disturb). Click one to jump to the session. **While you're away** (the screen locked for 5 minutes or more) they wait: when you're back, one notification sums up what finished, failed or needs you. Meanwhile, chats that need you can go to your phone with KDE Connect (off until you turn it on).
+- **Notifications** when a session needs you or finishes a long turn, with sounds from your sound theme (quiet during Do Not Disturb). Click one to open its chat beside the popup (or, with that setting off, its terminal or VS Code tab); **Open session** goes to the session itself. **While you're away** (the screen locked for 5 minutes or more) they wait: when you're back, one notification sums up what finished, failed or needs you. Meanwhile, chats that need you can go to your phone with KDE Connect (off until you turn it on).
 
 **Beyond this computer**
 

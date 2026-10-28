@@ -23,6 +23,9 @@ Item {
 
     implicitHeight: row.implicitHeight
     visible: shown !== null
+    // (a closed popup, or a desktop a window covers, still has it "visible")
+    readonly property bool seen: visible && root.dashboardShown && !root.coveredByWindow
+    onSeenChanged: if (seen) shownAt = Date.now()   // (the one on show gets its turn)
 
     function byKey(key) {
         return items.find(it => it.key === key) || null
@@ -33,7 +36,8 @@ Item {
         shown = item
         if (another) {
             shownAt = Date.now()
-            fadeIn.restart()
+            if (seen)
+                fadeIn.restart()
         }
     }
 
@@ -82,7 +86,7 @@ Item {
     Timer {
         interval: 500
         repeat: true
-        running: ticker.visible && ticker.items.length > 1
+        running: ticker.seen && ticker.items.length > 1
         onTriggered: {
             const on = Date.now() - ticker.shownAt
             if ((ticker.queue.length && on >= ticker.dwellMs) || on >= ticker.turnMs)
