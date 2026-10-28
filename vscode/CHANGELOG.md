@@ -126,6 +126,17 @@
   oldest, backwards against the Week card's, and with more than about 30
   weeks of history they ran off the card's right edge. They show the last 20
   weeks now, oldest first.
+- **A pet waves goodbye when its account's last chat leaves:** the
+  account's stage folded away at once with the pet frozen, and the pet
+  waved and dug away later, beside the next chat's pet. The stage stays
+  open until the pet is gone now, as in the widget.
+- **News from while the view was hidden:** a chat that finished (or
+  failed, or hit a limit) while the view was hidden was acted out with its
+  words when you next looked, however long ago that was. Now a pet acts
+  out only what happened in the last minute, and leaves older news be.
+- **The pets follow the theme's text color:** after switching to another
+  dark theme (or another light one), the pets' words, z's and sparks kept
+  the old theme's color until the view reloaded.
 
 ## 1.16.1
 

@@ -60,8 +60,10 @@ Item {
     readonly property bool live: strip.live
     readonly property bool playing: strip.playing   // not under a window: it moves
 
-    // Where it is: px = horizontal centre, lift = how high you hold it
-    property real px: homeX
+    // Where it is: px = horizontal centre, lift = how high you hold it (its
+    // spot moves it by digging over there: no binding to homeX)
+    property real px: 0
+    Component.onCompleted: px = homeX
     property real lift: 0
     // Where it's drawn: there, but while you hold it it trails your hand on a
     // spring and swings with how fast you move it (and wobbles back after)
@@ -79,6 +81,8 @@ Item {
     property int quickClicks: 0
     property int sleepyClicks: 0
     property string lastMood: ""
+    property var missed: null       // {kind, text, at}: what happened while it couldn't be seen
+    property real actedOutAt: 0     // when it last acted that out
     readonly property var talpy: view.talpy
 
     anchors.fill: parent
@@ -141,9 +145,11 @@ Item {
         lastMood = mood
     }
     onHomeXChanged: {
-        if (lone && !strip.firstShown)
-            px = homeX   // laid out before anyone saw it: it's just there
-        else if (!lone && !leaving && !held)
+        if (held || leaving)
+            return       // in your hand (put down, it digs back), or on its way out
+        if (!strip.firstShown || arriving)
+            px = homeX   // not seen yet, or still underground: it's just there
+        else
             digTo(homeX, true)
     }
     // The strip got narrower: back inside it
@@ -158,8 +164,8 @@ Item {
         }
     }
     onLiveChanged: {
-        if (!live || !lone || !talpy || mood === "done" || mood === "loading")
-            return
+        if (!live || !lone || !talpy || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000)
+            return   // (what it missed meanwhile comes instead, see onPlayingChanged)
         const holiday = holidayGreeting()
         if (holiday) {
             react("celebrate")
@@ -168,6 +174,22 @@ Item {
             react("wave")
             say(i18n("Hi!"))
         }
+    }
+
+    // Seen again: it acts out what happened meanwhile, if it's from the last
+    // minute (older news is dropped)
+    onPlayingChanged: {
+        if (!playing || !missed)
+            return
+        const m = missed
+        missed = null
+        if (fresh(m)) {
+            actedOutAt = Date.now()
+            event(m.kind, m.text)
+        }
+    }
+    function fresh(m) {
+        return m !== null && Date.now() - m.at < 60000
     }
 
     // (Removed once its frame is over: the leave ends in Talpy's tick, inside
@@ -302,6 +324,10 @@ Item {
     function event(kind, text) {
         if (held || leaving)
             return   // (a reaction now would stop it digging away)
+        if (!playing) {
+            missed = { kind: kind, text: text, at: Date.now() }   // (acted out when it can be seen)
+            return
+        }
         const action = { done: Math.random() < 0.4 ? "yay" : "finished", failed: "failed", stopped: "shrug", limit: "battery", oops: "confused", reset: "charged" }[kind]
         react(action || "alert")
         say(text)

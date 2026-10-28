@@ -20,7 +20,7 @@ function bundle(): string {
     const { buildSync } = createRequire(__filename)("esbuild") as Any; // (not bundled into this test)
     bundled = buildSync({
       stdin: {
-        contents: 'export { Stage } from "./webview/pets/stage";\nexport { petFields, stageCallbacks } from "./webview/util/petStage";\n' +
+        contents: 'export { Stage, setDarkAll } from "./webview/pets/stage";\nexport { petFields, stageCallbacks } from "./webview/util/petStage";\n' +
           'export { ACTIONS, MOODS } from "./vendor/talpy/actions.mjs";\n',
         resolveDir: repo,
         loader: "ts",
@@ -109,6 +109,7 @@ function load() {
   const intersect: ((entries: unknown[]) => void)[] = [];
   const frames = { asked: 0 };
   const posted: Any[] = [];
+  const css = { color: "rgb(204, 204, 204)" }; // the theme's text color
   const sandbox: Record<string, unknown> = {
     document: {
       createElement: (tag: string) => new FakeEl(tag),
@@ -134,7 +135,7 @@ function load() {
     },
     requestAnimationFrame: () => ++frames.asked,
     cancelAnimationFrame() {},
-    getComputedStyle: () => ({ getPropertyValue: () => "", color: "rgb(204, 204, 204)" }),
+    getComputedStyle: () => ({ getPropertyValue: () => "", color: css.color }),
     devicePixelRatio: 2,
     queueMicrotask,
     performance,
@@ -151,6 +152,7 @@ function load() {
   return {
     Stage: exports.Stage as Any, petFields: exports.petFields as Any, ACTIONS: exports.ACTIONS as Any,
     MOODS: exports.MOODS as Any, stageCallbacks: exports.stageCallbacks as Any, resize, intersect, frames, posted,
+    setDarkAll: exports.setDarkAll as Any, css,
   };
 }
 
@@ -166,9 +168,12 @@ function chat(key: string, state = "working", extra: Record<string, unknown> = {
 // An account's stage with room for maxPets pets, still unseen until show()
 function account(maxPets = 3) {
   const t = load();
-  const stage: Any = new t.Stage(new FakeEl("div"), false, "account:test", { open() {} });
+  const counts: number[] = []; // what it told the UI of its pets
+  const stage: Any = new t.Stage(new FakeEl("div"), false, "account:test", { open() {}, petsChanged: (n: number) => counts.push(n) });
   return {
     stage,
+    counts,
+    t,
     frames: t.frames,
     lay: (width = 400) => t.resize[0]([{ contentRect: { width, height: 80 } }]),
     show: (on = true) => t.intersect[0]([{ isIntersecting: on }]),
@@ -511,5 +516,56 @@ test("a pet still popping up goes to where its spot is now", () => {
   give([chat("p/1"), chat("p/2")]); // the row is spaced anew
   assert.notEqual(first.homeX, spot);
   assert.equal(first.px, first.homeX, "pops up where its spot was");
+  stage.destroy();
+});
+
+test("news from while the pets were hidden is acted out when they show, if it's from the last minute", () => {
+  const { stage, lay, show, give } = account();
+  give([chat("p/1", "idle")]);
+  lay();
+  show();
+  const pet = stage.petFor("p/1");
+  wait(pet, 3000); // up out of the ground
+  show(false);
+  stage.petEvent("done", "chat 1 is done!", "p/1");
+  assert.equal(stage.bubbleEl.hidden, true, "words nobody sees");
+  show();
+  assert.equal(stage.bubbleEl.textContent, "chat 1 is done!");
+  assert.ok(["yay", "finished"].includes(pet.talpy.run?.name), pet.talpy.run?.name);
+  show(false);
+  stage.petEvent("failed", "chat 1 failed…", "p/1");
+  pet.missed.at -= 61000; // an hour ago, say
+  show();
+  assert.notEqual(stage.bubbleEl.textContent, "chat 1 failed…", "old news");
+  assert.equal(pet.missed, null);
+  stage.destroy();
+});
+
+test("an account's stage stays open while its last pet waves goodbye", () => {
+  // (the UI folds it away once the stage has no pet left, AccountStage)
+  const { stage, counts } = leaving();
+  assert.deepEqual(counts, [1], "the pet still waves");
+  wait(stage.petFor("p/1"), 6000);
+  assert.deepEqual(counts, [1, 0]);
+  stage.destroy();
+});
+
+test("the pets take the theme's text color, also from one dark theme to another", () => {
+  const { stage, lay, show, give, t } = account();
+  give([chat("p/1")]);
+  lay();
+  show();
+  const pet = stage.petFor("p/1");
+  const film = pet.film;
+  let resets = 0;
+  const reset = film.reset.bind(film);
+  film.reset = () => (resets++, reset());
+  t.setDarkAll(true);
+  t.css.color = "rgb(102, 136, 204)"; // Abyss after Dark+
+  t.setDarkAll(true);
+  assert.equal(pet.talpy.theme.text, "rgb(102, 136, 204)");
+  const before = resets;
+  t.setDarkAll(true); // (nothing changed: its pictures stay)
+  assert.equal(resets, before);
   stage.destroy();
 });

@@ -51,14 +51,12 @@ document.addEventListener("visibilitychange", () => pageVisible.set(document.vis
 pets.onColorsChanged(() => petColorsVersion.set(petColorsVersion.get() + 1));
 
 function start(): void {
-  // VS Code swaps the body's theme class when the theme changes
-  let dark = isDark();
-  pets.setDark(dark);
-  new MutationObserver(() => {
-    if (isDark() === dark) return;
-    dark = isDark();
-    pets.setDark(dark);
-  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  // VS Code swaps the body's theme class when the theme changes, and its
+  // colors (the html element's style) also from one dark theme to another
+  pets.setDark(isDark());
+  const themed = new MutationObserver(() => pets.setDark(isDark()));
+  themed.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  themed.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
 
   const root = document.createElement("div");
   root.id = "root";

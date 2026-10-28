@@ -31,6 +31,9 @@ export interface AccountInput {
 
 export interface StageCallbacks {
   open(chat: ChatRef): void; // a pet, its name tag or the hero's headline was clicked
+  // An account's stage: how many pets stand on it now (one whose chat left
+  // counts until it has waved and dug away)
+  petsChanged?(count: number): void;
 }
 
 export interface PetStage {

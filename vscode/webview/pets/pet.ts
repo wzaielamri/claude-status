@@ -27,6 +27,10 @@ import type { Stage } from "./stage";
 export const SMALL = 4;
 export const LARGE = 8;
 
+// Events that happened while a stage was hidden are acted out when it shows
+// again, if they're this recent
+const MISSED_MS = 60000;
+
 function holidayGreeting(): string {
   const d = new Date(),
     m = d.getMonth() + 1,
@@ -127,6 +131,7 @@ export class Pet {
   private dragging = false;
   private lastClick = 0;
   private destroyed = false;
+  missed: { kind: string; text: string; at: number } | null = null; // what happened while it wasn't seen
 
   constructor(stage: Stage, key: string, chat: StageChat | null, colorIndex: number, homeX: number) {
     this.stage = stage;
@@ -335,8 +340,16 @@ export class Pet {
   // The stage was shown or hidden (offFor: ms it was hidden)
   liveChanged(offFor: number): void {
     this.changed();
+    if (!this.stage.live) return;
+    // what happened meanwhile, if it's from the last minute (older news is dropped)
+    const missed = this.missed;
+    this.missed = null;
+    if (missed && Date.now() - missed.at < MISSED_MS) {
+      this.event(missed.kind, missed.text);
+      return;
+    }
     const mood = this.mood;
-    if (!this.stage.live || !this.lone || mood === "done" || mood === "loading" || offFor < 1500) return;
+    if (!this.lone || mood === "done" || mood === "loading" || offFor < 1500) return;
     const holiday = holidayGreeting();
     if (holiday) {
       this.talpy.react("celebrate");
@@ -529,6 +542,10 @@ export class Pet {
   // Something happened to its chat (or, for the hero, to an account)
   event(kind: string, text: string): void {
     if (this.held || this.leaving) return; // (a reaction now would stop it digging away)
+    if (!this.stage.live) {
+      this.missed = { kind, text, at: Date.now() }; // (acted out when it shows)
+      return;
+    }
     const action = ({ done: Math.random() < 0.4 ? "yay" : "finished", failed: "failed", stopped: "shrug", limit: "battery", oops: "confused", reset: "charged" } as
       Record<string, string>)[kind];
     this.talpy.react(action || "alert");

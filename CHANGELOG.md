@@ -65,6 +65,8 @@
 - **Clicking a GNOME pet opens its own chat:** with four or five pets, clicking the edge of a pet's name tag (with six or more, part of the pet itself) opened the neighbouring pet's chat and its tooltip named that chat, a right or middle click opened a chat too, and so did a press on one pet let go over another. A pet takes the left button around its body and on its tag now, as in Plasma.
 - **GNOME's speech bubbles follow the pet:** a bubble stayed where the pet was when it began talking, over empty ground once it dug elsewhere, and a pet that dug away left its words behind.
 - **GNOME at a display scale of 2:** a pet's name tag could grow to twice the room between pets and overlap its neighbours' tags. And after the scale changed (a laptop docked, *Scale* in Settings) the hero and the pets kept their old size until GNOME Shell restarted; they follow the new scale now.
+- **Pets dig over to their new spot:** when a new chat made room (or one left), the other chats' pets and their name tags jumped to their new spots at once, then dived and popped up where they already were. They tunnel across now, as the pets in VS Code do.
+- **News from while the pets were out of sight:** a chat that finished (or failed, or hit a limit) while the popup was closed or its stage scrolled away was acted out without its words when you next looked, however long ago that was. Now the pet acts out what happened in the last minute, words and all, and leaves older news be (Plasma, GNOME and VS Code).
 
 ## 1.16.1 (2026-10-27)
 

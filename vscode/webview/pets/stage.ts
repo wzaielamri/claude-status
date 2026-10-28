@@ -32,11 +32,13 @@ const world = {
   shownOnce: false, // pets have been on screen: from now on the hero digs its way up too
 };
 
+// The theme changed (or may have): the pets' words and particles take its
+// text color, also from one dark theme to another
 export function setDarkAll(dark: boolean): void {
   world.dark = dark;
   for (const s of allStages) {
     s.root.classList.toggle("cs-dark", dark);
-    for (const p of s.pets) p.themeChanged();
+    s.themeChanged();
   }
 }
 
@@ -363,6 +365,7 @@ export class Stage implements PetStage, Animator {
     }
     for (const p of this.pets) p.setHome(this.slotX(p.key));
     this.publishColors();
+    this.countPets();
     // More chats than pets: say how many
     const hidden = Math.max(0, this.chats.length - shown.length);
     if (this.moreEl && this.drawn.more !== `${hidden}/${this.maxPets}`) {
@@ -386,6 +389,14 @@ export class Stage implements PetStage, Animator {
     }
     pet.destroy();
     this.publishColors();
+    this.countPets();
+  }
+
+  // (the UI keeps an account's stage open while a pet is on it)
+  private countPets(): void {
+    if (this.drawn.pets === String(this.pets.length)) return;
+    this.drawn.pets = String(this.pets.length);
+    this.cb.petsChanged?.(this.pets.length);
   }
 
   // The list shows a bar in each pet's color next to its chat
@@ -504,6 +515,14 @@ export class Stage implements PetStage, Animator {
   }
 
   // ------------------------------------------------------------ shared by the pets
+
+  // (their pictures are drawn again only when that color changed)
+  themeChanged(): void {
+    const theme = JSON.stringify(this.theme());
+    if (this.drawn.theme === theme) return;
+    this.drawn.theme = theme;
+    for (const p of this.pets) p.themeChanged();
+  }
 
   // The pets' particles and words in the theme's text color
   theme(): TalpyTheme {
