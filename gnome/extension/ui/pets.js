@@ -658,7 +658,10 @@ class Stage {
         this._bubbleOwner = null;   // the pet whose words show
         this.actor.connect('notify::width', () => {
             this._width = this.actor.get_allocation_box().get_width();
-            this.layout();
+            // (right after the layout pass this comes in: moving the pets in
+            // it left them, and the popup around them, without an allocation
+            // for a frame, see PetLayout)
+            this.timers.after('layout', 0, () => this.layout());
         });
         this.actor.connect('destroy', () => {
             this.gone = true;
