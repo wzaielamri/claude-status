@@ -394,6 +394,8 @@ export class Tracker {
         this.primed = {};
         this.lastWaitingAlert = {};   // key -> {at, ask}: its last "needs input" alert, and what it asked (askId)
         this.lastWindows = {};
+        this.lastStops = {};      // source -> {pet key: whether the limit that stopped it has reset}
+        this.lastOverlaps = {};   // source -> {pair of chats changing the same files: true}
     }
 
     // settings: {notifyWaiting, notifyDone, notifyDoneMinSeconds}
@@ -540,6 +542,39 @@ export class Tracker {
             if (key.startsWith(`${source}|`))
                 delete this.lastWindows[key];
         }
+        delete this.lastStops[source];
+        delete this.lastOverlaps[source];
+    }
+
+    // A chat's own news, for its pet: the usage limit that stopped it reset
+    // (it can go on), or it and another chat began changing the same files
+    // (the first check only learns)
+    chatEvents(source, groupList, host) {
+        const events = [];
+        const stopsBefore = this.lastStops[source], overlapsBefore = this.lastOverlaps[source];
+        const stops = {}, overlaps = {};
+        for (const g of groupList) {
+            for (const s of g.sessions) {
+                const pk = petKeyOf(s, host);
+                if (s.stopped && s.stopped.kind === 'limit' && !(pk in stops)) {
+                    stops[pk] = !!s.stopped.over;
+                    if (stopsBefore && stopsBefore[pk] === false && s.stopped.over)
+                        events.push({kind: 'reset', text: fmt('%1 can go on!', s.name), key: pk});
+                }
+                for (const o of s.overlaps || []) {
+                    // (by chat: one listed twice, open on two accounts, is one chat)
+                    const pair = [s.chatId || s.sessionId, o.chatId || o.sessionId].sort().join('|');
+                    if (pair in overlaps)
+                        continue;
+                    overlaps[pair] = true;
+                    if (overlapsBefore && !(pair in overlapsBefore))
+                        events.push({kind: 'waiting', text: fmt('%1 and %2 change the same files!', s.name, o.name), key: pk});
+                }
+            }
+        }
+        this.lastStops[source] = stops;
+        this.lastOverlaps[source] = overlaps;
+        return events;
     }
 
     // A limit that dropped a lot since the last poll was reset: the pets cheer

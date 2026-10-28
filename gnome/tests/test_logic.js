@@ -170,6 +170,21 @@ test('limit resets cheer once', () => {
     eq(t.celebrateResets('', g(0)), []);
 });
 
+test("a chat's own news: its limit reset, another chat changes its files", () => {
+    const t = new L.Tracker();
+    const limited = over => [group([session('a', 'idle', {stopped: {kind: 'limit', over}})])];
+    eq(t.chatEvents('', limited(false), ''), []);
+    eq(t.chatEvents('', limited(true), ''), [{kind: 'reset', text: 'chat a can go on!', key: '/a'}]);
+    eq(t.chatEvents('', limited(true), ''), []);
+    const files = o => [group([session('b', 'working', {overlaps: o}), session('c', 'working')])];
+    const both = [{chatId: 'c', sessionId: 'c', name: 'chat c', files: ['x.py'], count: 1}];
+    eq(t.chatEvents('ssh:lab', files(both), 'lab'), [], 'the first check only learns');
+    eq(t.chatEvents('ssh:lab', files([]), 'lab'), []);
+    eq(t.chatEvents('ssh:lab', files(both), 'lab'),
+        [{kind: 'waiting', text: 'chat b and chat c change the same files!', key: 'ssh:lab|/b'}]);
+    eq(t.chatEvents('ssh:lab', files(both), 'lab'), [], 'once per pair');
+});
+
 test('helper output', () => {
     eq(L.helperResult('{"ok": true, "message": "x"}', ''), {ok: true, message: 'x'});
     eq(L.helperResult('', 'Traceback\nValueError: no'), {ok: false, message: 'ValueError: no'});

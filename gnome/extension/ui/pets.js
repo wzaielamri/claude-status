@@ -31,6 +31,13 @@ const PALETTE = ['#e5534b', '#e8913a', '#c9a227', '#4caf50', '#26a69a', '#42a5f5
 const MOOD_COLORS = {needs: [245, 121, 0], error: [232, 68, 58], idle: [51, 184, 108]};
 const NIGHT = [99, 113, 200];
 
+// The pet the left button was pressed on (a click is a press and a release on the same pet)
+let pressed = null;
+
+// Events that happened while nobody saw the pets are acted out when they show
+// again, if they're this recent (older ones are dropped)
+const MISSED_MS = 60000;
+
 function pick(list, last) {
     const choices = list.length > 1 ? list.filter(x => x !== last) : list;
     return choices[Math.floor(Math.random() * choices.length)];
@@ -113,8 +120,10 @@ class Pet {
         this.leaving = false;
         this.arriving = false;
         this.travelTo = -1;              // where the next dig takes it (-1: it picks)
-        this.clicks = 0;
+        this.quickClicks = 0;
+        this.sleepyClicks = 0;
         this.lastMood = '';
+        this.missed = null;              // {kind, text, at}: what happened while it wasn't seen
         this.timers = new Timers();
 
         const s = stage.size;
@@ -122,7 +131,7 @@ class Pet {
             travels: this.lone});
         this.talpy.onTravel = ms => this._travel(ms);
         this.talpy.tick(Date.now());
-        this.actor = new St.Widget({reactive: true, track_hover: true, width: s.slot, height: s.canvasH + s.tag});
+        this.actor = new St.Widget({width: s.slot, height: s.canvasH + s.tag});
         // Talpy on its view, drawn from its sheets (Cairo surfaces): a chat's
         // pet as pictures (talpy/pictures.js), the hero live on its one sheet
         this.pictures = new Pictures(this.talpy, this.lone ? 1 : 5);
@@ -131,10 +140,15 @@ class Pet {
         this.view = new St.DrawingArea({width: s.canvasW, height: s.canvasH, x: Math.round((s.slot - s.canvasW) / 2)});
         this.view.connect('repaint', area => this._paint(area));
         this.actor.add_child(this.view);
+        // It takes clicks around its body and on its tag, not in the room
+        // around it, where its neighbours stand
+        this.hit = new St.Widget({reactive: true, track_hover: true});
+        this.actor.add_child(this.hit);
+        this.setRoom(s.slot);
         if (!this.lone) {
             const dark = this.tint && this._luma(this.tint) < 0.6;
             this._tagStyle = `background-color: ${this.tint}; color: ${dark ? 'white' : 'black'};`;
-            this.tag = new St.Label({text: this.label, style_class: 'claude-pet-tag'});
+            this.tag = new St.Label({text: this.label, style_class: 'claude-pet-tag', reactive: true});
             this.setTagWidth(s.slot - 4);
             this.tag.clutter_text.ellipsize = 3;   // Pango.EllipsizeMode.END
             this.actor.add_child(this.tag);
@@ -145,21 +159,33 @@ class Pet {
             this.gone = true;   // with the popup (or the whole shell)
             this.timers.stopAll();
         });
-        this.actor.connect('button-press-event', (a, event) => {
-            this._clickCount = event.get_click_count();
-            return Clutter.EVENT_STOP;
-        });
-        this.actor.connect('button-release-event', () => {
-            if (this._clickCount === 2 && this.lone)
-                this.dance();
-            else
-                this.clicked();
-            return Clutter.EVENT_STOP;
-        });
-        if (!this.lone) {
-            stage.ctx.tips.add(this.actor, () => this.lastChat
-                ? [(this.host ? `${this.host}: ` : '') + this.lastChat.name,
-                    `${L.stateText(this.lastChat, stage.ctx.now)}\nClick to open this chat`] : '');
+        for (const area of this.tag ? [this.hit, this.tag] : [this.hit]) {
+            // (the left button, pressed and let go on this pet)
+            area.connect('button-press-event', (a, event) => {
+                if (event.get_button() !== Clutter.BUTTON_PRIMARY)
+                    return Clutter.EVENT_PROPAGATE;
+                pressed = this;
+                this._clickCount = event.get_click_count();
+                return Clutter.EVENT_STOP;
+            });
+            area.connect('button-release-event', (a, event) => {
+                if (event.get_button() !== Clutter.BUTTON_PRIMARY)
+                    return Clutter.EVENT_PROPAGATE;
+                const mine = pressed === this;
+                pressed = null;
+                if (!mine || this.gone)
+                    return Clutter.EVENT_STOP;
+                if (this._clickCount === 2 && this.lone)
+                    this.dance();
+                else
+                    this.clicked();
+                return Clutter.EVENT_STOP;
+            });
+            if (!this.lone) {
+                stage.ctx.tips.add(area, () => this.lastChat
+                    ? [(this.host ? `${this.host}: ` : '') + this.lastChat.name,
+                        `${L.stateText(this.lastChat, stage.ctx.now)}\nClick to open this chat`] : '');
+            }
         }
     }
 
@@ -214,16 +240,54 @@ class Pet {
             cr.setSourceSurface(coming, 0, 0);
             cr.paintWithAlpha(pictures.mix);
         }
+        // what flies about (z's, sparks, hearts, words), over its picture
+        // (drawn live, a big move has them already)
+        if (this._fxOn && pictures.front.key !== '') {
+            cr.setOperator(Cairo.Operator.OVER);
+            const ctx = new CairoCanvas(cr);
+            const boxPx = width / 1.6;
+            ctx.translate(boxPx * 0.3, boxPx * 0.45);
+            ctx.scale(boxPx / 64, boxPx / 64);
+            this.talpy.drawParticles(ctx, this.talpy.now);
+        }
         cr.$dispose();
     }
 
-    // The name tag fits the room between pets
+    // Whether what flies about over its pictures shows something new now: as
+    // often as it moves (z's float up slowly), and once more as it's gone
+    _tickFx(now) {
+        const flying = this.lone ? 0 : this.talpy.particles(now);
+        if (!flying || this.pictures.front.key === '') {
+            const was = this._fxOn;
+            this._fxOn = false;
+            return was;
+        }
+        if (this._fxOn && now - this._fxAt < (flying === 1 ? 200 : 40) - 5)
+            return false;
+        this._fxOn = true;
+        this._fxAt = now;
+        return true;
+    }
+
+    // The name tag fits the room between pets (in CSS pixels, which St
+    // multiplies by the display's scale)
     setTagWidth(width) {
-        width = Math.round(width);
+        width = Math.round(width / this.stage.size.scale);
         if (!this.tag || width === this._tagWidth)
             return;
         this._tagWidth = width;
         this.tag.style = `${this._tagStyle} max-width: ${width}px;`;
+    }
+
+    // Where it takes clicks: around its body, never wider than its room in the row
+    setRoom(room) {
+        const s = this.stage.size;
+        const width = Math.round(Math.max(s.gu, Math.min(s.body + 8, room))), height = Math.round(s.bodyH + 8);
+        if (width === this._hitWidth)
+            return;
+        this._hitWidth = width;
+        this.hit.set_size(width, height);
+        this.hit.set_position(Math.round((s.slot - width) / 2), Math.round(s.floorY - height));
     }
 
     _placeTag() {
@@ -349,13 +413,14 @@ class Pet {
     }
 
     petIt() {
-        this.clicks += 1;
         this.timers.after('tickle', 1500, () => {
-            this.clicks = 0;
+            this.quickClicks = 0;
+            this.sleepyClicks = 0;
         });
         if (this.mood === 'done') {
-            if (this.clicks >= 3) {
-                this.clicks = 0;
+            this.sleepyClicks += 1;
+            if (this.sleepyClicks >= 3) {
+                this.sleepyClicks = 0;
                 this.react('angry');
                 this.say('I said let me SLEEP!');
             } else {
@@ -364,15 +429,17 @@ class Pet {
             }
             return;
         }
-        if (this.clicks >= 4) {
-            this.clicks = 0;
+        this.quickClicks += 1;
+        if (this.quickClicks >= 4) {
+            this.quickClicks = 0;
             this.react('laugh');
             this.say('Hehe, that tickles!');
-        } else if (this.clicks === 3) {
+        } else if (this.quickClicks === 3) {
             this.react('shy');
             this.say('Aww, stop it…');
         } else {
-            this.react('pet');
+            const r = Math.random();
+            this.react(r < 0.2 ? 'love' : r < 0.35 ? 'wink' : r < 0.45 ? 'blowkiss' : 'pet');
             this.say(this.petLine());
         }
     }
@@ -383,7 +450,7 @@ class Pet {
             this.say('…five more minutes.');
             return;
         }
-        this.react('dance');
+        this.react(Math.random() < 0.4 ? 'boogie' : 'dance');
         this.say('♪ ♫');
     }
 
@@ -404,7 +471,12 @@ class Pet {
     event(kind, text) {
         if (this.leaving)
             return; // (a reaction now would stop it digging away)
-        const action = {done: 'finished', failed: 'failed', stopped: 'shrug', limit: 'battery', oops: 'confused', reset: 'charged'}[kind];
+        if (!this.live) {
+            this.missed = {kind, text, at: Date.now()};   // (acted out when it shows, if it's recent)
+            return;
+        }
+        const action = {done: Math.random() < 0.4 ? 'yay' : 'finished', failed: 'failed', stopped: 'shrug', limit: 'battery',
+            oops: 'confused', reset: 'charged'}[kind];
         this.react(action || 'alert');
         this.say(text);
     }
@@ -428,8 +500,10 @@ class Pet {
             this.talpy.tick(now);
             if (this.gone)
                 return;   // (it dug away in that tick: removed)
-            if (this.pictures.tick(now) || this.pictures.sheets.some(s => s.paint))
+            const fx = this._tickFx(now);
+            if (this.pictures.tick(now) || this.pictures.sheets.some(s => s.paint) || fx)
                 this.view.queue_repaint();
+            this.stage.follow(this);   // (its speech bubble goes with it)
         });
         // the hero turns towards the mouse while it hovers the stage
         if (this.lone) {
@@ -439,46 +513,71 @@ class Pet {
                     this.talpy.facingLeft = cursor < this.px;
             });
         }
-        // a working chat whose context is nearly full, or a limit close by
-        this.timers.every('worries', 25000, () => this._worry());
-        this.timers.after('firstWorry', 2500, () => this._worry());
+        // a working chat whose context is nearly full, now and then
+        this.timers.every('context', 40000, () => this._contextFull());
+        this.timers.after('firstContext', 2500, () => this._contextFull());
+        // close to a usage limit: mind-blown now and then; at the limit out of steam
+        if (this.lone) {
+            this.timers.every('usage', 25000, () => this._highUsage());
+            this.timers.after('firstUsage', 4000, () => this._highUsage());
+        }
+        // what happened while nobody looked: a new chat's pet digs up, one
+        // whose chat left waves and digs away, a recent event is acted out
+        const missed = this.missed;
+        this.missed = null;
+        if (this.leaving) {
+            if (!this.talpy.run || this.talpy.run.name !== 'leave')
+                this._goAway();
+        } else if (this.arriving) {
+            if (!this.talpy.run || this.talpy.run.name !== 'arrive')
+                this.arrive();
+        } else if (missed && Date.now() - missed.at < MISSED_MS) {
+            this.event(missed.kind, missed.text);
+        }
     }
 
-    _worry() {
+    _contextFull() {
         if (this.leaving || this.talpy.busy)
             return;
         const ctx = this.stage.ctx, mood = this.mood;
-        const contextFull = !this.lone
+        const text = !this.lone
             ? this.chat && this.chat.state === 'working' && this.chat.context !== null && this.chat.context >= 85
                 ? L.fmt('%1: context %2% full', this.label, Math.round(this.chat.context)) : ''
             : L.contextFullText(ctx.allGroups, ctx.petColors);
-        if (contextFull && (mood === 'working' || mood === 'agents')) {
+        if (text && (mood === 'working' || mood === 'agents')) {
             this.react('contextFull');
-            this.say(contextFull);
-            return;
-        }
-        const high = this.lone ? L.highUsageText(ctx.allGroups) : '';
-        if (high && mood !== 'done') {
-            this.react(L.maxFiveHour(ctx.allGroups) >= 100 ? 'battery' : 'mindblown');
-            this.say(high);
+            this.say(text);
         }
     }
 
-    // A new chat: it digs up out of the ground
+    _highUsage() {
+        if (this.talpy.busy || this.mood === 'done')
+            return;
+        const ctx = this.stage.ctx, text = L.highUsageText(ctx.allGroups);
+        if (text) {
+            this.react(L.maxFiveHour(ctx.allGroups) >= 100 ? 'battery' : 'mindblown');
+            this.say(text);
+        }
+    }
+
+    // A new chat: it digs up out of the ground (when you look: setLive)
     arrive() {
         this.arriving = true;
+        if (!this.live)
+            return;
         this.react('arrive', () => {
             this.arriving = false;
         });
     }
 
-    // Its chat left the list: it waves and digs away
+    // Its chat left the list: it waves and digs away (when you look: setLive)
     leave() {
         this.leaving = true;
-        if (!this.live) {
-            this.stage.removePet(this.key);
-            return;
-        }
+        if (this.live)
+            this._goAway();
+    }
+
+    _goAway() {
         this.react('leave', ok => {
             if (ok && this.leaving && !this.gone)
                 this.stage.removePet(this.key);
@@ -529,6 +628,7 @@ class Stage {
         });
         this._width = 0;   // as last allocated
         this._toSay = null;   // [pet, text] said before it could be placed
+        this._bubbleOwner = null;   // the pet whose words show
         this.actor.connect('notify::width', () => {
             this._width = this.actor.get_allocation_box().get_width();
             this.layout();
@@ -669,9 +769,7 @@ class Stage {
         pet.px = this.slotX(pet.key);
         pet.placed = this.width > 0;
         pet.setLive(this.live);
-        // the first time the popup opens they're just there; later a new chat's pet digs up
-        if (this.firstShown && this.live && this.width > 0)
-            pet.arrive();
+        pet.arrive();   // (while the popup is closed: when it opens)
     }
 
     removePet(key) {
@@ -680,6 +778,8 @@ class Stage {
             return;
         this.list.delete(key);
         delete this.colors[key];
+        if (this._bubbleOwner === pet)
+            this._hideBubble();
         pet.destroy();
         if (!this.hero && this.list.size === 0 && this.chats.length === 0)
             this.pets.ctx.rerender();   // the stage folds away
@@ -708,6 +808,8 @@ class Stage {
         const tagWidth = Math.max(s.gu * 3.5, this.spacing - 8);
         for (const pet of this.list.values()) {
             pet.setTagWidth(tagWidth);
+            if (!pet.lone)
+                pet.setRoom(this.spacing);
             pet.actor.y = Math.round(ground - s.floorY);
             if (pet.leaving)
                 continue;
@@ -836,21 +938,40 @@ class Stage {
             return;
         }
         this._toSay = null;
-        const s = this.size;
         this.bubble.text = text;
         this.bubble.set_width(-1);   // measure the new text, not the last width
         this.bubble.show();
         const [, natWidth] = this.bubble.get_preferred_width(-1);
-        const width = Math.min(natWidth, this.width - 8);
-        this.bubble.width = width;
+        this.bubble.width = Math.min(natWidth, this.width - 8);
+        this._bubbleOwner = pet;
+        this._bubbleAt = '';
+        this.follow(pet);
+        this.actor.set_child_above_sibling(this.bubble, null);
+        this.timers.after('bubble', 4500, () => this._hideBubble());
+    }
+
+    // The bubble above whoever speaks, or beside it when there's no room
+    // above, wherever it has dug to (each frame of the pet's)
+    follow(pet) {
+        if (pet !== this._bubbleOwner)
+            return;
+        const s = this.size, width = this.bubble.width;
         const headTop = pet.actor.y + s.floorY - s.bodyH;
         const above = headTop - this.bubble.height - 4 >= 0;
         let x = above ? pet.px - width / 2
             : pet.px + s.body / 2 + width + 4 <= this.width ? pet.px + s.body / 2 + 4 : pet.px - s.body / 2 - width - 4;
-        x = Math.max(0, Math.min(this.width - width, x));
-        this.bubble.set_position(Math.round(x), Math.round(above ? headTop - this.bubble.height - 4 : Math.max(0, headTop)));
-        this.actor.set_child_above_sibling(this.bubble, null);
-        this.timers.after('bubble', 4500, () => this.bubble.hide());
+        x = Math.round(Math.max(0, Math.min(this.width - width, x)));
+        const y = Math.round(above ? headTop - this.bubble.height - 4 : Math.max(0, headTop));
+        if (`${x},${y}` === this._bubbleAt)
+            return;
+        this._bubbleAt = `${x},${y}`;
+        this.bubble.set_position(x, y);
+    }
+
+    _hideBubble() {
+        this.timers.stop('bubble');
+        this.bubble.hide();
+        this._bubbleOwner = null;
     }
 
     // Events go to the chat's own pet; the hero takes the ones about
@@ -858,8 +979,8 @@ class Stage {
     event(kind, text, key) {
         const pet = this.hero ? (!key || !(key in this.pets.colors) ? this.list.get('') : null)
             : key ? this.list.get(key) : null;
-        if (pet && this.live)
-            pet.event(kind, text);
+        if (pet)
+            pet.event(kind, text);   // (hidden: it acts it out when it shows, if it's recent)
     }
 
     setLive(live) {
@@ -868,29 +989,23 @@ class Stage {
         this.live = live;
         if (!live) {
             this.timers.stopAll();
-            this.bubble.hide();
+            this._hideBubble();
             this._toSay = null;
         } else {
             this.pets.updateTheme(this.actor);
         }
-        // shown and laid out: from now on a new chat's pet digs up
+        // shown and laid out: from now on a pet that changes spots digs over
         if (live && !this.firstShown)
             this.timers.after('firstShown', 500, () => {
                 this.firstShown = true;
             });
-        for (const [key, pet] of this.list) {
-            if (pet.leaving && !live) {
-                this.removePet(key);
-                continue;
-            }
-            pet.setLive(live);
-        }
+        if (this.hero && live)
+            this._greet();   // (first: what it missed meanwhile comes over that)
+        for (const pet of this.list.values())
+            pet.setLive(live);   // (one whose chat left meanwhile waves and digs away now)
         this.layout();
-        if (this.hero) {
+        if (this.hero)
             this._animateLight();
-            if (live)
-                this._greet();
-        }
     }
 
     // Opening the popup: the hero says hi now and then (or happy holidays)
@@ -927,13 +1042,31 @@ export class Pets {
         this.theme = {fx: 'rgba(255,255,255,0.55)', text: '#ffffff'};   // the popup's text color (updateTheme)
         this.mood = 'loading';
         this.accentRgb = [53, 132, 228];   // "working" blue (stylesheet.css)
+        this._active = false;   // the popup shows the chats (setActive)
+        this._makeHero();
+        // every size on the stages comes from the display's scale: a new
+        // scale (a laptop docked, Settings' Scale) makes them anew
+        this._themeContext = St.ThemeContext.get_for_stage(global.stage);
+        this._scaleChanged = this._themeContext.connect('notify::scale-factor', () => this._rescale());
+    }
+
+    _makeHero() {
         this.hero = new Stage(this, 'hero', true);
         const talpy = new Pet(this.hero, '', {});
         this.hero.list.set('', talpy);
         this.hero.actor.insert_child_below(talpy.actor, this.hero.bubble);
         talpy.sync();
-        this._heroShown = null;
-        this._active = false;   // the popup shows the chats (setActive)
+        this._heroShown = null;   // (update() puts it in the popup)
+    }
+
+    _rescale() {
+        for (const stage of this._stages.values())
+            stage.destroy();
+        this._stages.clear();
+        this.ctx._heroBin.child = null;
+        this.hero.destroy();
+        this._makeHero();
+        this.ctx.rerender();
     }
 
     get settings() {
@@ -966,7 +1099,7 @@ export class Pets {
         if (!stage) {
             stage = new Stage(this, groupKey, false);
             this._stages.set(groupKey, stage);
-            stage.setLive(this.ctx.menu.isOpen);
+            stage.setLive(this._active);
         }
         stage.chats = chats;
         stage.setChats(chats);
@@ -1032,6 +1165,7 @@ export class Pets {
     }
 
     destroy() {
+        this._themeContext.disconnect(this._scaleChanged);
         for (const stage of this._stages.values())
             stage.destroy();
         this._stages.clear();

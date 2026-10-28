@@ -259,7 +259,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
             notifyDone: this._settings.get_boolean('notify-done'),
             notifyDoneMinSeconds: this._settings.get_int('notify-done-min-seconds'),
         });
-        const resets = this._tracker.celebrateResets(source, groups);
+        const resets = [...this._tracker.celebrateResets(source, groups), ...this._tracker.chatEvents(source, groups, host)];
         const pose = this._settings.get_boolean('show-pet');
         this._noteUnseen(source, out);
         if (this._away) {
