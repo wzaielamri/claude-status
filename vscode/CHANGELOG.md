@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- **Chats stopped at the 5-hour limit with Claude Code 2.1.312:** Claude
+  now calls it the *5-hour limit* (before, the *session limit*), and such a
+  stop wasn't tied to the account's 5-hour window: its bar didn't show it
+  full, and *Go on at …* and **Keep going** guessed the reset from the
+  message. Both names work now, and the reset Claude notes with the stop
+  comes first, so a shared chat that another account's limit stopped no
+  longer fills this account's bar and goes on when that account's limit
+  resets.
+- **Keep going waits when nobody knows when the limit resets:** out of
+  usage credits, or a limit Claude dates more than a day out (*resets Oct
+  30, 7pm*), a chat that keeps going went on again every few seconds, each
+  time adding a go-on and a limit error to the chat, and a notification.
+  Dates in Claude's message are read now; with no reset to go by, it tries
+  again after 2, 5, 15, 30 and 60 minutes, then gives up and says so.
+- **One notification when two chats change the same files:** a chat open
+  on two accounts made it two.
+- **VS Code and the Plasma widget don't slow each other down:** each made
+  the other read its chats' transcripts again from the start, on every
+  check, when they list different chats.
+
 ## 1.16.1
 
 - **Enter on a chat in a terminal copies your reply:** for a chat whose

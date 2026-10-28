@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Chats stopped at the 5-hour limit with Claude Code 2.1.312:** Claude now calls it the *5-hour limit* (before, the *session limit*), and such a stop wasn't tied to the account's 5-hour window: its bar didn't show it full, and *Go on at …* and **Keep going** guessed the reset from the message. Both names work now, and the reset Claude notes with the stop comes first, so a shared chat that another account's limit stopped no longer fills this account's bar (also in *Recent chats*) and goes on when that account's limit resets.
+- **Keep going waits when nobody knows when the limit resets:** out of usage credits, or a limit Claude dates more than a day out (*resets Oct 30, 7pm*), a chat that keeps going went on again every few seconds, each time adding a go-on and a limit error to the chat, and a notification. Dates in Claude's message are read now; with no reset to go by, it tries again after 2, 5, 15, 30 and 60 minutes, then gives up and says so.
+- **A shared chat counts once in an account's last days:** with two Claude folders logged into one account, a chat shared between them counted twice in the tokens of days 9 to 14 (the days before were right).
+- **One notification when two chats change the same files:** a chat open on two accounts made it two.
+- **The widget and VS Code don't slow each other down:** each made the other read the transcripts of its chats again from the start for their tests after edits, on every check, when they list different chats (a tenth of a second each time with big chats).
+
 ## 1.16.1 (2026-10-27)
 
 - **The widget no longer stops refreshing:** a status check that lost its answer could still leave the popup and the panel showing what they saw last, **Refresh** too, until plasmashell restarted: what 1.16.0 does with such a check failed on it at each try (*a check didn't start* in the journal, every few seconds). Such a check now runs again at the next check instead of a minute later, and nothing can keep it from running.

@@ -107,6 +107,11 @@ test("two chats changing the same files: a notice once per pair", () => {
   assert.equal(r.notices[0].body, "A and B: src/x.py");
   assert.deepEqual(t.overlaps("", groups(true), undefined, OPTS).notices, []);
   assert.equal(overlapText(groups(true)[0].sessions[0].overlaps!), "Also changed by “B”: src/x.py");
+  // a chat listed twice (open on two accounts) is one chat: still one notice
+  const twice = new TransitionTracker();
+  const both = (on: boolean): Group[] => [{ ...base, sessions: on ? [row("a", "A", "b"), { ...row("a2", "A", "b"), chatId: "a" }, row("b", "B", "a")] : [] }];
+  twice.overlaps("", both(false), undefined, OPTS);
+  assert.equal(twice.overlaps("", both(true), undefined, OPTS).notices.length, 1);
 });
 
 test("the widgets' Markdown link opens only their runs and Claude's plans", () => {

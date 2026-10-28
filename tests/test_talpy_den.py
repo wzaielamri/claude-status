@@ -1077,6 +1077,23 @@ class OneAccountTwoProfilesTests(unittest.TestCase):
         self.assertEqual((g["tokens"]["today"]["output"], g["tokens"]["today"]["messages"]), (1000, 1))
         self.assertEqual(g["stats"]["days"][-1]["messages"], 1)
 
+    def test_a_shared_chat_counts_once_after_its_messages_age_out(self):
+        # (the caches keep each message for TOKEN_DAYS; older days are each profile's sums)
+        with tempfile.TemporaryDirectory() as tmp:
+            home, cache, now = Path(tmp) / "home", Path(tmp) / "cache", time.time()
+            for name in (".claude-a", ".claude-b"):
+                write(home / name / ".claude.json", {"oauthAccount": {"accountUuid": "same"}})
+            chat = home / ".claude-a/projects/p/chat.jsonl"
+            write(chat, assistant("m1", now - 10 * 86400, 1000) + "\n" + assistant("m2", now - 5, 10) + "\n")
+            write(home / ".claude-a/projects/p/own.jsonl", assistant("m3", now - 10 * 86400, 200) + "\n")
+            (home / ".claude-b/projects/p").mkdir(parents=True)
+            os.link(chat, home / ".claude-b/projects/p/chat.jsonl")
+            (g,) = cs.collect(home, cache, now=now)["groups"]
+        day = g["stats"]["days"][-11]
+        self.assertEqual((day["output"], day["messages"], day["chats"]), (1200, 2, 2))
+        self.assertEqual(g["stats"]["sum"]["output"], 1210)
+        self.assertEqual(sum(m["total"] for m in g["stats"]["models"]), g["stats"]["sum"]["total"])
+
 
 class ProfileNameTests(unittest.TestCase):
     def test_a_linked_profile_keeps_its_own_name(self):

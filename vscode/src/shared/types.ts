@@ -94,6 +94,7 @@ export interface Overlap {
   key: string; // its row
   name: string;
   sessionId: string;
+  chatId?: string; // the chat (sessionId, unless that's a session it was resumed in)
   profileDir: string;
   count: number;
   files: string[]; // relative to this chat's folder, at most 8

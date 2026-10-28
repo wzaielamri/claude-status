@@ -258,7 +258,8 @@ export class TransitionTracker {
     for (const g of groups)
       for (const s of g.sessions)
         for (const o of s.overlaps ?? []) {
-          const pair = [s.key, o.key].sort().join("|");
+          // (by chat: one listed twice, open on two accounts, is one chat)
+          const pair = [s.chatId || s.sessionId, o.chatId || o.sessionId].sort().join("|");
           if (next.has(pair)) continue;
           next.add(pair);
           if (!before || before.has(pair)) continue;

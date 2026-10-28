@@ -1451,9 +1451,11 @@ PEEK_MORE_LINE = re.compile(rb'"type":\s*"(?:user|assistant|last-prompt|system|p
 PEEK_ADDED = ("recap", "mode", "slug", "stopped")  # a cached peek without them (an older copy's) is read again
 RECAP_NOTE = re.compile(r"\s*\(disable recaps in /config\)\s*$")
 # Claude's names for the plan windows in "You've hit your … limit" (its
-# rate-limit types: five_hour is the session limit)
-LIMIT_NAMES = (("session limit", "five_hour"), ("weekly limit", "seven_day"), ("Opus limit", "seven_day_opus"),
-               ("Sonnet limit", "seven_day_sonnet"), ("Fable limit", "seven_day_overage_included"))
+# rate-limit types: five_hour is the session limit, the 5-hour limit since
+# Claude Code 2.1.312)
+LIMIT_NAMES = (("session limit", "five_hour"), ("5-hour limit", "five_hour"), ("weekly limit", "seven_day"),
+               ("Opus limit", "seven_day_opus"), ("Sonnet limit", "seven_day_sonnet"),
+               ("Fable limit", "seven_day_overage_included"))
 LIMIT_STARTS = ("You've hit your ", "You've reached your ")
 OUT_OF_USAGE = ("You're out of usage credits", "Your org is out of usage")
 LOGIN_ENDED = ("Login expired", "OAuth token revoked", "Anthropic profile login expired")
@@ -1633,7 +1635,8 @@ def recap_of(entries):
 def stopped_by(e):
     """What stopped a chat whose newest turn is the entry e: {"kind": "limit"
     (a usage limit; window: the plan window, e.g. "five_hour", if Claude
-    named it) or "login" (it expired), "text": Claude's message, "at"}, or None."""
+    named it) or "login" (it expired), "text": Claude's message, "at", and
+    "resets": when that limit resets, if Claude noted it}, or None."""
     if e.get("type") != "assistant" or e.get("isApiErrorMessage") is not True:
         return None
     text = " ".join(message_text(e.get("message")).split())
@@ -1648,7 +1651,15 @@ def stopped_by(e):
         kind = "login"
     if kind is None:
         return None
-    return {"kind": kind, "window": window, "text": short_text(text, 160), "at": to_ms(e.get("timestamp"))}
+    stop = {"kind": kind, "window": window, "text": short_text(text, 160), "at": to_ms(e.get("timestamp"))}
+    # (the error notes the account's limit it hit: its rate-limit type and when it resets)
+    quota = e.get("quotaLimits") if kind == "limit" and isinstance(e.get("quotaLimits"), dict) else {}
+    if window is None and quota.get("rateLimitType") in {w for _, w in LIMIT_NAMES}:
+        stop["window"] = quota["rateLimitType"]
+    resets = to_ms(quota.get("resetsAt"))
+    if resets:
+        stop["resets"] = resets
+    return stop
 
 
 def chat_peek(path):
@@ -2639,8 +2650,8 @@ class TestsCache:
         self.path = path
         data = read_json(path)
         ok = isinstance(data, dict) and data.get("version") == TESTS_CACHE_VERSION
-        self.old = data.get("files", {}) if ok and isinstance(data.get("files"), dict) else {}
-        self.data = {}
+        self.old = data if ok and isinstance(data.get("files"), dict) else {}
+        self.data = {"version": TESTS_CACHE_VERSION, "files": {}}
         self.changed = not ok
 
     def rec(self, path):
@@ -2649,7 +2660,7 @@ class TestsCache:
         except OSError:
             return new_tests()
         key = file_key(st)
-        old = self.data.get(key) or self.old.get(key)
+        old = self.data["files"].get(key) or self.old.get("files", {}).get(key)
         if isinstance(old, list) and len(old) == 2 and isinstance(old[0], int) and old[0] <= st.st_size \
                 and isinstance(old[1], dict) and all(k in old[1] for k in ("editAt", "run", "pending")):
             size, rec = old
@@ -2659,7 +2670,7 @@ class TestsCache:
             rec = json.loads(json.dumps(rec))
             size = scan_tests(path, rec, size)
             self.changed = True
-        self.data[key] = [size, rec]
+        self.data["files"][key] = [size, rec]
         return rec
 
     def review(self, path):
@@ -2670,9 +2681,10 @@ class TestsCache:
         return {"editedAt": merged["editAt"], "tests": merged["run"]} if merged["editAt"] is not None else None
 
     def save(self):
-        if self.changed or set(self.data) != set(self.old):
+        kept = keep_unused(self.old, self.data, ("files",), time.time())
+        if self.changed or kept or set(self.data["files"]) != set(self.old.get("files", {})):
             try:
-                write_json_atomic(self.path, {"version": TESTS_CACHE_VERSION, "files": self.data})
+                write_json_atomic(self.path, self.data)
             except OSError:
                 pass
 
@@ -3449,22 +3461,33 @@ def recent_extras(ctx, path, group, cwd=""):
 # ---------------------------------------------------------------- usage limits that stopped chats
 
 
-RESET_IN_TEXT = re.compile(r"\bresets (\d{1,2})(?::(\d{2}))?\s*([ap]m)\b", re.IGNORECASE)
+# (a reset more than a day out comes with its day: "resets Oct 30, 7pm", and
+# its year when that isn't this one: "resets Jan 2, 2027, 9am")
+RESET_IN_TEXT = re.compile(r"\bresets (?:([A-Z][a-z]{2}) (\d{1,2}),(?: (\d{4}),)? )?(\d{1,2})(?::(\d{2}))?\s*([ap]m)\b",
+                           re.IGNORECASE)
+MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 
 
 def reset_from_text(text, at_ms):
-    """When "… · resets 7:10pm (Europe/Berlin)" in Claude's message is (taken
-    as this machine's local time), after at_ms; None if it names no time of day."""
+    """When "… · resets 7:10pm (Europe/Berlin)" (or "resets Oct 30, 7pm") in
+    Claude's message is (taken as this machine's local time), after at_ms
+    when it names no day; None if it names no time of day."""
     m = RESET_IN_TEXT.search(text or "")
     if not m or not at_ms:
         return None
-    hour = int(m.group(1)) % 12 + (12 if m.group(3).lower() == "pm" else 0)
-    minute = int(m.group(2) or 0)
-    if minute > 59:
+    month, day, year = m.group(1), m.group(2), m.group(3)
+    hour = int(m.group(4)) % 12 + (12 if m.group(6).lower() == "pm" else 0)
+    minute = int(m.group(5) or 0)
+    if minute > 59 or (month and month.lower() not in MONTHS):
         return None
     then = datetime.fromtimestamp(at_ms / 1000)
-    reset = then.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if reset <= then:
+    try:
+        reset = then.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if month:
+            reset = reset.replace(year=int(year or then.year), month=MONTHS.index(month.lower()) + 1, day=int(day))
+    except ValueError:  # (no such day)
+        return None
+    if reset <= then and not month:
         reset += timedelta(days=1)
     return int(reset.timestamp() * 1000)
 
@@ -3473,9 +3496,15 @@ def limit_stop(stopped, limits, now_ms):
     """A copy of what stopped a chat (stopped_by), with when the usage limit
     it hit resets ("resetsAt") or whether it has since ("over"): from the
     account's plan window of that limit (a window that started after the
-    chat stopped is a new one), else from the time in Claude's message."""
+    chat stopped is a new one), else from the time in Claude's message.
+    When it resets as Claude noted it with the stop ("resets") comes first:
+    that is the window of the account the chat ran on then."""
     s = dict(stopped, resetsAt=None, over=False)
     if s.get("kind") != "limit":
+        return s
+    if isinstance(s.get("resets"), int):
+        s["over"] = s["resets"] <= now_ms
+        s["resetsAt"] = None if s["over"] else s["resets"]
         return s
     at = s.get("at") or 0
     w = next((w for w in (limits or {}).get("windows", []) if w.get("key") == s.get("window")), None) \
@@ -3526,6 +3555,8 @@ def note_limit_hits(group):
             if w["key"] != stopped.get("window") or w["reset"] or not w["resetsAt"] or not hours \
                     or not w["resetsAt"] - hours * 3600_000 <= at < w["resetsAt"]:
                 continue  # (a limit of a window that's over since)
+            if stopped.get("resets") and not same_window(stopped["resets"], w["resetsAt"]):
+                continue  # (another account's window: a shared chat that ran there then)
             w["pct"] = max(w["pct"], 100.0)
             if w.get("forecast"):
                 w["forecast"] = dict(w["forecast"], fullAt=None, atReset=max(w["forecast"]["atReset"], w["pct"]))
@@ -3543,7 +3574,7 @@ OVERLAP_FILES = 8  # file names a row carries per other chat
 
 def note_overlaps(groups, changed, home):
     """Set "overlaps" on the rows of chats with a process that changed the
-    same files as another such chat: [{"key", "name", "sessionId",
+    same files as another such chat: [{"key", "name", "sessionId", "chatId",
     "profileDir", "count", "files"}]. changed: row key -> absolute paths."""
     rows = [s for g in groups for s in g["sessions"] if s.get("pid") is not None and changed.get(s["key"])]
     named = {}  # row key -> the chats it names (one listed twice, once)
@@ -3560,7 +3591,7 @@ def note_overlaps(groups, changed, home):
                     continue
                 named[row["key"]].add(chat)
                 row["overlaps"] = (row.get("overlaps") or []) + [{
-                    "key": other["key"], "name": other["name"], "sessionId": other["sessionId"],
+                    "key": other["key"], "name": other["name"], "sessionId": other["sessionId"], "chatId": chat,
                     "profileDir": other["profileDir"], "count": len(both),
                     "files": sorted(file_label(p, row["cwd"], home) for p in both)[:OVERLAP_FILES],
                 }]
@@ -3796,7 +3827,7 @@ def kept_step(k, turn, row, queued, limits, now_ms):
             return None
         return "go on", int(start), why, prompt
 
-    def again(why, prompt=""):
+    def again(why, prompt="", retry="retry"):
         tries = k.get("tries") or 0
         if in_tab:
             return go(now_ms)  # (says why it can't)
@@ -3804,7 +3835,7 @@ def kept_step(k, turn, row, queued, limits, now_ms):
             k.update(error=f"Gave up after {tries} tries: {why}", errorAt=now_ms)
             return None
         k["tries"] = tries + 1
-        return go(now_ms + KEEP_RETRY_MINUTES[tries] * 60_000, "retry", prompt)
+        return go(now_ms + KEEP_RETRY_MINUTES[tries] * 60_000, retry, prompt)
 
     if k.get("cappedUntil"):  # the usage cap stopped it: on once that window resets
         return go(max(k["cappedUntil"] + 60_000, now_ms), "cap")
@@ -3816,9 +3847,13 @@ def kept_step(k, turn, row, queued, limits, now_ms):
             return None  # it gave up; something new in the chat starts it over
         k.update(error="", errorAt=None, tries=0)
     if turn["kind"] == "limit" and at > went:
-        k["tries"] = 0
         s = limit_stop(turn, limits, now_ms)
-        return go(s["resetsAt"] + 60_000 if s.get("resetsAt") and not s.get("over") else now_ms)
+        if not s.get("resetsAt") and not s.get("over"):
+            # when it resets isn't known (out of usage credits, a limit with no
+            # window on record): on after a pause, longer each time it hits it
+            return again(turn.get("text") or "a usage limit", retry="")
+        k["tries"] = 0
+        return go(s["resetsAt"] + 60_000 if not s["over"] else now_ms)
     if turn["kind"] == "login":
         k["note"] = "Its account's login has expired: log in again, then it can go on"
         return None
@@ -5941,24 +5976,63 @@ def scan_transcripts(profile, cache, now):
 def day_history(messages):
     """Messages summed per day for the stats: {day: {"models": {model:
     [input, output, cacheRead, cacheWrite, messages]}, "projects": {folder:
-    [tokens, output]}, "chats": [chat ids]}}."""
+    [tokens, output]}, "chats": [chat ids], "shared": {chat id: {"models",
+    "projects"}}: the part of those in chats shared with other profiles, so
+    the stats count them once when the messages are gone (count_once)}}."""
     out = {}
     for day, model, *rest in messages.values():
         vals = rest[:4]
+        shared = len(rest) > 4 and bool(rest[4])
         project = rest[5] if len(rest) > 5 else ""
         chat = rest[6] if len(rest) > 6 else ""
-        h = out.setdefault(day, {"models": {}, "projects": {}, "chats": []})
-        row = h["models"].setdefault(model, [0, 0, 0, 0, 0])
-        for i, v in enumerate(vals):
-            row[i] += v
-        row[4] += 1
-        if project:
-            pr = h["projects"].setdefault(project, [0, 0])
-            pr[0] += sum(vals)
-            pr[1] += vals[1]
+        h = out.setdefault(day, {"models": {}, "projects": {}, "chats": [], "shared": {}})
+        for sums in [h] + ([h["shared"].setdefault(chat, {"models": {}, "projects": {}})] if shared and chat else []):
+            row = sums["models"].setdefault(model, [0, 0, 0, 0, 0])
+            for i, v in enumerate(vals):
+                row[i] += v
+            row[4] += 1
+            if project:
+                pr = sums["projects"].setdefault(project, [0, 0])
+                pr[0] += sum(vals)
+                pr[1] += vals[1]
         if chat and chat not in h["chats"]:
             h["chats"].append(chat)
     return out
+
+
+def count_once(histories):
+    """Several profiles' day_history with each chat counted once on each day:
+    a chat that more than one of them has on a day (one transcript linked
+    into each) is taken out of all but one, by its sums kept apart ("shared";
+    one with none kept apart, e.g. read before the chat was shared, is the
+    one that counts it)."""
+    out = [dict(h) for h in histories]
+    for day in {d for h in histories for d in h}:
+        holders = {}
+        for i, h in enumerate(histories):
+            if isinstance(h.get(day), dict):
+                for chat in h[day].get("chats") or []:
+                    holders.setdefault(chat, []).append(i)
+        for chat, held in holders.items():
+            apart = [i for i in held if isinstance((histories[i][day].get("shared") or {}).get(chat), dict)]
+            if len(held) < 2 or not apart:
+                continue
+            keep = next((i for i in held if i not in apart), apart[0])
+            for i in apart:
+                if i != keep:
+                    out[i][day] = without(out[i][day], histories[i][day]["shared"][chat])
+    return out
+
+
+def without(h, part):
+    """A day of day_history with the sums of part (its "shared" of a chat) taken out."""
+    h = dict(h, models=dict(h.get("models") or {}), projects=dict(h.get("projects") or {}))
+    for section, size in (("models", 5), ("projects", 2)):
+        for key, row in (part.get(section) or {}).items():
+            have = h[section].get(key)
+            if isinstance(have, list) and len(have) == size and isinstance(row, list) and len(row) == size:
+                h[section][key] = [max(0, a - b) for a, b in zip(have, row)]
+    return h
 
 
 def scan_prompts(profile, rec, stats_from):
@@ -6012,7 +6086,8 @@ def token_stats(caches, now, home, shown=STATS_SHOWN_DAYS):
     histories = [cache.get("history") or {} for cache in caches]
     if len(caches) > 1:  # the days the caches still have messages of: each message once
         recent = day_history(merged_messages(caches))
-        histories = [{d: h for d, h in history.items() if d not in recent} for history in histories] + [recent]
+        histories = count_once([{d: h for d, h in history.items() if d not in recent} for history in histories])
+        histories.append(recent)
     for history in histories:
         for day, h in history.items():
             if day < first or day not in days or not isinstance(h, dict):

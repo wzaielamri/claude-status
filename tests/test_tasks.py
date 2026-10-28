@@ -89,8 +89,16 @@ class PeekTests(Fixture):
         p = self.peek(prompt("go on", t), limit_error("You've hit your session limit · resets 7:10pm (Europe/Berlin)", t + 2))
         self.assertEqual(p["stopped"], {"kind": "limit", "window": "five_hour", "at": int((t + 2) * 1000),
                                         "text": "You've hit your session limit · resets 7:10pm (Europe/Berlin)"})
+        # (Claude Code 2.1.312 and later name it the 5-hour limit)
+        p = self.peek(prompt("go on", t), limit_error("You've hit your 5-hour limit · resets 7:10pm (Europe/Berlin)", t + 2))
+        self.assertEqual(p["stopped"]["window"], "five_hour")
         p = self.peek(prompt("go on", t), limit_error("You've hit your weekly limit · resets Oct 24, 9am", t + 2))
         self.assertEqual(p["stopped"]["window"], "seven_day")
+        # the limit and its reset as Claude notes them with the error (whatever it calls the limit)
+        error = dict(limit_error("You've hit your daily limit", t + 2),
+                     quotaLimits={"status": "rejected", "resetsAt": 1792572000, "rateLimitType": "five_hour"})
+        p = self.peek(prompt("go on", t), error)
+        self.assertEqual((p["stopped"]["window"], p["stopped"]["resets"]), ("five_hour", 1792572000_000))
         p = self.peek(prompt("go on", t), limit_error("You've reached your Fable limit.", t + 2))
         self.assertEqual(p["stopped"]["window"], "seven_day_overage_included")
         p = self.peek(prompt("go on", t), limit_error("You've hit your monthly spend limit.", t + 2))
@@ -147,6 +155,12 @@ class LimitStopTests(unittest.TestCase):
                          int(datetime(2026, 10, 21, 5, 10).timestamp() * 1000))
         self.assertEqual(cs.reset_from_text("resets 12am", at), int(datetime(2026, 10, 21, 0, 0).timestamp() * 1000))
         self.assertIsNone(cs.reset_from_text("You've hit your monthly spend limit.", at))
+        # more than a day out, Claude names the day (and the year, if it isn't this one)
+        self.assertEqual(cs.reset_from_text("You've hit your Sonnet limit · resets Oct 30, 7pm (Europe/Berlin)", at),
+                         int(datetime(2026, 10, 30, 19, 0).timestamp() * 1000))
+        self.assertEqual(cs.reset_from_text("… · resets Jan 2, 2027, 9:30am", at),
+                         int(datetime(2027, 1, 2, 9, 30).timestamp() * 1000))
+        self.assertIsNone(cs.reset_from_text("… · resets Feb 30, 9am", at))
         s = cs.limit_stop(self.stop(at, window=None, text="resets 5:10am"), None,
                           int(datetime(2026, 10, 21, 6, 0).timestamp() * 1000))
         self.assertTrue(s["over"])
@@ -203,6 +217,22 @@ class LimitStopTests(unittest.TestCase):
         # and a chat only this account has stopped here, whenever its session started
         g = self.group_at(74.0, [self.stop(self.NOW - 720_000)])
         g["sessions"][0].update(shared=None, startedAt=self.NOW - 60_000)
+        cs.note_limit_hits(g)
+        self.assertEqual(g["limits"]["windows"][0]["pct"], 100.0)
+
+    def test_a_recent_shared_chat_another_account_hit_the_limit_in(self):
+        # (recent chats have no session start: the reset Claude noted with the stop says whose window it was)
+        theirs = dict(self.stop(self.NOW - 720_000), resets=self.NOW + 5 * 3600_000)
+        g = self.group_at(74.0, [None, theirs])
+        g["recent"][0]["shared"] = True
+        cs.note_limit_hits(g)
+        self.assertEqual(g["limits"]["windows"][0]["pct"], 74.0)
+        # and it resets when that account's window does
+        s = cs.limit_stop(theirs, g["limits"], self.NOW)
+        self.assertEqual((s["resetsAt"], s["over"]), (self.NOW + 5 * 3600_000, False))
+        ours = dict(self.stop(self.NOW - 720_000), resets=self.NOW + 3 * 3600_000 + 2000)
+        g = self.group_at(74.0, [None, ours])
+        g["recent"][0]["shared"] = True
         cs.note_limit_hits(g)
         self.assertEqual(g["limits"]["windows"][0]["pct"], 100.0)
 
@@ -1250,6 +1280,27 @@ class KeepGoingTests(TaskFixture):
         self.assertIsNone(cs.kept_step(dict(k), dict(open_turn, at=self.now_ms - 1000), None, False, limits, self.now_ms))
         self.assertEqual(cs.kept_step(dict(k), open_turn, None, False, limits, self.now_ms)[2], "retry")
 
+    def test_a_limit_with_no_known_reset_waits_longer_each_time(self):
+        at = self.now_ms - 60_000
+        k = {"chat": self.SID, "profile": ".claude-work", "since": at - 60_000, "wentOnAt": None, "tries": 0}
+        limits = {"windows": [{"key": "five_hour", "pct": 100, "resetsAt": self.reset}]}
+        row = {"sessionId": self.SID, "chatId": self.SID, "pid": 42, "state": "idle", "entrypoint": "cli"}
+        # out of usage credits: no window, no time in the message (not on again right away, each time it hits it)
+        out = {"kind": "limit", "window": None, "text": "You're out of usage credits", "at": at, "ended": True}
+        for n, minutes in enumerate(cs.KEEP_RETRY_MINUTES):
+            self.assertEqual(cs.kept_step(k, dict(out, at=at + n), row, False, limits, self.now_ms),
+                             ("go on", self.now_ms + minutes * 60_000, "", ""))
+        self.assertIsNone(cs.kept_step(k, dict(out, at=at + 9), row, False, limits, self.now_ms))
+        self.assertEqual(k["error"], "Gave up after 5 tries: You're out of usage credits")
+        # a limit with no window on record whose message names the day it resets: on after that
+        day = datetime.fromtimestamp(self.now + 3 * 86400)
+        sonnet = {"kind": "limit", "window": "seven_day_sonnet", "at": at, "ended": True,
+                  "text": f"You've hit your Sonnet limit · resets {day:%b} {day.day}, {day.year}, 7pm (Europe/Berlin)"}
+        k = {"chat": self.SID, "profile": ".claude-work", "since": at - 60_000, "wentOnAt": None, "tries": 3}
+        reset = int(day.replace(hour=19, minute=0, second=0, microsecond=0).timestamp() * 1000)
+        self.assertEqual(cs.kept_step(k, sonnet, row, False, limits, self.now_ms), ("go on", reset + 60_000, "", ""))
+        self.assertEqual(k["tries"], 0)
+
     def test_the_usage_cap_stops_what_works_once_and_kept_chats_go_on_after(self):
         self.say(reply("On it.", self.now - 30, msg_id="m2"))
         cs.keep_chat(self.cache_root(), ".claude-work", self.SID, "Fix it", str(self.folder), now_ms=self.now_ms - 60_000)
@@ -1539,7 +1590,7 @@ class OverlapTests(Fixture):
                    "c": {"/srv/app/x.py"}, "d": {"/srv/app/x.py"}}
         cs.note_overlaps([{"sessions": rows}], changed, Path("/home/me"))
         a, b, c, d = rows
-        self.assertEqual(a["overlaps"], [{"key": "b", "name": "B", "sessionId": "b", "profileDir": ".claude-work",
+        self.assertEqual(a["overlaps"], [{"key": "b", "name": "B", "sessionId": "b", "chatId": "b", "profileDir": ".claude-work",
                                           "count": 1, "files": ["y.py"]}])
         self.assertEqual([o["key"] for o in b["overlaps"]], ["a"])
         self.assertEqual((c["overlaps"], d["overlaps"]), (None, None))  # no process; the same chat

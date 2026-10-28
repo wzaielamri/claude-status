@@ -1183,6 +1183,11 @@ class TestsAfterEditTests(PaneFixture):
         with mock.patch.object(cs, "scan_tests", wraps=cs.scan_tests) as scanned:
             self.assertTrue(again.review(self.transcript)["tests"]["ok"])
         scanned.assert_not_called()
+        # another copy that lists other chats (VS Code, say) keeps what this one read
+        cs.TestsCache(self.cache / "tests.json").save()
+        with mock.patch.object(cs, "scan_tests", wraps=cs.scan_tests) as scanned:
+            self.assertTrue(cs.TestsCache(self.cache / "tests.json").review(self.transcript)["tests"]["ok"])
+        scanned.assert_not_called()
 
     def test_no_edits_no_review(self):
         self.chat(prompt("explain", self.now - 5), tool_use("t1", "Bash", {"command": "pytest"}, self.now - 4))
