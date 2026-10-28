@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { PermsData, WeekGrant, WeekRule } from "../../src/shared/types";
 import { GRANTED_FEW, grantedIntro, grantMeta, promptsText, ruleMeta } from "../../src/shared/week";
 import { post } from "../env";
@@ -71,8 +71,11 @@ function Prompts({ prompts: p, host, rules: suggest, reload }: {
   const ruleAnswer = useStore(weekRuleAnswer);
   const [asking, setAsking] = useState("");
   const [busy, setBusy] = useState("");
+  const seen = useRef(ruleAnswer); // (one from before the tab showed is old news)
   useEffect(() => {
-    if (!ruleAnswer) return;
+    if (!ruleAnswer || ruleAnswer === seen.current) return;
+    seen.current = ruleAnswer;
+    if (ruleAnswer.host !== host) return; // (the section it's for reads them all again, once)
     setBusy("");
     reload();
   }, [ruleAnswer]);
@@ -139,8 +142,11 @@ function Granted({ granted, host, reload }: { granted: WeekGrant[]; host: string
   const [asking, setAsking] = useState("");
   const [busy, setBusy] = useState("");
   const [all, setAll] = useState(false);
+  const seen = useRef(answer); // (as in Prompts)
   useEffect(() => {
-    if (!answer) return;
+    if (!answer || answer === seen.current) return;
+    seen.current = answer;
+    if (answer.host !== host) return;
     setBusy("");
     reload();
   }, [answer]);

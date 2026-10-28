@@ -7,11 +7,12 @@
 
 import { useEffect, useState } from "preact/hooks";
 import type { ProjectRow, ProjectsData, Session } from "../../src/shared/types";
-import { duration } from "../../src/shared/model";
+import { doingText, duration, stateText } from "../../src/shared/model";
 import { hoursText } from "../../src/shared/week";
 import { post } from "../env";
 import { chatRefOf } from "../util/chat";
 import { Icon } from "../util/icons";
+import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
 import { projectsAnswer, viewState } from "../util/stores";
 
@@ -29,11 +30,14 @@ export function ProjectsView() {
   const answer = useStore(projectsAnswer);
   const state = useStore(viewState);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Asked when the tab is in sight, again every 10 minutes
+  const visible = useViewVisible();
   useEffect(() => {
+    if (!visible) return undefined;
     post({ type: "projects" });
     const t = setInterval(() => post({ type: "projects" }), 600000);
     return () => clearInterval(t);
-  }, []);
+  }, [visible]);
   if (!answer) return <div class="empty muted">Reading your chats by project…</div>;
   if (answer.error) return <div class="msg error" role="alert">Couldn't read your projects: {answer.error}</div>;
   const projects = answer.data?.projects ?? [];
@@ -82,15 +86,19 @@ function ProjectDetails({ p, groups, now, cur }: { p: ProjectRow; groups: NonNul
     .sort((a, b) => (b.m.updatedAt ?? 0) - (a.m.updatedAt ?? 0));
   return (
     <div class="project-details">
-      {sessions.map((s) => (
-        <button key={s.key} type="button" class="focus-line" onClick={() => post({ type: "open", chat: chatRefOf(s) })}>
-          <span class="pet-bar" aria-hidden="true" />
-          <span class={`focus-dot st-${s.state}`} aria-hidden="true" />
-          <span class="focus-name">{s.name}</span>
-          <span class="focus-what">{s.peek?.activity || s.state}</span>
-          <span class="focus-time small muted">{s.since ? duration(now - s.since) : ""}</span>
-        </button>
-      ))}
+      {sessions.map((s) => {
+        // (what a working chat does, as in the focus view; else how it stands, as its row says)
+        const doing = s.state === "working" ? doingText(s, null) : "";
+        return (
+          <button key={s.key} type="button" class="focus-line" onClick={() => post({ type: "open", chat: chatRefOf(s) })}>
+            <span class="pet-bar" aria-hidden="true" />
+            <span class={`focus-dot st-${s.state}`} aria-hidden="true" />
+            <span class="focus-name">{s.name}</span>
+            <span class="focus-what">{doing || stateText(s, now)}</span>
+            <span class="focus-time small muted">{doing && s.since ? duration(now - s.since) : ""}</span>
+          </button>
+        );
+      })}
       {recaps.length ? <p class="project-recap">“{recaps[0].recap!.text}”</p> : null}
       <ul class="week-chats">
         {p.chats.slice(0, 5).map((c) => (

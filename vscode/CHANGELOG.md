@@ -208,6 +208,47 @@
 - **The Recap's dates as in the widget:** *Everything since …*, the price
   list's date and the exchange rate's read *24 Oct 2026*, not *24 October
   2026*.
+- **Links in Claude's replies keep their parentheses:** a link to a page
+  with parentheses in its address (Wikipedia's *C_(programming_language)*)
+  opened a cut-off address and left a stray `)` after its text. The whole
+  address is the link now.
+- **The sidebar at its narrowest:** below about 330 px the Focus button was
+  pushed off the right edge with no way to reach it, and around 220 px the
+  Projects tab too. There the tabs you aren't on are icons now (named in
+  their tooltips), so every tab and the Focus button stay in sight down to
+  200 px.
+- **High Contrast themes:** a chat that needs you and one at work had the
+  same color (two oranges in High Contrast Dark, two blues in High Contrast
+  Light), on rows, dots, counts and usage bars. Needs you is orange and
+  working blue in both now. In High Contrast Light the chat tab's inline
+  code, code blocks and syntax colors were pale on white (the dark theme's);
+  they're the light theme's now.
+- **Permission prompts:** a Deny note begun for one prompt stayed open,
+  with its text, when the chat went on to ask the next, and Enter then
+  denied that one with your note; and the Enter that picks a word in an
+  input method (Chinese, Japanese, Korean…) sent the Deny with a
+  half-written note. A new prompt starts afresh now, and Enter waits for
+  the word.
+- **The chat tab stays quick in a long chat:** each key typed in the reply
+  drew the whole conversation again, some 200 ms a key after a few *Show
+  earlier*; typing, a dictation's running seconds and the chat's checks
+  leave it be now. A tab opened on its Review compared the chat's files
+  three times at once (over ssh for an SSH host's chat), once now. The
+  Review's commit message box was unframed, read as plain text and had no
+  focus ring; it's an input in the editor's font now. A JSON or YAML key,
+  and an HTML tag, in a diff is green as in the widget, not grey like a
+  comment.
+- **The Recap, Permissions and Projects tabs:** a day's chats and a
+  folder's chats open from the keyboard too (Tab to it, then Enter or
+  Space). In *Chats it worked on most* the folder gives way before the
+  chat's name in a narrow sidebar (names read *Nigh…* before). One Revoke
+  or Allow reads your permissions again once, not once per section (with
+  SSH hosts several reads of everything at once), and showing the tab
+  again doesn't read them once more per section. The Projects tab's
+  running chats say how they stand (*Needs input · permission*, *Done · 3h
+  0m*) beside a dot in that state's color, not a blue dot for all and the
+  word *done*; and the tab no longer reads every chat every 10 minutes
+  while the view is hidden.
 
 ## 1.16.1
 

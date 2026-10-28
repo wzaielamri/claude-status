@@ -2,7 +2,7 @@
 <!--
   The webview in a browser, with demo data: build with `npm run build` and
   `node esbuild.mjs --harness`, serve the repository folder over http and open
-  dev/harness.html. ?theme=dark|light|hc  ?width=360  ?tab=1  ?phase=0  ?week=1 (the Recap tab; ?span=day or all for a day or everything)  ?perms=1 (the Permissions tab)  ?rules=0 (its rule suggestions left out)
+  dev/harness.html. ?theme=dark|light|hc|hcl (High Contrast Dark, Light)  ?width=360  ?tab=1  ?phase=0  ?week=1 (the Recap tab; ?span=day or all for a day or everything)  ?perms=1 (the Permissions tab)  ?rules=0 (its rule suggestions left out)
   ?live=1 (live mode: a working chat's step)  ?open=1 (subagents with two of them unfolded, a peek, recent chats, plans, memories and the stats)  ?digest=1 (the "while
   you were away" card)  ?hover=1 (the rows' hover
   buttons shown)  ?scroll=N (scrolled down N px)  ?stopped=1 (two chats here a usage limit
@@ -72,6 +72,7 @@
         --vscode-contrastBorder: #6fc3df;
         --vscode-contrastActiveBorder: #f38518;
         --vscode-charts-orange: #ab5a00;
+        --vscode-charts-blue: #59a4f9;
         --vscode-errorForeground: #f48771;
         --vscode-testing-iconPassed: #73c991;
         --vscode-charts-green: #89d185;
@@ -81,6 +82,25 @@
         --vscode-textLink-foreground: #21a6ff;
         --vscode-sideBar-background: #000000;
         --vscode-editor-background: #000000;
+      }
+      html[data-theme="hcl"] {
+        --vscode-foreground: #292929;
+        --vscode-descriptionForeground: rgba(41, 41, 41, 0.7);
+        --vscode-disabledForeground: #7f7f7f;
+        --vscode-focusBorder: #006bbd;
+        --vscode-contrastBorder: #0f4a85;
+        --vscode-contrastActiveBorder: #006bbd;
+        --vscode-charts-orange: #0f4a85;
+        --vscode-charts-blue: #0063d3;
+        --vscode-errorForeground: #b5200d;
+        --vscode-testing-iconPassed: #007100;
+        --vscode-charts-green: #374e06;
+        --vscode-badge-background: #0f4a85;
+        --vscode-badge-foreground: #ffffff;
+        --vscode-widget-border: #0f4a85;
+        --vscode-textLink-foreground: #0f4a85;
+        --vscode-sideBar-background: #ffffff;
+        --vscode-editor-background: #ffffff;
       }
       body {
         background: var(--vscode-sideBar-background);
@@ -136,7 +156,8 @@
         const params = new URLSearchParams(location.search);
         const theme = params.get("theme") || "dark";
         document.body.className =
-          theme === "light" ? "vscode-light" : theme === "hc" ? "vscode-high-contrast" : "vscode-dark";
+          theme === "light" ? "vscode-light" : theme === "hc" ? "vscode-high-contrast"
+          : theme === "hcl" ? "vscode-high-contrast vscode-high-contrast-light" : "vscode-dark";
         if (params.get("tab") === "1") document.body.classList.add("tab");
         document.body.style.width = (Number(params.get("width")) || 360) + "px";
         if (params.get("hover") === "1") {

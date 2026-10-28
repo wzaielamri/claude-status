@@ -7,6 +7,12 @@ import type { Answers, Decision, PermissionAsk, Question } from "../../src/share
 import { Markdown } from "../util/markdown";
 import { Diff } from "./CodeView";
 
+// The prompt an AskBox is for, its key where it's drawn: a Deny note begun
+// for one prompt goes when the chat asks the next
+export function askKey(ask: PermissionAsk): string {
+  return ask.request ?? ask.line;
+}
+
 // What a waiting chat asks, with Allow once / Always allow / Deny (a note);
 // Claude's questions: each with its options, Send answers / Decline (a note)
 export function AskBox({ ask, onAnswer, onWholePlan, busy = false, max = 12, compact = false }: {
@@ -58,7 +64,7 @@ export function AskBox({ ask, onAnswer, onWholePlan, busy = false, max = 12, com
       {ask.diff.length ? <Diff lines={ask.diff} max={max} path={ask.file} /> : null}
       {questions.length ? (
         <QuestionForm
-          key={ask.request ?? ask.line}
+          key={askKey(ask)}
           questions={questions}
           enabled={canAnswer && !busy}
           buttons={canAnswer && !denying}
@@ -94,7 +100,11 @@ export function AskBox({ ask, onAnswer, onWholePlan, busy = false, max = 12, com
             value={note}
             onInput={(e) => setNote((e.target as HTMLInputElement).value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") deny();
+              // (not the Enter that picks a word in an input method's list)
+              if (e.key === "Enter" && !e.isComposing && !busy) {
+                e.preventDefault();
+                deny();
+              }
             }}
           />
           <button type="button" class="btn" disabled={busy} onClick={deny}>{plan ? "Keep planning" : questions.length ? "Decline" : "Deny"}</button>

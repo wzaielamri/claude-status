@@ -5,9 +5,9 @@
 // shows what the extension sends and says what you clicked.
 
 import { render } from "preact";
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer, type TermRun, type TermStyle } from "../src/shared/pane";
-import { AskBox } from "./components/AskBox";
+import { AskBox, askKey } from "./components/AskBox";
 import { Diff, Listing, TermScreen, ToolDetail } from "./components/CodeView";
 import type { Answers, Decision } from "../src/shared/types";
 import { Tag } from "./components/Tag";
@@ -21,6 +21,7 @@ declare global {
 
 const api = acquireVsCodeApi();
 const post = (m: PaneMessage) => api.postMessage(m);
+const copyCode = (code: string) => post({ type: "copy", text: code });
 const config = window.CLAUDE_CHAT;
 
 function plural(n: number, one: string, many = one + "s"): string {
@@ -122,6 +123,7 @@ function ChatApp() {
   const [review, setReview] = useState<ReviewAnswer | null>(null);
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewAsked, setReviewAsked] = useState(0); // (the extension showed the Review tab)
   const [openFiles, setOpenFiles] = useState<Record<string, boolean>>({});
   const [undoAsk, setUndoAsk] = useState("");
   const [commitOpen, setCommitOpen] = useState(false);
@@ -352,6 +354,7 @@ function ChatApp() {
       } else if (m.type === "result") {
         if (m.kind.startsWith("tab:")) {
           setTab(m.kind.slice(4) as "chat" | "review");
+          if (m.kind === "tab:review") setReviewAsked((n) => n + 1); // (compared again, also when it showed already)
           return;
         }
         if (m.kind === "draft") {
@@ -381,10 +384,6 @@ function ChatApp() {
     };
     window.addEventListener("message", onMessage);
     post({ type: "ready" });
-    if (config.tab === "review") {
-      setReviewLoading(true);
-      post({ type: "review" });
-    }
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
@@ -398,14 +397,23 @@ function ChatApp() {
     if (review && !commitEdited) setCommitText(review.message || "");
   }, [review]);
 
-  // A new edit: compare again (while the tab shows the review)
-  const editedAt = chat?.review?.editedAt ?? 0;
+  // The review: compared when its tab shows (once, however it was opened),
+  // and again after a new edit while it shows. (The chat's first news says
+  // when it was last edited: no news, the comparison asked for is on its way.)
+  const askReview = () => {
+    setReviewLoading(true);
+    post({ type: "review" });
+  };
   useEffect(() => {
-    if (tab === "review") {
-      setReviewLoading(true);
-      post({ type: "review" });
-    }
-  }, [tab, editedAt]);
+    if (tab === "review") askReview();
+  }, [tab, reviewAsked]);
+  const editedAt = chat ? chat.review?.editedAt ?? 0 : null;
+  const lastEdit = useRef(editedAt);
+  useEffect(() => {
+    const was = lastEdit.current;
+    lastEdit.current = editedAt;
+    if (tab === "review" && was !== null && editedAt !== was) askReview();
+  }, [editedAt]);
 
   useLayoutEffect(() => {
     const el = list.current;
@@ -438,6 +446,45 @@ function ChatApp() {
   const sums = (review?.files ?? []).reduce((a, f) => [a[0] + (f.added ?? 0), a[1] + (f.removed ?? 0)], [0, 0]);
   const tests = testsText(chat?.review ?? (review ? { editedAt: review.editedAt, tests: review.tests } : null));
   const marked = !!chat && !chat.reviewPending && !!chat.review;
+
+  // The conversation, drawn again only when it or how it shows changes: not
+  // for each key typed in the reply, a dictation's second or a chat's poll
+  const asking = !!chat?.permission;
+  const going = !!chat?.busy;
+  const steps = useMemo(() => items.map((it, i) => {
+    const gap = gapOf(it.kind, items[i - 1]?.kind);
+    return it.kind === "you" ? (
+      <div key={it.key} class={`pane-item pane-you ${gap}`}>
+        <span class="pane-gutter" aria-hidden="true">›</span>
+        <div class="pane-you-text">{it.text}</div>
+      </div>
+    ) : it.kind === "claude" ? (
+      <div key={it.key} class={`pane-item pane-claude ${gap}`}>
+        <span class="pane-gutter" aria-hidden="true">
+          <span class="pane-dot" />
+        </span>
+        <div class="pane-body">
+          <Markdown text={it.text ?? ""} onCopy={copyCode} />
+        </div>
+      </div>
+    ) : it.kind === "tool" ? (
+      <ToolLine
+        key={it.key}
+        item={it}
+        gap={gap}
+        open={!!open[it.key]}
+        asking={asking && i === items.length - 1 && it.status === "open"}
+        going={going && it.status === "open"}
+        onToggle={() => setOpen((was) => ({ ...was, [it.key]: !was[it.key] }))}
+        split={split}
+        onSplit={sideBySide}
+      />
+    ) : (
+      <div key={it.key} class={`pane-item pane-note${it.error ? " bad" : ""} ${gap}`}>
+        <span>{it.text}</span>
+      </div>
+    );
+  }), [items, open, asking, going, split]);
 
   return (
     <div class="pane pane-grow" style={{ "--pane-scale": String(scale) }}>
@@ -529,40 +576,7 @@ function ChatApp() {
               <div class="muted center small">Only its last 2000 steps are shown here.</div>
             ) : null}
             {!loaded || loadError ? <div class={`muted center${loadError ? " bad" : ""}`}>{loadError || "Reading the chat…"}</div> : null}
-            {items.map((it, i) => {
-              const gap = gapOf(it.kind, items[i - 1]?.kind);
-              return it.kind === "you" ? (
-                <div key={it.key} class={`pane-item pane-you ${gap}`}>
-                  <span class="pane-gutter" aria-hidden="true">›</span>
-                  <div class="pane-you-text">{it.text}</div>
-                </div>
-              ) : it.kind === "claude" ? (
-                <div key={it.key} class={`pane-item pane-claude ${gap}`}>
-                  <span class="pane-gutter" aria-hidden="true">
-                    <span class="pane-dot" />
-                  </span>
-                  <div class="pane-body">
-                    <Markdown text={it.text ?? ""} onCopy={(code) => post({ type: "copy", text: code })} />
-                  </div>
-                </div>
-              ) : it.kind === "tool" ? (
-                <ToolLine
-                  key={it.key}
-                  item={it}
-                  gap={gap}
-                  open={!!open[it.key]}
-                  asking={!!chat?.permission && i === lastIndex && it.status === "open"}
-                  going={!!chat?.busy && it.status === "open"}
-                  onToggle={() => setOpen({ ...open, [it.key]: !open[it.key] })}
-                  split={split}
-                  onSplit={sideBySide}
-                />
-              ) : (
-                <div key={it.key} class={`pane-item pane-note${it.error ? " bad" : ""} ${gap}`}>
-                  <span>{it.text}</span>
-                </div>
-              );
-            })}
+            {steps}
             {chat?.state === "working" ? (
               <div class="pane-item pane-working">
                 <span class="pane-gutter">
@@ -572,7 +586,7 @@ function ChatApp() {
               </div>
             ) : null}
           </div>
-          {chat?.permission ? <AskBox ask={chat.permission} onAnswer={answer} busy={answering > 0} /> : null}
+          {chat?.permission ? <AskBox key={askKey(chat.permission)} ask={chat.permission} onAnswer={answer} busy={answering > 0} /> : null}
           {chat?.queued ? (
             <div class="pane-queued">
               <span>Sent when this turn ends: {chat.queued.prompt}{chat.queued.error ? ` (${chat.queued.error})` : ""}</span>

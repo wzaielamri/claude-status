@@ -211,6 +211,22 @@ function Trend({ values }: { values: (number | null)[] }) {
   );
 }
 
+// A day or a folder that unfolds its chats: a click, or Enter / Space when
+// Tab got to it
+function opens(shown: boolean, toggle: () => void) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-expanded": shown,
+    onClick: toggle,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      toggle();
+    },
+  };
+}
+
 // A chat in the tab's lists: click one of this computer's to bring it up
 function ChatLine({ c, cur, where, sub }: { c: WeekChat; cur: Currency; where?: string; sub?: boolean }) {
   return (
@@ -266,7 +282,7 @@ function Timeline({ recap }: { recap: WeekRecap }) {
         return (
           <div key={d.day}>
             <div class={"week-row" + (i === last && recap.back === 0 ? " today" : "") + (d.chats?.length ? " opens" : "") + (shown ? " open" : "")}
-              title={dayTip(d, cur)} onClick={() => setOpen(shown || !d.chats?.length ? "" : d.day)}>
+              title={dayTip(d, cur)} {...(d.chats?.length ? opens(shown, () => setOpen(shown ? "" : d.day)) : { onClick: () => setOpen("") })}>
               <span class="week-day small">{rowDay(d.day, weeks)}</span>
               {weeks ? (
                 <span class="week-track">
@@ -365,7 +381,7 @@ function Projects({ recap }: { recap: WeekRecap }) {
           const shown = open === key;
           const chats = Array.isArray(p.chats) ? p.chats : [];
           return [
-            <li key={key} class={"opens" + (shown ? " open" : "")} onClick={() => setOpen(shown ? "" : key)}
+            <li key={key} class={"opens" + (shown ? " open" : "")} {...opens(shown, () => setOpen(shown ? "" : key))}
               title={`${p.host ? p.host + ": " : ""}${p.path}\nClaude worked ${hoursText(p.workedMs)} · ${moneyText(p.cost, cur)} at API prices\n` +
                 `${p.prompts} prompts · ${p.chatCount ?? chats.length} chats\nClick for its chats`}>
               <span class="week-bar-name">

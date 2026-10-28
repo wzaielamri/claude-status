@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "add" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter";
+export type IconName = "refresh" | "add" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -70,6 +70,9 @@ const shapes: Record<IconName, JSX.Element> = {
   move: <path d="M2.5 8h8M7.75 5.25L10.5 8l-2.75 2.75M13.25 3v10" />,
   star: <path d="M8 1.9l1.85 3.8 4.15.6-3 2.93.7 4.13L8 11.4l-3.7 1.96.7-4.13-3-2.93 4.15-.6z" />,
   chat: <path d="M2.5 3.75c0-.7.55-1.25 1.25-1.25h8.5c.7 0 1.25.55 1.25 1.25v5.5c0 .7-.55 1.25-1.25 1.25H7l-3 2.75V10.5h-.25c-.7 0-1.25-.55-1.25-1.25z" />,
+  chart: <path d="M2.5 13.5h11M4.5 11V8M8 11V3.5M11.5 11V6" />,
+  shield: <path d="M8 1.75l5 2v4c0 3.1-2.15 5.35-5 6.5-2.85-1.15-5-3.4-5-6.5v-4z" />,
+  folder: <path d="M2 4c0-.55.45-1 1-1h3.5l1.5 1.75h5c.55 0 1 .45 1 1V12c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1z" />,
   external: (
     <>
       <path d="M9.5 2.5h4v4M13.5 2.5L8 8" />

@@ -23,6 +23,23 @@
   --cs-link: var(--vscode-textLink-foreground, #3794ff);
 }
 
+/* High Contrast: there charts.orange is a dark orange beside an orange focus
+   border (Dark) or a blue beside a blue one (Light), so a chat that needs you
+   gets an orange of its own and a working one blue. (High Contrast Light's
+   body has both classes; the usage levels are set again as :root's took
+   its colors.) */
+body.vscode-high-contrast {
+  --cs-waiting: #f38518;
+  --cs-working: var(--vscode-charts-blue, #59a4f9);
+  --cs-usage-medium: var(--cs-waiting);
+  --cs-usage-low: var(--cs-working);
+}
+
+body.vscode-high-contrast-light {
+  --cs-waiting: #a65200;
+  --cs-working: var(--vscode-charts-blue, #0063d3);
+}
+
 html,
 body {
   margin: 0;
@@ -1564,13 +1581,24 @@ body.vscode-high-contrast .top.scrolled {
 /* ---------------------------------------------------------------------------
    Tabs: your chats now, or your last 7 days (the Recap tab) */
 
+/* Short of room the summary gives way first, then the tab names (elided);
+   in a narrow sidebar the tabs not shown are icons: the Focus button stays
+   in sight down to the narrowest sidebar */
 .tabs {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 2px;
 }
 
+.header .summary {
+  flex-basis: 0; /* (only the room the rest leaves: the tabs never shrink for it) */
+}
+
 .tab-btn {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   white-space: nowrap;
   border: none;
   border-bottom: 2px solid transparent;
@@ -1588,6 +1616,30 @@ body.vscode-high-contrast .top.scrolled {
 .tab-btn.on {
   color: var(--cs-fg);
   border-bottom-color: var(--cs-working);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-btn .tab-icon {
+  display: none;
+}
+
+@container cs (max-width: 340px) {
+  .tab-btn:not(.on) {
+    flex: none;
+    padding: 1px 4px;
+  }
+
+  .tab-btn:not(.on) .tab-icon {
+    display: block;
+  }
+
+  .tab-btn:not(.on) .tab-name {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1933,9 +1985,10 @@ body.vscode-high-contrast .top.scrolled {
   list-style: none;
 }
 
+/* name | folder | hours · cost; short of room the folder gives way faster
+   than the name, which tells the chats apart */
 .week-chat {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto;
+  display: flex;
   gap: 8px;
   align-items: baseline;
   width: 100%;
@@ -1958,16 +2011,23 @@ body.vscode-high-contrast .top.scrolled {
 
 .week-chat-name,
 .week-chat-folder {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.week-chat-name {
+  flex: 1 1 auto;
+}
+
 .week-chat-folder {
+  flex: 0 2 auto;
   max-width: 12em;
 }
 
 .week-chat-value {
+  flex: none;
   white-space: nowrap;
 }
 
@@ -2054,6 +2114,12 @@ body.vscode-high-contrast .top.scrolled {
 .week-row.opens,
 .week-bars li.opens {
   cursor: pointer;
+}
+
+.week-row.opens:focus-visible,
+.week-bars li.opens:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #0078d4);
+  outline-offset: -1px;
 }
 
 .week-row.open .week-day,
@@ -2273,8 +2339,9 @@ body.vscode-high-contrast .top.scrolled {
   overflow-x: auto;
 }
 
+/* (High Contrast Light's body has the class vscode-high-contrast too: it keeps the light colors) */
 body.vscode-dark .cv,
-body.vscode-high-contrast .cv {
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .cv {
   --cv-kw: #ff7b72; --cv-lit: #79c0ff; --cv-str: #a5d6ff; --cv-com: #8b949e; --cv-num: #79c0ff; --cv-fn: #d2a8ff; --cv-key: #7ee787;
 }
 
@@ -2410,8 +2477,9 @@ body.vscode-high-contrast .cv {
   word-break: break-word;
 }
 
+/* (a field's name: muted; a JSON or YAML key in code is .cv-key, colored) */
 .cv-prompt,
-.cv-key {
+.cv-name {
   color: var(--cs-muted);
 }
 
@@ -2513,7 +2581,8 @@ body.chat-page {
   line-height: 1.55;
 }
 
-body.vscode-light .pane {
+body.vscode-light .pane,
+body.vscode-high-contrast-light .pane {
   --pane-claude: #c15f3c;
   --pane-code: #5769f7;
   --pane-block-bg: color-mix(in srgb, var(--cs-fg) 5%, var(--cs-bg));
@@ -3051,7 +3120,8 @@ body.vscode-light .pane {
   color: var(--pane-you);
 }
 
-.pane .pane-reply {
+/* (the reply box draws its frame and focus around it; the Review tab's commit message keeps its own) */
+.pane-replybox .pane-reply {
   flex: 1 1 auto;
   min-height: 3.6em;
   padding: 6px 10px 6px 0;
@@ -3184,6 +3254,20 @@ body.vscode-light .pane {
   margin-top: 8px;
 }
 
+/* the commit message: an input in the editor's font */
+.commit-box .pane-reply {
+  flex: none;
+  padding: 6px 8px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.commit-box .pane-reply:focus {
+  outline: 1px solid var(--vscode-focusBorder, #0078d4);
+  outline-offset: -1px;
+}
+
 /* ---------------------------------------------------------------------------
    Motion: rows slide (util/motion.ts), a tab slides in from its side, the
    chat tab grows open */
@@ -3273,7 +3357,7 @@ body.vscode-light .pane {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--vscode-focusBorder, #0078d4);
+  background: var(--st, var(--cs-working));
 }
 
 .focus-line.finished .focus-dot {
@@ -3510,7 +3594,7 @@ body.vscode-light .pane {
 }
 
 .lane-w {
-  background: var(--vscode-focusBorder, #0078d4);
+  background: var(--cs-working);
 }
 
 .lane-y {

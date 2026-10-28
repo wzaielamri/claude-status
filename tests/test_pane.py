@@ -1462,6 +1462,12 @@ class PaneMarkdownTests(unittest.TestCase):
         self.assertIn(" b", html)  # (as text)
         self.assertIn(" c ", html)
 
+    def test_a_link_keeps_parentheses_in_its_address(self):
+        html = markdown('Md.toHtml("[C](https://en.wikipedia.org/wiki/C_(programming_language)) and [x](https://a.b/c).", style)')
+        self.assertEqual(re.findall(r'href="([^"]*)"', html),
+                         ["https://en.wikipedia.org/wiki/C_(programming_language)", "https://a.b/c"])
+        self.assertIn("</a> and <a", html)
+
     def test_blocks(self):
         text = ("# Title\n\nSome **bold**, *it*, snake_case_name and `code`.\n\n## Steps\n\n1. one\n2. two\n"
                 "   - nested\n\n```python\nprint(1)\n```\n\n> quoted\n\n---\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")

@@ -291,7 +291,7 @@ class Pane implements vscode.Disposable {
   reveal(tab: "chat" | "review"): void {
     if (this.disposed) return;
     this.panel.reveal();
-    if (tab === "review") void this.loadReview();
+    // (on tab:review the page shows its Review tab and asks for the review, once)
     this.post({ type: "result", kind: "tab:" + tab, ok: true, message: "" });
   }
 

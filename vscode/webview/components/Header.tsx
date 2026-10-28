@@ -3,9 +3,17 @@ import type { Counts, Group, HostState, Overall } from "../../src/shared/types";
 import { editorTab, post } from "../env";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
-import { setFocus, setTab, uiState } from "../util/ui";
+import { setFocus, setTab, type Tab, uiState } from "../util/ui";
+import { Icon, type IconName } from "../util/icons";
 import { IconButton } from "./IconButton";
 import { TalpyIcon } from "./TalpyIcon";
+
+const TABS: [Tab, string, IconName][] = [
+  ["chats", "Talpy Den", "chat"],
+  ["week", "Recap", "chart"],
+  ["perms", "Permissions", "shield"],
+  ["projects", "Projects", "folder"],
+];
 
 // The icon and the summary. In the sidebar the view's title bar has the
 // buttons; opened as an editor tab there's no title bar, so they're here.
@@ -38,12 +46,14 @@ export function Header(props: {
       <TalpyIcon state={overall} moving={visible} />
       {/* The app's name is the first tab: your chats now. The others: your last 7 days with Claude (WeekView.tsx),
           the permissions you gave (PermsView.tsx), your projects (ProjectsView.tsx) */}
+      {/* (in a narrow sidebar the tabs not shown are icons, so the Focus button stays in sight) */}
       <div class="tabs" role="tablist">
-        {(["chats", "week", "perms", "projects"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} class={"tab-btn" + (tab === t ? " on" : "")}
-            title={t === "chats" ? tooltipLines(groups, counts, hosts).join("\n") : undefined}
+        {TABS.map(([t, name, icon]) => (
+          <button key={t} type="button" role="tab" aria-selected={tab === t} aria-label={name} class={"tab-btn" + (tab === t ? " on" : "")}
+            title={t === "chats" ? tooltipLines(groups, counts, hosts).join("\n") : name}
             onClick={() => setTab(t)}>
-            {t === "chats" ? "Talpy Den" : t === "week" ? "Recap" : t === "perms" ? "Permissions" : "Projects"}
+            <Icon name={icon} class="tab-icon" />
+            <span class="tab-name">{name}</span>
           </button>
         ))}
       </div>

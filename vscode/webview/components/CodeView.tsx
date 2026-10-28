@@ -6,7 +6,7 @@
 // and what it printed, a file read's numbered lines, else what it was asked).
 
 import type { ComponentChildren } from "preact";
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { changed, diffRows, highlight, language, pairs, readLines, splitRows, type DiffRow } from "../../vendor/codeview.mjs";
 import type { PaneItem, TermRun, TermStyle } from "../../src/shared/pane";
 
@@ -78,9 +78,11 @@ export function Diff({ lines, path = "", max = 0, split = false, onSplit }: {
   onSplit?: (split: boolean) => void;
 }) {
   const [ref, width] = useWidth();
-  const all = diffRows(lines);
-  const marks = marksOf(all);
-  const index = new Map(all.map((r, i) => [r, i]));
+  // (worked out again only for other lines, not when the tab is redrawn)
+  const { all, marks, index } = useMemo(() => {
+    const rows = diffRows(lines);
+    return { all: rows, marks: marksOf(rows), index: new Map(rows.map((r, i) => [r, i])) };
+  }, [lines]);
   const lang = language(path);
   const cut = shown(all, max);
   const twoSided = lines.some((l) => l.startsWith("-")) && lines.some((l) => l.startsWith("+"));
@@ -176,7 +178,7 @@ export function ToolDetail({ item, path }: { item: PaneItem; path: string }) {
     <div class="pane-tool-detail cv-detail">
       {input.split("\n").filter((l) => l !== "").map((l, i) => {
         const k = /^([\w-]{1,40}): (.*)$/.exec(l);
-        return <div key={i} class="cv-field">{k ? <><span class="cv-key">{k[1]}</span>{"  "}{k[2]}</> : l}</div>;
+        return <div key={i} class="cv-field">{k ? <><span class="cv-name">{k[1]}</span>{"  "}{k[2]}</> : l}</div>;
       })}
       {out}
     </div>

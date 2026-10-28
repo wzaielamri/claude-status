@@ -244,6 +244,14 @@ test("Claude's Markdown: links only to the web or mail; the rest stays text", ()
   assert.ok(nodes.some((n) => n.type === "strong"));
 });
 
+test("Claude's Markdown: a link's address keeps its parentheses (a Wikipedia page)", () => {
+  const out = inline("[C](https://en.wikipedia.org/wiki/C_(programming_language)) and [x](https://a.b/c).") as unknown[];
+  const links = out.filter((n) => n && typeof n === "object" && (n as { type: unknown }).type === "a")
+    .map((n) => (n as { props: { href: string } }).props.href);
+  assert.deepEqual(links, ["https://en.wikipedia.org/wiki/C_(programming_language)", "https://a.b/c"]);
+  assert.deepEqual(out.filter((n) => typeof n === "string"), [" and ", "."]);
+});
+
 test("the chat tab's text size: a number in range, else the default", () => {
   assert.equal(textScale(1.5), 1.5);
   assert.equal(textScale(9), 2);
