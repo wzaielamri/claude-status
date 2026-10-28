@@ -41,6 +41,7 @@ import {
 import type { ChatRef, FoundChat, FoundMemory, FoundPlan, FoundProject, Group, PlanItem, Project, Session } from "./shared/types";
 import { attachClients, localAncestors, type Place, type Terminals } from "./terminals";
 import type { PlanReview } from "./planReview";
+import { windowHostFile } from "./remoteHost";
 
 const CHAT_LINK = "vscode://anthropic.claude-code/open?session=";
 
@@ -507,8 +508,8 @@ export class Actions {
       if (error) this.fail(`Couldn't open the plan: ${error}`);
       return;
     }
-    // (a file of this computer, in a Remote-SSH window: through vscode-local)
-    const uri = !host && vscode.env.remoteName ? vscode.Uri.from({ scheme: "vscode-local", path: plan.path }) : vscode.Uri.file(plan.path);
+    // (a file of the window's host, or of this computer: file:, in any window)
+    const uri = (host && windowHostFile(vscode, plan.path)) || vscode.Uri.file(plan.path);
     if (edit) {
       try {
         await vscode.window.showTextDocument(uri, { preview: false });
@@ -529,8 +530,8 @@ export class Actions {
   // else it goes to the clipboard and the chat comes up, to paste it there.
   async sendPlanFeedback(plan: { slug: string; path: string; profileDir: string; chatId?: string | null; title?: string }): Promise<void> {
     if (this.demoOnly()) return;
-    const uri = vscode.env.remoteName ? vscode.Uri.from({ scheme: "vscode-local", path: plan.path }) : vscode.Uri.file(plan.path);
-    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+    const uri = vscode.Uri.file(plan.path);
+    const doc =vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
     if (doc?.isDirty) await doc.save(); // (what you changed and didn't save yet counts)
     const comments = (await this.planReview?.comments(plan.path)) ?? [];
     const answer = await this.backend.action("jump.py", [
@@ -574,7 +575,7 @@ export class Actions {
     if (this.demoOnly()) return;
     if (host && host !== this.dash.currentHost) return this.fail(`That memory is on ${host}: open it from a VS Code window connected to ${host}.`);
     if (!/(\/projects\/[^/]+\/memory\/[^/]+\.md|\/CLAUDE\.md)$/.test(memory.path)) return this.fail("That isn't one of Claude's memories.");
-    const uri = !host && vscode.env.remoteName ? vscode.Uri.from({ scheme: "vscode-local", path: memory.path }) : vscode.Uri.file(memory.path);
+    const uri = (host && windowHostFile(vscode, memory.path)) || vscode.Uri.file(memory.path);
     if (!edit) {
       const error = await showMarkdown(uri);
       if (error) this.fail(`Couldn't open the memory: ${error}`);

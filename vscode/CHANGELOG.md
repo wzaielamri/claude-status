@@ -168,6 +168,12 @@
   something it started still held its output, the view waited until that
   ended, then said the check took too long (and no other check of this
   computer started meanwhile).
+- **Plans, memories and subagent runs in a Remote-SSH window:** they
+  opened through an address the window doesn't serve, so *Couldn't open
+  the plan* (or the memory, or the subagent's run) came instead, a plan of
+  this computer took no comments there, and the window host's own plans
+  and memories opened this computer's file of the same path. Each opens
+  from where it is now.
 
 ## 1.16.1
 

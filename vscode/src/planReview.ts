@@ -29,8 +29,8 @@ export interface PlanComment {
 // {slug, file} of a plan of this computer, <config>/plans/<slug>.md (a Claude
 // config folder: ~/.claude*, or one of configDirs), or null
 export function planFileOf(uri: vscode.Uri, configDirs: string[] = [], home = os.homedir()): { slug: string; file: string } | null {
-  const local = vscode.env.remoteName ? uri.scheme === "vscode-local" : uri.scheme === "file";
-  if (!local) return null;
+  // (file: in a Remote-SSH window too: this extension runs on this computer)
+  if (uri.scheme !== "file") return null;
   return planPath(uri.path, configDirs, home);
 }
 

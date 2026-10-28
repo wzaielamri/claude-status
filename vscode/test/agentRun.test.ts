@@ -11,6 +11,8 @@ import * as vscode from "vscode";
 import { agentRunArgs, agentRunsRoot, isAgentRunFile, openAgentRunFile } from "../src/agentRun";
 import { Backend } from "../src/backend";
 import { cacheDir } from "../src/config";
+import { planFileOf } from "../src/planReview";
+import { windowHostFile } from "../src/remoteHost";
 
 test("the run is saved by jump.py here and by remote.py for an SSH host", () => {
   const chat = { sessionId: "s1", chatId: "c1", profileDir: ".claude-work" };
@@ -40,6 +42,34 @@ test("only files in the cache's agent-runs folder are opened", () => {
     assert.equal(isAgentRunFile("Find the parser (a1).md", root), false);
   } finally {
     fs.rmSync(cache, { recursive: true });
+  }
+});
+
+// The extension runs on this computer in a Remote-SSH window too, where VS
+// Code maps no file: URI to vscode-local (it does so only for extensions
+// running on the host): this computer's files are file: URIs, and the
+// window's host's are vscode-remote ones
+test("in a Remote-SSH window, this computer's files are file: URIs, the window's host's vscode-remote ones", async () => {
+  const stub = vscode as unknown as typeof import("./vscode-stub");
+  const calls: unknown[][] = [];
+  const commands = vscode.commands as unknown as { executeCommand: (...a: unknown[]) => Promise<unknown> };
+  const realCommand = commands.executeCommand;
+  const workspace = stub.workspace as unknown as { workspaceFolders: unknown };
+  stub.env.remoteName = "ssh-remote";
+  try {
+    commands.executeCommand = async (...a: unknown[]) => void calls.push(a);
+    assert.equal(await openAgentRunFile("/c/agent-runs/run.md"), "");
+    assert.equal((calls[0][1] as vscode.Uri).scheme, "file");
+    const plan = vscode.Uri.file(path.join(os.homedir(), ".claude", "plans", "calm-red-owl.md"));
+    assert.equal(planFileOf(plan)?.slug, "calm-red-owl", "a plan of this computer takes comments");
+    assert.equal(planFileOf(vscode.Uri.from({ scheme: "vscode-local", path: plan.path })), null);
+    workspace.workspaceFolders = [{ uri: vscode.Uri.from({ scheme: "vscode-remote", authority: "ssh-remote+lab", path: "/home/me/app" }) }];
+    const there = windowHostFile(vscode, "/home/me/.claude/plans/p.md")!;
+    assert.deepEqual([there.scheme, there.authority, there.path], ["vscode-remote", "ssh-remote+lab", "/home/me/.claude/plans/p.md"]);
+  } finally {
+    commands.executeCommand = realCommand;
+    stub.env.remoteName = undefined;
+    workspace.workspaceFolders = undefined;
   }
 });
 

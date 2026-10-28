@@ -56,8 +56,9 @@ export function markdownLinkFile(
 // Opens it in the Markdown preview (as text where that's missing); the error
 // to report, or "" when it opened
 export async function openAgentRunFile(file: string): Promise<string> {
-  // a file of this computer: in a Remote-SSH window, through vscode-local
-  return showMarkdown(vscode.env.remoteName ? vscode.Uri.from({ scheme: "vscode-local", path: file }) : vscode.Uri.file(file));
+  // a file of this computer: file:, in a Remote-SSH window too (this
+  // extension runs here, where VS Code maps no file: to vscode-local)
+  return showMarkdown(vscode.Uri.file(file));
 }
 
 // A Markdown file in the preview (its Open Source button edits it), else as

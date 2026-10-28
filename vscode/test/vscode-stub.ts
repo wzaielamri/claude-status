@@ -213,9 +213,12 @@ export class MarkdownString {
 }
 
 export class Uri {
-  private constructor(public scheme: string, public path: string) {}
+  private constructor(public scheme: string, public path: string, public authority = "") {}
   static file(p: string) {
     return new Uri("file", p);
+  }
+  static from(c: { scheme: string; authority?: string; path: string }) {
+    return new Uri(c.scheme, c.path, c.authority ?? "");
   }
   static parse(s: string) {
     return new Uri(s.split(":")[0], s);

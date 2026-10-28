@@ -72,3 +72,11 @@ export function currentRemoteAuthority(vscode: typeof import("vscode")): string 
   for (const uri of uris) if (uri.scheme === "vscode-remote" && hostFromAuthority(uri.authority)) return uri.authority;
   return undefined;
 }
+
+// A file of the host this window is connected to, as the window names it.
+// (VS Code maps file: to and from vscode-local only for extensions running
+// on the host: to this one, file: is a file of this computer.)
+export function windowHostFile(vscode: typeof import("vscode"), file: string): import("vscode").Uri | undefined {
+  const authority = currentRemoteAuthority(vscode);
+  return authority ? vscode.Uri.from({ scheme: "vscode-remote", authority, path: file }) : undefined;
+}
