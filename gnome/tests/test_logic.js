@@ -33,7 +33,11 @@ const T = 1792060000000;   // a real time (ms): alerts are limited per minute
 
 test('counts and overall state', () => {
     const groups = [group([session('a', 'waiting'), session('b', 'working'), session('c', 'done', {pid: null})])];
-    eq(L.counts(groups), {waiting: 1, working: 1, idle: 0, done: 1});
+    eq(L.counts(groups), {waiting: 1, working: 1, idle: 0, done: 1, limit: 0});
+    // a chat a usage limit stopped waits for the limit, not for you
+    const limited = session('d', 'idle', {stopped: {kind: 'limit', over: false}});
+    eq(L.counts([group([limited, session('e', 'idle', {stopped: {kind: 'limit', over: true}})])]),
+        {waiting: 0, working: 0, idle: 1, done: 0, limit: 1});
     eq(L.overall(groups), 'waiting');
     eq(L.overall([group([session('c', 'done', {pid: null})])]), 'none', 'finished records only');
     eq(L.overall([group([session('c', 'done')])]), 'idle', 'finished but its process runs');
@@ -55,7 +59,10 @@ test('headline and summary', () => {
     eq(L.headline({}, '', {waiting: 2, working: 1, idle: 0, done: 0}), '2 chats need you');
     eq(L.headline({}, '', {waiting: 0, working: 1, idle: 0, done: 0}), '1 chat working');
     eq(L.headline({}, '', {waiting: 0, working: 0, idle: 0, done: 0}), 'All quiet');
+    eq(L.headline({}, '', {waiting: 0, working: 0, idle: 0, done: 1, limit: 1}), '1 chat waits for its usage limit');
+    eq(L.headline({}, '', {waiting: 0, working: 0, idle: 0, done: 0, limit: 2}), '2 chats wait for their usage limit');
     eq(L.summaryText({waiting: 1, working: 2, idle: 0, done: 3}), '1 needs input · 2 working · 3 done');
+    eq(L.summaryText({waiting: 0, working: 0, idle: 1, done: 1, limit: 2}), '1 idle · 2 at the usage limit · 1 done');
     eq(L.summaryText({waiting: 0, working: 0, idle: 0, done: 0}), 'No sessions running');
 });
 

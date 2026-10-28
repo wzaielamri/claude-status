@@ -19,11 +19,15 @@ export function stopOf(s) {
     return (s.state === 'idle' || s.state === 'done') && s.stopped && !s.stopped.over ? s.stopped.kind : '';
 }
 
+// (a chat a usage limit stopped waits for the limit, not for you: "limit",
+// whether a process still has it open or not)
 export function counts(groups) {
-    const c = {waiting: 0, working: 0, idle: 0, done: 0};
+    const c = {waiting: 0, working: 0, idle: 0, done: 0, limit: 0};
     for (const g of groups) {
-        for (const s of g.sessions)
-            c[s.state] = (c[s.state] || 0) + 1;
+        for (const s of g.sessions) {
+            const state = stopOf(s) === 'limit' ? 'limit' : s.state;
+            c[state] = (c[state] || 0) + 1;
+        }
     }
     return c;
 }
@@ -74,6 +78,8 @@ export function headline(status, errorText, c) {
         return plural(c.working, '%1 chat working', '%1 chats working');
     if (c.idle)
         return plural(c.idle, 'Your turn in %1 chat', 'Your turn in %1 chats');   // Claude finished its reply
+    if (c.limit)
+        return plural(c.limit, '%1 chat waits for its usage limit', '%1 chats wait for their usage limit');
     if (c.done)
         return plural(c.done, '%1 finished chat to look at', '%1 finished chats to look at');
     return 'All quiet';
@@ -87,6 +93,8 @@ export function summaryText(c) {
         parts.push(fmt('%1 working', c.working));
     if (c.idle)
         parts.push(fmt('%1 idle', c.idle));
+    if (c.limit)
+        parts.push(fmt('%1 at the usage limit', c.limit));
     if (c.done)
         parts.push(fmt('%1 done', c.done));
     return parts.length ? parts.join(' · ') : 'No sessions running';

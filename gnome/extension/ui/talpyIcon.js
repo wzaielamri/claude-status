@@ -18,7 +18,15 @@ class ClaudeTalpyIcon extends St.DrawingArea {
         this._timer = 0;
         this._colorClass = '';
         this._mode = 'none';
+        this._moving = true;
         this.connect('destroy', () => this._stop());
+    }
+
+    // false: holds still (the popup's own icon while the popup is closed)
+    setMoving(moving) {
+        this._moving = moving;
+        this._sync();
+        this.queue_repaint();
     }
 
     // colorClass: claude-fg-<colorClass>; mode: the dashboard's state (waiting working idle none)
@@ -30,16 +38,21 @@ class ClaudeTalpyIcon extends St.DrawingArea {
             this.add_style_class_name(`claude-fg-${colorClass}`);
         }
         this._mode = mode;
-        // a few frames a second, so an icon that moves for hours stays cheap
-        if (glyphMoves(mode) && !this._timer) {
+        this._sync();
+        this.queue_repaint();
+    }
+
+    // a few frames a second, so an icon that moves for hours stays cheap
+    _sync() {
+        const moves = this._moving && glyphMoves(this._mode);
+        if (moves && !this._timer) {
             this._timer = GLib.timeout_add(GLib.PRIORITY_LOW, 80, () => {
                 this.queue_repaint();
                 return GLib.SOURCE_CONTINUE;
             });
-        } else if (!glyphMoves(mode)) {
+        } else if (!moves) {
             this._stop();
         }
-        this.queue_repaint();
     }
 
     _stop() {

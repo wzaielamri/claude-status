@@ -764,6 +764,11 @@ class Stage {
         if (this.gone)
             return;
         const mood = this.pets.mood;
+        // (most checks change none of it: then there's nothing to do)
+        const shown = JSON.stringify([headline, counts, !!status, mood]);
+        if (shown === this._heroDrawn)
+            return;
+        this._heroDrawn = shown;
         this.headline.child.text = headline;
         if (mood === 'needs')
             this.headline.add_style_class_name('claude-fg-waiting');
@@ -772,7 +777,8 @@ class Stage {
         this.chips.destroy_all_children();
         if (status) {
             const chips = [['waiting', counts.waiting, counts.waiting === 1 ? '%1 needs input' : '%1 need input'],
-                ['working', counts.working, '%1 working'], ['ok', counts.idle, '%1 idle'], ['ok', counts.done, '%1 done']]
+                ['working', counts.working, '%1 working'], ['ok', counts.idle, '%1 idle'],
+                ['bad', counts.limit, '%1 at the usage limit'], ['ok', counts.done, '%1 done']]
                 .filter(c => c[1] > 0);
             for (const [cls, n, text] of chips) {
                 const chip = box('claude-chip');
@@ -927,6 +933,7 @@ export class Pets {
         this.hero.actor.insert_child_below(talpy.actor, this.hero.bubble);
         talpy.sync();
         this._heroShown = null;
+        this._active = false;   // the popup shows the chats (setActive)
     }
 
     get settings() {
@@ -1005,6 +1012,7 @@ export class Pets {
         if (shown !== this._heroShown) {
             this._heroShown = shown;
             ctx._heroBin.child = shown ? this.hero.actor : null;
+            this.hero.setLive(this._active && shown);   // (hidden: it holds still)
         }
         if (shown)
             this.hero.updateHero(L.headline(ctx._status, ctx._errorText, counts), counts, ctx._status);
@@ -1017,7 +1025,8 @@ export class Pets {
     }
 
     setActive(open) {
-        this.hero.setLive(open);
+        this._active = open;
+        this.hero.setLive(open && this.heroShown);
         for (const stage of this._stages.values())
             stage.setLive(open);
     }

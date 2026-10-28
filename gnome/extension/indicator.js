@@ -917,6 +917,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         // Header: the tabs, the summary, SSH hosts, refresh
         const header = box('claude-header', {x_expand: true});
         this._headerSpark = new TalpyIcon('claude-spark claude-spark-small');
+        this._headerSpark.setMoving(false);   // (moves while the popup shows)
         header.add_child(this._headerSpark);
         // (the title and the tabs keep their whole names: the summary gives way)
         const whole = actor => {
@@ -995,6 +996,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
                 this.ui.openMenu = null;
                 this.ui.stopConfirm = '';
             }
+            this._headerSpark.setMoving(open);
             this._pets.setActive(open && this.ui.tab === 'chats');
             this._weekTimer();
             this._adjustPollTimer();

@@ -58,6 +58,8 @@
 - **GNOME shows a chat a usage limit stopped:** it read *Idle · 5m* with a green dot, like a healthy chat. It reads *Limit · resets in 2h 3m* (or *Login expired*) with a red dot now, as in Plasma and VS Code.
 - **Failed subagents are called failed:** the subagents tag's tooltip counted them as stopped, while the tree right under it says *failed* (Plasma and GNOME).
 - **GNOME checks as often as the others while nothing runs:** its *…while nothing runs* setting started at 10 seconds, where Plasma and VS Code start at 20; it starts at 20 now (a value you set yourself stays).
+- **GNOME's hero says when chats wait for their usage limit:** a chat a usage limit stopped counted as idle or done there, so the hero said *Your turn in 1 chat* (or *1 finished chat to look at*) though it couldn't go on before the reset. It says *1 chat waits for its usage limit* now, with a red *1 at the usage limit* among the counts and in the header's summary, as in Plasma and VS Code.
+- **GNOME rests while the popup is closed:** the little Talpy in the popup's header went on moving (a wakeup 12 times a second) after the popup closed, for as long as it stayed closed; with *Show Talpy, the pet* off the hidden hero still moved, reacted and talked while the popup was open; and every check rebuilt the hero's counts even when nothing had changed. All of them hold still now when nobody can see them.
 
 ## 1.16.1 (2026-10-27)
 
