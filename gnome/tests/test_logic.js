@@ -405,6 +405,11 @@ test('subagent details', () => {
     const a = {id: 'a1', type: 'Explore', description: 'Find the parser', status: 'running', activity: 'Grep: def parse',
         task: 'Find it', steps: ['Read: a.py', 'Grep: def parse'], report: '', toolCalls: 12, tokens: 45210};
     eq(L.agentKey('lab|.claude-work/s1/live', a), 'lab|.claude-work/s1/live|a1');
+    // a row's open details stay open when its chat changes kind (a background session ends: live → job)
+    const live = {key: '.claude-work/s1/live', profileDir: '.claude-work', sessionId: 's1', chatId: 'c1'};
+    eq(L.rowKey(live, 'lab'), L.rowKey({...live, key: '.claude-work/s1/job'}, 'lab'));
+    eq(L.rowKey(live, 'lab'), 'lab|.claude-work/c1');
+    eq(L.rowKey({...live, chatId: null}, ''), '.claude-work/s1');
     eq(L.agentSummaryText(a), '12 tool calls · 45.2k tokens');
     eq(L.agentSummaryText({toolCalls: 1, tokens: null}), '1 tool call');
     eq(L.agentSummaryText({toolCalls: null, tokens: 0}), '', 'nothing known');

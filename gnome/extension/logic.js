@@ -845,6 +845,12 @@ export function changesTooltip(changes, remoteHost) {
 
 // ---------------------------------------------------------------- subagents
 
+// A row's popup state (details, subagents, stop asked) is kept by its chat,
+// not its key: a background session that ends goes from live to job
+export function rowKey(s, remoteHost) {
+    return `${remoteHost ? `${remoteHost}|` : ''}${s.profileDir}/${s.chatId || s.sessionId}`;
+}
+
 // Popup state of one subagent (unfolded or not): by its row's key and its id
 export function agentKey(rowKey, agent) {
     return `${rowKey}|${agent.id}`;

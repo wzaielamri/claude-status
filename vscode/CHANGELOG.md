@@ -109,6 +109,14 @@
   with the backslash showing; a code block under a numbered step was shown
   and copied with the step's indentation on every line. They show and copy
   as written now, and a bare `https://` address is a link.
+- **What you opened on a chat stays open when its session ends:** when a
+  background session finished, its row folded the details or the subagents
+  you had open, and faded in as if it were a new chat. They're kept by the
+  chat now.
+- **Go on at … says the day:** a weekly limit that resets on another day
+  read *Go on at 09:01*, as if it were today. The button, its tooltips, a
+  recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or
+  *Fri 30 Oct 09:01* now.
 
 ## 1.16.1
 

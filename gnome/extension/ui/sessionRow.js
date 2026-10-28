@@ -14,7 +14,7 @@ import {box, column, dot, iconButton, label, link, meter, nameLine, paragraph, t
 export function buildSessionRow(ctx, session, {showProfile = false, remoteHost = ''} = {}) {
     const s = session;
     const tips = ctx.tips;
-    const rowKey = (remoteHost ? `${remoteHost}|` : '') + (s.key || s.sessionId);
+    const rowKey = L.rowKey(s, remoteHost);
     // A background session (claude stop), or a chat with a process of its own
     // (its claude quits; one in tmux can be interrupted instead: logic.js canEnd)
     const canEnd = L.canEnd(s);

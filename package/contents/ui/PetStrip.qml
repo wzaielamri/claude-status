@@ -370,27 +370,28 @@ Item {
             spacing: Kirigami.Units.largeSpacing
             visible: strip.hero && root.status !== null
 
+            // (a fixed model: a poll changes the counts' text, not the rows)
             Repeater {
-                model: !strip.hero ? [] : [
-                    { state: "waiting", n: root.counts.waiting, text: i18np("%1 needs input", "%1 need input", root.counts.waiting) },
-                    { state: "working", n: root.counts.working, text: i18n("%1 working", root.counts.working) },
-                    { state: "idle", n: root.counts.idle, text: i18n("%1 idle", root.counts.idle) },
-                    { state: "limit", n: root.counts.limit, text: i18n("%1 at the usage limit", root.counts.limit) },
-                    { state: "done", n: root.counts.done, text: i18n("%1 done", root.counts.done) }
-                ].filter(c => c.n > 0)
+                model: strip.hero ? ["waiting", "working", "idle", "limit", "done"] : []
                 delegate: Row {
-                    required property var modelData
+                    required property string modelData
+                    readonly property int n: root.counts[modelData] || 0
+                    visible: n > 0
                     spacing: Kirigami.Units.smallSpacing
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.round(strip.gu * 0.45)
                         height: width
                         radius: width / 2
-                        color: root.stateColor(modelData.state)
+                        color: root.stateColor(modelData)
                     }
                     PlasmaComponents3.Label {
                         textFormat: Text.PlainText
-                        text: modelData.text
+                        text: modelData === "waiting" ? i18np("%1 needs input", "%1 need input", n)
+                            : modelData === "working" ? i18n("%1 working", n)
+                            : modelData === "idle" ? i18n("%1 idle", n)
+                            : modelData === "limit" ? i18n("%1 at the usage limit", n)
+                            : i18n("%1 done", n)
                         font: Kirigami.Theme.smallFont
                         opacity: 0.85
                     }

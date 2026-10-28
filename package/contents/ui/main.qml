@@ -690,6 +690,13 @@ PlasmoidItem {
         return parts.join(" · ")
     }
 
+    // A row's key for what's open in it (details, subagents, a stop asked) and
+    // where it was drawn: its chat, not session.key, which goes from live to
+    // job when a background session ends
+    function rowKeyOf(s, host) {
+        return (host ? host + "|" : "") + (s.profileDir || "") + "/" + (s.chatId || s.sessionId || "")
+    }
+
     function togglePeek(rowKey) {
         const next = Object.assign({}, expandedPeek)
         next[rowKey] = !next[rowKey]
@@ -2821,7 +2828,7 @@ PlasmoidItem {
         placer.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --place-window " + shellQuote(win.title)
                              + " " + geometry.join(",") + " # " + Date.now())
         const chat = root.paneChat || {}
-        const spot = root.rowSpots[(chat.host ? chat.host + "|" : "") + (chat.key || "")]
+        const spot = root.rowSpots[root.rowKeyOf(chat, chat.host)]
         const fromY = spot !== undefined && root.rowSpace ? root.rowSpace.mapToGlobal(0, spot).y + Kirigami.Units.gridUnit
                                                           : p.y + item.height / 2
         win.grow(x > p.x, fromY - geometry[1])

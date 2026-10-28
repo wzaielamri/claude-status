@@ -45,6 +45,9 @@
 - **The chat pane's text size covers what Claude asks and the Review tab:** with the pane's text larger (*A+*, Ctrl+wheel; 115 % by default), a permission prompt, a plan, Claude's questions and the Review tab's files and commit message stayed at the desktop's size, half the chat's at 200 %. They follow it now. A long changed line in a diff wraps under its code (its second line started about two characters further right).
 - **Folder names in the new-chat box show as they are:** a folder whose name looks like markup (`<b>x</b>`, `&amp;`) was drawn formatted.
 - **Lists and web addresses in a VS Code chat tab look as in the widget's pane:** a numbered list with bullets under a step numbered the bullets too, and the next step got a later number (*1. Step one, 2. detail, 3. detail, 4. Step two*); the bullets are a list of their own under their step now. A bare `https://` address is a link there too.
+- **What you opened on a chat stays open when its session ends:** when a background session finished, its row folded the details, the subagents or the stop question you had open, and faded in as if it were a new chat. They're kept by the chat now (Plasma, GNOME and VS Code).
+- **Go on at … says the day:** a weekly limit that resets on another day read *Go on at 09:01*, as if it were today. The button, its tooltips, a recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or *Fri 30 Oct 09:01* now (Plasma and VS Code).
+- **The hero's session counts stay put:** their lines were made anew at every check, even when no count had changed; only their numbers change now.
 
 ## 1.16.1 (2026-10-27)
 

@@ -38,8 +38,9 @@ RowLayout {
         : row.canEnd
         ? i18n("Asks first. The current step is cut off, Claude quits and its terminal stays open; the chat is kept and shows under Recent chats.")
         : i18n("Asks first. The conversation is kept; claude attach resumes it.")
-    // Kept in root by row key: rows are refreshed with new data every poll.
-    readonly property string rowKey: (remoteHost ? remoteHost + "|" : "") + session.key
+    // Kept in root by row key: rows are refreshed with new data every poll
+    // (by the chat: a background session that ends stays open where it was).
+    readonly property string rowKey: root.rowKeyOf(session, remoteHost)
 
     // Motion: the row is the same delegate whichever chat it shows, so when a
     // chat moves in the list (or what's above it grows) it slides from where
@@ -690,8 +691,8 @@ RowLayout {
                 PlasmaComponents3.ToolButton {
                     visible: row.goOnAt > 0 || row.goingOn !== null
                     icon.name: row.goingOn ? "checkmark" : "chronometer"
-                    text: row.goingOn ? i18n("Goes on at %1", root.clockText(row.goingOn.startAt))
-                                      : i18n("Go on at %1", root.clockText(row.goOnAt))
+                    text: row.goingOn ? i18n("Goes on at %1", root.startText(row.goingOn.startAt))
+                                      : i18n("Go on at %1", root.startText(row.goOnAt))
                     font: Kirigami.Theme.smallFont
                     Layout.preferredHeight: stepLabel.implicitHeight + Kirigami.Units.smallSpacing
                     onClicked: {
@@ -704,9 +705,9 @@ RowLayout {
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
                         anchors.fill: parent
-                        mainText: row.goingOn ? i18n("Goes on by itself at %1", root.clockText(row.goingOn.startAt))
+                        mainText: row.goingOn ? i18n("Goes on by itself at %1", root.startText(row.goingOn.startAt))
                                               : i18n("Go on once the limit resets")
-                        subText: (row.goingOn ? "" : i18n("At %1, a minute after the limit resets, the chat goes on in the background, telling Claude that the limit has reset.", root.clockText(row.goOnAt)) + " ")
+                        subText: (row.goingOn ? "" : i18n("At %1, a minute after the limit resets, the chat goes on in the background, telling Claude that the limit has reset.", root.startText(row.goOnAt)) + " ")
                                  + (row.session.pid === null || row.session.pid === undefined ? ""
                                     : row.session.kind === "bg" ? i18n("This background session is stopped first (claude stop).")
                                     : i18n("Claude here quits first (its terminal stays open); open the chat from here to see it.")) + " "
@@ -731,7 +732,7 @@ RowLayout {
                         textFormat: Text.PlainText
                         anchors.fill: parent
                         mainText: i18n("Keep going until it's done")
-                        subText: i18n("At %1, a minute after the limit resets, the chat goes on in the background, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.", root.clockText(row.goOnAt))
+                        subText: i18n("At %1, a minute after the limit resets, the chat goes on in the background, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.", root.startText(row.goOnAt))
                                  + " " + (row.session.pid === null || row.session.pid === undefined ? ""
                                           : row.session.kind === "bg" ? i18n("This background session is stopped first (claude stop).")
                                           : i18n("Claude here quits first (its terminal stays open); open the chat from here to see it."))

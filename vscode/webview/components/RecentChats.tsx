@@ -1,6 +1,5 @@
 import {
   ago,
-  clockText,
   goOnAt,
   claudeCodeHere,
   claudeCodeReopenHint,
@@ -10,6 +9,7 @@ import {
   machineStatus,
   queuedChat,
   reopensInClaudeCode,
+  startText,
   stopText,
   terminalReopenHint,
 } from "../../src/shared/model";
@@ -147,16 +147,16 @@ export function RecentChats({ group }: { group: Group }) {
         ) : null}
         {goingOn ? (
           <Tag
-            text={`⏱ ${clockText(goingOn.startAt)}`}
+            text={`⏱ ${startText(goingOn.startAt, view.now)}`}
             active
-            title={`Goes on by itself at ${clockText(goingOn.startAt)}, in the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).\n\nClick to cancel it.`}
+            title={`Goes on by itself at ${startText(goingOn.startAt, view.now)}, in the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).\n\nClick to cancel it.`}
             onClick={() => post({ type: "unqueue", id: goingOn.id })}
           />
         ) : c.stopped?.kind === "limit" && !c.stopped.over ? (
           <Tag
             text="limit"
             warning
-            title={`A usage limit stopped it\n${c.stopped.text}` + (goOn ? `\n\nClick to have it go on by itself in the background at ${clockText(goOn)}, a minute after the limit resets.${later}` : "")}
+            title={`A usage limit stopped it\n${c.stopped.text}` + (goOn ? `\n\nClick to have it go on by itself in the background at ${startText(goOn, view.now)}, a minute after the limit resets.${later}` : "")}
             onClick={goOn ? () => post({ type: "queueContinue", chat }) : undefined}
           />
         ) : null}
@@ -171,7 +171,7 @@ export function RecentChats({ group }: { group: Group }) {
         ) : canKeep ? (
           <Tag
             text="↻"
-            title={`Keep going until it's done\nClick to have it go on by itself in the background at ${clockText(goOn)}, a minute after the limit resets, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.`}
+            title={`Keep going until it's done\nClick to have it go on by itself in the background at ${startText(goOn, view.now)}, a minute after the limit resets, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.`}
             onClick={() => post({ type: "queueContinue", chat, keep: true })}
           />
         ) : null}

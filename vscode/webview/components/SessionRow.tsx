@@ -4,7 +4,6 @@ import {
   changesTitle,
   claudeCodeHere,
   cliInstalled,
-  clockText,
   goOnAt,
   handoverTarget,
   hasPeek,
@@ -23,6 +22,7 @@ import {
   reopensInClaudeCode,
   resetAtText,
   shareAccounts,
+  startText,
   stateText,
   tasksTitle,
   usageLevel,
@@ -108,7 +108,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
   const stopped = s.stopped && !s.stopped.over ? " stopped" : s.stopped ? " freed" : "";
 
   return (
-    <div class={`session ${stateClass(s.state, s.reason)}${stopped}`} data-flip={s.key}>
+    <div class={`session ${stateClass(s.state, s.reason)}${stopped}`} data-flip={rowKey}>
       {/* A bar in the color of the chat's pet, to spot which pet is which */}
       <span class="pet-bar" style={{ background: petColor || "transparent" }} aria-hidden="true" />
       <span class="state-dot" aria-hidden="true" />
@@ -290,26 +290,26 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
               <button
                 type="button"
                 class="link"
-                title={`Goes on by itself at ${clockText(goingOn.startAt)}, in the background, telling Claude that the limit has reset.${ending} If it went on before then, nothing happens.\n\nClick to cancel it${kept ? ": then it doesn't keep going either" : ""}.`}
+                title={`Goes on by itself at ${startText(goingOn.startAt, now)}, in the background, telling Claude that the limit has reset.${ending} If it went on before then, nothing happens.\n\nClick to cancel it${kept ? ": then it doesn't keep going either" : ""}.`}
                 onClick={() => post({ type: "unqueue", id: goingOn.id })}
               >
-                ✓ Goes on at {clockText(goingOn.startAt)}
+                ✓ Goes on at {startText(goingOn.startAt, now)}
               </button>
             ) : goOn ? (
               <button
                 type="button"
                 class="link"
-                title={`At ${clockText(goOn)}, a minute after the limit resets, the chat goes on in the background, telling Claude that the limit has reset.${ending} If it went on before then, nothing happens.\n\nThis happens once${host ? "" : ": to have it go on after later limits too, choose Keep going"}.`}
+                title={`At ${startText(goOn, now)}, a minute after the limit resets, the chat goes on in the background, telling Claude that the limit has reset.${ending} If it went on before then, nothing happens.\n\nThis happens once${host ? "" : ": to have it go on after later limits too, choose Keep going"}.`}
                 onClick={() => post({ type: "queueContinue", chat })}
               >
-                ⏱ Go on at {clockText(goOn)}
+                ⏱ Go on at {startText(goOn, now)}
               </button>
             ) : null}
             {goOn && !goingOn && !kept && !host ? (
               <button
                 type="button"
                 class="link"
-                title={`Keep going until it's done: at ${clockText(goOn)}, a minute after the limit resets, the chat goes on in the background, and again after each later limit that stops it, until a turn of it ends by itself.${ending}`}
+                title={`Keep going until it's done: at ${startText(goOn, now)}, a minute after the limit resets, the chat goes on in the background, and again after each later limit that stops it, until a turn of it ends by itself.${ending}`}
                 onClick={() => post({ type: "queueContinue", chat, keep: true })}
               >
                 ↻ Keep going

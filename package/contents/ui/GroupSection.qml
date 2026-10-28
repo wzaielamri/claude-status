@@ -360,7 +360,7 @@ ColumnLayout {
                         subText: queuedLine.what + "\n\n"
                                  + (queuedLine.task.chat
                                     ? i18n("The chat goes on in the background in %1, at %2, telling Claude that the limit has reset. A session that still has it open (in a terminal, or in the background) ends first; if it went on before then, nothing happens.",
-                                           queuedLine.folder, root.clockText(queuedLine.task.startAt))
+                                           queuedLine.folder, root.startText(queuedLine.task.startAt))
                                     : i18n("Starts in the background in %1, at %2.", queuedLine.folder, root.startText(queuedLine.task.startAt)))
                     }
                 }
@@ -631,16 +631,16 @@ ColumnLayout {
                     readonly property var goingOn: root.queuedChat(recentLine.chat.sessionId, section.remoteHost)
                     visible: goingOn !== null
                              || (!!recentLine.chat.stopped && recentLine.chat.stopped.kind === "limit" && !recentLine.chat.stopped.over)
-                    text: goingOn ? i18nc("a chat that goes on by itself at this time", "⏱ %1", root.clockText(goingOn.startAt))
+                    text: goingOn ? i18nc("a chat that goes on by itself at this time", "⏱ %1", root.startText(goingOn.startAt))
                                   : i18n("limit")
                     warning: goingOn === null
                     active: goingOn !== null
                     clickable: goingOn !== null || goOnAt > 0
-                    tooltipTitle: goingOn ? i18n("Goes on by itself at %1", root.clockText(goingOn.startAt))
+                    tooltipTitle: goingOn ? i18n("Goes on by itself at %1", root.startText(goingOn.startAt))
                                           : i18n("A usage limit stopped it")
                     tooltip: (goingOn ? i18n("In the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).")
                               : (recentLine.chat.stopped ? recentLine.chat.stopped.text : "")
-                                + (goOnAt > 0 ? "\n\n" + i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, once.", root.clockText(goOnAt))
+                                + (goOnAt > 0 ? "\n\n" + i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, once.", root.startText(goOnAt))
                                                 + (section.remoteHost ? "" : " " + i18n("↻ beside it: after later limits too, until it's done.")) : ""))
                              + (goingOn ? "\n\n" + i18n("Click to cancel it.") : "")
                     onClicked: {
@@ -663,7 +663,7 @@ ColumnLayout {
                     tooltipTitle: kept ? i18n("Keeps going until it's done") : i18n("Keep going until it's done")
                     tooltip: kept ? root.keptText(kept)
                                   : i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.",
-                                         root.clockText(root.goOnAt(recentLine.chat)))
+                                         root.startText(root.goOnAt(recentLine.chat)))
                     onClicked: {
                         if (kept)
                             root.keepGoing(recentLine.chat, false)

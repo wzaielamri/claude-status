@@ -11,9 +11,10 @@ export function groupKeyOf(g: Group): string {
   return (g.host ? g.host + "/" : "") + g.id;
 }
 
-// A row's key, for UI state kept across polls (open subagent trees)
-export function rowKeyOf(s: Pick<Session, "key">, host?: string): string {
-  return (host ? host + "|" : "") + s.key;
+// A row's key, for UI state kept across polls (open subagent trees): by its
+// chat, not its key, which goes from live to job when a background session ends
+export function rowKeyOf(s: Pick<Session, "key" | "profileDir" | "sessionId" | "chatId">, host?: string): string {
+  return (host ? host + "|" : "") + s.profileDir + "/" + (s.chatId || s.sessionId);
 }
 
 // (built where the extension can rebuild them from its own state: model.ts)
