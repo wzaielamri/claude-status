@@ -388,6 +388,23 @@ Rectangle {
                       + (box.plan && index === 0 && box.plan.cwd ? "  " + i18nc("the folder a plan was made in", "(the plan's)") : "")
                 enabled: box.usable(folderRow.folder)
                 onClicked: root.startChat(box.group, box.remoteHost, folderRow.folder, box.inVscode, box.plan)
+                // (as the delegate's own, but the folder's name as it is: one that looks like markup isn't drawn as it)
+                contentItem: RowLayout {
+                    spacing: folderRow.spacing
+                    Kirigami.Icon {
+                        source: folderRow.icon.name
+                        Layout.preferredWidth: folderRow.icon.width
+                        Layout.preferredHeight: folderRow.icon.height
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: folderRow.text
+                        textFormat: Text.PlainText
+                        font: folderRow.font
+                        color: Kirigami.Theme.textColor
+                        elide: Text.ElideRight
+                    }
+                }
 
                 PlasmaCore.ToolTipArea {
                     textFormat: Text.PlainText

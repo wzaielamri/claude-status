@@ -35,7 +35,13 @@ Rectangle {
     function hex(c) {
         return Qt.rgba(c.r, c.g, c.b, 1).toString()
     }
-    readonly property var codeStyle: Code.palette(dark, hex(Kirigami.Theme.textColor), hex(base), mono, pt)
+    FontMetrics {
+        id: codeFm   // (a character of the code: where a wrapped line goes on, under the code)
+        font.family: diffView.mono
+        font.pointSize: diffView.pt * 0.88
+    }
+    readonly property var codeStyle: Code.palette(dark, hex(Kirigami.Theme.textColor), hex(base), mono, pt,
+                                                  codeFm.font.pointSize && codeFm.advanceWidth("M"))
     property bool shown: false
     onVisibleChanged: if (visible) shown = true
     Component.onCompleted: if (visible) shown = true

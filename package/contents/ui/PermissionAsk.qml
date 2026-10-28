@@ -30,6 +30,10 @@ ColumnLayout {
     readonly property bool asksQuestions: questions.length > 0
     readonly property var plan: permission && permission.plan ? permission.plan : null
     property real planHeight: Kirigami.Units.gridUnit * 9   // (in a row: more in the pane)
+    // Its text size and code font (the pane's, which you can make larger)
+    property real pt: Kirigami.Theme.defaultFont.pointSize
+    property string mono: "monospace"
+    readonly property real smallPt: Kirigami.Theme.smallFont.pointSize * pt / Kirigami.Theme.defaultFont.pointSize
     signal wholePlan()
     spacing: Kirigami.Units.smallSpacing
 
@@ -41,7 +45,7 @@ ColumnLayout {
     }
     readonly property bool dark: Kirigami.Theme.backgroundColor.hslLightness < 0.5
     readonly property var planStyle: ({
-        pt: Kirigami.Theme.defaultFont.pointSize, mono: "monospace", text: hex(Kirigami.Theme.textColor),
+        pt: ask.pt, mono: ask.mono, text: hex(Kirigami.Theme.textColor),
         muted: hex(mix(Kirigami.Theme.textColor, 0.62)), accent: dark ? "#d97757" : "#c15f3c", heading: dark ? "#d97757" : "#c15f3c",
         code: dark ? "#b1b9f9" : "#5769f7", codeBg: hex(mix(Kirigami.Theme.textColor, 0.09)), blockBg: hex(mix(Kirigami.Theme.textColor, 0.05)),
         border: hex(mix(Kirigami.Theme.textColor, 0.16)), link: hex(Kirigami.Theme.linkColor)
@@ -73,6 +77,7 @@ ColumnLayout {
         textFormat: Text.PlainText
         Layout.fillWidth: true
         font.bold: true
+        font.pointSize: ask.pt
         wrapMode: Text.Wrap
         text: !ask.permission ? ""
               : ask.plan ? i18n("Claude has a plan, ready to start:")
@@ -100,8 +105,8 @@ ColumnLayout {
             wrapMode: TextEdit.WrapAnywhere
             color: Kirigami.Theme.textColor
             selectionColor: Kirigami.Theme.focusColor
-            font.family: "monospace"
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
+            font.family: ask.mono
+            font.pointSize: ask.smallPt
         }
     }
     // The plan, rendered (in a row: its start, the pane shows all of it)
@@ -137,7 +142,7 @@ ColumnLayout {
         textFormat: Text.StyledText
         Layout.fillWidth: true
         text: "<a href=\"#\">" + i18n("Read the whole plan") + "</a>"
-        font: Kirigami.Theme.smallFont
+        font.pointSize: ask.smallPt
         onLinkActivated: ask.wholePlan()
     }
     DiffView {
@@ -145,6 +150,8 @@ ColumnLayout {
         Layout.fillWidth: true
         lines: ask.diff
         maxRows: ask.diffLines
+        pt: ask.smallPt / 0.88
+        mono: ask.mono
         path: ask.permission ? ask.permission.file || "" : ""
     }
     QuestionForm {
@@ -156,6 +163,7 @@ ColumnLayout {
         questions: ask.questions
         requestKey: ask.permission ? (ask.permission.request || ask.permission.line) : ""
         compact: ask.compact
+        pt: ask.pt
     }
     RowLayout {
         visible: ask.canAnswer && ask.asksQuestions && !ask.denying
@@ -263,6 +271,7 @@ ColumnLayout {
         PlasmaComponents3.TextField {
             id: noteField
             Layout.fillWidth: true
+            font.pointSize: ask.pt
             placeholderText: ask.plan ? i18n("What should change in the plan? (optional)") : i18n("What should Claude do instead? (optional)")
             onAccepted: denyButton.clicked()
         }
@@ -288,7 +297,7 @@ ColumnLayout {
         visible: !!ask.permission && !ask.canAnswer
         Layout.fillWidth: true
         wrapMode: Text.Wrap
-        font: Kirigami.Theme.smallFont
+        font.pointSize: ask.smallPt
         opacity: 0.7
         text: ask.plan
               ? i18n("Approve it in the chat, or turn on \"Answer permission prompts from the widget\" in the settings (it takes plans too) to approve it here.")

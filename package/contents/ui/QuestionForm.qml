@@ -14,6 +14,8 @@ ColumnLayout {
     property var questions: []
     property string requestKey: ""   // a new request starts over
     property bool compact: false     // (in a row: descriptions in tooltips)
+    property real pt: Kirigami.Theme.defaultFont.pointSize   // (the pane's text size there)
+    readonly property real smallPt: Kirigami.Theme.smallFont.pointSize * pt / Kirigami.Theme.defaultFont.pointSize
     // index -> {labels: {label: true}, text}; kept here, as the rows come again each poll
     property var chosen: ({})
 
@@ -91,7 +93,7 @@ ColumnLayout {
                 textFormat: Text.PlainText
                 visible: questionItem.question.header !== "" && form.questions.length > 1
                 text: questionItem.question.header
-                font: Kirigami.Theme.smallFont
+                font.pointSize: form.smallPt
                 opacity: 0.7
             }
             PlasmaComponents3.Label {
@@ -100,6 +102,7 @@ ColumnLayout {
                 text: questionItem.question.question + (questionItem.question.multiSelect ? " " + i18n("(choose any)") : "")
                 wrapMode: Text.Wrap
                 font.bold: true
+                font.pointSize: form.pt
             }
             Repeater {
                 model: questionItem.question.options.length
@@ -148,6 +151,7 @@ ColumnLayout {
                             Layout.fillWidth: true
                             text: optionItem.option.label
                             wrapMode: Text.Wrap
+                            font.pointSize: form.pt
                         }
                         PlasmaComponents3.Label {
                             textFormat: Text.PlainText
@@ -155,7 +159,7 @@ ColumnLayout {
                             Layout.fillWidth: true
                             text: optionItem.option.description
                             wrapMode: Text.Wrap
-                            font: Kirigami.Theme.smallFont
+                            font.pointSize: form.smallPt
                             opacity: 0.7
                         }
                     }
@@ -180,6 +184,7 @@ ColumnLayout {
                 id: ownWords
                 Layout.fillWidth: true
                 placeholderText: i18n("Or answer in your own words…")
+                font.pointSize: form.pt
                 onTextEdited: form.setText(questionItem.index, text)
 
                 Connections {   // (an option chosen instead, or a new request: the field follows)

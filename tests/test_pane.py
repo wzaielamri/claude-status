@@ -1545,6 +1545,21 @@ console.log(JSON.stringify({ unified: H.diffHtml(lines, 'a.html', p, 0), folded:
         self.assertIn("… 17 more", r["folded"])
         self.assertNotIn("ctx 10", r["folded"])
 
+    def test_a_wrapped_line_goes_on_under_its_code(self):
+        # (the hanging indent is as wide as what comes before the code: a number of w digits, a space,
+        # the mark and a space (a listing: number and two spaces), in characters of the code's size)
+        r = self.node("""
+const lines = ['@@ -9,2 +9,2 @@', '-a', '+b', ' c'];
+const at = (html) => html.match(/margin-left:(\\d+)px; text-indent:-(\\d+)px/).slice(1).map(Number);
+const guess = H.palette(true, '#eeeeee', '#202020', 'monospace', 11.5);
+const measured = H.palette(true, '#eeeeee', '#202020', 'monospace', 11.5, 7);
+console.log(JSON.stringify({ diff: at(H.diffHtml(lines, 'a.py', guess, 0)), diffMeasured: at(H.diffHtml(lines, 'a.py', measured, 0)),
+    plain: at(H.diffHtml(['@@ @@', '-a', '+b'], '', measured, 0)), listing: at(H.listingHtml(['x', 'y'], 'a.py', measured, 0)) }));""")
+        self.assertEqual(r["diff"], [round(5 * 11.5 * 0.88 * 1.333 * 0.6)] * 2)
+        self.assertEqual(r["diffMeasured"], [35, 35])
+        self.assertEqual(r["plain"], [14, 14])
+        self.assertEqual(r["listing"], [21, 21])
+
 
 class ScreenColorTests(unittest.TestCase):
     def test_colors_and_rows_drawn_in_part(self):

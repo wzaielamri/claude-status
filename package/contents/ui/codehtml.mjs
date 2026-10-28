@@ -27,11 +27,13 @@ function mix(a, b, k) {
 }
 
 // The palette for a theme: text and bg (what the code sits on) as
-// "#rrggbb"; green and red tints over bg, syntax colors as GitHub's
-export function palette(dark, text, bg, mono, pt) {
+// "#rrggbb"; green and red tints over bg, syntax colors as GitHub's.
+// advance: a mono character's width at the code's size (pt × 0.88), in px,
+// as FontMetrics measures it (else about that, at 96 dpi)
+export function palette(dark, text, bg, mono, pt, advance) {
     const green = dark ? "#2ea043" : "#2da44e", red = dark ? "#f85149" : "#cf222e";
     return {
-        mono: mono, pt: pt, text: text, bg: bg,
+        mono: mono, pt: pt, text: text, bg: bg, advance: advance || pt * 0.88 * 1.333 * 0.6,
         muted: mix(bg, text, 0.62), faint: mix(bg, text, 0.38), hunkBg: mix(bg, text, dark ? 0.07 : 0.05),
         addBg: mix(bg, green, dark ? 0.2 : 0.12), addWord: mix(bg, green, dark ? 0.45 : 0.32),
         delBg: mix(bg, red, dark ? 0.2 : 0.1), delWord: mix(bg, red, dark ? 0.45 : 0.27),
@@ -122,8 +124,8 @@ export function diffHtml(lines, path, p, max) {
     const cut = shown(all, max);
     const w = widthOf(cut.rows);
     const numbered = cut.rows.some(r => r.old !== null || r.new !== null);
-    const em = p.pt * 1.333 * 0.6;   // (a mono character's width, about, in px)
-    const lead = (numbered ? w + 2 : 0) + 2;   // characters before the code
+    const em = p.advance;
+    const lead = numbered ? w + 3 : 2;   // characters before the code (number, space, mark, space)
     const state = {};
     let html = "";
     cut.rows.forEach((r, i) => {
@@ -190,7 +192,7 @@ export function splitHtml(lines, path, p, max) {
 function listingLines(lines, path, p) {
     const w = Math.max(1, ...lines.map(l => String(l.no === null ? "" : l.no).length));
     const lang = language(path), st = {};
-    const em = p.pt * 1.333 * 0.6;
+    const em = p.advance;   // (before the code: number and two spaces)
     return lines.map(l => `<p style="margin:0px; margin-left:${Math.round((w + 2) * em)}px; text-indent:-${Math.round((w + 2) * em)}px; white-space:pre-wrap">`
         + `<span style="color:${p.faint}">${number(l.no, w)}</span>&nbsp;&nbsp;${l.no === null ? `<i style="color:${p.muted}">${escape(l.text)}</i>`
                                                                                      : codeSpans(l.text, lang, st, p, null, "")}</p>`).join("");

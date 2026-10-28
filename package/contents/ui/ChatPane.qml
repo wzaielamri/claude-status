@@ -84,7 +84,13 @@ Window {
         border: hex(borderColor), link: hex(surface.Kirigami.Theme.linkColor)
     })
     // Code and changes (codehtml.mjs): a tool call's details
-    readonly property var codeStyle: Code.palette(dark, hex(textColor), mdStyle.blockBg, monoFamily, pt)
+    readonly property var codeStyle: Code.palette(dark, hex(textColor), mdStyle.blockBg, monoFamily, pt,
+                                                  codeFm.font.pointSize && codeFm.advanceWidth("M"))
+    FontMetrics {
+        id: codeFm   // (a character of code: where a wrapped line goes on, under the code)
+        font.family: pane.monoFamily
+        font.pointSize: pane.pt * 0.88
+    }
 
     FontMetrics {
         id: fm
@@ -1546,6 +1552,8 @@ Window {
                         width: parent.width
                         permission: pane.permission
                         busy: pane.answering > 0
+                        pt: pane.pt
+                        mono: pane.monoFamily
                         diffLines: 12
                         planHeight: Kirigami.Units.gridUnit * 1000   // (the box scrolls)
                         onAnswered: (decision, note, answers) => pane.answer(decision, note, answers)
@@ -1992,6 +2000,7 @@ Window {
                         text: pane.reviewLoading ? i18n("Comparing its files with how they were before the chat…")
                                                  : pane.reviewError || i18n("Nothing to review yet")
                         color: pane.reviewError ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
+                        font.pointSize: pane.pt
                         opacity: 0.7
                         wrapMode: Text.Wrap
                     }
@@ -2000,6 +2009,7 @@ Window {
                         Layout.fillWidth: true
                         visible: pane.review !== null && pane.review.files.length === 0
                         text: i18n("No changed files: they're as they were before this chat.")
+                        font.pointSize: pane.pt
                         opacity: 0.7
                         wrapMode: Text.Wrap
                     }
@@ -2016,6 +2026,7 @@ Window {
                             text: pane.review ? i18np("%1 file changed since the chat started", "%1 files changed since the chat started",
                                                      pane.review.files.length) + "  +" + sums[0] + " −" + sums[1] : ""
                             font.bold: true
+                            font.pointSize: pane.pt
                         }
                         TestsBadge {
                             review: pane.row ? pane.row.review : (pane.review ? { tests: pane.review.tests } : null)
@@ -2053,6 +2064,7 @@ Window {
                                 PlasmaComponents3.Label {
                                     textFormat: Text.PlainText
                                     text: fileItem.unfolded ? "▾" : "▸"
+                                    font.pointSize: pane.pt
                                     opacity: 0.6
                                 }
                                 PlasmaComponents3.Label {
@@ -2061,7 +2073,8 @@ Window {
                                     text: fileItem.file.label + (fileItem.file.created ? "  " + i18nc("a file the chat made", "(new)") : "")
                                           + (fileItem.file.deleted ? "  " + i18nc("a file the chat removed", "(removed)") : "")
                                     elide: Text.ElideMiddle
-                                    font.family: "monospace"
+                                    font.family: pane.monoFamily
+                                    font.pointSize: pane.pt
 
                                     MouseArea {
                                         anchors.fill: parent
@@ -2078,21 +2091,23 @@ Window {
                                     visible: fileItem.file.added !== null && fileItem.file.added !== undefined
                                     text: "+" + fileItem.file.added
                                     color: Kirigami.Theme.positiveTextColor
-                                    font.family: "monospace"
+                                    font.family: pane.monoFamily
+                                    font.pointSize: pane.pt
                                 }
                                 PlasmaComponents3.Label {
                                     textFormat: Text.PlainText
                                     visible: fileItem.file.removed !== null && fileItem.file.removed !== undefined
                                     text: "−" + fileItem.file.removed
                                     color: Kirigami.Theme.negativeTextColor
-                                    font.family: "monospace"
+                                    font.family: pane.monoFamily
+                                    font.pointSize: pane.pt
                                 }
                                 PlasmaComponents3.Label {
                                     textFormat: Text.PlainText
                                     visible: !!fileItem.file.binary || !!fileItem.file.unknown
                                     text: fileItem.file.binary ? i18n("binary") : i18n("no earlier version kept")
                                     opacity: 0.6
-                                    font: Kirigami.Theme.smallFont
+                                    font.pointSize: pane.pt * 0.85
                                 }
                                 PlasmaComponents3.ToolButton {
                                     visible: !fileItem.file.unknown
@@ -2124,7 +2139,7 @@ Window {
                                 Layout.leftMargin: Kirigami.Units.gridUnit
                                 textFormat: Text.PlainText
                                 text: i18n("No earlier version was kept, so this is how it is now:")
-                                font: Kirigami.Theme.smallFont
+                                font.pointSize: pane.pt * 0.85
                                 opacity: 0.7
                                 wrapMode: Text.Wrap
                             }
@@ -2158,13 +2173,15 @@ Window {
                                   ? i18n("Commit only these files in %1 (yours that aren't this chat's stay as they are):", pane.review.repos.join(", "))
                                   : i18n("None of these files is in a git repository.")
                             wrapMode: Text.Wrap
+                            font.pointSize: pane.pt
                         }
                         PlasmaComponents3.TextArea {
                             id: commitText
                             Layout.fillWidth: true
                             Layout.preferredHeight: Kirigami.Units.gridUnit * 6
                             wrapMode: TextEdit.Wrap
-                            font.family: "monospace"
+                            font.family: pane.monoFamily
+                            font.pointSize: pane.pt
                             onTextChanged: if (activeFocus) pane.commitEdited = true
                         }
                         RowLayout {

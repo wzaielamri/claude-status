@@ -42,6 +42,8 @@
 - **Plans in the chat pane:** *Read the whole plan* (a plan too long to show) did nothing; it opens the plan's file now. Its buttons come in Claude's own order, as in VS Code: *Approve, accept edits* first (the main one, in bold), then *Approve*, then *Keep planning…*.
 - **Show earlier in a very long chat:** past the 2000th step it stayed and did nothing; a note says only the last 2000 steps are shown there now (Plasma and VS Code).
 - **A minimized chat pane rests:** it went on reading its chat every 1.5 seconds (over ssh for a host's chat); it reads it again when you bring it back. Its *Chat*, *Output* and *Review* tabs are no longer made again on every check, which took the highlight off the one under the mouse and could lose a click.
+- **The chat pane's text size covers what Claude asks and the Review tab:** with the pane's text larger (*A+*, Ctrl+wheel; 115 % by default), a permission prompt, a plan, Claude's questions and the Review tab's files and commit message stayed at the desktop's size, half the chat's at 200 %. They follow it now. A long changed line in a diff wraps under its code (its second line started about two characters further right).
+- **Folder names in the new-chat box show as they are:** a folder whose name looks like markup (`<b>x</b>`, `&amp;`) was drawn formatted.
 - **Lists and web addresses in a VS Code chat tab look as in the widget's pane:** a numbered list with bullets under a step numbered the bullets too, and the next step got a later number (*1. Step one, 2. detail, 3. detail, 4. Step two*); the bullets are a list of their own under their step now. A bare `https://` address is a link there too.
 
 ## 1.16.1 (2026-10-27)
