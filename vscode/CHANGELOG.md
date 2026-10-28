@@ -94,6 +94,11 @@
   for the next), its notification came a check later and without a sound,
   and the same prompt asked again could be told twice. A new prompt is
   told right away now, and only the same one asked again is held back.
+- **Back from Review or Output:** a chat tab showed the chat's beginning
+  and stopped following new steps. It's at its end and follows it again if
+  it was when you left, else where you were.
+- **Show earlier in a very long chat:** past the 2000th step it stayed and
+  did nothing; a note says only the last 2000 steps are shown there now.
 - **Lists in a chat tab:** a numbered list with bullets under a step
   numbered the bullets too, and the next step got a later number (*1. Step
   one, 2. detail, 3. detail, 4. Step two*). The bullets are a list of their

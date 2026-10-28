@@ -31,6 +31,7 @@ export interface Conversation {
   cwd?: string;
   items?: PaneItem[];
   more?: boolean; // there are older items
+  capped?: boolean; // there are, but the tab shows no more (LIMIT_MAX)
   stamp?: string;
   mode?: string | null;
 }

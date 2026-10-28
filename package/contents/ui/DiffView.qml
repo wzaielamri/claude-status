@@ -11,7 +11,9 @@ import "codehtml.mjs" as Code
 // words marked, in the file's syntax colors; side by side (before | after)
 // with the setting on and room for it (the button in the corner switches,
 // for every diff). Or a file's lines as they are now (`now`, no earlier
-// version to compare with). One rich text, made only while it shows.
+// version to compare with). One rich text, made once it shows, and kept
+// while hidden (a hidden tab's rows keep their heights, so its list stays where
+// it was).
 Rectangle {
     id: diffView
 
@@ -34,6 +36,9 @@ Rectangle {
         return Qt.rgba(c.r, c.g, c.b, 1).toString()
     }
     readonly property var codeStyle: Code.palette(dark, hex(Kirigami.Theme.textColor), hex(base), mono, pt)
+    property bool shown: false
+    onVisibleChanged: if (visible) shown = true
+    Component.onCompleted: if (visible) shown = true
 
     implicitHeight: code.implicitHeight + Kirigami.Units.smallSpacing * 2
     radius: Kirigami.Units.cornerRadius
@@ -51,7 +56,7 @@ Rectangle {
         color: Kirigami.Theme.textColor
         selectionColor: Kirigami.Theme.focusColor
         selectedTextColor: Kirigami.Theme.highlightedTextColor
-        text: !diffView.visible ? ""
+        text: !diffView.shown ? ""
             : diffView.now.length ? Code.listingHtml(diffView.now, diffView.path, diffView.codeStyle, diffView.maxRows)
             : diffView.sideBySide ? Code.splitHtml(diffView.lines, diffView.path, diffView.codeStyle, diffView.maxRows)
             : Code.diffHtml(diffView.lines, diffView.path, diffView.codeStyle, diffView.maxRows)

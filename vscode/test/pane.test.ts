@@ -239,6 +239,30 @@ test("Claude's Markdown: ~~struck~~ text, and a code block keeps its text for Co
   assert.deepEqual(copied, ["if (a < b) return 1;"]);
 });
 
+test("Show earlier goes up to the most a tab shows, then the tab says only the last steps are shown", async () => {
+  const row = demoState(NOW).status!.groups.flatMap((g) => g.sessions)[0];
+  const limits: string[] = [];
+  const backend = { pane: async (args: string[]) => (limits.push(args[args.indexOf("--limit") + 1]), { ok: true, items: [], more: true, stamp: `s${limits.length}` }) };
+  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { canMoveToClaudeCode: () => false } as never,
+                          { find: async () => undefined } as never, {} as never);
+  const tick = () => new Promise((r) => setTimeout(r, 10));
+  p.open(chatRefOf(row));
+  const panel = recorded.panels.at(-1)!;
+  panel.show(true);
+  panel.receive({ type: "ready" });
+  await tick();
+  for (let i = 0; i < 6; i++) {
+    panel.receive({ type: "more" });
+    await tick();
+  }
+  panel.dispose();
+  const answers = panel.sent.filter((m) => (m as { type: string }).type === "conversation").map((m) => (m as { answer: { more?: boolean; capped?: boolean } }).answer);
+  assert.deepEqual(limits, ["120", "240", "480", "960", "1920", "2000", "2000"]);
+  assert.deepEqual([answers[0].more, answers[0].capped], [true, false]);
+  assert.deepEqual([answers.at(-1)!.more, answers.at(-1)!.capped], [false, true]);
+});
+
 // A Markdown() tree as HTML (tags, their plain props and the text), to compare
 const asHtml = (n: unknown): string => {
   if (n === null || n === undefined || typeof n === "boolean") return "";

@@ -11,7 +11,8 @@ import "markdown.mjs" as Md
 // (answer "hook": through the hook, "keys": in its tmux pane). Claude's
 // questions: each with its options (QuestionForm.qml), then Send answers
 // and Decline (with a note). A chat leaving plan mode: its plan, then
-// Approve, Approve and accept edits, Keep planning (with what to change).
+// Approve and accept edits (the main one), Approve, Keep planning (with what
+// to change), in the order of Claude's own dialog.
 ColumnLayout {
     id: ask
 
@@ -45,7 +46,14 @@ ColumnLayout {
         code: dark ? "#b1b9f9" : "#5769f7", codeBg: hex(mix(Kirigami.Theme.textColor, 0.09)), blockBg: hex(mix(Kirigami.Theme.textColor, 0.05)),
         border: hex(mix(Kirigami.Theme.textColor, 0.16)), link: hex(Kirigami.Theme.linkColor)
     })
-    onPermissionChanged: if (!permission) denying = false
+    // (another prompt, or another chat's: a Deny… begun for the one before is dropped, with its note)
+    readonly property string requestKey: permission ? (permission.request || permission.line || "") : ""
+    onRequestKeyChanged: cancelDeny()
+
+    function cancelDeny() {
+        denying = false
+        noteField.text = ""
+    }
 
     // Deny… (Decline… a question): its note field (optional), ready to type in
     function denyWithNote() {
@@ -124,7 +132,8 @@ ColumnLayout {
         }
     }
     PlasmaComponents3.Label {
-        visible: ask.plan !== null && (planText.implicitHeight > ask.planHeight || ask.plan.cut)
+        // (in the pane: a plan cut short, its file opens)
+        visible: ask.plan !== null && (planText.implicitHeight > ask.planHeight || (ask.plan.cut && !!ask.plan.file))
         textFormat: Text.StyledText
         Layout.fillWidth: true
         text: "<a href=\"#\">" + i18n("Read the whole plan") + "</a>"
@@ -176,6 +185,20 @@ ColumnLayout {
 
         PlasmaComponents3.Button {
             enabled: !ask.busy
+            icon.name: "dialog-ok"
+            text: i18n("Approve, accept edits")
+            font.bold: true
+            onClicked: ask.answered("approve-edits", "", null)
+
+            PlasmaCore.ToolTipArea {
+                textFormat: Text.PlainText
+                anchors.fill: parent
+                mainText: i18n("Approve and accept edits")
+                subText: i18n("It starts on the plan and changes files without asking for the rest of this chat (accept edits mode); commands still ask.")
+            }
+        }
+        PlasmaComponents3.Button {
+            enabled: !ask.busy
             icon.name: "dialog-ok-apply"
             text: i18n("Approve")
             onClicked: ask.answered("approve", "", null)
@@ -185,19 +208,6 @@ ColumnLayout {
                 anchors.fill: parent
                 mainText: i18n("Approve")
                 subText: i18n("It starts on the plan and asks before each change, as \"Yes, manually approve edits\" in its dialog.")
-            }
-        }
-        PlasmaComponents3.Button {
-            enabled: !ask.busy
-            icon.name: "dialog-ok"
-            text: i18n("Approve, accept edits")
-            onClicked: ask.answered("approve-edits", "", null)
-
-            PlasmaCore.ToolTipArea {
-                textFormat: Text.PlainText
-                anchors.fill: parent
-                mainText: i18n("Approve and accept edits")
-                subText: i18n("It starts on the plan and changes files without asking for the rest of this chat (accept edits mode); commands still ask.")
             }
         }
         PlasmaComponents3.Button {
@@ -263,15 +273,14 @@ ColumnLayout {
             text: ask.plan ? i18n("Keep planning") : ask.asksQuestions ? i18n("Decline") : i18n("Deny")
             onClicked: {
                 ask.answered(ask.plan ? "keep" : "deny", noteField.text.trim(), null)
-                noteField.text = ""
-                ask.denying = false
+                ask.cancelDeny()
             }
         }
         PlasmaComponents3.ToolButton {
             icon.name: "edit-undo"
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("Cancel")
-            onClicked: ask.denying = false
+            onClicked: ask.cancelDeny()
         }
     }
     PlasmaComponents3.Label {

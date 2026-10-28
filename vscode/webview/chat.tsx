@@ -86,6 +86,7 @@ function ChatApp() {
   const [chat, setChat] = useState<PaneChat | null>(null);
   const [items, setItems] = useState<PaneItem[]>([]);
   const [more, setMore] = useState(false);
+  const [capped, setCapped] = useState(false); // (Show earlier went as far as a tab goes)
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState<"chat" | "review" | "output">(config.tab);
@@ -337,10 +338,11 @@ function ChatApp() {
         if (!a.ok) setLoadError(a.message || "Can't read this chat");
         else if (!a.unchanged) {
           const el = list.current;
-          follow.current = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+          if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; // (on another tab: as when you left)
           setLoadError("");
           setItems(a.items ?? []);
           setMore(!!a.more);
+          setCapped(!!a.capped);
           setLoaded(true);
         }
       } else if (m.type === "review") {
@@ -409,6 +411,13 @@ function ChatApp() {
     const el = list.current;
     if (el && follow.current) el.scrollTop = el.scrollHeight;
   }, [items, chat?.activity]);
+  // Back on the Chat tab (its list is made again): at its end, following it, if it was when
+  // you left, else where you were
+  const listTop = useRef(0);
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (tab === "chat" && el) el.scrollTop = follow.current ? el.scrollHeight : listTop.current;
+  }, [tab]);
 
   const send = (how: "auto" | "background" | "copy" | "enter", afterTurn: boolean) => {
     if (!text.trim() || sendingNow.current) return;
@@ -501,6 +510,11 @@ function ChatApp() {
           <div
             class="pane-list"
             ref={list}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              listTop.current = el.scrollTop;
+              follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+            }}
             onWheel={(e) => {
               if (!e.ctrlKey) return;
               e.preventDefault();
@@ -511,6 +525,8 @@ function ChatApp() {
               <button type="button" class="btn secondary small pane-more" onClick={() => post({ type: "more" })}>
                 Show earlier
               </button>
+            ) : capped ? (
+              <div class="muted center small">Only its last 2000 steps are shown here.</div>
             ) : null}
             {!loaded || loadError ? <div class={`muted center${loadError ? " bad" : ""}`}>{loadError || "Reading the chat…"}</div> : null}
             {items.map((it, i) => {

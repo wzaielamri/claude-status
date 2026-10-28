@@ -161,6 +161,7 @@ Window {
 
     property string stamp: ""
     property int limit: 120
+    readonly property int limitMax: 2000   // (pane.py's PANE_ITEMS_MAX: Show earlier goes no further)
     property bool more: false
     property bool loaded: false
     property string loadError: ""
@@ -192,10 +193,25 @@ Window {
         commitText.text = ""   // (the chat before's message: this one's comes with its review)
         commitEdited = false
         undoAsk = ""
-        replyBox.text = ""
+        // (the reply you were typing stays with its chat, for when you're back)
+        if (draftKey !== "" && replyBox.text.trim() !== "")
+            drafts[draftKey] = replyBox.text
+        else
+            delete drafts[draftKey]
+        draftKey = (chat.host || "") + "\n" + chatId
+        replyBox.text = drafts[draftKey] || ""
+        delete drafts[draftKey]
+        sending = false
+        sendStale.stop()
         askHow = false
+        askColumn.cancelDeny()
         answering = 0
         answerStale.stop()
+        // (a recording for the chat before stops; words on their way go in its draft)
+        if (dictating === "starting" || dictating === "recording")
+            cancelDictation()
+        offerSetup = false
+        offerModel = false
         outputText = ""
         outputHtml = ""
         outputError = ""
@@ -285,13 +301,15 @@ Window {
     // (the time makes a click run its command again; the conversation, read
     // every 1.5 s, goes without, so its name repeats while nothing changes:
     // every executable DataSource in plasmashell keeps each name, hub/Exec.qml)
-    function run(kind, args) {
+    function run(kind, args, sent) {
         const cmd = "python3 -I " + root.shellQuote(root.codeDir + "pane.py") + " " + args
                     + (kind === "conversation" || kind === "logs" ? "" : " # " + Date.now())   // (read again and again: one name)
-        runs[cmd] = { kind: kind, chat: chatId, host: host, target: row || chat }
+        runs[cmd] = { kind: kind, chat: chatId, host: host, target: row || chat, sent: sent || "", draft: draftKey }
         runner.connectSource(cmd)
     }
-    property var runs: ({})   // command -> {kind, chat: the chat it's for, host, target: its row (openRow)}
+    // command -> {kind, chat: the chat it's for, host, target: its row (openRow), sent: the box's text a message
+    // took, draft: that chat's key in drafts}
+    property var runs: ({})
     // A command whose answer never came (plasmashell lost it) is given up
     // after this, and a read runs again (hub/Exec.qml; a host's goes over ssh)
     readonly property int staleMs: 120000
@@ -316,16 +334,19 @@ Window {
     // moment the chat does a step or changes state, and the timer is only
     // there for what comes without one (a long reply being written)
     readonly property bool followsLive: !host && root.watching && root.liveHook
+    // (minimized, it reads nothing: once it's back, the conversation now)
+    readonly property bool shown: visible && visibility !== Window.Minimized
+    onShownChanged: if (shown && loaded) load()
     Timer {
         interval: pane.host || pane.followsLive ? 5000 : 1500
-        running: pane.visible && pane.chatId !== ""
+        running: pane.shown && pane.chatId !== ""
         repeat: true
         onTriggered: pane.load()
     }
     Connections {
         target: Hub
         function onLive(views) {
-            if (pane.visible && !pane.host && pane.sessionId && views.some(v => v.sessionId === pane.sessionId))
+            if (pane.shown && !pane.host && pane.sessionId && views.some(v => v.sessionId === pane.sessionId))
                 pane.load()
         }
     }
@@ -367,13 +388,19 @@ Window {
     }
     function followEnd() {
         list.contentY = Math.max(list.originY, list.originY + list.contentHeight - list.height)
+        settle.at = list.contentY
     }
     Timer {
         id: settle
         property int left: 0
+        property real at: 0   // (where it put the view: moved up from there, you scrolled, and it stops)
         interval: 80
         repeat: true
         onTriggered: {
+            if (list.moving || list.contentY < at - 1) {
+                stop()
+                return
+            }
             pane.followEnd()
             if (--left <= 0)
                 stop()
@@ -385,7 +412,7 @@ Window {
         settle.restart()
     }
     onChatStateChanged: {
-        if (visible)
+        if (shown)
             load()   // (its turn began or ended, it asks something: the conversation now)
         if (loaded && nearEnd())
             keepEnd()   // (the working line comes or goes)
@@ -490,6 +517,15 @@ Window {
                     infoBad = true
                     infoTimer.restart()
                 }
+                // (it went: out of that chat's draft)
+                if (kind === "send" && result.ok && result.how !== "ask" && !(result.how === "copy" && !result.copied)
+                        && drafts[asked.draft] !== undefined) {
+                    const left = withoutSent(drafts[asked.draft], asked.sent)
+                    if (left.trim())
+                        drafts[asked.draft] = left
+                    else
+                        delete drafts[asked.draft]
+                }
             }
             if (kind !== "conversation" && kind !== "review" && kind !== "complete" && kind !== "logs") {
                 root.refresh()   // (what was done there shows in the popup)
@@ -550,6 +586,10 @@ Window {
         info = result.message || (result.ok ? "" : i18n("That didn't work"))
         infoBad = !result.ok
         infoTimer.restart()
+        if (kind === "send" || kind === "later") {
+            sending = false
+            sendStale.stop()
+        }
         if (kind === "send" && result.ok) {
             if (result.how === "ask") {
                 askHow = true
@@ -565,7 +605,7 @@ Window {
                 }
                 root.openRow(row || chat, host)
             }
-            replyBox.text = ""
+            replyBox.text = withoutSent(replyBox.text, asked.sent)
             askHow = false
         }
         if (kind === "deny" || kind === "answer")
@@ -611,6 +651,7 @@ Window {
     property bool cancelStart: false     // cancelled (or the pane closed) while it started: stopped once it has
     property string dictateId: ""
     property real dictateSince: 0
+    property string dictateFor: ""       // the chat (its draftKey) the words being written down are for
     property var dictateState: null      // dictate.py --status
     property bool offerModel: false      // (asks before it downloads one)
     property bool offerSetup: false      // (asks before it sets dictation up)
@@ -621,6 +662,7 @@ Window {
     function dictate() {
         if (dictating === "recording") {
             dictating = "writing"
+            dictateFor = draftKey
             dictateRun("--stop " + dictateId + " --language " + root.shellQuote(Plasmoid.configuration.dictateLanguage || "auto"))
         } else if (dictating === "") {
             dictating = "starting"
@@ -689,7 +731,11 @@ Window {
                 }
             } else if (source.indexOf(" --stop ") >= 0) {
                 pane.dictating = ""
-                if (result.ok && result.text) {
+                if (result.ok && result.text && pane.dictateFor !== pane.draftKey) {
+                    // (the pane shows another chat now: they go in the draft of the one they're for)
+                    const was = pane.drafts[pane.dictateFor] || ""
+                    pane.drafts[pane.dictateFor] = was + (was && was.slice(-1).trim() !== "" ? " " : "") + result.text + " "
+                } else if (result.ok && result.text) {
                     const at = replyBox.cursorPosition
                     replyBox.insert(at, (at > 0 && replyBox.text.charAt(at - 1).trim() !== "" ? " " : "") + result.text + " ")
                     replyBox.forceActiveFocus()
@@ -722,16 +768,32 @@ Window {
     // ---------------------------------------------------------------- replying
 
     property bool askHow: false   // its terminal takes no text: background or copy?
+    property var drafts: ({})     // what you were typing to the other chats ("host\nchatId" -> text)
+    property string draftKey: ""  // the chat the box's text is for
+    property bool sending: false  // a message on its way: none other till it's there (an Enter again, a click)
+
+    // (one that never comes back: Send works again after a while)
+    Timer {
+        id: sendStale
+        interval: pane.staleMs
+        onTriggered: pane.sending = false
+    }
 
     function send(how, afterTurn) {
         const text = replyBox.text.trim()
-        if (!text)
+        if (!text || sending)
             return
+        sending = true
+        sendStale.restart()
         run(afterTurn ? "later" : "send", "--send " + root.shellQuote(chatId) + " --text " + root.shellQuote(text)
             + (sessionId ? " --session " + root.shellQuote(sessionId) : "") + " --how " + (how || "auto")
-            + (afterTurn ? " --after-turn --name " + root.shellQuote(chatName) : "") + paneArgs())
+            + (afterTurn ? " --after-turn --name " + root.shellQuote(chatName) : "") + paneArgs(), replyBox.text)
         if (afterTurn)
             replyBox.text = ""
+    }
+    // The box without the message that went (what you typed after it stays)
+    function withoutSent(box, sent) {
+        return sent && box.indexOf(sent) === 0 ? box.slice(sent.length).replace(/^\s+/, "") : box
     }
 
     readonly property string routeHint: {
@@ -802,7 +864,15 @@ Window {
             loadReview()
         if (tab === "output")
             loadOutput()
+        // (back on the Chat tab: at its end, following it, if it was when you left)
+        if (tab !== "chat" && chatTab)
+            chatAtEnd = !loaded || nearEnd()
+        else if (tab === "chat" && !chatTab && chatAtEnd)
+            keepEnd()
+        chatTab = tab === "chat"
     }
+    property bool chatTab: true
+    property bool chatAtEnd: true
 
     // A background session's screen (the Output tab): its terminal as Claude
     // draws it, in its colors on a terminal's dark ground (a light theme too)
@@ -1000,30 +1070,30 @@ Window {
                 spacing: 0
 
                 Repeater {
-                    model: [
-                        { tab: "chat", text: i18n("Chat") }].concat(pane.jobId ? [{ tab: "output", text: i18n("Output") }] : []).concat([
-                        { tab: "review", text: pane.row && pane.row.changes
-                              ? (pane.reviewPending ? i18nc("tab: the files a chat changed, not reviewed yet", "Review ±%1 •", pane.row.changes.count)
-                                                    : i18nc("tab: the files a chat changed", "Review ±%1", pane.row.changes.count))
-                              : i18n("Review") }
-                    ])
+                    // (made again only when the Output tab comes or goes: not on each status check)
+                    model: pane.jobId !== "" ? ["chat", "output", "review"] : ["chat", "review"]
                     delegate: MouseArea {
                         id: tabButton
-                        required property var modelData
-                        readonly property bool on: pane.tab === modelData.tab
+                        required property string modelData
+                        readonly property bool on: pane.tab === modelData
                         implicitWidth: tabText.implicitWidth + Kirigami.Units.gridUnit * 1.5
                         implicitHeight: tabText.implicitHeight + Kirigami.Units.largeSpacing * 1.5
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: pane.tab = modelData.tab
+                        onClicked: pane.tab = modelData
                         Accessible.role: Accessible.PageTab
-                        Accessible.name: modelData.text
+                        Accessible.name: tabText.text
 
                         PlasmaComponents3.Label {
                             id: tabText
                             anchors.centerIn: parent
                             textFormat: Text.PlainText
-                            text: tabButton.modelData.text
+                            text: tabButton.modelData === "chat" ? i18n("Chat")
+                                  : tabButton.modelData === "output" ? i18n("Output")
+                                  : pane.row && pane.row.changes
+                                  ? (pane.reviewPending ? i18nc("tab: the files a chat changed, not reviewed yet", "Review ±%1 •", pane.row.changes.count)
+                                                        : i18nc("tab: the files a chat changed", "Review ±%1", pane.row.changes.count))
+                                  : i18n("Review")
                             font.pointSize: pane.pt
                             font.weight: tabButton.on ? Font.Bold : Font.Normal
                             color: tabButton.on || tabButton.containsMouse ? Kirigami.Theme.textColor : pane.mutedColor
@@ -1077,6 +1147,7 @@ Window {
                     // every item made and laid out once (not as it scrolls in), so the
                     // list doesn't jump while you scroll
                     cacheBuffer: 100000
+                    onMovementStarted: settle.stop()   // (you scroll: it doesn't pull you back to the end)
 
                     // Ctrl+wheel: the text size
                     WheelHandler {
@@ -1093,15 +1164,25 @@ Window {
                             width: parent.width
 
                             PlasmaComponents3.Button {
-                                visible: pane.more
+                                visible: pane.more && pane.limit < pane.limitMax
                                 Layout.alignment: Qt.AlignHCenter
                                 icon.name: "go-up"
                                 text: i18n("Show earlier")
                                 onClicked: {
-                                    pane.limit = Math.min(2000, pane.limit * 2)
+                                    pane.limit = Math.min(pane.limitMax, pane.limit * 2)
                                     pane.stamp = ""
                                     pane.load()
                                 }
+                            }
+                            PlasmaComponents3.Label {
+                                textFormat: Text.PlainText
+                                Layout.fillWidth: true
+                                visible: pane.more && pane.limit >= pane.limitMax
+                                horizontalAlignment: Text.AlignHCenter
+                                text: i18n("Only its last %1 steps are shown here.", pane.limitMax)
+                                color: pane.mutedColor
+                                font.pointSize: pane.pt * 0.85
+                                wrapMode: Text.Wrap
                             }
                             PlasmaComponents3.Label {
                                 textFormat: Text.PlainText
@@ -1468,6 +1549,8 @@ Window {
                         diffLines: 12
                         planHeight: Kirigami.Units.gridUnit * 1000   // (the box scrolls)
                         onAnswered: (decision, note, answers) => pane.answer(decision, note, answers)
+                        // (a plan too long to show whole: its file, by its name)
+                        onWholePlan: root.openPlan(permission.plan.file.split("/").pop().replace(/\.md$/, ""), pane.profileDir, pane.host)
                     }
                 }
             }
@@ -1791,14 +1874,14 @@ Window {
                     }
                     PlasmaComponents3.Button {
                         visible: pane.route === "terminal" || pane.askHow
-                        enabled: replyBox.text.trim() !== ""
+                        enabled: replyBox.text.trim() !== "" && !pane.sending
                         icon.name: "edit-copy"
                         text: i18n("Copy and open its tab")
                         onClicked: pane.send("copy", false)
                     }
                     PlasmaComponents3.Button {
                         visible: pane.busy
-                        enabled: replyBox.text.trim() !== ""
+                        enabled: replyBox.text.trim() !== "" && !pane.sending
                         icon.name: "chronometer"
                         text: i18n("Send when this turn ends")
                         onClicked: pane.send(pane.route === "terminal" ? "background" : "auto", true)
@@ -1811,10 +1894,10 @@ Window {
                         }
                     }
                     PlasmaComponents3.Button {
-                        enabled: replyBox.text.trim() !== "" && !(pane.route === "terminal" && pane.busy)
+                        enabled: replyBox.text.trim() !== "" && !pane.sending && !(pane.route === "terminal" && pane.busy)
                                  && !(pane.permission && pane.route === "tmux")
                         icon.name: "document-send"
-                        text: pane.route === "terminal" || pane.askHow ? i18n("Send, go on in the background") : i18n("Send")
+                        text: pane.sending ? i18n("Sending…") : pane.route === "terminal" || pane.askHow ? i18n("Send, go on in the background") : i18n("Send")
                         onClicked: pane.send(pane.route === "terminal" || pane.askHow ? "background" : "auto", false)
                     }
                 }

@@ -336,7 +336,9 @@ class Pane implements vscode.Disposable {
       ], this.host ? 60000 : 30000);
       if (this.disposed || (r.ok && r.unchanged)) return;
       if (r.ok && typeof r.stamp === "string") this.stamp = r.stamp;
-      this.post({ type: "conversation", answer: r as never });
+      // (at the most a tab shows: no Show earlier, it says so instead)
+      const capped = r.ok && !!r.more && this.limit >= LIMIT_MAX;
+      this.post({ type: "conversation", answer: (r.ok ? { ...r, more: !!r.more && !capped, capped } : r) as never });
     } finally {
       this.loading = false;
       if (this.loadAgain) {
