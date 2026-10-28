@@ -8,7 +8,7 @@ import St from 'gi://St';
 
 import * as L from '../logic.js';
 import {buildSessionRow, buildKeepOnly, buildShareMenu} from './sessionRow.js';
-import {box, column, iconButton, label, link, meter, paragraph, separator, tag, textButton, usageMeter} from './widgets.js';
+import {box, column, iconButton, label, link, meter, paragraph, scaleFactor, separator, tag, textButton, usageMeter} from './widgets.js';
 
 // accounts: how many its machine has (with two or more, the default one is marked)
 export function buildGroupSection(ctx, group, {last = false, remoteHost = '', accounts = 1} = {}) {
@@ -154,15 +154,16 @@ function buildStats(ctx, stats) {
     const wrap = column('claude-stats claude-indent', {x_expand: true});
     wrap.add_child(label(L.fmt('Last %1 days', stats.days.length), 'claude-small claude-strong'));
     const chart = box('claude-stats-chart', {x_expand: true});
-    const heights = L.statsBarHeights(stats, STATS_BAR_PX);
+    const scale = scaleFactor();
+    const heights = L.statsBarHeights(stats, STATS_BAR_PX * scale);
     stats.days.forEach((d, i) => {
         const today = i === stats.days.length - 1;
         const col = column('claude-stats-day', {x_expand: true});
-        const area = new St.Widget({layout_manager: new Clutter.BinLayout(), x_expand: true, height: STATS_BAR_PX});
+        const area = new St.Widget({layout_manager: new Clutter.BinLayout(), x_expand: true, height: STATS_BAR_PX * scale});
         const bar = new St.Widget({
             style_class: `claude-stats-bar ${heights[i] ? 'claude-bg-working' : 'claude-stats-baseline'}`,
             x_expand: true, y_expand: true, y_align: Clutter.ActorAlign.END,
-            height: heights[i] || 2, opacity: today || !heights[i] ? 255 : 140,
+            height: heights[i] || 2 * scale, opacity: today || !heights[i] ? 255 : 140,
         });
         area.add_child(bar);
         col.add_child(area);

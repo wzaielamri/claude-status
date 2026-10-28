@@ -9,8 +9,9 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import * as L from '../logic.js';
-import {box, column, iconButton, label, meter, paragraph, textButton} from './widgets.js';
+import {box, column, iconButton, label, meter, paragraph, scaleFactor, textButton} from './widgets.js';
 
+// (in the display's units: the Cairo drawings are scaled, see scaled())
 const ROW_PX = 18;
 const FILL_PX = 18;
 // The colors of the timeline: mid tones, as the rest of the popup, so they
@@ -163,9 +164,13 @@ function chatLine(ctx, c, cur, where = null, sub = false) {
     if (place)
         line.add_child(label(place, 'claude-small claude-dim claude-week-folder'));
     line.add_child(label(`${L.hoursText(c.workedMs)} · ${L.moneyText(c.cost, cur)}`, 'claude-small claude-dim'));
-    const button = new St.Button({style_class: `claude-row-button${sub ? ' claude-week-sub' : ''}`, child: line, x_expand: true,
-        can_focus: !c.host && !!c.chatId, reactive: !c.host && !!c.chatId});
-    button.connect('clicked', () => ctx.jumpTo(c.chatId, c.profileDir));
+    const opens = !c.host && !!c.chatId;
+    const button = new St.Button({style_class: `${opens ? 'claude-row-button' : ''}${sub ? ' claude-week-sub' : ''}`, child: line,
+        x_expand: true, can_focus: opens, reactive: opens});
+    button.connect('clicked', () => {
+        if (opens)   // (its tooltip makes every row reactive)
+            ctx.jumpTo(c.chatId, c.profileDir);
+    });
     ctx.tips.add(button, c.host ? `${c.name} on ${c.host}: its row under ${c.host} opens it` : `Open “${c.name}”`);
     return button;
 }
@@ -210,7 +215,7 @@ function buildTimeline(ctx, recap, cur) {
         const row = box('claude-week-row', {x_expand: true});
         const dayLabel = label(L.weekRowDay(d.day, weeks), `claude-small claude-week-day${today || open ? ' claude-strong' : ''}`);
         row.add_child(dayLabel);
-        const area = new St.DrawingArea({x_expand: true, height: ROW_PX, reactive: true, track_hover: true});
+        const area = new St.DrawingArea({x_expand: true, height: ROW_PX * scaleFactor(), reactive: true, track_hover: true});
         area._week = {day: d, today, hoverX: -1, most};
         area.connect('repaint', a => (weeks ? paintWeek(a) : paintDay(a, recap.generatedAt)));
         area.connect('motion-event', (a, event) => {
@@ -266,8 +271,7 @@ function buildTimeline(ctx, recap, cur) {
 // Overall's row: the 7 days' time, yours and Claude's, against the busiest 7 days
 function paintWeek(area) {
     const {day: d, most} = area._week;
-    const cr = area.get_context();
-    const [w, h] = area.get_surface_size();
+    const [cr, w, h] = scaled(area);
     cr.setSourceRGBA(...GRID);
     cr.rectangle(0, h - 1, w, 1);
     cr.fill();
@@ -282,10 +286,19 @@ function paintWeek(area) {
     cr.$dispose();
 }
 
-function paintDay(area, now) {
-    const {day: d, today, hoverX} = area._week;
+// A drawing area's Cairo context, drawing in the display's units, and its size in them
+function scaled(area) {
     const cr = area.get_context();
+    const scale = scaleFactor();
     const [w, h] = area.get_surface_size();
+    cr.scale(scale, scale);
+    return [cr, w / scale, h / scale, scale];
+}
+
+function paintDay(area, now) {
+    const {day: d, today} = area._week;
+    const [cr, w, h, scale] = scaled(area);
+    const hoverX = area._week.hoverX / scale;   // (in real pixels: where the pointer is on the actor)
     const span = Math.max(1, d.end - d.start);
     const x = ms => Math.max(0, Math.min(w, (ms - d.start) / span * w));
     const bar = (a, b, top, height) => {
@@ -338,7 +351,7 @@ function buildPlan(ctx, recap) {
         for (const w of p.windows) {
             const line = box('claude-stats-project', {x_expand: true});
             line.add_child(label((plans.length > 1 ? `${p.name} · ` : '') + w.label, 'claude-small claude-week-name'));
-            const area = new St.DrawingArea({x_expand: true, height: FILL_PX, y_align: Clutter.ActorAlign.CENTER});
+            const area = new St.DrawingArea({x_expand: true, height: FILL_PX * scaleFactor(), y_align: Clutter.ActorAlign.CENTER});
             area.connect('repaint', a => paintFill(a, w, recap.generatedAt));
             line.add_child(area);
             line.add_child(label(L.weekPlanText(w, recap.generatedAt),
@@ -352,8 +365,7 @@ function buildPlan(ctx, recap) {
 }
 
 function paintFill(area, win, now) {
-    const cr = area.get_context();
-    const [w, h] = area.get_surface_size();
+    const [cr, w, h] = scaled(area);
     const [from, until] = L.weekWindowSpan(win);
     const x = ms => Math.max(0, Math.min(w, (ms - from) / (until - from) * w));
     const y = pct => h - 0.5 - Math.max(0, Math.min(100, pct)) / 100 * (h - 1);

@@ -71,6 +71,9 @@ test('durations, tokens, reset text', () => {
         ['0m', '59m', '1h 1m', '1d 2h']);
     eq([L.formatTokens(999), L.formatTokens(1500), L.formatTokens(2.5e6), L.formatTokens(3e9)],
         ['999', '1.5k', '2.5M', '3.0B']);
+    // the unit goes by the rounded value, as in Plasma: never "1000.0k"
+    eq([L.formatTokens(999949), L.formatTokens(999950), L.formatTokens(999999), L.formatTokens(999.95e6)],
+        ['999.9k', '1.0M', '1.0M', '1.0B']);
     eq(L.resetText({reset: true}, 0), 'reset');
     eq(L.resetText({reset: false, resetsAt: 7200000}, 0), 'resets in 2h 0m');
     // the last minute: "<1m", never a rounded "0m" that looks stuck

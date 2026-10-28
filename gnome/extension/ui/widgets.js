@@ -8,6 +8,12 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+// The display's scale: CSS lengths follow it, sizes given in code (an actor's
+// height, Cairo's units) are in real pixels and must be multiplied by it
+export function scaleFactor() {
+    return St.ThemeContext.get_for_stage(global.stage).scale_factor;
+}
+
 export function box(styleClass = '', props = {}) {
     return new St.BoxLayout({style_class: styleClass, ...props});
 }
@@ -213,6 +219,7 @@ export function meter(pct, colorClass, styleClass = 'claude-meter') {
 // forecast.atReset), and a thin tick where an even pace would be by now
 export function usageMeter(pct, colorClass, projected = pct, projectedClass = colorClass, evenPct = null) {
     const share = v => Math.min(100, Math.max(0, v)) / 100;
+    const s = scaleFactor();
     const ahead = projected > pct
         ? new St.Widget({style_class: `claude-meter-fill claude-bg-${projectedClass}`, opacity: 90}) : null;
     const fill = new St.Widget({style_class: `claude-meter-fill claude-bg-${colorClass}`});
@@ -227,7 +234,7 @@ export function usageMeter(pct, colorClass, projected = pct, projectedClass = co
         }
         parts.push([fill, 0, 0, filled, h]);
         if (tick)   // sticks out above and below, so it shows over the fill too
-            parts.push([tick, Math.max(0, Math.round(w * share(evenPct)) - 1), -3, 2, h + 6]);
+            parts.push([tick, Math.max(0, Math.round(w * share(evenPct)) - s), -3 * s, 2 * s, h + 6 * s]);
         return parts;
     };
     const trough = new St.Widget({style_class: 'claude-meter', x_expand: true, y_align: Clutter.ActorAlign.CENTER,

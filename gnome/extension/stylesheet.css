@@ -122,6 +122,8 @@
 .claude-login-button { border: 1px solid rgba(127, 127, 127, 0.45); }
 .claude-link { border-radius: 4px; }
 .claude-link:hover StLabel, .claude-link:focus StLabel { text-decoration: underline; }
+.claude-row-button { border-radius: 6px; }   /* (the Recap's chats and folders) */
+.claude-row-button:hover, .claude-row-button:focus { background-color: rgba(127, 127, 127, 0.15); }
 
 /* Inline menus (new chat, SSH hosts, share) and questions (stop, keep only) */
 .claude-inline-menu {
@@ -149,7 +151,8 @@
 .claude-confirm-buttons { spacing: 6px; }
 .claude-confirm-button { background-color: rgba(127, 127, 127, 0.2); }
 
-.claude-tooltip { max-width: 26em; }
+/* (the shell's .dash-label is a one-line pill: a tip's lines go left, in a box) */
+.claude-tooltip { max-width: 26em; border-radius: 8px; padding: 6px 10px; text-align: left; }
 
 /* Pets (pets.js): the hero's stage, the accounts' stages, tags, bubbles */
 .claude-hero { margin: 0 8px; border: 1px solid; border-radius: 12px; }
@@ -157,7 +160,7 @@
 .claude-hero-info { spacing: 4px; }
 .claude-headline StLabel { font-weight: bold; font-size: 1.1em; }
 .claude-chips { spacing: 10px; }
-.claude-chip { spacing: 4px; }
+.claude-count { spacing: 4px; }  /* (the hero's counts; .claude-chip is a button) */
 .claude-star { color: #8b96e0; font-size: 0.7em; }
 .claude-star-dot { font-size: 1.3em; }
 .claude-stage { margin: 0 4px; border-radius: 8px; background-color: rgba(127, 127, 127, 0.06); }

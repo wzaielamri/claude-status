@@ -214,10 +214,11 @@ export function stateText(s, now) {
     }
 }
 
+// (the unit goes by the rounded value, so 999,999 reads 1.0M, not 1000.0k)
 export function formatTokens(n) {
-    if (n >= 1e9)
+    if (n >= 999.95e6)
         return `${(n / 1e9).toFixed(1)}B`;
-    if (n >= 1e6)
+    if (n >= 999.95e3)
         return `${(n / 1e6).toFixed(1)}M`;
     if (n >= 1e3)
         return `${(n / 1e3).toFixed(1)}k`;

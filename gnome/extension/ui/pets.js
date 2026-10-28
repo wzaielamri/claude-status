@@ -883,7 +883,7 @@ class Stage {
                 ['bad', counts.limit, '%1 at the usage limit'], ['ok', counts.done, '%1 done']]
                 .filter(c => c[1] > 0);
             for (const [cls, n, text] of chips) {
-                const chip = box('claude-chip');
+                const chip = box('claude-count');
                 chip.add_child(dot(cls, 'claude-dot claude-dot-small'));
                 chip.add_child(label(L.fmt(text, n), 'claude-small'));
                 this.chips.add_child(chip);

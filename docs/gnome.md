@@ -15,7 +15,7 @@ The same dashboard as a GNOME Shell extension: Talpy in the top bar, the popup w
 - Working sessions are blue rather than your accent color (Ubuntu's orange would look like "needs you").
 - Sounds come from your GNOME sound theme and stay quiet with Do Not Disturb.
 - The shortcut to the chat that needs you is **Super+Shift+C** (change it in the settings).
-- GNOME turns extensions off while the screen is locked, so nothing notifies then; when you're back after 5 minutes or more, the summary comes as soon as the chats have been checked.
+- GNOME turns extensions off while the screen is locked, so nothing notifies then; when you're back after 5 minutes or more, the summary comes as soon as the chats have been checked. After a shorter lock (or with the summary off), the first check notifies what changed meanwhile.
 
 **Tested** in a headless GNOME Shell 50.1 on Ubuntu 26.04 (`tools/gnome/shell.sh`: the popup, jumping, notifications, settings, pets, install and uninstall), not yet on a physical Ubuntu desktop.
 

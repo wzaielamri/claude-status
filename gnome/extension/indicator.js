@@ -21,7 +21,7 @@ import {buildGroupSection, buildHostSection} from './ui/groupSection.js';
 import {TalpyIcon} from './ui/talpyIcon.js';
 import {buildPermsView} from './ui/permsView.js';
 import {buildWeekView} from './ui/weekView.js';
-import {box, column, iconButton, label, paragraph, textButton, Tooltips} from './ui/widgets.js';
+import {box, column, iconButton, label, paragraph, scaleFactor, textButton, Tooltips} from './ui/widgets.js';
 
 const USAGE_PAGE = 'https://claude.ai/settings/usage';
 const WEEK_REFRESH_S = 600;   // the Recap tab reads again while it's open
@@ -30,8 +30,10 @@ export const Indicator = GObject.registerClass(
 class TalpyDenIndicator extends PanelMenu.Button {
     // away: {lockedAt, snapshot} when the screen was locked before this
     // (GNOME Shell turns extensions off while it's locked): the summary of
-    // what happened meanwhile goes out once the first checks are back
-    _init(extension, away = null) {
+    // what happened meanwhile goes out once the first checks are back.
+    // tracker: the one from before the lock (what it saw of each chat), so the
+    // first checks tell what changed meanwhile
+    _init(extension, away = null, tracker = null) {
         super._init(0.5, 'Talpy Den', false);
         this._extension = extension;
         this._settings = extension.getSettings();
@@ -40,7 +42,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._runner = new Runner(GLib.build_filenamev([extension.path, 'code']));
         this.petsDir = GLib.build_filenamev([extension.path, 'pets']);
         this._notifier = new Notifier(this.petsDir);
-        this._tracker = new L.Tracker();
+        this._tracker = tracker || new L.Tracker();
         this.tips = new Tooltips();
 
         this._status = null;          // parsed output of talpy_den.py
@@ -70,6 +72,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this.perms = {data: null, error: '', busy: false, asking: '', ruleBusy: '', ruleMessage: '', ruleHost: '',
             rules: this._settings.get_boolean('recap-rules'), revoking: '', ruleRevoked: false, allGranted: {}};
         this._weekAsked = 0;
+        this._permsAgain = false;     // read the permissions again once the read on its way is in (a rule changed meanwhile)
         // Turns that ended while the menu was closed (row key -> "done"), for
         // the hotkey; forgotten when the menu opens
         this._unseen = {};
@@ -262,6 +265,10 @@ class TalpyDenIndicator extends PanelMenu.Button {
         const resets = [...this._tracker.celebrateResets(source, groups), ...this._tracker.chatEvents(source, groups, host)];
         const pose = this._settings.get_boolean('show-pet');
         this._noteUnseen(source, out);
+        // (after a lock as long as the summary asks for, the summary tells
+        // what changed meanwhile: the first check of each source keeps quiet)
+        const summed = !!this._away && !this._away.heard.has(source)
+            && Date.now() - this._away.lockedAt >= this._settings.get_int('away-minutes') * 60000;
         if (this._away) {
             this._away.heard.add(source);
             if (['', ...this.shownHosts.map(h => `ssh:${h}`)].every(s => this._away.heard.has(s)))
@@ -276,12 +283,12 @@ class TalpyDenIndicator extends PanelMenu.Button {
         };
         for (const c of out.close)
             guard('closing a notification', () => this._notifier.close(c.key, c.kind));
-        for (const n of out.notify)
+        for (const n of summed ? [] : out.notify)
             guard('a notification', () => this._notifier.notify(n, pose, () => this._openFromNotification(n)));
         guard('closing notifications', () => this._notifier.closeMissing(source, out.present));
         for (const event of [...out.pets, ...resets])
             guard(`the pets' "${event.kind}"`, () => this._pets.event(event));
-        if (out.sound)
+        if (out.sound && !summed)
             guard('a sound', () => this._playSound(out.sound));
     }
 
@@ -984,7 +991,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             if (open) {
                 this._unseen = {};   // seen now
                 const area = Main.layoutManager.getWorkAreaForMonitor(Main.layoutManager.primaryIndex);
-                this._scroll.style = `max-height: ${Math.round(area.height * 0.62)}px;`;
+                // (CSS pixels, which the display's scale multiplies, as panelMenu.js does)
+                this._scroll.style = `max-height: ${Math.round(area.height * 0.62 / scaleFactor())}px;`;
                 this._loadHosts();
                 this.rerender();
                 this.refresh();  // it may have been checked a while ago (see _pollInterval)
@@ -1081,6 +1089,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         if (this.perms.busy)
             return;
         this.perms.busy = true;
+        this._permsAgain = false;
         this._render(true);
         const out = await this._runner.run('week.py', L.permsArgs(this._configDirArgs, this.shownHosts, this.remote), {poll: true});
         if (this._destroyed || out.cancelled)
@@ -1094,6 +1103,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this.perms.error = result.message || result.error || 'no answer';
         }
         this._render(true);
+        if (this._permsAgain)
+            this.loadPerms();
     }
 
     permsAsk(id) {
@@ -1116,6 +1127,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
             return;
         this.perms.ruleBusy = '';
         this.perms.ruleMessage = result.ok ? result.message || '' : L.fmt('Nothing changed: %1', result.message || 'no answer');
+        this._permsAgain = true;   // (a read on its way may have read the file before)
         this.loadPerms();
     }
 
@@ -1143,6 +1155,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
             return;
         this.perms.ruleBusy = '';
         this.perms.ruleMessage = result.ok ? result.message || '' : L.fmt('Nothing changed: %1', result.message || 'no answer');
+        this._permsAgain = true;   // (a read on its way may have read the file before)
         this.loadPerms();
     }
 
@@ -1165,8 +1178,10 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._pets.update();
         if (!this.menu.isOpen)
             return;
+        // (a host that answered before looks the same while it's checked again)
         const remote = Object.fromEntries(Object.entries(this.remote).map(([host, r]) =>
-            [host, {...r, result: r.result ? {...r.result, generatedAt: 0} : null, updatedAt: Math.floor(r.updatedAt / 60000)}]));
+            [host, {...r, loading: r.loading && !r.result, result: r.result ? {...r.result, generatedAt: 0} : null,
+                updatedAt: Math.floor(r.updatedAt / 60000)}]));
         // A forecast moves a little with every check (fullAt in ms): only
         // what the bar shows (its warning, whole percents) rebuilds the popup
         const now = this.now;
@@ -1178,8 +1193,16 @@ class TalpyDenIndicator extends PanelMenu.Button {
                 return Array.isArray(value.days) ? L.statsSignature(value) : L.chatRecapText(value);
             return value;
         };
-        const signature = JSON.stringify([this._status ? {...this._status, generatedAt: 0} : null, this._errorText,
-            remote, this._sshHosts, this.ui, this._actionError, this._actionInfo, Math.floor(this.now / 60000),
+        // The Recap and Permissions tabs show none of the chats, only the
+        // header's counts: a check that changed a chat leaves them (and the
+        // tooltip you're reading) as they are
+        const chats = this.ui.tab === 'chats';
+        const c = L.counts(this.allGroups);
+        const overall = L.overall(this.allGroups, c);
+        const shown = chats ? [this._status ? {...this._status, generatedAt: 0} : null, remote]
+            : [c, overall, this._status?.dismissed || 0];
+        const signature = JSON.stringify([shown, this._errorText,
+            this._sshHosts, this.ui, this._actionError, this._actionInfo, Math.floor(this.now / 60000),
             this.ui.tab === 'week' ? [this.week.span, this.week.back, this.week.account, this.week.busy, this.week.error, this.week.copied,
                 this.week.open, this.week.recap ? this.week.recap.generatedAt : 0] : null,
             this.ui.tab === 'perms' ? {...this.perms, data: this.perms.data ? this.perms.data.generatedAt : 0} : null,
@@ -1190,10 +1213,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._signature = signature;
         this.tips.hide();
 
-        const c = L.counts(this.allGroups);
-        const overall = L.overall(this.allGroups, c);
         this._headerSpark.setState(L.stateClass(overall), overall);
-        const chats = this.ui.tab === 'chats';
         for (const [tab, b] of Object.entries(this._tabs))
             b.checked = tab === this.ui.tab;   // (St.Button's :checked)
         this._heroBin.visible = chats;

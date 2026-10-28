@@ -500,13 +500,7 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
             row.subtitle = preset >= 0 ? '' : GLib.markup_escape_text(GLib.path_get_basename(value), -1);   // shown as markup
             syncing = false;
         };
-        row.connect('notify::selected', () => {
-            if (syncing)
-                return;
-            if (row.selected < SOUNDS.length) {
-                settings.set_string(key, SOUNDS[row.selected][1]);
-                return;
-            }
+        const choose = () => {
             const filter = new Gtk.FileFilter({name: 'Sound files'});
             for (const ext of ['oga', 'ogg', 'wav', 'flac', 'mp3'])
                 filter.add_suffix(ext);
@@ -518,6 +512,14 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
                     sync();   // cancelled
                 }
             });
+        };
+        row.connect('notify::selected', () => {
+            if (syncing)
+                return;
+            if (row.selected < SOUNDS.length)
+                settings.set_string(key, SOUNDS[row.selected][1]);
+            else
+                choose();
         });
         const changed = settings.connect(`changed::${key}`, sync);
         row.connect('destroy', () => settings.disconnect(changed));
@@ -527,6 +529,11 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
             tooltip_text: 'Play this sound', css_classes: ['flat']});
         play.connect('clicked', () => this._preview(settings, settings.get_string(key)));
         row.add_suffix(play);
+        // (picking "Sound file…" again, with a file set, changes nothing in the list)
+        const file = new Gtk.Button({icon_name: 'document-open-symbolic', valign: Gtk.Align.CENTER,
+            tooltip_text: 'Choose a sound file', css_classes: ['flat']});
+        file.connect('clicked', choose);
+        row.add_suffix(file);
         return row;
     }
 
