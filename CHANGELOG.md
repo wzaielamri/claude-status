@@ -75,6 +75,7 @@
 - **GNOME's Recap at a display scale of 2:** the Recap's timeline rows and plan graphs and an account's daily bars stayed half as tall as the text beside them, and the popup could grow taller than the screen; they follow the scale now.
 - **GNOME's sound settings:** with a sound file picked, choosing *Sound file…* again did nothing; a button beside each sound opens the file chooser now.
 - **GNOME notifies what changed while the screen was locked:** after a lock shorter than the away summary's minutes (or with the summary off), a chat that started needing you or finished meanwhile never notified: GNOME starts the extension afresh at unlocking and it took what it found for the way things were. It remembers what it saw before the lock now, so the first check notifies what changed.
+- **GNOME's pets when a chat comes while the popup is open:** the new chat's pet stood too low, its name tag at the top of the stage, and from then on the popup could stop placing what changed in it until it was closed. It digs up in its spot now. A double click on the hero dances again (it only got petted), and a pet's sparkle or idea bulb no longer stops its own drawing in its first frame.
 
 ## 1.16.1 (2026-10-27)
 

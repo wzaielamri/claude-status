@@ -69,7 +69,9 @@ export class CairoCanvas {
     }
 
     translate(x, y) { this.cr.translate(x, y); }
-    scale(x, y) { this.cr.scale(x, y); }
+    // (a canvas draws nothing at a scale of 0, where Cairo's matrix can't be
+    // inverted and the frame's drawing stops: a bulb's first frame)
+    scale(x, y) { this.cr.scale(x || 1e-4, y || 1e-4); }
     rotate(r) { this.cr.rotate(r); }
     beginPath() { this.cr.newPath(); }
     moveTo(x, y) { this.cr.moveTo(x, y); }

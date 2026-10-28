@@ -1,7 +1,8 @@
 # Steps for tools/gnome/shell.sh: the pets (hero and the accounts' pets), a
 # few reactions, and the dark style.
 #   tools/gnome/shell.sh OUT tools/gnome/steps-pets.sh
-pet='const g = ext.groups.find(g => g.name.startsWith("work")); const key = n => g.sessions.find(x => x.name === n).chatId;'
+# (a pet's key is logic.js petKeyOf's: profileDir/chatId)
+pet='const g = ext.groups.find(g => g.name.startsWith("work")); const key = n => { const s = g.sessions.find(x => x.name === n); return `${s.profileDir || ""}/${s.chatId || s.sessionId || s.key}`; };'
 ev 'ext.menu.open()'
 sleep 3
 popup pets

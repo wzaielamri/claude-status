@@ -18,6 +18,7 @@
 import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as L from '../logic.js';
@@ -37,6 +38,9 @@ let pressed = null;
 // Events that happened while nobody saw the pets are acted out when they show
 // again, if they're this recent (older ones are dropped)
 const MISSED_MS = 60000;
+// A second press this soon after the first is a double click (GNOME's
+// default; Clutter's events no longer count clicks)
+const DOUBLE_CLICK_MS = 400;
 
 function pick(list, last) {
     const choices = list.length > 1 ? list.filter(x => x !== last) : list;
@@ -107,6 +111,32 @@ class Timers {
 
 // ---------------------------------------------------------------- one pet
 
+// A pet's parts where they were put, and its name tag centred under it, as
+// the pet is allocated. (Centring the tag on its notify::width moved it in the
+// middle of a layout pass, which could leave the whole popup without an
+// allocation: a pet that came while it was open stood too low, its tag at
+// the top. See widgets.js BarLayout.)
+const PetLayout = GObject.registerClass(
+class ClaudePetLayout extends Clutter.FixedLayout {
+    _init(tag, tagY) {
+        super._init();
+        this._tag = tag;
+        this._tagY = tagY;
+    }
+
+    vfunc_allocate(container, box) {
+        for (const child of container.get_children()) {
+            if (child === this._tag) {
+                const [, width] = child.get_preferred_width(-1);
+                child.allocate_preferred_size(Math.round((box.get_width() - width) / 2), this._tagY);
+            } else {
+                const [, x, y] = child.get_fixed_position();
+                child.allocate_preferred_size(x, y);
+            }
+        }
+    }
+});
+
 class Pet {
     constructor(stage, key, opts) {
         this.stage = stage;
@@ -152,7 +182,7 @@ class Pet {
             this.setTagWidth(s.slot - 4);
             this.tag.clutter_text.ellipsize = 3;   // Pango.EllipsizeMode.END
             this.actor.add_child(this.tag);
-            this.tag.connect('notify::width', () => this._placeTag());
+            this.actor.layout_manager = new PetLayout(this.tag, Math.round(s.floorY + s.box * 6 / 64));
         }
 
         this.actor.connect('destroy', () => {
@@ -165,7 +195,9 @@ class Pet {
                 if (event.get_button() !== Clutter.BUTTON_PRIMARY)
                     return Clutter.EVENT_PROPAGATE;
                 pressed = this;
-                this._clickCount = event.get_click_count();
+                const at = event.get_time();
+                this._clickCount = this._pressedAt !== undefined && at - this._pressedAt <= DOUBLE_CLICK_MS ? 2 : 1;
+                this._pressedAt = this._clickCount === 2 ? undefined : at;   // (a third press starts anew)
                 return Clutter.EVENT_STOP;
             });
             area.connect('button-release-event', (a, event) => {
@@ -288,11 +320,6 @@ class Pet {
         this._hitWidth = width;
         this.hit.set_size(width, height);
         this.hit.set_position(Math.round((s.slot - width) / 2), Math.round(s.floorY - height));
-    }
-
-    _placeTag() {
-        const s = this.stage.size;
-        this.tag.set_position(Math.round((s.slot - this.tag.width) / 2), Math.round(s.floorY + s.box * 6 / 64));
     }
 
     get px() {
