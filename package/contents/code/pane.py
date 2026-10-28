@@ -11,8 +11,9 @@ its permission prompt and its review.
         "stamp" of the last answer; while the transcript is as it was then,
         the answer is only {"ok", "unchanged"}.
   --send CHAT --profile P --text T [--session ID] [--how auto|background|copy|enter] [--after-turn] [--name N]
-        your message to the chat, the way it can take one (send):
-        typed into its tmux pane; put in the input of its VS Code tab; or
+        your message to the chat, the way it can take one (send) (or
+        --text-file F: a long one in F, a text-*.txt of the cache folder,
+        removed once read); typed into its tmux pane; put in the input of its VS Code tab; or
         Claude goes on with it in the background (claude --bg --resume),
         after a background session that has it stops. A chat in a terminal
         that takes no text from outside asks first (how background: it goes
@@ -1826,6 +1827,23 @@ def relay_status(home, extra_dirs, kind="relay"):
 
 # ---------------------------------------------------------------- command line
 
+def take_text(cache_root, name):
+    """The message in a file of the cache (text-*.txt), which goes once read
+    (one command-line argument holds 128 KiB at most); None if it isn't one."""
+    f = Path(os.path.abspath(name))
+    if f.parent != Path(os.path.abspath(str(cache_root))) or not (f.name.startswith("text-") and f.name.endswith(".txt")):
+        return None
+    try:
+        return f.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return None
+    finally:
+        try:
+            f.unlink()
+        except OSError:
+            pass
+
+
 def forward(host, args):
     """Run this file on an SSH host with args: its answer."""
     import remote
@@ -1845,7 +1863,7 @@ def main(argv=None):
     action, target = None, None
     profile, how, note, decision, message, name = None, "auto", "", None, "", ""
     session, text, stamp, limit, files, config_dirs, answers = None, None, None, PANE_ITEMS, [], [], None
-    after, off, remote, pretty, source, expect = False, False, False, False, None, None
+    after, off, remote, pretty, source, expect, text_file = False, False, False, False, None, None, None
     actions = ("--conversation", "--send", "--answer", "--keys", "--review", "--undo", "--commit", "--reviewed",
                "--relay", "--live", "--oldest", "--shortcuts", "--complete", "--logs")
     osd = False
@@ -1861,6 +1879,8 @@ def main(argv=None):
             session = args.pop(0)
         elif arg == "--text" and args:
             text = args.pop(0)
+        elif arg == "--text-file" and args:
+            text_file = args.pop(0)
         elif arg == "--how" and args:
             how = args.pop(0)
         elif arg == "--note" and args:
@@ -1911,6 +1931,12 @@ def main(argv=None):
         out = json.dumps(result, indent=2 if pretty and not remote else None)
         sys.stdout.write(("\n" + cs.REMOTE_MARK + " " if remote else "") + out + "\n")
 
+    if text_file is not None:  # (a long message: VS Code's, or remote.put_text's on a host)
+        text = take_text(cache_root, text_file)
+        if text is None:
+            return emit({"ok": False, "message": "Couldn't read your message"})
+        i = rest.index("--text-file")
+        rest[i:i + 2] = ["--text", text]  # (a host gets the text: remote.host_answer takes it there)
     try:
         if host and action == "--reviewed":  # (kept here, as stars are)
             mark_reviewed(cache_root, target, host, on=not off)

@@ -9,11 +9,13 @@
 // nothing but the tab's own chat, and what you typed.
 
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as vscode from "vscode";
 import type { Actions } from "./actions";
 import type { Backend } from "./backend";
 import { openComparison } from "./changes";
-import { configDirArgs } from "./config";
+import { cacheDir, configDirArgs } from "./config";
 import type { Dashboard } from "./dashboard";
 import { chatRefOf, doingText, liveOf, recentRef, stateText } from "./shared/model";
 import { answersOf, askShownOf, PICTURE_TYPES, queuedReply, reviewPending, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage, type TermRun, type TermStyle } from "./shared/pane";
@@ -23,6 +25,7 @@ import { localAncestors, type Terminals } from "./terminals";
 
 export const ASKS_SOMETHING_ELSE = "It asks something else now"; // (pane.py --keys --expect says the same)
 const TEXT_MAX = 100_000; // (as a queued task's prompt may be)
+const TEXT_IN_ARGS = 32_000; // bytes of a message that go to pane.py as an argument
 type DictationState = Extract<PaneHostMessage, { type: "dictation" }>["state"];
 const LIMIT = 120;
 const LIMIT_MAX = 2000;
@@ -157,11 +160,23 @@ export class ChatPanes implements vscode.Disposable {
       return { ok: true, message: "Sent (typed into its terminal)" };
     }
     const sid = session?.sessionId ?? chat.sessionId;
+    // (a long message goes in a file of its own, private to you, that pane.py
+    // removes once read: one command-line argument holds 128 KiB at most)
+    const file = Buffer.byteLength(text) > TEXT_IN_ARGS ? path.join(cacheDir(), `text-${crypto.randomUUID()}.txt`) : "";
     // (enter goes as auto: the copy is VS Code's clipboard, also in a remote window)
-    const args = ["--send", chatId, "--text", text, "--how", how === "enter" ? "auto" : how, ...(sid ? ["--session", sid] : []),
+    const args = ["--send", chatId, ...(file ? ["--text-file", file] : ["--text", text]), "--how", how === "enter" ? "auto" : how, ...(sid ? ["--session", sid] : []),
                   ...(chat.profileDir ? ["--profile", chat.profileDir] : []), ...(afterTurn ? ["--after-turn", "--name", chat.name || ""] : []),
                   ...(host ? ["--host", host] : configDirArgs())];
-    const r = await this.backend.pane(args, 180000);
+    let r: Record<string, any>;
+    try {
+      if (file) {
+        fs.mkdirSync(cacheDir(), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(file, text, { mode: 0o600, flag: "wx" });
+      }
+      r = await this.backend.pane(args, 180000);
+    } finally {
+      if (file) fs.rmSync(file, { force: true });
+    }
     if (r.ok && r.how === "ask" && how === "enter")
       return copy("Its terminal takes no text from outside, so your message is in the clipboard: paste it there");
     if (r.ok && r.how === "ask") return { ok: true, message: String(r.message ?? ""), ask: true };

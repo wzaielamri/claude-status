@@ -324,8 +324,18 @@ def run(host, command, stdin=None):
 
 def host_answer(host, args, name="talpy_den.py"):
     """Run a script of this folder on host with args (it goes to python3's
-    stdin, as for --status): its answer, {"ok", "message", ...}."""
+    stdin, as for --status): its answer, {"ok", "message", ...}. A long
+    message for pane.py (--text) goes over first, into a file it reads there:
+    ssh's command is one argument, and one holds 128 KiB at most."""
     host = check_host(host)
+    args = list(args)
+    if name == "pane.py" and "--text" in args[:-1]:
+        i = args.index("--text")
+        if len(args[i + 1].encode("utf-8")) > TEXT_IN_COMMAND:
+            put = put_text(host, args[i + 1])
+            if not put.get("ok"):
+                return put
+            args[i:i + 2] = ["--text-file", put["path"]]
     command = "python3 -I - --remote " + " ".join(shlex.quote(a) for a in args)
     try:
         r = ssh(host, command, host_script(name))
@@ -495,6 +505,40 @@ def task(host, profile, folder, text="", plan=None, plan_profile=None, backgroun
         return {"ok": True, "message": "", "command": command}
     ok, message = open_remote(host, command)
     return {"ok": ok, "message": message}
+
+
+# A long message for a chat there (host_answer) goes into a file of the
+# host's cache folder, private to you (mkstemp), on python3's stdin; pane.py
+# --text-file reads it there and removes it.
+TEXT_IN_COMMAND = 4000  # bytes of a message that go in ssh's command as they are
+PUT_TEXT = """
+import json, os, sys, tempfile
+folder = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache"), "talpy-den")
+os.makedirs(folder, mode=0o700, exist_ok=True)
+fd, path = tempfile.mkstemp(prefix="text-", suffix=".txt", dir=folder)
+with os.fdopen(fd, "wb") as f:
+    f.write(sys.stdin.buffer.read())
+sys.stdout.write("\\n" + MARK + " " + json.dumps({"ok": True, "message": "", "path": path}) + "\\n")
+""".replace("MARK", repr(cs.REMOTE_MARK))
+
+
+def put_text(host, text):
+    """text in a new file on host (PUT_TEXT): {"ok", "message", "path": the file there}."""
+    host = check_host(host)
+    try:
+        r = subprocess.run(["ssh", *ssh_options(), "-T", host, posix("python3 -I -c " + shlex.quote(PUT_TEXT))],
+                           input=text.encode("utf-8"), capture_output=True, timeout=RUN_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "message": f"{host} didn't answer within {RUN_TIMEOUT} s"}
+    except OSError as exc:
+        return {"ok": False, "message": f"Can't run ssh: {exc}"}
+    r = subprocess.CompletedProcess(r.args, r.returncode, r.stdout.decode("utf-8", "replace"),
+                                    r.stderr.decode("utf-8", "replace"))
+    answer = answer_after_mark(r.stdout)
+    if answer is not None and answer.get("path"):
+        return {"ok": True, "message": "", "path": answer["path"]}
+    ok, message = outcome(host, r)
+    return {"ok": False, "message": f"{host} sent an answer the widget can't read." if ok else message}
 
 
 # A picture pasted here for a task there goes to the host's pictures folder

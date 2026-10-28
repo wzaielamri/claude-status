@@ -87,6 +87,33 @@ test("nothing is answered for a chat that doesn't ask, or that only its own dial
   assert.deepEqual(calls, []);
 });
 
+// One command-line argument holds 128 KiB at most: a long reply (60,000
+// characters of Japanese is 180 KB) goes in a file of its own, private to
+// you, which is gone after; one over 100,000 characters isn't sent
+test("a long reply goes to pane.py in a file of its own, removed after", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  process.env.XDG_CACHE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "talpy-den-text-"));
+  const state = demoState(NOW);
+  const row = state.status!.groups.flatMap((g) => g.sessions)[0];
+  const seen: [string, number, string][] = [];
+  const backend = {
+    pane: async (args: string[]) => {
+      const file = args[args.indexOf("--text-file") + 1];
+      seen.push([args.includes("--text") ? "text" : "file", fs.statSync(file).mode & 0o777, fs.readFileSync(file, "utf8")]);
+      return { ok: true, message: "Sent" };
+    },
+  };
+  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {} };
+  const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
+  const long = "語".repeat(60000);
+  assert.equal((await p.send(chatRefOf(row), long, "auto", false)).ok, true);
+  assert.deepEqual(seen, [["file", 0o600, long]]);
+  assert.deepEqual(fs.readdirSync(path.join(process.env.XDG_CACHE_HOME, "talpy-den")).filter((f) => f.startsWith("text-")), [], "gone after");
+  assert.deepEqual(await p.send(chatRefOf(row), "a".repeat(100001), "auto", false), { ok: false, message: "That message is too long" });
+});
+
 test("a reply goes to pane.py --send; copy goes to the clipboard and opens the chat; a Claude Code tab gets its link", async () => {
   const state = demoState(NOW);
   const row = state.status!.groups.flatMap((g) => g.sessions)[0];

@@ -259,6 +259,27 @@ class LoginShellTests(FakeSSH):
         self.assertEqual((self.fake_home / ".cache/talpy-den/images" / here.name).read_bytes(), here.read_bytes())
 
 
+    def test_a_long_text_goes_over_first(self):
+        # (one command-line argument holds 128 KiB at most, and ssh's command is one)
+        text = "語" * 50000 + " it's\n!x"
+        self.mode("tcsh")
+        put = remote.put_text("lab", text)
+        self.assertTrue(put["ok"], put)
+        there = Path(put["path"])
+        self.assertEqual((there.parent, there.read_text(encoding="utf-8")), (self.fake_home / ".cache/talpy-den", text))
+        self.assertEqual(there.stat().st_mode & 0o777, 0o600)
+        there.unlink()
+        answer = remote.host_answer("lab", ["--send", "abc12345", "--text", text, "--how", "copy"], name="pane.py")
+        self.assertIn("message", answer)
+        put_call, run_call = self.calls()[-2:]
+        self.assertIn("--text-file", run_call[1])
+        self.assertNotIn("語", run_call[1])
+        self.assertEqual(list((self.fake_home / ".cache/talpy-den").glob("text-*")), [], "read and removed there")
+        # a short one goes in the command, as before
+        remote.host_answer("lab", ["--send", "abc12345", "--text", "and the docs", "--how", "copy"], name="pane.py")
+        self.assertIn("--text 'and the docs'", self.calls()[-1][1])
+
+
 class StatusTests(FakeSSH):
     def test_status_of_a_host(self):
         out = remote.status("lab", recent=3, tokens=False)

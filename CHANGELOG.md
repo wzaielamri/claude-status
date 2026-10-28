@@ -78,6 +78,7 @@
 - **GNOME's pets when a chat comes while the popup is open:** the new chat's pet stood too low, its name tag at the top of the stage, and from then on the popup could stop placing what changed in it until it was closed. It digs up in its spot now. A double click on the hero dances again (it only got petted), and a pet's sparkle or idea bulb no longer stops its own drawing in its first frame.
 - **Search shows an SSH host's chats with the right ages:** the chats, folders, plans and memories found on a host whose clock is off said how long ago by the host's clock (a few minutes in the future came out as *now*, or too old). They go by this computer's clock now, as the host's own rows do.
 - **GNOME's usage forecast in Plasma's words:** the line under a bar said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it says how long before the reset it runs out now (*full in 1h 20m, 45m before it resets*), and the bar's tooltip gives your pace, the time it runs out, and no *would be at N%* for a full window.
+- **A long reply reaches an SSH host's chat:** a message of a few thousand characters (fewer with accents, quotes or a non-Latin script), from the chat pane or queued for after the turn, didn't fit in the one ssh command that carries it, and wasn't sent. It goes over to the host first now, into a file private to you that's removed once read.
 
 ## 1.16.1 (2026-10-27)
 

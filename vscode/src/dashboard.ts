@@ -18,7 +18,7 @@ import { currentRemoteAuthority, hostFromAuthority, portFromAuthority, sshPort }
 import { demoPerms, demoProjects, demoState, demoWeek } from "./shared/demo";
 import { allGroups, chatsNeedingYou, keptChat, limitReset, liveFromRows, queuedWhat, shareUsage, toLocalClock, trackKey, withLive, type ChatSpot } from "./shared/model";
 import { chatRef } from "./notify";
-import type { ClaudeCodeInfo, DigestCard, HostState, LiveView, PermsData, PetEventKind, ProjectsData, QueuedTask, Status, ViewState, WeekRecap, WeekSpan } from "./shared/types";
+import type { ClaudeCodeInfo, DigestCard, Group, HostState, LiveView, PermsData, PetEventKind, ProjectsData, QueuedTask, Status, ViewState, WeekRecap, WeekSpan } from "./shared/types";
 import type { WeekRuleAsk } from "./shared/week";
 import { mergeChanges, TransitionTracker, type Changes, type PetEvent } from "./transitions";
 
@@ -394,21 +394,25 @@ export class Dashboard implements vscode.Disposable {
   // that resets: jump.py --requeue)
   private startDueTasks(status: Status): void {
     if (this.demo || !this.notifier.isLeader()) return;
-    const groups = allGroups(status, this.state().hosts);
+    // (a host's accounts as it last said them, also when its last check
+    // failed: allGroups leaves those out, and its chats aren't gone then)
+    const groupsOf = (host: string): Group[] => (host ? (this.hosts.get(host)?.result?.groups ?? []) : status.groups);
     for (const t of status.queue ?? []) {
       if (t.afterTurn) {
-        // a reply for when the chat's turn ends: now it has (or the chat isn't listed)
-        const known = !t.host || !!this.hosts.get(t.host)?.result;
-        const row = groups
-          .filter((g) => (g.host ?? "") === (t.host || ""))
-          .flatMap((g) => g.sessions)
-          .find((s) => s.chatId === t.chat || s.sessionId === t.chat);
-        if (known && !t.error && !this.starting.has(t.id) && (!row || (row.state !== "working" && row.state !== "waiting")))
+        // a reply for when the chat's turn ends: now it has (or the chat isn't
+        // listed); a host not heard from yet, or whose last check failed, waits
+        const h = t.host ? this.hosts.get(t.host) : undefined;
+        if (t.host && (!h?.result || h.error)) continue;
+        // (the chat's row on the task's account first, as the widget's listedRow)
+        const rows = groupsOf(t.host || "").flatMap((g) =>
+          g.sessions.filter((s) => s.chatId === t.chat || s.sessionId === t.chat).map((s) => ({ s, own: (g.profileKeys ?? []).includes(t.profile) })));
+        const row = (rows.find((r) => r.own) ?? rows[0])?.s;
+        if (!t.error && !this.starting.has(t.id) && (!row || (row.state !== "working" && row.state !== "waiting")))
           void this.startQueued(t);
         continue;
       }
       if (!t.due || this.starting.has(t.id)) continue;
-      const group = groups.find((g) => (g.host ?? "") === (t.host || "") && (g.profileKeys ?? []).includes(t.profile));
+      const group = groupsOf(t.host || "").find((g) => (g.profileKeys ?? []).includes(t.profile));
       const reset = group ? limitReset(group, Date.now()) : null;
       if (!reset) {
         void this.startQueued(t);

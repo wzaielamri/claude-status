@@ -187,6 +187,18 @@
   first read came only after up to 5 seconds (and moving focus between
   editors put it off again), so Claude's last reply was missing while the
   header already said the turn was done.
+- **A reply queued for after an SSH host's turn waits for it:** one check
+  of the host that failed (a VPN or Wi-Fi blip, the laptop waking up) made
+  its chat look gone, so the reply was sent while the chat was still
+  working, or failed and stayed in the queue with an error. It waits until
+  the host answers and lists the chat as done; a task due on a host at its
+  usage limit waits for the reset there too.
+- **Long replies are sent:** a message of more than about 43,000
+  characters in Japanese or Chinese (65,000 with accents or Cyrillic), or
+  a few thousand to an SSH host's chat, passed the tab's length check and
+  then failed with only *spawn E2BIG*. It goes over in a file private to
+  you now, removed once read; over 100,000 characters still says *That
+  message is too long*.
 
 ## 1.16.1
 

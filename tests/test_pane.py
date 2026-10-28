@@ -1041,6 +1041,27 @@ class SendTests(PaneFixture):
             self.assertEqual(self.cli("--send", SID, "--host", "lab", "--text", "x", "--how", "enter")["how"], "typed")
         copy.assert_not_called()
 
+    def test_a_long_text_comes_in_a_file_of_its_own(self):
+        # (one command-line argument holds 128 KiB at most: VS Code hands over a long reply in a file)
+        text = "語" * 60000
+        self.cache.mkdir(parents=True, exist_ok=True)
+        f = self.cache / "text-1.txt"
+        f.write_text(text, encoding="utf-8")
+        with mock.patch.object(pane, "send", return_value={"ok": True, "how": "typed", "message": "Sent"}) as sent:
+            self.assertTrue(self.cli("--send", SID, "--profile", ".claude-work", "--text-file", str(f))["ok"])
+        self.assertEqual(sent.call_args[0][4], text)
+        self.assertFalse(f.exists(), "read once, then removed")
+        # a host's chat: the text itself goes on (remote.host_answer takes it there)
+        f.write_text("and the docs", encoding="utf-8")
+        with mock.patch("remote.host_answer", return_value={"ok": True, "how": "typed", "message": "Sent"}) as host:
+            self.cli("--send", SID, "--host", "lab", "--text-file", str(f), "--how", "auto")
+        self.assertEqual(host.call_args[0][1], ["--send", SID, "--text", "and the docs", "--how", "auto"])
+        # only a text file of the cache's
+        other = self.home / "notes.txt"
+        other.write_text("secret", encoding="utf-8")
+        self.assertFalse(self.cli("--send", SID, "--text-file", str(other))["ok"])
+        self.assertTrue(other.exists())
+
     def test_after_the_turn(self):
         answer = self.cli("--send", SID, "--profile", ".claude-work", "--text", "next: docs", "--after-turn",
                           "--how", "background", "--session", SID, "--name", "Fix it")

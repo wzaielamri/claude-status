@@ -13,6 +13,35 @@ import type { Status } from "../src/shared/types";
 
 const NOW = 1_800_000_000_000;
 
+// A reply queued for when an SSH host's chat ends its turn waits while the
+// host's last check failed (its chat isn't gone, nor reachable), and goes
+// once the host lists the chat as done
+test("a reply after a host chat's turn waits while the host's check fails", () => {
+  const actions: string[][] = [];
+  const backend = { action: async (_s: string, args: string[]) => (actions.push(args), { ok: true, message: "" }) } as unknown as Backend;
+  const log = { warn() {}, info() {}, error() {} } as unknown as vscode.LogOutputChannel;
+  const dash = new Dashboard(backend, { handle() {}, isLeader: () => true } as unknown as Notifier, log);
+  const priv = dash as unknown as { hosts: Map<string, unknown>; startDueTasks(s: Status): void; starting: Set<string> };
+  try {
+    const result = structuredClone(demoState(NOW).hosts[0].result!);
+    const chat = result.groups[0].sessions[0];
+    chat.state = "working";
+    const status = { ...structuredClone(demoState(NOW).status!), queue: [
+      { id: "q1", afterTurn: true, chat: chat.chatId || chat.sessionId, host: "lab", profile: result.groups[0].profileKeys[0] } as never] };
+    priv.hosts.set("lab", { name: "lab", loading: false, ok: false, error: "timed out", result, updatedAt: NOW });
+    priv.startDueTasks(status);
+    priv.hosts.set("lab", { name: "lab", loading: false, ok: true, error: "", result, updatedAt: NOW });
+    priv.startDueTasks(status);
+    assert.equal(actions.length, 0, "not while the check failed, nor while it works");
+    chat.state = "idle";
+    priv.startDueTasks(status);
+    assert.deepEqual(actions.map((a) => a.slice(0, 2)), [["--start-queued", "q1"]]);
+  } finally {
+    priv.starting.clear();
+    dash.dispose();
+  }
+});
+
 function withFiveHour(pct: number): Status {
   const status = structuredClone(demoState(NOW).status!);
   const windows = status.groups[0].limits!.windows;
