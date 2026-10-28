@@ -26,6 +26,8 @@
 | **Keep going** under a session | The same, and again after every later limit, until it's done (in *Recent chats*: **↻**). Click **↻ keeps going** to stop that. |
 | A queued task under an account | Starts it now, or cancels it. |
 | **⚠ same files** next to a session | Goes to the other chat that changes the same files. |
+| Filter button at the top (**Focus**) | Shows only what needs you, the chats that finished a turn you haven't looked at yet and one line for each chat at work; **Show everything** goes back. |
+| Microphone in the chat pane (**Dictate**) | Records your reply and writes it into the box (click again to stop); the first time, it offers to set dictation up. |
 | Magnifier at the top | Finds a chat by the words in its name, folder or your prompts, and project folders, plans and memories with those words. |
 | Server button at the top | Picks the SSH hosts to show. |
 | **Log in…** at an account | An account that isn't logged in (a new one, or one you logged out of): a terminal opens with Claude's own login. |
@@ -58,6 +60,8 @@ Right-click the widget → **Configure Talpy Den…**
 | Open plans and runs in | Okular if installed, else your browser | Plans and subagent runs (Markdown): in Okular, your browser (a page the widget makes), VS Code's Markdown preview (with the Talpy Den extension for VS Code 1.13 or newer), or your app for Markdown files |
 | Chat pets per account | 5 | 0 keeps only the big Talpy |
 | Popup | on | Token totals |
+| Monday recap | on | On Mondays, sum up the last 7 days in a notification (it opens the Recap) |
+| Dictation language | auto | The language you dictate in (`en`, `de`, `fr`…), or auto to let whisper tell; below it, set up dictation, download, delete or pick a speech model, or remove faster-whisper |
 | Recap amounts in | US dollars | The Recap tab's amounts: US dollars (Claude's API prices), or another currency at the European Central Bank's rate of the day |
 
 ## Accounts

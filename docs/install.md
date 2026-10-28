@@ -101,6 +101,6 @@ The VS Code extension doesn't update by itself: install the `.vsix` of a newer [
    ```
 
    This removes the widget and its window rule, and takes the snippet out of your status-line scripts (it shows the change and keeps a backup).
-3. Optionally delete the widget's cache: `rm -rf ~/.cache/talpy-den`.
+3. Optionally delete the widget's cache, `rm -rf ~/.cache/talpy-den`, and its data, `rm -rf ~/.local/share/talpy-den`: the hooks' scripts and, if you set dictation up, its speech engine and models (about 600 MB, more with each bigger model). Keep both while the GNOME or VS Code extension still uses them.
 
-Apart from the chats you share and the accounts you add, the widget never changes Claude Code's own files, so nothing else is left behind. Accounts you added stay (they're Claude's folders now), and so do their `~/.local/bin/claude-NAME` commands: remove those on the Accounts page first if you like. Shared chats stay shared: use **Keep only on …** first if you want them back as normal chats (see [Sharing chats](sharing.md)).
+Apart from what you change through it (the chats and plans you share, the accounts you add, permissions you allow or revoke, and the files a chat's review undoes or commits), the widget never changes Claude Code's own files, so nothing else is left behind. Accounts you added stay (they're Claude's folders now), and so do their `~/.local/bin/claude-NAME` commands: remove those on the Accounts page first if you like. Shared chats stay shared: use **Keep only on …** first if you want them back as normal chats (see [Sharing chats](sharing.md)).

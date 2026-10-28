@@ -155,7 +155,7 @@ ColumnLayout {
                     readonly property var project: block.projects[index] || ({ folder: "", folderShort: "", chats: 0, lastActive: 0, account: "", groupId: "" })
                     icon: "folder"
                     text: project.folderShort || project.folder
-                    detail: i18np("%1 chat", "%1 chats", project.chats) + " · " + i18nc("how long ago", "%1 ago", root.duration(root.now - project.lastActive))
+                    detail: i18np("%1 chat", "%1 chats", project.chats) + " · " + root.ago(root.now - project.lastActive)
                     account: root.hostGroups(block.host).length > 1 ? project.profile : ""
                     tipTitle: project.folder
                     tip: i18n("Click to start a new chat in this folder on %1: its new-chat box opens with this folder first.", project.account)
@@ -179,7 +179,7 @@ ColumnLayout {
                     readonly property var plan: block.plans[index] || ({ slug: "", title: "", profileDir: "", updatedAt: 0, account: "" })
                     icon: "view-task"
                     text: plan.title
-                    detail: i18nc("how long ago", "%1 ago", root.duration(root.now - plan.updatedAt))
+                    detail: root.ago(root.now - plan.updatedAt)
                     account: root.hostGroups(block.host).length > 1 ? plan.profile : ""
                     tipTitle: plan.title
                     tip: i18n("A plan on %1. Click to read it.", plan.account)
@@ -291,8 +291,8 @@ ColumnLayout {
                         }
                         PlasmaComponents3.Label {
                             textFormat: Text.PlainText
-                            text: i18nc("found chat: folder · how long ago", "%1 · %2 ago", hit.chat.cwdShort || "~",
-                                        root.duration(root.now - hit.chat.lastActive))
+                            text: i18nc("found chat: folder · how long ago", "%1 · %2", hit.chat.cwdShort || "~",
+                                        root.ago(root.now - hit.chat.lastActive))
                             opacity: 0.6
                             font: Kirigami.Theme.smallFont
                             elide: Text.ElideLeft

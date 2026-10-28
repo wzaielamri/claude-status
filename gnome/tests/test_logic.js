@@ -66,7 +66,28 @@ test('headline and summary', () => {
     eq(L.summaryText({waiting: 0, working: 0, idle: 0, done: 0}), 'No chats running');
 });
 
+test('plan usage shows once per account, with the newest numbers', () => {
+    const lim = at => ({updatedAt: at, windows: [{key: 'five_hour', label: '5h', pct: 10}]});
+    const here = {id: 'a', limits: lim(1000)};
+    const lab = {id: 'a', limits: lim(5000)};
+    const other = {id: 'b', limits: lim(2000)};
+    const owners = L.usageOwners([here], [['lab', [lab, other]], ['gpu', [{id: 'a', limits: lim(9000)}]]]);
+    // here: the newest numbers (gpu's), said where they're from
+    eq(L.withUsage(here, '', owners).limits.updatedAt, 9000);
+    eq(L.withUsage(here, '', owners).limitsFrom, 'gpu');
+    // on the hosts: hidden, as it shows here
+    eq(L.withUsage(lab, 'lab', owners).limitsHidden, true);
+    eq(L.withUsage(lab, 'lab', owners).limits, null);
+    // an account only on a host shows its own
+    eq(L.withUsage(other, 'lab', owners), other);
+    eq(L.planUsageText(lim(1000), 31000, 'gpu'), 'Plan usage updated just now, on gpu');
+    eq(L.planUsageText(lim(1000), 1000 + 5 * 60000, 'gpu'), 'Plan usage as of 5m ago, on gpu');
+    eq(L.planUsageText(lim(1000), 1000 + 5 * 60000), 'Plan usage as of 5m ago');
+});
+
 test('durations, tokens, reset text', () => {
+    eq(L.ago(20000), 'just now');
+    eq(L.ago(5 * 60000), '5m ago');
     eq([L.duration(0), L.duration(59 * 60000), L.duration(61 * 60000), L.duration(26 * 3600000)],
         ['0m', '59m', '1h 1m', '1d 2h']);
     eq([L.formatTokens(999), L.formatTokens(1500), L.formatTokens(2.5e6), L.formatTokens(3e9)],

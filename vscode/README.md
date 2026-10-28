@@ -56,6 +56,11 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   chats do right now, taking turns between them (click it for that chat's
   tab). **Talpy Den: Live Mode…** shows each step of each chat as it
   happens too (a hook in Claude's settings that Claude doesn't wait for).
+- **Focus** (the button at the top of the view): only what needs you, as
+  full rows (their questions, Allow and Deny), the chats that finished a turn
+  you haven't looked at yet (until you open that chat), one line for each
+  chat at work with what it does now, and how the rest stands; **Show
+  everything** goes back.
 - **What a chat is doing, without switching to it**: a line under each chat
   says what it's on right now (*▸ Bash: npm test*), what it needs, Claude's
   recap of it (when you come back to a chat after a while, Claude Code writes
@@ -139,7 +144,8 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   and a command to copy. For all your accounts or one, with the SSH hosts
   shown, in US dollars or your currency (`talpyDen.recapCurrency`). It's read from the chats' transcripts, so it uses no tokens,
   and only while the tab is open: the first time takes a few seconds, after
-  that only what's new is read.
+  that only what's new is read. On Mondays a notification sums up the last 7
+  days; **Open the Recap** shows them (`talpyDen.mondayRecap`).
 - **The permissions you gave, in one place**: the view's **Permissions** tab
   lists everything that lets chats go without asking you, here and on the
   SSH hosts shown: the rules and modes in your settings, your administrator's
@@ -239,6 +245,18 @@ session stops first). A terminal outside VS Code takes no text from outside,
 so there you choose: send it, and Claude there quits and the chat goes on in
 the background, or copy it and open its terminal. An SSH host's chats work
 the same way. A notification takes a reply too (**Reply…**).
+
+**Dictating a reply:** the microphone under the reply box records what you
+say (up to five minutes) and writes it into the box, with speech to text
+that runs on this computer: what you say never leaves it, and the recording
+is deleted once it's written down. The first click offers to set it up, with
+no sudo: faster-whisper from pypi.org in a Python environment of its own and
+its base speech model from huggingface.co (about 600 MB), in
+`~/.local/share/talpy-den/whisper` (with whisper.cpp installed, that's used
+and only a model is downloaded). **Talpy Den: Dictation Models…** downloads,
+deletes or picks a model (up to 1.5 GB each), or removes faster-whisper;
+`talpyDen.dictateLanguage` sets the language. One setup serves the widget
+and the extension.
 
 **Permission prompts:** a chat waiting for a permission shows the command, or
 the file and its change, with **Allow once**, **Always allow** and **Deny**
@@ -401,6 +419,8 @@ code --install-extension talpy-den-*.vsix
 | `talpyDen.showTokens`, `showUsageInStatusBar`, `recentChats`, `keepDoneHours` | | What the view shows |
 | `talpyDen.recapCurrency` | `USD` | The Recap tab's amounts: US dollars (Claude's API prices), or another currency at the European Central Bank's rate of the day |
 | `talpyDen.recapHistory` | `true` | The Recap keeps the numbers of chats Claude Code has deleted (after 30 days), so **Overall** keeps growing; **Delete the Recap's Saved History…** starts it again |
+| `talpyDen.mondayRecap` | `true` | On Mondays, a notification sums up the last 7 days and opens the Recap (once a week, here or in the Plasma widget) |
+| `talpyDen.dictateLanguage` | `auto` | The language you dictate replies in (`en`, `de`, `fr`…), or `auto` to let whisper tell |
 | `talpyDen.recapRules` | `true` | The Permissions tab suggests rules for the permission prompts you answered, each with **Allow…**; off, it only counts the prompts |
 | `talpyDen.pythonPath` | `python3` | Python on this computer |
 
@@ -415,11 +435,15 @@ named in each profile's `settings.json`) writes each chat's last steps to
 command (cut to 60 characters) and the first line of Claude's last reply. A
 file goes once its chat has said nothing for 3 days; turning Live Mode off
 takes the hook out again.
-The one download: with `talpyDen.recapCurrency` set to a currency other
+The downloads: with `talpyDen.recapCurrency` set to a currency other
 than US dollars, the **Recap** tab fetches the European Central Bank's public
 exchange rates (`https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml`)
-at most every 6 hours while it's open; that request carries nothing about
-you or your chats.
+at most every 6 hours while it's open; setting up dictation downloads
+faster-whisper from pypi.org (with `pip`) and a speech model from
+huggingface.co, as does downloading another model. None of them carries
+anything about you or your chats. The microphone is used only while you
+dictate: the recording goes to `~/.cache/talpy-den/dictation` (yours alone),
+is written down on this computer and deleted right after.
 
 What it reads, all of it written by Claude Code itself: the session registry
 (`<config>/sessions`), background jobs (`<config>/jobs`), transcripts (for
@@ -453,7 +477,8 @@ reply is saved in `~/.cache/talpy-den/images` (yours alone, deleted after
 **Copy**. It writes only to
 `~/.cache/talpy-den` (caches, the list of chats you removed, the tasks
 you queue until they start, copies of the files a comparison shows, kept for
-a day, pictures you paste) and, if you
+a day, pictures you paste), `~/.local/share/talpy-den` (the hooks' scripts
+and, once you set dictation up, its speech engine and models) and, if you
 ask for it, the status-line change above, the links of the chats and plans
 you share (see below) and the accounts you add or remove. A task you start a
 chat with goes to Claude, which runs it like a prompt you type (with a plan

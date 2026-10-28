@@ -120,6 +120,11 @@ class TalpyDenIndicator extends PanelMenu.Button {
         return this._status ? this._status.groups : [];
     }
 
+    // Each account's plan usage, shown once with the newest numbers (L.withUsage)
+    get usageOwners() {
+        return L.usageOwners(this.groups, this.shownHosts.map(h => [h, this.remote[h]?.result?.groups || []]));
+    }
+
     get shownHosts() {
         return this._settings.get_strv('ssh-hosts').map(h => h.trim()).filter(h => h.length);
     }
@@ -1248,8 +1253,9 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this._list.add_child(this.ui.tab === 'week' ? buildWeekView(this) : buildPermsView(this));
             return;
         }
+        const owners = this.usageOwners;
         this.groups.forEach((g, i) => {
-            this._list.add_child(buildGroupSection(this, g, {last: i === this.groups.length - 1, accounts: this.groups.length}));
+            this._list.add_child(buildGroupSection(this, L.withUsage(g, '', owners), {last: i === this.groups.length - 1, accounts: this.groups.length}));
         });
         for (const host of hosts)
             this._list.add_child(buildHostSection(this, host));

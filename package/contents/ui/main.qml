@@ -3980,6 +3980,11 @@ PlasmoidItem {
         return i18nc("duration in days and hours", "%1d %2h", Math.floor(h / 24), h % 24)
     }
 
+    // How long ago, for the lists' ages: "just now" under a minute, not "0m ago"
+    function ago(ms) {
+        return ms < 60000 ? i18nc("how long ago: under a minute", "just now") : i18nc("how long ago", "%1 ago", duration(ms))
+    }
+
     function resetText(window) {
         if (window.reset)
             return i18n("reset")

@@ -10,7 +10,7 @@ And Talpy, a pet that acts out what each chat is doing.
 
 [![Tests](https://github.com/wzaielamri/talpy-den/actions/workflows/tests.yml/badge.svg)](https://github.com/wzaielamri/talpy-den/actions/workflows/tests.yml)
 [![KDE Plasma 6](https://img.shields.io/badge/KDE_Plasma-6-1d99f3?logo=kde&logoColor=white)](https://kde.org/plasma-desktop/)
-[![GNOME Shell 49+](https://img.shields.io/badge/GNOME_Shell-49%2B-4a86cf?logo=gnome&logoColor=white)](https://extensions.gnome.org/)
+[![GNOME Shell 43, 44, 49+](https://img.shields.io/badge/GNOME_Shell-43%20%7C%2044%20%7C%2049%2B-4a86cf?logo=gnome&logoColor=white)](docs/gnome.md)
 [![VS Code](https://img.shields.io/badge/VS_Code-1.90%2B-007acc)](vscode/)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -45,7 +45,7 @@ git clone https://github.com/wzaielamri/talpy-den.git && cd talpy-den && ./insta
 
 Then right-click your panel → **Add Widgets…** and add **Talpy Den**. It needs Claude Code, python3 and jq; `install.sh` also adds the small status-line snippet that plan usage comes from ([details](docs/install.md)).
 
-**GNOME Shell 49 or newer:** the same `./install.sh` (in a GNOME session it installs the GNOME extension), then log out and back in. [What's different on GNOME](docs/gnome.md).
+**GNOME Shell 49 or newer, or 43 and 44 (Debian 12):** the same `./install.sh` (in a GNOME session it installs the GNOME extension), then log out and back in. [What's different on GNOME](docs/gnome.md).
 
 **VS Code:** download `talpy-den-<version>.vsix` from the [latest release](https://github.com/wzaielamri/talpy-den/releases/latest), then `code --install-extension talpy-den-<version>.vsix`. It needs Python 3.7+ and works on its own or next to the widget, also in Remote-SSH windows: see [Talpy Den for VS Code](vscode/).
 
@@ -72,7 +72,7 @@ I built this widget to make my own day-to-day work with Claude Code easier. With
 
 This is an independent, personal project. It is not affiliated with, endorsed by, sponsored by or otherwise connected to Anthropic, PBC, and building it does not make me a representative of Anthropic in any way. "Claude" and "Claude Code" are trademarks of Anthropic, PBC; they appear here only to describe what the widget works with.
 
-The widget only reads files that Claude Code writes on your own computer, and changes them only when you share a chat between your accounts, or add, remove or pick the default account. It does not call any Anthropic API, and it sends no data anywhere: logging in and out is Claude Code's own command. The *Open Usage Page on claude.ai* menu entry just opens that page in your browser.
+The widget only reads files that Claude Code writes on your own computer, and changes them only when you ask it to: when you share a chat between your accounts, add, remove or pick the default account, allow or revoke a permission, undo or commit a chat's changes from its review, or turn on live mode or answering permission prompts from the widget (a hook in Claude's settings). It does not call any Anthropic API, and it sends no data anywhere: logging in and out is Claude Code's own command, and dictation runs on your computer ([Privacy](docs/privacy.md) has the details). The *Open Usage Page on claude.ai* menu entry just opens that page in your browser.
 
 ### AI-assisted development
 

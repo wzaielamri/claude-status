@@ -449,6 +449,12 @@ if [ "$uninstall" = 1 ]; then
     live off
   fi
   echo "Uninstalled. Cached data is in ${XDG_CACHE_HOME:-$HOME/.cache}/talpy-den (safe to delete)."
+  # (left as the cache is: the hooks' scripts, and dictation's speech engine
+  # and models if it was set up, hundreds of MB)
+  data="${XDG_DATA_HOME:-$HOME/.local/share}/talpy-den"
+  if [ -d "$data" ] && [ "${#others[@]}" -eq 0 ]; then
+    echo "The hooks and dictation's speech engine and models (if you set it up) are in $data (safe to delete)."
+  fi
   exit 0
 fi
 

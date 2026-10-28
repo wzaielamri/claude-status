@@ -88,13 +88,13 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
             limits.add_child(line);
         }
     }
-    const asOf = label(L.planUsageText(group.limits, ctx.now), 'claude-small claude-dim', {x_expand: true});
+    const asOf = label(L.planUsageText(group.limits, ctx.now, group.limitsFrom), 'claude-small claude-dim', {x_expand: true});
     if (!group.limits) {
         tips.add(asOf, ['No plan usage yet',
             'Plan limits come from the Claude Code status line (statusline-snippet.sh). They update whenever a session of this account gets a reply.']);
     }
     limits.add_child(asOf);
-    if (!group.loggedOut)
+    if (!group.loggedOut && !group.limitsHidden)   // (hidden: the account shows it where it's listed first)
         section.add_child(limits);
 
     // Token totals (from local transcripts); with stats, a toggle for the last days
@@ -329,7 +329,7 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
     line.add_child(name);
     if (chat.shared)
         line.add_child(label('⇄', 'claude-dim'));
-    const when = label(L.fmt('%1 · %2 ago', chat.cwdShort || '~', L.duration(ctx.now - chat.lastActive)),
+    const when = label(L.fmt('%1 · %2', chat.cwdShort || '~', L.ago(ctx.now - chat.lastActive)),
         'claude-small claude-dim claude-side');
     when.clutter_text.ellipsize = 1;   // Pango.EllipsizeMode.START
     line.add_child(when);
@@ -358,7 +358,8 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
 export function buildHostSection(ctx, host) {
     const tips = ctx.tips;
     const info = ctx.remote[host] || {loading: true, ok: false, error: '', result: null, updatedAt: 0};
-    const groups = info.result ? info.result.groups : [];
+    const owners = ctx.usageOwners;
+    const groups = (info.result ? info.result.groups : []).map(g => L.withUsage(g, host, owners));
     const stale = !!info.error && info.result !== null;
     const section = column('claude-host', {x_expand: true});
     const rule = separator();   // (set off from this computer's accounts, and from the host before)

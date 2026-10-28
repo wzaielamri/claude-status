@@ -66,6 +66,41 @@ export function remoteGroups(shownHosts, remote) {
     return out;
 }
 
+// Plan usage is the account's, whichever machine it's used on. An account on
+// several (this computer and SSH hosts: the same id) shows it once, where it's
+// listed first, with the newest numbers of them all (as Plasma's and VS Code's
+// default). hostGroups: [[host, groups], ...] in the hosts' order
+export function usageOwners(groups, hostGroups) {
+    const out = {};
+    const note = (g, host) => {
+        const o = out[g.id] || (out[g.id] = {host, limits: null, from: ''});
+        if (g.limits && (!o.limits || g.limits.updatedAt > o.limits.updatedAt)) {
+            o.limits = g.limits;
+            o.from = host;
+        }
+    };
+    for (const g of groups)
+        note(g, '');
+    for (const [host, gs] of hostGroups) {
+        for (const g of gs)
+            note(g, host);
+    }
+    return out;
+}
+
+// group as shown in host's section ('' here): limitsHidden when its usage
+// shows elsewhere, limitsFrom when the numbers come from another machine
+export function withUsage(group, host, owners) {
+    const owner = owners[group.id];
+    if (!owner)
+        return group;
+    if (host && owner.host !== host)
+        return Object.assign({}, group, {limits: null, limitsHidden: true});
+    if (owner.from === host)
+        return group;
+    return Object.assign({}, group, {limits: owner.limits, limitsFrom: owner.from});
+}
+
 // The hero's headline: the most important thing on the dashboard
 export function headline(status, errorText, c) {
     if (!status && errorText)
@@ -184,6 +219,11 @@ export function duration(ms) {
     return fmt('%1d %2h', Math.floor(h / 24), h % 24);
 }
 
+// How long ago, for the lists' ages: "just now" under a minute, not "0m ago"
+export function ago(ms) {
+    return ms < 60000 ? 'just now' : fmt('%1 ago', duration(ms));
+}
+
 export function resetText(window, now) {
     if (window.reset)
         return 'reset';
@@ -245,9 +285,14 @@ export function usageClass(pct) {
     return 'working';
 }
 
-export function planUsageText(limits, now) {
+// from: the SSH host the numbers come from, when another machine's are newer (withUsage)
+export function planUsageText(limits, now, from = '') {
     if (!limits)
         return "No plan usage yet: shows after this account's next reply";
+    if (from) {
+        return now - limits.updatedAt < 60000 ? fmt('Plan usage updated just now, on %1', from)
+            : fmt('Plan usage as of %1 ago, on %2', duration(now - limits.updatedAt), from);
+    }
     if (now - limits.updatedAt < 60000)
         return 'Plan usage updated just now';
     return fmt('Plan usage as of %1 ago', duration(now - limits.updatedAt));

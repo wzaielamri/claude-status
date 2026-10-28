@@ -706,8 +706,8 @@ ColumnLayout {
                 PlasmaComponents3.Label {
                     id: recentFolder
                     textFormat: Text.PlainText
-                    text: i18nc("recent chat: folder, how long ago", "%1 · %2 ago", recentLine.chat.cwdShort || "~",
-                                root.duration(root.now - recentLine.chat.lastActive))
+                    text: i18nc("recent chat: folder · how long ago", "%1 · %2", recentLine.chat.cwdShort || "~",
+                                root.ago(root.now - recentLine.chat.lastActive))
                     opacity: 0.6
                     font: Kirigami.Theme.smallFont
                     elide: Text.ElideLeft
@@ -874,8 +874,8 @@ ColumnLayout {
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText
                     text: planLine.plan.cwdShort
-                          ? i18nc("plan: folder, how long ago", "%1 · %2 ago", planLine.plan.cwdShort, root.duration(root.now - planLine.plan.updatedAt))
-                          : i18nc("plan: how long ago", "%1 ago", root.duration(root.now - planLine.plan.updatedAt))
+                          ? i18nc("plan: folder · how long ago", "%1 · %2", planLine.plan.cwdShort, root.ago(root.now - planLine.plan.updatedAt))
+                          : root.ago(root.now - planLine.plan.updatedAt)
                     opacity: 0.6
                     font: Kirigami.Theme.smallFont
                     elide: Text.ElideLeft
@@ -1090,9 +1090,9 @@ ColumnLayout {
             PlasmaComponents3.Label {
                 textFormat: Text.PlainText
                 text: memoryLine.memory.folderShort || memoryLine.memory.type === "account"
-                      ? i18nc("memory: folder, how long ago", "%1 · %2 ago", memoryLine.memory.folderShort || i18n("every folder"),
-                              root.duration(root.now - memoryLine.memory.updatedAt))
-                      : i18nc("memory: how long ago", "%1 ago", root.duration(root.now - memoryLine.memory.updatedAt))
+                      ? i18nc("memory: folder · how long ago", "%1 · %2", memoryLine.memory.folderShort || i18n("every folder"),
+                              root.ago(root.now - memoryLine.memory.updatedAt))
+                      : root.ago(root.now - memoryLine.memory.updatedAt)
                 opacity: 0.6
                 font: Kirigami.Theme.smallFont
                 elide: Text.ElideLeft
