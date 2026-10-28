@@ -63,7 +63,7 @@ test('headline and summary', () => {
     eq(L.headline({}, '', {waiting: 0, working: 0, idle: 0, done: 0, limit: 2}), '2 chats wait for their usage limit');
     eq(L.summaryText({waiting: 1, working: 2, idle: 0, done: 3}), '1 needs input · 2 working · 3 done');
     eq(L.summaryText({waiting: 0, working: 0, idle: 1, done: 1, limit: 2}), '1 idle · 2 at the usage limit · 1 done');
-    eq(L.summaryText({waiting: 0, working: 0, idle: 0, done: 0}), 'No sessions running');
+    eq(L.summaryText({waiting: 0, working: 0, idle: 0, done: 0}), 'No chats running');
 });
 
 test('durations, tokens, reset text', () => {
@@ -285,8 +285,10 @@ test('tasks and changes tags', () => {
     const [title, text] = L.tasksTooltip(tasks, false);
     eq(title, 'Tasks: 1 of 3 done');
     eq(text.split('\n'), ['Now: Testing', '✓ Write', '▸ Test', '○ Ship', 'Click to show the list.']);
-    eq(L.changesTag({count: 1, files: ['a']}), '± 1 file');
-    eq(L.changesTag({count: 14, files: []}), '± 14 files');
+    eq(L.changesTag({count: 1, files: ['a']}), '±1');
+    eq(L.changesTag({count: 14, files: []}), '±14');
+    eq(L.changesTooltip({count: 1, files: ['a.py']}, '')[0], '1 file changed');
+    eq(L.changesTooltip({count: 13, files: ['a.py']}, '')[0], '13 files changed');
     eq(L.changesTooltip({count: 13, files: ['a.py']}, '')[1].split('\n').slice(0, 2), ['a.py', '… and 12 more']);
     eq(L.changesTooltip({count: 1, files: ['a.py']}, 'lab')[1].includes('On lab'), true);
 });

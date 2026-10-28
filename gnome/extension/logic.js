@@ -97,7 +97,7 @@ export function summaryText(c) {
         parts.push(fmt('%1 at the usage limit', c.limit));
     if (c.done)
         parts.push(fmt('%1 done', c.done));
-    return parts.length ? parts.join(' · ') : 'No sessions running';
+    return parts.length ? parts.join(' · ') : 'No chats running';
 }
 
 // A chat's key: its account and conversation, so its pet, its notifications
@@ -882,7 +882,7 @@ export function tasksTooltip(tasks, open) {
 }
 
 export function changesTag(changes) {
-    return plural(changes.count, '± %1 file', '± %1 files');
+    return fmt('±%1', changes.count);
 }
 
 export function changesTooltip(changes, remoteHost) {
@@ -893,7 +893,7 @@ export function changesTooltip(changes, remoteHost) {
     lines.push(remoteHost
         ? fmt('On %1: comparing them works for chats on this computer.', remoteHost)
         : 'Click to compare them with how they were before the chat, side by side in VS Code.');
-    return ['Files this chat changed', lines.join('\n')];
+    return [plural(changes.count, '%1 file changed', '%1 files changed'), lines.join('\n')];
 }
 
 // ---------------------------------------------------------------- subagents

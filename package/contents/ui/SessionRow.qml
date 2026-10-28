@@ -368,7 +368,7 @@ RowLayout {
                         text: row.changes ? i18nc("number of files a chat changed", "±%1", row.changes.count) : ""
                         clickable: row.canCompare
                         onClicked: root.showChanges(row.session.chatId, row.session.profileDir, false)
-                        tooltipTitle: row.changes ? i18np("Changed %1 file", "Changed %1 files", row.changes.count) : ""
+                        tooltipTitle: row.changes ? i18np("%1 file changed", "%1 files changed", row.changes.count) : ""
                         tooltip: !row.changes ? ""
                                  : row.changes.files.join("\n")
                                    + (row.changes.count > row.changes.files.length ? "\n" + i18n("…and %1 more", row.changes.count - row.changes.files.length) : "")
@@ -523,7 +523,7 @@ RowLayout {
                         textFormat: Text.PlainText
                         anchors.fill: parent
                         mainText: i18n("Remove from the list")
-                        subText: i18n("Only hides it here; nothing is deleted. It comes back if the session runs again, or via right-click → Show removed sessions again.")
+                        subText: i18n("Only hides it here; nothing is deleted. It comes back if the chat runs again, or via right-click → Show Removed Chats Again.")
                     }
                 }
                 PlasmaComponents3.ToolButton {

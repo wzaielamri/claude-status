@@ -22,6 +22,7 @@ import {
   overallState,
   panelWindow,
   petKeyOf,
+  planUsageText,
   resetText,
   shareAccounts,
   shareUsage,
@@ -29,6 +30,7 @@ import {
   toLocalClock,
   stateText,
   summaryText,
+  tokensText,
 } from "../src/shared/model";
 
 const NOW = 1_800_000_000_000;
@@ -302,4 +304,15 @@ test("a row's open details stay open when its chat changes kind (a background se
   assert.equal(rowKeyOf(live, "lab"), rowKeyOf({ ...live, key: ".claude-work/s1/job" }, "lab"));
   assert.equal(rowKeyOf(live, "lab"), "lab|.claude-work/c1");
   assert.equal(rowKeyOf({ ...live, chatId: "" }), ".claude-work/s1");
+});
+
+test("an account's plan usage line and token line read as in the widget", () => {
+  const limits = (ago: number) => ({ updatedAt: NOW - ago, windows: [] }) as unknown as Parameters<typeof planUsageText>[0];
+  assert.equal(planUsageText(limits(20_000), "", NOW), "Plan usage updated just now");
+  assert.equal(planUsageText(limits(5 * 60_000), "", NOW), "Plan usage as of 5m ago");
+  assert.equal(planUsageText(limits(20_000), "lab", NOW), "Plan usage updated just now, on lab");
+  assert.equal(planUsageText(limits(5 * 60_000), "lab", NOW), "Plan usage as of 5m ago, on lab");
+  const totals = (total: number, output: number) => ({ total, output, input: 0, cacheRead: 0, cacheWrite: 0, messages: 0, shared: 0 });
+  const t = { today: totals(378_300, 12_000), week: totals(502_900, 15_000), models: [{ model: "claude-opus-5", total: 400_000 }] };
+  assert.equal(tokensText(t as unknown as Parameters<typeof tokensText>[0]), "Tokens today 378.3k (12.0k out) · 7 days 502.9k (15.0k out)");
 });

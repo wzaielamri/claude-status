@@ -314,7 +314,7 @@ ColumnLayout {
         visible: section.group.sessions.length === 0
         Layout.fillWidth: true
         Layout.leftMargin: Kirigami.Units.smallSpacing
-        text: i18n("No running sessions")
+        text: i18n("No running chats")
         opacity: 0.6
     }
 

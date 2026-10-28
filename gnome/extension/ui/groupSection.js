@@ -115,7 +115,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
     for (const s of group.sessions)
         section.add_child(buildSessionRow(ctx, s, {showProfile: multiProfile, remoteHost}));
     if (group.sessions.length === 0)
-        section.add_child(label('No running sessions', 'claude-dim claude-indent'));
+        section.add_child(label('No running chats', 'claude-dim claude-indent'));
 
     // Chats shared with this account that are in use on another one (they're
     // listed there, once): a line pointing to them
@@ -378,7 +378,7 @@ export function buildHostSection(ctx, host) {
                 : L.fmt('updated %1 ago', L.duration(ctx.now - info.updatedAt)), 'claude-small claude-dim'));
     if (info.result && (info.result.dismissed || 0) > 0) {
         head.add_child(tips.add(iconButton('view-reveal-symbolic', () => ctx.remoteUndismissAll(host)),
-            L.fmt('Show removed sessions again (%1)', info.result.dismissed)));
+            L.fmt('Show removed chats again (%1)', info.result.dismissed)));
     }
     head.add_child(tips.add(iconButton('view-refresh-symbolic', () => ctx.pollHost(host)),
         [L.fmt('Refresh %1', host), L.fmt("Checked every %1 seconds while it's shown.", ctx.remotePollSeconds)]));

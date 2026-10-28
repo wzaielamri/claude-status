@@ -475,7 +475,7 @@ export class Stage implements PetStage, Animator {
       el("span", `cs-count-dot cs-dot-${state}`, item);
       el("span", "cs-count-text", item).textContent = text;
     }
-    if (!box.childElementCount) el("span", "cs-count-none", box).textContent = "No sessions running";
+    if (!box.childElementCount) el("span", "cs-count-none", box).textContent = "No chats running";
   }
 
   private openCalling(): void {

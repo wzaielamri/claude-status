@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "add" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder";
+export type IconName = "refresh" | "add" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -21,6 +21,7 @@ const shapes: Record<IconName, JSX.Element> = {
     </>
   ),
   add: <path d="M8 2.75v10.5M2.75 8h10.5" />,
+  remove: <path d="M2.75 8h10.5" />,
   stop: <rect x="3.75" y="3.75" width="8.5" height="8.5" rx="1.5" fill="currentColor" />,
   close: <path d="M4 4l8 8M12 4l-8 8" />,
   share: (

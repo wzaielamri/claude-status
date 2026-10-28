@@ -401,7 +401,7 @@ Item {
             PlasmaComponents3.Label {
                 textFormat: Text.PlainText
                 visible: root.counts.waiting + root.counts.working + root.counts.idle + root.counts.done + root.counts.limit === 0
-                text: i18n("No sessions running")
+                text: i18n("No chats running")
                 font: Kirigami.Theme.smallFont
                 opacity: 0.7
             }

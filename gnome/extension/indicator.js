@@ -980,7 +980,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         popup.add_child(this._scroll);
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this._undismissItem = this.menu.addAction('Show removed sessions again',
+        this._undismissItem = this.menu.addAction('Show removed chats again',
             () => this.runHelper(['--undismiss-all']), 'view-reveal-symbolic');
         this.menu.addAction('Open usage page on claude.ai', () => {
             Gio.AppInfo.launch_default_for_uri(USAGE_PAGE, global.create_app_launch_context(0, -1));
@@ -1220,7 +1220,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._summary.text = this._pets.heroShown && chats ? '' : L.summaryText(c);   // the big Talpy's headline says it
         const hosts = this.shownHosts;
         this._hostsCount.text = hosts.length > 0 ? String(hosts.length) : '';
-        this._undismissItem.label.text = L.fmt('Show removed sessions again (%1)', this._status?.dismissed || 0);
+        this._undismissItem.label.text = L.fmt('Show removed chats again (%1)', this._status?.dismissed || 0);
         this._undismissItem.visible = (this._status?.dismissed || 0) > 0;
 
         this._messages.destroy_all_children();

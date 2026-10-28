@@ -919,7 +919,7 @@ class Stage {
                 this.chips.add_child(chip);
             }
             if (!chips.length)
-                this.chips.add_child(label('No sessions running', 'claude-small claude-dim'));
+                this.chips.add_child(label('No chats running', 'claude-small claude-dim'));
         }
         // the light: what the whole dashboard is up to
         const [r, g, b] = mood === 'working' || mood === 'agents' ? this.pets.accentRgb : MOOD_COLORS[mood] || NIGHT;

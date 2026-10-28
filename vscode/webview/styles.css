@@ -521,24 +521,12 @@ button:focus-visible {
   font-weight: 700;
 }
 
-/* When the numbers are from: a hint while you look at the account */
+/* When the plan usage numbers are from: a dim line under the bars */
 .usage-age {
-  flex: 0 1 auto;
-  min-width: 0;
+  margin: 0 0 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 120ms;
-}
-
-.group:hover .usage-age,
-.group:focus-within .usage-age {
-  opacity: 1;
-}
-
-.group-head .usage-age + .nowrap {
-  margin-left: 6px;
 }
 
 /* The account's pet stage folds open when it gets chats (0fr → 1fr animates
@@ -818,6 +806,12 @@ button:focus-visible {
 .session.stopped > .session-main .state-text,
 .session.freed > .session-main .state-text {
   font-weight: 600;
+  color: var(--st);
+}
+
+/* the limit reset: it can go on */
+.session.freed > .session-main .state-text {
+  color: var(--cs-idle);
 }
 
 .pk-stopped {
@@ -941,11 +935,14 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--st);
 }
 
+/* Only what needs you stands out in words (as in the widget): a chat that
+   waits for you, and a usage limit, held (red) or reset (green, above); the
+   dot carries every state's color */
 .st-waiting > .session-main .state-text {
   font-weight: 600;
+  color: var(--st);
 }
 
 .folder {

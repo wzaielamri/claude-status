@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { demoState } from "../src/shared/demo";
 import {
   allGroups,
+  changesTag,
   changesTitle,
   chatsNeedingYou,
   clockText,
@@ -47,7 +48,9 @@ test("task and changed-file tooltips list them", () => {
     { subject: "Write", status: "completed" }, { subject: "Test", status: "in_progress" }, { subject: "Ship", status: "pending" }] };
   assert.equal(tasksTitle(t), "Tasks: 1 of 3 done · now: Testing\n✓ Write\n▸ Test\n○ Ship");
   const c = { count: 14, files: ["a.ts", "b.ts"] };
-  assert.match(changesTitle(c), /^Files this chat changed \(14\):\na\.ts\nb\.ts\n…and 12 more\nClick to compare/);
+  assert.match(changesTitle(c), /^14 files changed:\na\.ts\nb\.ts\n…and 12 more\nClick to compare/);
+  assert.match(changesTitle({ count: 1, files: ["a.ts"] }), /^1 file changed:\na\.ts\n/);
+  assert.equal(changesTag(c), "±14");
   assert.match(changesTitle(c, "lab"), /They're on lab/);
 });
 

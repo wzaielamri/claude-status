@@ -719,7 +719,7 @@ PlasmoidItem {
             onTriggered: root.refresh()
         },
         PlasmaCore.Action {
-            text: i18n("Show removed sessions again (%1)", root.status ? root.status.dismissed || 0 : 0)
+            text: i18n("Show Removed Chats Again (%1)", root.status ? root.status.dismissed || 0 : 0)
             icon.name: "view-visible"
             visible: root.status !== null && (root.status.dismissed || 0) > 0
             onTriggered: root.runHelper("--undismiss-all")
@@ -4053,7 +4053,7 @@ PlasmoidItem {
             parts.push(i18np("%1 at the usage limit", "%1 at the usage limit", counts.limit))
         if (counts.done)
             parts.push(i18np("%1 done", "%1 done", counts.done))
-        return parts.length ? parts.join(" · ") : i18n("No sessions running")
+        return parts.length ? parts.join(" · ") : i18n("No chats running")
     }
 
     function tooltipText() {

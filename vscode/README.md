@@ -105,7 +105,7 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
 - **Memories**: each account lists what Claude remembers about you and your
   projects (**Memories**), after its own `CLAUDE.md`: read one in the
   Markdown preview, or edit it.
-- **What a chat changed**: its **± 3 files** tag opens VS Code's changes view
+- **What a chat changed**: its **±3** tag opens VS Code's changes view
   with each file as it was before the chat and as it is now (or only the last
   turn: **Last turn** in the unfolded peek). The files come from the backups
   Claude Code makes before it edits a file; a file with no backup is compared
@@ -431,7 +431,7 @@ the plans chats wrote (`<config>/plans`), Claude's memories
 (`<config>/projects/<folder>/memory`) and each account's `CLAUDE.md`,
 the account name and plan from `.claude.json`, and the status-line copies in
 `~/.cache/talpy-den/statusline`. The **Recap** tab reads the transcripts
-too, and keeps what it read in `~/.cache/talpy-den/week-2.json`; it calls
+too, and keeps what it read in `~/.cache/talpy-den/week-3.json`; it calls
 no model. A rule you **Allow…** in the **Permissions** tab is one entry in the
 `.claude/settings.local.json` of the folder its chats started in (only
 there, never your user settings), and `~/.cache/talpy-den/rules.json`

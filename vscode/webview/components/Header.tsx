@@ -30,7 +30,7 @@ export function Header(props: {
   const visible = useViewVisible();
   const { tab, focus } = useStore(uiState);
   const { overall, counts, groups, hosts } = props;
-  // "No sessions running" only once something answered; until then the list
+  // "No chats running" only once something answered; until then the list
   // says it's looking
   const summary = props.answered ? summaryText(counts) : props.unavailable ? "Status unavailable" : "";
 

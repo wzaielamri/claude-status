@@ -1,7 +1,7 @@
 // The dashboard's derived values, shared by the extension (status bar,
 // notifications) and the webview. Ported from the widget's main.qml.
 
-import type { Agent, ChangeSummary, ChatRef, ChatStats, ClaudeCodeInfo, Counts, Group, HostState, KeptChat, Limits, LimitWindow, LiveView, Memory, Overall, Overlap, PlanItem, QueuedTask, RecentChat, ReopenIn, Session, SharedPointer, SshUsage, StatsDay, Status, Stop, TaskProgress, UsageStats, ViewState } from "./types";
+import type { Agent, ChangeSummary, ChatRef, ChatStats, ClaudeCodeInfo, Counts, Group, HostState, KeptChat, Limits, LimitWindow, LiveView, Memory, Overall, Overlap, PlanItem, QueuedTask, RecentChat, ReopenIn, Session, SharedPointer, SshUsage, StatsDay, Status, Stop, TaskProgress, Tokens, UsageStats, ViewState } from "./types";
 
 // This computer's accounts and the hosts', for the counts, the badge and
 // what needs you. A host whose last check failed still shows what it said
@@ -298,7 +298,7 @@ export function summaryText(counts: Counts): string {
   if (counts.idle) parts.push(`${counts.idle} idle`);
   if (counts.limit) parts.push(`${counts.limit} at the usage limit`);
   if (counts.done) parts.push(`${counts.done} done`);
-  return parts.length ? parts.join(" · ") : "No sessions running";
+  return parts.length ? parts.join(" · ") : "No chats running";
 }
 
 export function agentsRunning(groups: Group[]): number {
@@ -490,6 +490,23 @@ export function formatTokens(n: number): string {
   if (n >= 999.95e3) return (n / 1e6).toFixed(1) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
   return String(n);
+}
+
+// An account's token line: today's and the week's totals, each with its output
+// (the widget's words; the models are in its tooltip)
+export function tokensText(t: Tokens): string {
+  return (
+    `Tokens today ${formatTokens(t.today.total)} (${formatTokens(t.today.output)} out)` +
+    ` · 7 days ${formatTokens(t.week.total)} (${formatTokens(t.week.output)} out)`
+  );
+}
+
+// The dim line under an account's plan usage bars: how old the numbers are, and
+// the host they're from when another machine's are newer (shareUsage)
+export function planUsageText(limits: Limits, from: string, now: number): string {
+  if (!Number.isFinite(limits.updatedAt)) return "";
+  const on = from ? `, on ${from}` : "";
+  return now - limits.updatedAt < 60000 ? `Plan usage updated just now${on}` : `Plan usage as of ${duration(now - limits.updatedAt)} ago${on}`;
 }
 
 export function ago(ms: number): string {
@@ -896,12 +913,17 @@ export function tasksTitle(t: TaskProgress): string {
   return [head, ...t.items.map((i) => `${taskMark(i.status)} ${i.subject}`)].join("\n");
 }
 
+// The tag's text: "±3" (the widget's)
+export function changesTag(c: ChangeSummary): string {
+  return `±${c.count}`;
+}
+
 export function changesTitle(c: ChangeSummary, host?: string): string {
   const more = c.count > c.files.length ? `\n…and ${c.count - c.files.length} more` : "";
   const what = host
     ? `\nThey're on ${host}: compare them there.`
     : "\nClick to compare them with what they were before the chat, side by side (VS Code's changes view).";
-  return `Files this chat changed (${c.count}):\n${c.files.join("\n")}${more}${what}`;
+  return `${plural(c.count, "%1 file changed", "%1 files changed")}:\n${c.files.join("\n")}${more}${what}`;
 }
 
 // ---------------------------------------------------------------- usage forecast

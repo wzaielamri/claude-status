@@ -1,5 +1,5 @@
 import { useRef } from "preact/hooks";
-import { duration, formatTokens, stateText } from "../../src/shared/model";
+import { formatTokens, planUsageText, stateText, tokensText } from "../../src/shared/model";
 import type { Group, TokenTotals, Tokens } from "../../src/shared/types";
 import { post } from "../env";
 import { fiveHourOf, groupKeyOf, sharedRef, stageChats } from "../util/chat";
@@ -37,21 +37,8 @@ function tokenTitle(t: Tokens): string {
   );
 }
 
-function TokenLine({ tokens, topModels }: { tokens: Tokens; topModels: Tokens["models"] }) {
-  return (
-    <span class="token-line">
-      <span class="muted">Tokens today </span>
-      {formatTokens(tokens.today.total)}
-      <span class="muted"> · 7 days </span>
-      {formatTokens(tokens.week.total)}
-      {topModels.map((m) => (
-        <span key={m.model} class="muted">
-          {" · "}
-          {modelName(m.model)} {formatTokens(m.total)}
-        </span>
-      ))}
-    </span>
-  );
+function TokenLine({ tokens }: { tokens: Tokens }) {
+  return <span class="token-line">{tokensText(tokens)}</span>;
 }
 
 // One Claude account: its pets, plan limits, token totals, chats (from every
@@ -68,10 +55,8 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
   const settings = view.settings;
   const multiProfile = g.profiles.length > 1;
   const limits = g.limits;
-  const usageAge = !limits || !Number.isFinite(limits.updatedAt) ? "" : now - limits.updatedAt < 60000 ? "just now" : `${duration(now - limits.updatedAt)} ago`;
-  const usageOn = g.limitsFrom ? ` on ${g.limitsFrom}` : ""; // (the newer numbers of the account's copy there: shareUsage)
+  const usageAge = limits ? planUsageText(limits, g.limitsFrom ?? "", now) : ""; // (limitsFrom: the newer numbers of the account's copy there, shareUsage)
   const tokens = settings.showTokens ? g.tokens : null;
-  const topModels = (tokens?.models ?? []).slice(0, 2);
   const ui = useStore(uiState);
   const stats = tokens && g.stats ? g.stats : null;
   const statsOpen = !!stats && !!ui.stats[key];
@@ -106,12 +91,6 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
           onClick={() => post(host ? { type: "newChat", groupId: g.id, host } : { type: "newChat", groupId: g.id })}
         />
         <span class="spacer" />
-        {usageAge ? (
-          <span class="usage-age small muted">
-            usage updated {usageAge}
-            {usageOn}
-          </span>
-        ) : null}
         {multiProfile ? <span class="small muted nowrap">{(g.profiles ?? []).join(" + ")}</span> : null}
       </div>
 
@@ -148,11 +127,14 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
 
       {/* Plan limits (from the status line); not where they show elsewhere (shareUsage) */}
       {g.limitsHidden || g.loggedOut ? null : limits && limits.windows.length ? (
-        <div class="usage" title={`Plan usage as of ${usageAge}${usageOn}`}>
-          {limits.windows.map((w) => (
-            <UsageBar key={w.key} window={w} now={now} />
-          ))}
-        </div>
+        <>
+          <div class="usage">
+            {limits.windows.map((w) => (
+              <UsageBar key={w.key} window={w} now={now} />
+            ))}
+          </div>
+          {usageAge ? <div class="usage-age small muted">{usageAge}</div> : null}
+        </>
       ) : (
         <div class="no-usage small muted">
           <span title="Plan limits come from Claude Code's status line. They update whenever a chat of this account gets a reply.">
@@ -185,11 +167,11 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
             onClick={() => toggleStats(key)}
           >
             <Icon name="chevron" class={statsOpen ? "open" : ""} />
-            <TokenLine tokens={tokens} topModels={topModels} />
+            <TokenLine tokens={tokens} />
           </button>
         ) : (
           <div class="tokens small" title={tokenTitle(tokens)}>
-            <TokenLine tokens={tokens} topModels={topModels} />
+            <TokenLine tokens={tokens} />
           </div>
         )
       ) : null}

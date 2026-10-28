@@ -77,12 +77,12 @@ ColumnLayout {
             icon.name: "view-visible"
             visible: !!hostSection.info.result && (hostSection.info.result.dismissed || 0) > 0
             display: PlasmaComponents3.AbstractButton.IconOnly
-            text: i18n("Show removed sessions again")
+            text: i18n("Show removed chats again")
             onClicked: root.remoteUndismissAll(hostSection.host)
             PlasmaCore.ToolTipArea {
                 textFormat: Text.PlainText
                 anchors.fill: parent
-                mainText: i18n("Show removed sessions again (%1)", hostSection.info.result ? hostSection.info.result.dismissed : 0)
+                mainText: i18n("Show removed chats again (%1)", hostSection.info.result ? hostSection.info.result.dismissed : 0)
             }
         }
         PlasmaComponents3.ToolButton {

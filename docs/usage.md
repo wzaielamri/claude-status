@@ -4,14 +4,14 @@
 
 | Where | What it does |
 |---|---|
-| Panel icon | Left-click opens the popup, middle-click refreshes. Right-click: *Refresh*, *Show removed sessions again*, *Open Usage Page on claude.ai*, and the settings. |
+| Panel icon | Left-click opens the popup, middle-click refreshes. Right-click: *Refresh*, *Show Removed Chats Again*, *Go to the Chat That Needs You* (when one does), *Open Usage Page on claude.ai*, the *Default Account* (with two accounts or more), and the settings. |
 | The big Talpy | Click its headline (*… needs you*) to go to that chat. Click it to pet it, double-click to make it dance, drag it out of its burrow. |
-| A session's name | Jumps to the session: its terminal tab, its VS Code window, or a terminal attached to the background job. |
-| The line under a session | Unfolds your last prompt, Claude's reply, the chat's tasks, and buttons that compare what it changed (all of it, or its last turn). |
-| **±3** next to a session | Compares the files the chat changed in VS Code. |
+| A chat's name | Jumps to the chat: its terminal tab, its VS Code window, or a terminal attached to the background job. |
+| The line under a chat | Unfolds your last prompt, Claude's reply, the chat's tasks, and buttons that compare what it changed (all of it, or its last turn). |
+| **±3** next to a chat | Compares the files the chat changed in VS Code. |
 | An account's token line | Unfolds its last 14 days: tokens per day, chats, prompts, busiest folders and models. |
 | The widget's keyboard shortcut | Goes to the chat that needs you, else opens the popup (set the key in the settings, on the Keyboard Shortcuts page). |
-| Hovering a session | ■ stops or interrupts a chat (it asks first), － hides a finished one, and the share button shares a chat with your other accounts. |
+| Hovering a chat | ■ stops or interrupts a chat (it asks first), － hides a finished one, and the share button shares a chat with your other accounts. |
 | A chat's pet | Opens its chat. |
 | **+** next to an account | A field for what Claude should do (optional), then the account's recent folders and **Choose folder…** (an SSH host's: its home folder instead). Click one for a new chat there: in a terminal, in VS Code (the switch at the top of the list) or, with a task and **In the background**, as a background session. |
 | *Recent chats* | Unfolds the account's older conversations; click one to reopen it, in a terminal or in VS Code (the switch at the top of the list). |

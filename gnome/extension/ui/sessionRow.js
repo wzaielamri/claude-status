@@ -117,7 +117,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
         const remove = iconButton('list-remove-symbolic',
             () => (remoteHost ? ctx.remoteDismiss(remoteHost, s.sessionId) : ctx.dismissSession(s.sessionId)));
         tips.add(remove, ['Remove from the list',
-            'Only hides it here; nothing is deleted. It comes back if the session runs again, or with “Show removed sessions again” at the bottom of this menu.']);
+            'Only hides it here; nothing is deleted. It comes back if the chat runs again, or with “Show removed chats again” at the bottom of this menu.']);
         hoverButtons.push(remove);
         end.add_child(remove);
     }

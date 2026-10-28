@@ -249,6 +249,18 @@
   0m*) beside a dot in that state's color, not a blue dot for all and the
   word *done*; and the tab no longer reads every chat every 10 minutes
   while the view is hidden.
+- **An account reads as in the Plasma widget:** its token line gives
+  today's and the week's totals with their output (*Tokens today 378.3k
+  (12.0k out) · 7 days 502.9k (15.0k out)*); the week's two biggest models,
+  cut off mid-name in a narrow sidebar, are in its tooltip. How old the plan
+  usage is shows in a dim line under the bars (*Plan usage as of 5m ago*,
+  *…, on lab*), not as *usage updated …* at the right of the heading. A
+  chat's state words are colored only when it needs you or a usage limit
+  holds it (*Working* blue and *Done* green drowned out *Needs input*); the
+  dot carries every state's color. Removing a finished chat from the list is
+  a − (it was the × that also cancels a queued task and hides a host). An
+  account with nothing running reads *No chats running* in the hero, and the
+  files-changed tag reads *±3*, with *3 files changed* over its list.
 
 ## 1.16.1
 
