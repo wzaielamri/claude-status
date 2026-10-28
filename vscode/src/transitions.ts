@@ -9,7 +9,9 @@ import type { AskShown, Group, PetEventKind, Session, SessionState, Stop } from 
 
 export interface Notice {
   key: string; // the row: one notification per row at a time
-  kind: "waiting" | "done" | "stopped"; // stopped: a usage limit (or an expired login) broke its turn off
+  // stopped: a usage limit (or an expired login) broke its turn off; overlap:
+  // two chats change the same files; reset: an account's usage limit reset
+  kind: "waiting" | "done" | "stopped" | "overlap" | "reset";
   title: string;
   body: string;
   session: Session;
@@ -242,7 +244,7 @@ export class TransitionTracker {
       const names = freed.slice(0, 4).map((s) => s.name).join(", ") + (freed.length > 4 ? ` +${freed.length - 4}` : "");
       changes.notices.push({
         key: `limit-reset|${source}|${g.id}`,
-        kind: "done",
+        kind: "reset",
         title: `${host ? `${host}: ` : ""}${g.name}: the usage limit reset`,
         body: plural(freed.length, `${names} can go on`, `%1 chats can go on: ${names}`),
         session: freed[0],
@@ -273,7 +275,7 @@ export class TransitionTracker {
           if (opts.notifyWaiting)
             changes.notices.push({
               key: `overlap|${source}|${pair}`,
-              kind: "waiting",
+              kind: "overlap",
               title: "Two chats change the same files",
               body: `${s.name} and ${o.name}: ${o.files.join(", ")}${o.count > o.files.length ? " …" : ""}${host ? ` · ${host}` : ""}`,
               session: s,

@@ -105,6 +105,7 @@ test("two chats changing the same files: a notice once per pair", () => {
   assert.equal(r.notices.length, 1);
   assert.equal(r.notices[0].title, "Two chats change the same files");
   assert.equal(r.notices[0].body, "A and B: src/x.py");
+  assert.equal(r.notices[0].kind, "overlap"); // (its own kind: no prompt's buttons)
   assert.deepEqual(t.overlaps("", groups(true), undefined, OPTS).notices, []);
   assert.equal(overlapText(groups(true)[0].sessions[0].overlaps!), "Also changed by “B”: src/x.py");
   // a chat listed twice (open on two accounts) is one chat: still one notice

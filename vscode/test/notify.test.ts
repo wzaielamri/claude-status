@@ -196,3 +196,48 @@ test("a notification's buttons answer the prompt it shows; when the chat asks so
   assert.equal(opened.length, 1, "Open shows the chat, with what it asks now");
   notifier.dispose();
 });
+
+// Two chats changing the same files and a limit that reset are notices of
+// their own: Open only, never the prompt's buttons of the chat they name
+// first or a Reply… to it alone. A reply from a notification that isn't
+// sent says so, and Open shows the chat's tab with it as the draft.
+test("an overlap or limit reset notice has Open only; a reply that isn't sent says so", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const vscode = (await import("vscode")) as unknown as typeof import("./vscode-stub");
+  process.env.XDG_CACHE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "talpy-den-notify-"));
+  const { Notifier } = await import("../src/notify");
+  const window = vscode.window as unknown as Record<string, unknown>;
+  const shown: [string, string[]][] = [];
+  let pick = "";
+  window.showWarningMessage = async (m: string, ...buttons: string[]) => (shown.push([m, buttons]), m.startsWith("Talpy Den:") ? "Open" : pick);
+  window.showInformationMessage = window.showWarningMessage;
+  window.showInputBox = async () => "run the tests";
+  const drafts: string[] = [];
+  let sent = { ok: false, message: "No such chat" };
+  const notifier = new Notifier({ sound() {} } as never, () => undefined);
+  notifier.panes = { reply: async () => sent, open: () => undefined, draft: (_c: unknown, text: string) => void drafts.push(text) } as never;
+  const s = {
+    ...demoState(Date.now()).status!.groups[0].sessions[0], state: "waiting", name: "deploy",
+    permission: { tool: "Bash", line: "Bash: rm -rf build", command: "rm -rf build", file: "", diff: [], always: "", request: "r1", toolUse: null, answer: "hook" },
+  } as Session;
+  const notify = async (kind: string, title: string) => {
+    notifier.handle({ notices: [{ key: s.key, kind, title, body: "", session: s }], petEvents: [], sound: "", finished: [] } as never);
+    await new Promise((r) => setTimeout(r, 10));
+  };
+  await notify("overlap", "Two chats change the same files");
+  await notify("reset", "personal: the usage limit reset");
+  assert.deepEqual(shown.map(([, b]) => b), [["Open"], ["Open"]]);
+  // a finished chat's Reply… that isn't sent
+  shown.length = 0;
+  pick = "Reply…";
+  await notify("done", "deploy finished");
+  assert.deepEqual(shown.at(-1), ["Talpy Den: couldn't send your message to deploy: No such chat", ["Open"]]);
+  assert.deepEqual(drafts, ["run the tests"]);
+  sent = { ok: true, message: "Sent" };
+  shown.length = 0;
+  await notify("done", "deploy finished");
+  assert.equal(shown.length, 1, "a reply that went: nothing more to say");
+  notifier.dispose();
+});

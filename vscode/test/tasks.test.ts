@@ -145,6 +145,7 @@ test("a notice when the limit that stopped chats resets: once, per account", () 
   assert.equal(freed.notices.length, 1);
   assert.equal(freed.notices[0].title, "personal: the usage limit reset");
   assert.equal(freed.notices[0].body, "Parser can go on");
+  assert.equal(freed.notices[0].kind, "reset"); // (its own kind: no Reply… to the first chat only)
   assert.equal(freed.sound, "done");
   assert.deepEqual(freed.petEvents.map((e) => e.kind), ["reset"]);
   assert.deepEqual(t.limitResets("", g(true), undefined, OPTS).notices, []); // once

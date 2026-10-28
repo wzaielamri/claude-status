@@ -137,6 +137,17 @@
 - **The pets follow the theme's text color:** after switching to another
   dark theme (or another light one), the pets' words, z's and sparks kept
   the old theme's color until the view reloaded.
+- **Notifications about several chats offer only Open:** *Two chats change
+  the same files* showed the first chat's Allow once and Deny (or its plan,
+  or its question's options) when that chat was asking something, so Allow
+  approved a command the notification never named; and *the usage limit
+  reset* had a *Reply…* that went to the first chat it named only. Both
+  have just *Open* now, as in the widget.
+- **A reply from a notification that isn't sent says so:** when the
+  message typed into a notification's *Reply…* couldn't be sent, only the
+  Talpy Den view said why, which usually isn't on screen then, and the text
+  was gone. A notification says so now, and its *Open* shows the chat's
+  tab with your message ready to send again.
 
 ## 1.16.1
 

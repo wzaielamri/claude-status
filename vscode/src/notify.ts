@@ -86,11 +86,11 @@ export class Notifier implements vscode.Disposable {
 
   // holdDone: you're away; finished (and stopped) chats wait for the digest (away.ts)
   handle(changes: Changes, opts: { holdDone?: boolean } = {}): void {
-    const notices = opts.holdDone ? changes.notices.filter((n) => n.kind === "waiting") : changes.notices;
+    const notices = opts.holdDone ? changes.notices.filter((n) => n.kind === "waiting" || n.kind === "overlap") : changes.notices;
     if (!notices.length || !this.isLeader()) return;
     for (const n of notices) {
       const text = `${n.title} — ${n.body}`;
-      const show = n.kind === "done" ? vscode.window.showInformationMessage : vscode.window.showWarningMessage;
+      const show = n.kind === "done" || n.kind === "reset" ? vscode.window.showInformationMessage : vscode.window.showWarningMessage;
       const chat = chatRef(n.session, n.host);
       const p = n.kind === "waiting" ? n.session.permission : null;
       const asks = !!p && (p.answer === "hook" || p.answer === "keys") && !!this.panes;
@@ -117,6 +117,7 @@ export class Notifier implements vscode.Disposable {
       }
       // a permission prompt: answer it here, in Claude's own order (Yes, Yes
       // and don't ask again, No); a chat that waits or finished: reply here
+      // (two chats on the same files, a limit that reset: Open only)
       const buttons = asks
         ? ["Allow once", ...(p!.answer === "keys" || p!.always ? ["Always allow"] : []), "Deny", "Deny with a note…", "Open"]
         : this.panes && (n.kind === "done" || (n.kind === "waiting" && !p)) ? ["Reply…", "Open"] : ["Open"];
@@ -132,7 +133,7 @@ export class Notifier implements vscode.Disposable {
           if (note !== undefined) this.told(chat, await panes.answer(chat, "deny", shown, note.trim()));
         } else if (panes && choice === "Reply…") {
           const reply = await vscode.window.showInputBox({ title: `Reply to ${n.session.name}`, prompt: "Sent the way the chat takes it", ignoreFocusOut: true });
-          if (reply?.trim()) await panes.reply(chat, reply);
+          if (reply?.trim()) this.notSent(chat, reply, await panes.reply(chat, reply));
         }
       });
     }
@@ -175,6 +176,15 @@ export class Notifier implements vscode.Disposable {
       if (choice !== "Open") return;
       if (this.panes && settings.clickOpensPane()) this.panes.open(chat, "chat");
       else this.open(chat);
+    });
+  }
+
+  // A reply from a notification that wasn't sent: said, and Open shows the
+  // chat's tab with it as the unsent reply (the box it was typed in is gone)
+  private notSent(chat: ChatRef, text: string, answer: { ok: boolean; message: string }): void {
+    if (answer.ok) return;
+    void vscode.window.showWarningMessage(`Talpy Den: couldn't send your message to ${chat.name}: ${answer.message}`, "Open").then((choice) => {
+      if (choice === "Open") this.panes?.draft(chat, text);
     });
   }
 

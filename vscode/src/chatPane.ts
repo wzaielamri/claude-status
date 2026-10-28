@@ -98,13 +98,18 @@ export class ChatPanes implements vscode.Disposable {
 
   // A reply from a notification: sent the way the chat takes one; a chat in a
   // terminal that takes no text opens in its tab with it, to choose there
-  async reply(chat: ChatRef, text: string): Promise<void> {
+  async reply(chat: ChatRef, text: string): Promise<{ ok: boolean; message: string }> {
     const answer = await this.send(chat, text, "auto", false);
-    if (answer.ask) {
-      this.open(chat, "chat");
-      this.panes.get(`${chat.host ?? ""}|${chat.chatId || chat.sessionId}`)?.draft(text);
-    } else if (!answer.ok) this.dash.setActionError(answer.message);
+    if (answer.ask) this.draft(chat, text);
+    else if (!answer.ok) this.dash.setActionError(answer.message);
     else if (answer.message) this.dash.setActionInfo(answer.message);
+    return answer;
+  }
+
+  // The chat's tab, open with text as its unsent reply
+  draft(chat: ChatRef, text: string): void {
+    this.open(chat, "chat");
+    this.panes.get(`${chat.host ?? ""}|${chat.chatId || chat.sessionId}`)?.draft(text);
   }
 
   // Your message to a chat: typed into this window's terminal it runs in, or
