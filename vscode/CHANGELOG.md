@@ -48,6 +48,35 @@
   another account the default dropped that one from every list, with no
   word. It now says so instead, until that folder is in
   `talpyDen.extraConfigDirs`.
+- **A reply to a chat in VS Code arrives whole:** a message from the chat
+  tab (or one queued for after the turn) to a chat in VS Code's Claude was
+  cut off at an `&`, and a `+` in it became a space. It now reaches the
+  chat's input as you wrote it.
+- **Two replies typed into tmux chats at once go each to its own chat:**
+  both went through one shared paste buffer, so one chat could get (and
+  run) the other's message while the other got *no buffer*.
+- **Allow and Deny answer what the chat asks now:** after you answered a
+  permission prompt in the chat and it asked again right away, the chat's
+  row, its tab, the notification and *Allow the oldest prompt* could still
+  offer the first prompt, and Allow or Deny there went nowhere, though it
+  said *Allowed* or *Denied*. They show the newest prompt now, and an
+  answer to one the chat asked again after isn't taken: you're told it
+  asks something else now.
+- **Undo and Commit in the review:** Undo brought a file the chat deleted
+  (and its folder) back private to you, so a script came back not
+  executable; it comes back as git has it, with your usual permissions.
+  *Commit* also committed your own changes to files that a chat's file
+  name matched as a pattern (`app/[id]/page.tsx`, `a[1].txt`); names are
+  taken as they are now.
+- **Live mode keeps every step of a chat that runs for days:** a new
+  session elsewhere removed the lock of a chat older than three days, so
+  two of its events could arrive at once and one was lost (a finished turn
+  could show as working). The hook you have updates itself at the next
+  check.
+- **The chat tab counts an edit's lines right:** a changed line starting
+  with `--` or `++` (a Markdown rule `---`, YAML front matter, `++i`)
+  wasn't counted, so an edit could say *1 line removed* for one line added
+  and two removed.
 
 ## 1.16.1
 

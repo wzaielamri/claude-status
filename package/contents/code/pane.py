@@ -24,7 +24,8 @@ its permission prompt and its review.
         answer a permission request the hook relayed (permission_hook.py);
         Claude's questions (AskUserQuestion): answer, with JSON {question:
         [chosen labels, or what you typed]}, or deny (decline, with a note).
-        A request that's gone (answered in the chat): "changed": true
+        A request that's gone (answered in the chat), or one the chat asked
+        again after: "changed": true
   --keys CHAT --decision allow|always|deny [--note T] [--profile P] [--expect TOOL_USE]
         answer a permission prompt of a chat in tmux with its keys (CHAT: its
         session id). --expect: the id of the tool call the prompt you answered
@@ -188,9 +189,10 @@ def capped(lines):
 
 
 def change_summary(name, diff, fallback=""):
-    """What an edit changed, in a line: from its diff's lines."""
-    added = sum(1 for d in diff if d.startswith("+") and not d.startswith("+++"))
-    removed = sum(1 for d in diff if d.startswith("-") and not d.startswith("---"))
+    """What an edit changed, in a line: from its diff's lines (@@ lines and
+    content, no file headers: a "---" is a removed "--")."""
+    added = sum(1 for d in diff if d.startswith("+"))
+    removed = sum(1 for d in diff if d.startswith("-"))
     if name != "Edit" and name != "MultiEdit" and not removed:
         return plural(added, "line")
     if added and removed:
@@ -509,7 +511,7 @@ NOT_ASKING = "It isn't asking any more (answered in the chat?)"
 def answer_request(cache_root, request_id, decision, note="", answers=None):
     """Answer a relayed request: (ok, message). A question takes "answer"
     (answers: {question: [labels or text]}) or "deny". One that's gone:
-    (False, NOT_ASKING)."""
+    (False, NOT_ASKING); one its chat asked again after: (False, ASKS_ELSE)."""
     if decision not in DECISIONS + PLAN_DECISIONS:
         return False, f"Not an answer: {decision}"
     if not re.fullmatch(r"[0-9]+-[0-9a-f]{8}", request_id or ""):
@@ -518,6 +520,9 @@ def answer_request(cache_root, request_id, decision, note="", answers=None):
     req = cs.read_json(folder / (request_id + ".json"))
     if not isinstance(req, dict) or not cs.pid_alive(req.get("hookPid")):
         return False, NOT_ASKING
+    now = cs.permission_requests(cache_root).get(req.get("sessionId"))
+    if now is not None and now.get("id") != request_id:
+        return False, ASKS_ELSE   # (it asked again since: that one was answered in the chat)
     inp, given = None, None
     plan = req.get("tool") == cs.PLAN_TOOL
     if plan != (decision in PLAN_DECISIONS) and not (plan and decision == "deny"):
@@ -1112,18 +1117,27 @@ def tmux_run(base, args, data=None):
     return True, r.stdout.decode(errors="replace")
 
 
+_pastes = [0]
+
+
 def tmux_type(entry, text):
     """Paste text into a chat's tmux pane and send it (Enter): (ok, message)."""
     base, target = tmux_base(entry)
     if base is None:
         return False, "It doesn't run in tmux (or tmux isn't installed)"
-    for args, data in ((["load-buffer", "-b", "talpy-den", "-"], text.encode()),
-                       (["paste-buffer", "-p", "-d", "-b", "talpy-den", "-t", target], None),
+    # a buffer of its own: a reply typed meanwhile (each runs in its own
+    # process) would else paste this text into its chat, or take it away
+    _pastes[0] += 1
+    buffer = f"talpy-den-{os.getpid()}-{_pastes[0]}"
+    for args, data in ((["load-buffer", "-b", buffer, "-"], text.encode()),
+                       (["paste-buffer", "-p", "-d", "-b", buffer, "-t", target], None),
                        (["send-keys", "-t", target, "Enter"], None)):
         if args[0] == "send-keys":
             time.sleep(0.3)  # (Claude takes the paste in first)
         ok, out = tmux_run(base, args, data)
         if not ok:
+            if args[0] == "paste-buffer":
+                tmux_run(base, ["delete-buffer", "-b", buffer])
             return False, out
     return True, ""
 
@@ -1192,8 +1206,11 @@ HOWS = ("auto", "background", "copy", "enter")
 
 
 def vscode_prompt_link(session_id, text):
-    from urllib.parse import quote
-    return f"vscode://anthropic.claude-code/open?session={quote(session_id)}&prompt={quote(text)}"
+    """Encoded twice, as jump.link_query does: VS Code decodes the query once
+    before the extension's URLSearchParams decodes it again (else an & ends
+    the message there and a + becomes a space)."""
+    from urllib.parse import urlencode
+    return "vscode://anthropic.claude-code/open?" + urlencode({"session": session_id, "prompt": text}).replace("%", "%25")
 
 
 def go_on_in_background(home, extra_dirs, profile, chat_id, text, claude):
@@ -1324,11 +1341,12 @@ def read_bytes(path):
 
 
 def git(folder, *args, data=None, timeout=20):
-    """(ok, stdout, stderr) of git in folder."""
+    """(ok, stdout, stderr) of git in folder. Paths are names, not patterns
+    (else a chat's a[1].txt would take your a1.txt along)."""
     if not shutil.which("git"):
         return False, "", "git isn't installed"
     try:
-        r = subprocess.run(["git", "-C", folder, *args], input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        r = subprocess.run(["git", "--literal-pathspecs", "-C", folder, *args], input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                            timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, "", str(exc)
@@ -1353,6 +1371,19 @@ def git_original(path, missing=b""):
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout if r.returncode == 0 else missing
+
+
+def git_executable(path):
+    """Does git's last commit have path as an executable file?"""
+    folder = os.path.dirname(path)
+    while folder and not os.path.isdir(folder):
+        folder = os.path.dirname(folder)
+    root = git_root(folder) if folder else None
+    if root is None:
+        return False
+    ok, out, _ = git(root, "ls-tree", "HEAD", "--", os.path.relpath(os.path.realpath(path), os.path.realpath(root)),
+                     timeout=5)
+    return ok and out.startswith("100755 ")
 
 
 def backup_content(profiles, sessions, name):
@@ -1520,6 +1551,9 @@ def chosen(files, wanted):
     return [f for f in files if not wanted or f["path"] in wanted]
 
 
+USER_UMASK = [None]  # your umask, before main() made this run's files private
+
+
 def undo(home, extra_dirs, chat_id, profile_key=None, wanted=()):
     """Put the files a chat changed (all, or those in wanted) back as they
     were before it: (ok, message). A file it made is removed, one it
@@ -1547,12 +1581,22 @@ def undo(home, extra_dirs, chat_id, profile_key=None, wanted=()):
                     os.unlink(full)
                     done += 1
             elif current != original:
-                os.makedirs(os.path.dirname(full), exist_ok=True)
                 tmp = full + ".talpy-den-undo"
-                with open(tmp, "wb") as f:
-                    f.write(original)
+                # (with your umask, not this run's private one: a file or
+                # folder it brings back is as you'd have made it)
+                mask = os.umask(USER_UMASK[0]) if USER_UMASK[0] is not None else None
+                try:
+                    os.makedirs(os.path.dirname(full), exist_ok=True)
+                    with open(tmp, "wb") as f:
+                        f.write(original)
+                finally:
+                    if mask is not None:
+                        os.umask(mask)
                 if current is not None:
                     shutil.copymode(full, tmp)
+                elif git_executable(full):  # (a script it removed runs again)
+                    mode = os.stat(tmp).st_mode
+                    os.chmod(tmp, mode | (mode & 0o444) >> 2)
                 os.replace(tmp, full)
                 done += 1
         except OSError as exc:
@@ -1858,7 +1902,7 @@ def main(argv=None):
             sys.exit(__doc__)
     if action is None:
         sys.exit(__doc__)
-    os.umask(0o077)
+    USER_UMASK[0] = os.umask(0o077)
     home = Path.home()
     cs.adopt_legacy_dirs(home)
     cache_root = cs.cache_dir(home)
@@ -1899,7 +1943,7 @@ def main(argv=None):
         elif action == "--answer":
             ok, said = answer_request(cache_root, target, decision, note, answers)
             # (changed: the request you answered is gone; the chat may ask something else now)
-            result = {"ok": ok, "message": said, **({"changed": True} if not ok and said == NOT_ASKING else {})}
+            result = {"ok": ok, "message": said, **({"changed": True} if not ok and said in (NOT_ASKING, ASKS_ELSE) else {})}
         elif action == "--logs":
             result = job_screen(home, config_dirs, target, profile)
         elif action == "--complete":

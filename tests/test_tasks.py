@@ -655,6 +655,32 @@ class TaskTests(TaskFixture):
         self.assertEqual(vscode_link_params(link), {"prompt": task})
         self.assertEqual(jump.vscode_task_link(""), "vscode://anthropic.claude-code/open")
 
+    def test_a_long_plans_vscode_link_fits_in_one_argument(self):
+        # in the link, most characters but letters and digits take 5 (%25XX),
+        # and the link is one argument (of xdg-open, then VS Code): 128 KB at most
+        import remote
+        plan = self.home / ".claude-work/plans/code-plan.md"
+        write(plan, "# Code plan\n\n" + "    if (a[i] != b[i]) { return -1; }\n" * 2600)  # 96 KB
+        with mock.patch.object(jump, "vscode_for", return_value=("/usr/bin/code", self.profile)), \
+                mock.patch.object(jump, "start_vscode_chat") as started:
+            ok, message = jump.new_chat_vscode(self.home, [], ".claude-work", str(self.folder),
+                                               jump.Task("Go.", "code-plan"))
+            self.assertTrue(ok, message)
+            link = started.call_args[0][2]
+            self.assertLess(len(link.encode()), 128 * 1024)
+            self.assertTrue(vscode_link_params(link)["prompt"].endswith("return -1; }\n\n(The plan goes on in that file.)\n"))
+            # a task too long by itself isn't cut: it says so, and nothing opens
+            ok, message = jump.new_chat_vscode(self.home, [], ".claude-work", str(self.folder), jump.Task("[x] " * 40000))
+            self.assertEqual((ok, started.call_count), (False, 1))
+            self.assertIn("too long", message)
+        # an SSH host's plan too
+        with mock.patch.object(remote, "plan_text", return_value={"ok": True, "markdown": plan.read_text(),
+                                                                  "where": "~/.claude/plans/code-plan.md"}), \
+                mock.patch.object(jump, "remote_vscode", side_effect=lambda host, folder, link, what: (True, link)):
+            ok, link = jump.new_chat_remote_vscode("lab", "/srv", task=jump.Task("Go.", "code-plan"))
+        self.assertLess(len(link.encode()), 128 * 1024)
+        self.assertTrue(vscode_link_params(link)["prompt"].endswith("(The plan goes on in that file.)\n"))
+
 
 class PlanSharingTests(Fixture):
     def setUp(self):

@@ -26,7 +26,7 @@ import time
 VERSION = 1  # (of the live files it writes)
 # This file's version: a status check brings an older copy of it in
 # ~/.local/share/talpy-den up to date (talpy_den.refresh_hooks)
-HOOK_REVISION = 2
+HOOK_REVISION = 3
 STEPS = 8  # the last steps a live file keeps
 AGENTS = 20
 TEXT = 70  # characters of a step's words
@@ -226,13 +226,17 @@ def fold(view, event, now):
 
 
 def tidy(where, now):
-    """Live files of chats not heard from for days go (once per new session)."""
+    """Live files of chats not heard from for days go (once per new session).
+    A lock goes with its live file only: it's never written, so its age is
+    the chat's, and a hook of a chat running for days may hold it."""
     try:
         names = os.listdir(where)
     except OSError:
         return
-    for name in names:
+    for name in sorted(names, key=lambda n: n.endswith(".lock")):  # (live files first)
         path = os.path.join(where, name)
+        if name.endswith(".lock") and os.path.exists(path[:-5] + ".json"):
+            continue
         try:
             if now - os.stat(path).st_mtime > KEEP_S:
                 os.unlink(path)

@@ -914,14 +914,15 @@ class Task:
         A task naming a picture pasted into it (with home) gets the pictures' folder."""
         return cs.chat_options(self.model, self.effort, self.mode) + (cs.picture_options(home, self.text) if home else [])
 
-    def prompt(self, home, profiles):
-        """Its first prompt; ValueError if its plan is gone."""
+    def prompt(self, home, profiles, fits=None):
+        """Its first prompt (its plan cut until fits(prompt), see
+        talpy_den.task_prompt); ValueError if its plan is gone."""
         path = None
         if self.plan:
             path = cs.find_plan(profiles, self.plan, self.plan_profile)
             if path is None:
                 raise ValueError("That plan isn't there any more")
-        return cs.task_prompt(self.text, path, home)
+        return cs.task_prompt(self.text, path, home, fits)
 
 
 NO_TASK = Task()
@@ -1475,13 +1476,25 @@ def vscode_task_link(prompt):
     return VSCODE_NEW_CHAT + "?" + link_query({"prompt": prompt}) if prompt else VSCODE_NEW_CHAT
 
 
+# A link is one argument (of xdg-open, then of VS Code), which can't pass 128 KB;
+# in it, most characters but letters and digits take 5 (%25XX, per UTF-8 byte)
+VSCODE_LINK_MAX = 120_000
+TOO_LONG_FOR_VSCODE = "That task is too long to type into VS Code's chat: shorten it, or start it in a terminal"
+
+
+def vscode_link_fits(prompt):
+    return len(vscode_task_link(prompt)) <= VSCODE_LINK_MAX
+
+
 def new_chat_vscode(home, extra_dirs, dirname, folder=None, task=NO_TASK):
     """Open folder in VS Code and a new chat in its Claude extension, when
     that runs on this profile (vscode_for); a task is typed into it."""
     code, profile = vscode_for(home, extra_dirs, dirname)
     if code is None:
         return False, profile
-    prompt = task.prompt(home, cs.discover_profiles(home, extra_dirs)) if task else ""
+    prompt = task.prompt(home, cs.discover_profiles(home, extra_dirs), vscode_link_fits) if task else ""
+    if not vscode_link_fits(prompt):
+        return False, TOO_LONG_FOR_VSCODE
     folder = folder if folder and os.path.isdir(folder) else str(home)
     start_vscode_chat(code, folder, vscode_task_link(prompt))
     return True, f"Opening a new {profile.label} chat in VS Code ({cs.short_path(folder, home)})"
@@ -1538,7 +1551,10 @@ def new_chat_remote_vscode(host, folder="", account=None, task=NO_TASK):
         answer = remote.plan_text(host, task.plan, task.plan_profile)
         if not answer.get("ok"):
             return False, answer.get("message") or f"Couldn't get the plan from {host}"
-        prompt = cs.plan_prompt(task.text, answer.get("markdown") or "", answer.get("where") or task.plan)
+        prompt = cs.fitting_plan_prompt(task.text, answer.get("markdown") or "", answer.get("where") or task.plan,
+                                        vscode_link_fits)
+    if not vscode_link_fits(prompt):
+        return False, TOO_LONG_FOR_VSCODE
     if account is not None:
         ok, message = remote.vscode_account(host, None if account == "-" else account)
         if not ok:
@@ -2139,25 +2155,8 @@ def was_background(profiles, chat_id):
 
 def tmux_paste(entry, text):
     """Paste text into the tmux pane of a chat and send it (Enter): (ok, message)."""
-    tmux = shutil.which("tmux")
-    pane = entry.get("tmux")
-    if tmux is None or not isinstance(pane, str) or not pane:
-        return False, "tmux isn't there"
-    socket = cs.tmux_socket(entry["pid"])
-    base = [tmux, *(["-S", socket] if socket else [])]
-    target = pane.rsplit(".", 1)[-1] if "." in pane else pane  # its pane id, e.g. %3
-    try:
-        for args, data in ((["load-buffer", "-b", "talpy-den", "-"], text.encode()),
-                           (["paste-buffer", "-p", "-d", "-b", "talpy-den", "-t", target], None),
-                           (["send-keys", "-t", target, "Enter"], None)):
-            if args[0] == "send-keys":
-                time.sleep(0.3)  # (Claude takes the paste in first)
-            r = subprocess.run(base + args, input=data, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=10)
-            if r.returncode != 0:
-                return False, f"tmux: {r.stderr.decode(errors='replace').strip()}"
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"tmux didn't answer: {exc}"
-    return True, ""
+    import pane
+    return pane.tmux_type(entry, text)
 
 
 def copy_to_clipboard(text):

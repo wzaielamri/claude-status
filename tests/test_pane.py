@@ -21,6 +21,7 @@ from unittest import mock
 sys.dont_write_bytecode = True  # keep __pycache__ out of the plasmoid package
 CODE = Path(__file__).resolve().parent.parent / "package/contents/code"
 sys.path.insert(0, str(CODE))
+import jump  # noqa: E402
 import pane  # noqa: E402
 import permission_hook  # noqa: E402
 
@@ -317,6 +318,12 @@ class ConversationTests(PaneFixture):
             "File has not been read yet.",
             "",  # (no result yet)
         ])
+        # lines that start with -- or ++ count too (a Markdown rule, front matter, ++i)
+        edit = {"file_path": a, "old_string": "intro\n---\n\n++i;\nend", "new_string": "intro\n\nend\n++"}
+        self.assertEqual(pane.tool_summary("Edit", edit, "The file was updated.", False), "1 line added, 2 removed")
+        patch = {"structuredPatch": [{"oldStart": 1, "oldLines": 4, "newStart": 1, "newLines": 3,
+                                      "lines": [" a", "----", "-++i;", "++++", " b"]}]}
+        self.assertEqual(pane.change_summary("Edit", pane.edit_lines("Edit", {}, patch)), "1 line added, 2 removed")
 
     def test_the_newest_items_and_more(self):
         t = self.now - 1000
@@ -529,6 +536,28 @@ class KeysTests(unittest.TestCase):
         ok, message, keys, _ = self.keys("allow", screen="❯ \n")
         self.assertEqual((ok, keys), (False, []))
         self.assertIn("no permission question", message)
+
+    def test_each_paste_has_its_own_buffer(self):
+        # two replies typed at once (each in its own process) mustn't paste each other's text
+        sent = []
+
+        def run(base, args, data=None):
+            sent.append(args)
+            return (False, "tmux: can't find pane: %9") if args[0] == "paste-buffer" and args[-1] == "%9" else (True, "")
+        with mock.patch.object(pane, "tmux_base", side_effect=lambda e: (["tmux"], e["tmux"])), \
+                mock.patch.object(pane, "tmux_run", side_effect=run), mock.patch.object(pane.time, "sleep"):
+            self.assertEqual(pane.tmux_type({"pid": 1, "tmux": "%3"}, "one"), (True, ""))
+            self.assertEqual(pane.tmux_type({"pid": 1, "tmux": "%9"}, "two")[0], False)
+        loads = [a[a.index("-b") + 1] for a in sent if a[0] == "load-buffer"]
+        pastes = [a[a.index("-b") + 1] for a in sent if a[0] == "paste-buffer"]
+        self.assertEqual(loads, pastes)
+        self.assertNotEqual(loads[0], loads[1])
+        # (a paste that failed doesn't leave its text in tmux)
+        self.assertEqual(sent[-1], ["delete-buffer", "-b", loads[1]])
+        # jump.py types plan feedback the same way
+        with mock.patch.object(pane, "tmux_type", return_value=(True, "")) as typed:
+            self.assertEqual(jump.tmux_paste({"pid": 1, "tmux": "%3"}, "fb"), (True, ""))
+        self.assertEqual(typed.call_args[0][1], "fb")
 
 
 class ToolUseTests(PaneFixture):
@@ -770,6 +799,30 @@ class HookTests(unittest.TestCase):
         self.assertEqual(pane.answer_oldest(cache, "always"), (False, "Not an answer: always"))
         question.kill()
 
+    def test_a_chat_that_asked_again_is_answered_about_the_new_prompt(self):
+        # you answered the first prompt in the chat and it asked again at once
+        # (its status stayed "waiting"): the first one's hook may still wait
+        cache = self.cache / "talpy-den"
+        first = self.hook_for(SID, "Bash", {"command": "make first"})
+        old = cs.permission_requests(cache)[SID]
+        second = self.hook_for(SID, "Bash", {"command": "make second"})
+        deadline = time.time() + 5
+        while time.time() < deadline and cs.permission_requests(cache)[SID]["id"] == old["id"]:
+            time.sleep(0.05)
+        new = cs.permission_requests(cache)[SID]
+        self.assertEqual(new["input"], {"command": "make second"})   # what the row, pane and notification show
+        self.assertEqual(pane.oldest_request(cache)[0]["id"], new["id"])   # (and what the keys answer)
+        # an answer to the one shown before isn't taken: it says so
+        self.assertEqual(pane.answer_request(cache, old["id"], "deny"), (False, "It asks something else now"))
+        self.assertIsNone(first.poll())
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"HOME": str(self.home), "XDG_CACHE_HOME": str(self.cache)}), \
+                contextlib.redirect_stdout(out):
+            pane.main(["--answer", old["id"], "--decision", "deny"])
+        self.assertEqual(json.loads(out.getvalue()), {"ok": False, "message": "It asks something else now", "changed": True})
+        self.assertEqual(pane.answer_request(cache, new["id"], "deny"), (True, "Denied"))
+        self.assertEqual(json.loads(second.stdout.read())["hookSpecificOutput"]["decision"]["behavior"], "deny")
+
     def test_keyboard_shortcuts_go_where_they_are_free(self):
         # A stand-in gdbus: Meta+Alt+N belongs to KWin here; every call logged
         bin_dir = self.home / "bin"
@@ -908,10 +961,13 @@ class SendTests(PaneFixture):
 
     def test_vscode(self):
         self.live(entrypoint="claude-vscode")
-        answer = self.send(text="also: README")
+        answer = self.send(text="also: README & a+b 100%20")
         self.assertEqual(answer["how"], "vscode")
-        self.assertTrue(answer["link"].startswith(
-            f"vscode://anthropic.claude-code/open?session={SID}&prompt=also%3A%20README"), answer["link"])
+        base, query = answer["link"].split("?", 1)
+        self.assertEqual(base, "vscode://anthropic.claude-code/open")
+        # VS Code decodes the query once, the extension's URLSearchParams again
+        from urllib.parse import parse_qs, unquote
+        self.assertEqual(parse_qs(unquote(query)), {"session": [SID], "prompt": ["also: README & a+b 100%20"]})
         self.assertEqual(self.calls(), [])
 
     def test_tmux(self):
@@ -1119,6 +1175,54 @@ class ReviewTests(PaneFixture):
         ok, said = pane.undo(self.home, [], SID, None, {str(init), str(blank)})
         self.assertEqual((ok, said), (True, "Put back 2 files as before the chat"))
         self.assertEqual((init.read_text(), blank.read_text()), ("", ""))
+
+    @unittest.skipUnless(HAVE_GIT, "needs git")
+    def test_a_removed_file_comes_back_with_its_mode(self):
+        # the chat edited a script, then removed its folder: Undo brings both
+        # back as git has them (executable) and as your umask makes them, not
+        # private to you like the files pane.py writes for itself
+        script = self.folder / "bin/run.sh"
+        write(script, "echo hi\n")
+        script.chmod(0o755)
+        self.git("add", "bin/run.sh")
+        self.git("commit", "-qm", "script")
+        write(self.home / f".claude-work/file-history/{SID}/bb22@v1", "echo hi\n")
+        t = self.now - 50
+        with open(self.transcript, "a") as f:
+            f.write(lines({"type": "file-history-delta", "trackingPath": str(script), "snapshotMessageId": "p",
+                           "backup": {"backupFileName": "bb22@v1", "version": 1}, "sessionId": SID},
+                          tool_use("s1", "Edit", {"file_path": str(script), "old_string": "hi", "new_string": "bye"}, t, "s1"),
+                          tool_result("s1", t + 1)))
+        shutil.rmtree(self.folder / "bin")
+        mask = os.umask(0o022)
+        try:
+            self.assertEqual(self.cli("--undo", SID, "--file", str(script))["message"], "Put back 1 file as before the chat")
+        finally:
+            os.umask(mask)
+        self.assertEqual(script.read_text(), "echo hi\n")
+        self.assertEqual((script.stat().st_mode & 0o777, script.parent.stat().st_mode & 0o777), (0o755, 0o755))
+
+    @unittest.skipUnless(HAVE_GIT, "needs git")
+    def test_commit_takes_names_as_they_are(self):
+        # a file named like a pattern (a route folder [id], a[1].txt) commits
+        # that file only, not others the pattern matches
+        write(self.folder / "a1.txt", "mine\n")
+        self.git("add", "a1.txt")
+        self.git("commit", "-qm", "mine")
+        write(self.folder / "a1.txt", "mine, changed\n")
+        odd = self.folder / "a[1].txt"
+        t = self.now - 50
+        made = tool_result("o1", t + 1)
+        made["toolUseResult"] = {"type": "create", "filePath": str(odd), "content": "made\n", "originalFile": None}
+        with open(self.transcript, "a") as f:
+            f.write(lines({"type": "file-history-delta", "trackingPath": str(odd), "snapshotMessageId": "p",
+                           "backup": {"backupFileName": None, "version": 1}, "sessionId": SID},
+                          tool_use("o1", "Write", {"file_path": str(odd), "content": "made\n"}, t, "o1"), made))
+        write(odd, "made\n")
+        answer = self.cli("--commit", SID, "--message", "Odd", "--file", str(odd))
+        self.assertTrue(answer["ok"], answer)
+        self.assertEqual(self.git("show", "--name-only", "--format=", "HEAD").split(), ["a[1].txt"])
+        self.assertIn("a1.txt", self.git("status", "--porcelain"))
 
     def test_undo(self):
         ok, message = pane.undo(self.home, [], SID, None, {str(self.folder / "new.py")})

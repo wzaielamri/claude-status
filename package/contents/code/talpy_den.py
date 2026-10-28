@@ -2340,8 +2340,11 @@ def pid_alive(pid):
 
 
 def permission_requests(cache_root, now_ms=None):
-    """{session id: its oldest open request} of the requests the hook wrote
-    (relayed), whose hook still waits; the files of the others are removed."""
+    """{session id: its newest open request} of the requests the hook wrote
+    (relayed), whose hook still waits; the files of the others are removed.
+    The newest: a prompt answered in the chat leaves its hook waiting until
+    the chat stops waiting, so when the chat asks again at once, the older
+    request is one it doesn't show any more."""
     now_ms = int(time.time() * 1000) if now_ms is None else now_ms
     folder = requests_dir(cache_root)
     try:
@@ -2364,7 +2367,7 @@ def permission_requests(cache_root, now_ms=None):
                     pass
             continue
         sid = req.get("sessionId")
-        if valid_id(sid or "") and (sid not in out or req.get("at", 0) < out[sid].get("at", 0)):
+        if valid_id(sid or "") and (sid not in out or req.get("at", 0) >= out[sid].get("at", 0)):
             out[sid] = req
     return out
 
@@ -4963,19 +4966,29 @@ def find_plan(profiles, slug, profile_key=None):
     return None
 
 
-def task_prompt(text, plan=None, home=None):
-    """A task's first prompt: what you wrote, and the plan (a path) it's about."""
+def task_prompt(text, plan=None, home=None, fits=None):
+    """A task's first prompt: what you wrote, and the plan (a path) it's
+    about, cut until fits(prompt) (fits_in_a_terminal by default)."""
     text = (text or "").strip()
     if plan is None:
         return text
     with open(plan, "rb") as f:
         data = f.read(TASK_PLAN_MAX + 1)
     body, where = data[:TASK_PLAN_MAX].decode("utf-8", "replace"), short_folder(str(plan), home)
-    cut = len(data) > TASK_PLAN_MAX
+    return fitting_plan_prompt(text, body, where, fits or fits_in_a_terminal, len(data) > TASK_PLAN_MAX)
+
+
+def fits_in_a_terminal(prompt):
+    """Does prompt fit in one argument once quoted for an SSH host's terminal?"""
+    quoted = shlex.quote(posix(prompt_word(prompt)))  # (each quote makes a ' 4 more characters, and posix more)
+    return len(quoted.encode("utf-8", "replace")) <= TASK_ARG_MAX
+
+
+def fitting_plan_prompt(text, body, where, fits, cut=False):
+    """plan_prompt, with the plan cut at a line's end (and saying so) until fits(prompt)."""
     while True:
         prompt = plan_prompt(text, body.rstrip() + TASK_PLAN_CUT if cut else body, where)
-        quoted = shlex.quote(posix(prompt_word(prompt)))  # (each quote makes a ' 4 more characters, and posix more)
-        if len(quoted.encode("utf-8", "replace")) <= TASK_ARG_MAX or not body:
+        if fits(prompt) or not body:
             return prompt
         shorter = body[:len(body) * 9 // 10]
         body, cut = shorter[:shorter.rfind("\n") + 1] or shorter, True  # at a line's end

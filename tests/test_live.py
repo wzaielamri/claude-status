@@ -162,6 +162,22 @@ class LiveHookTests(HookFixture):
         self.assertFalse(old.exists())
         self.assertEqual(oct(os.stat(self.live / (SID + ".json")).st_mode & 0o777), "0o600")
 
+    def test_a_long_chats_lock_stays(self):
+        # a lock is never written (its time is the chat's first event): it
+        # goes with its live file only, else two events of a chat running for
+        # days could fold at once
+        days = (time.time() - 4 * 86400,) * 2
+        write(self.live / "long.json", {"v": 1})
+        for name in ("long.lock", "gone.lock"):
+            write(self.live / name, "")
+            os.utime(self.live / name, days)
+        self.hook(event("SessionStart", source="startup"))
+        self.assertTrue((self.live / "long.lock").exists())
+        self.assertFalse((self.live / "gone.lock").exists())   # (its chat's live file went before)
+        os.utime(self.live / "long.json", days)
+        self.hook(event("SessionStart", source="startup"))
+        self.assertEqual([n for n in os.listdir(self.live) if n.startswith("long")], [])
+
 
 def live_hook_steps():
     import importlib.util
