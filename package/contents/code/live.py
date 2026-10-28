@@ -212,9 +212,12 @@ def wait(home, extra=(), name="default", timeout=TIMEOUT_S, clock=time.time):
         snap = snapshot(live, sessions)
         moved, views = changes(seen, snap, live, now)
         urgent = moved or any(v.get("event") in URGENT_EVENTS for v in views)
-        if views and not urgent and seen is not None and now - (seen.get("at") or 0) < MIN_GAP_S:
-            # (steps alone, just after the last answer: a moment later, with what comes meanwhile)
-            if watch.wait(MIN_GAP_S - (now - seen["at"])):
+        since = now - (seen.get("at") or 0) if seen is not None else MIN_GAP_S
+        if views and not urgent and 0 <= since < MIN_GAP_S:
+            # (steps alone, just after the last answer: a moment later, with
+            # what comes meanwhile; a last answer later than now is one from
+            # before the clock was set back)
+            if watch.wait(MIN_GAP_S - since):
                 time.sleep(GATHER_S)
                 watch.drain()
             continue
@@ -222,7 +225,7 @@ def wait(home, extra=(), name="default", timeout=TIMEOUT_S, clock=time.time):
             save_seen(path, snap, now)
             return {"ok": True, "at": int(now * 1000), "sessions": moved, "urgent": urgent, "live": views,
                     "timeout": False}
-        left = timeout - (now - start)
+        left = timeout - abs(now - start)  # (the clock set back meanwhile: time's up)
         if left <= 0:
             return {"ok": True, "at": int(now * 1000), "sessions": False, "urgent": False, "live": [], "timeout": True}
         if watch.wait(min(left, 1.0)):

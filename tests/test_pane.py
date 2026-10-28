@@ -536,6 +536,16 @@ class KeysTests(unittest.TestCase):
         ok, message, keys, _ = self.keys("allow", screen="❯ \n")
         self.assertEqual((ok, keys), (False, []))
         self.assertIn("no permission question", message)
+        # an edit's dialog: Always is its "allow all edits during this session"
+        edit = (" Edit file\n parser.py\n Do you want to make this edit to parser.py?\n ❯ 1. Yes\n"
+                "   2. Yes, allow all edits during this session (shift+tab)\n"
+                "   3. No, and tell Claude what to do differently (esc)\n")
+        self.assertEqual(self.keys("always", screen=edit)[:3], (True, "Allowed, and from now on", ["2"]))
+        self.assertEqual(self.keys("deny", screen=edit)[2], ["3"])
+        # (never auto mode, which isn't what Always says)
+        ok, message, keys, _ = self.keys("always", screen=" Do you want to proceed?\n ❯ 1. Yes\n   2. Yes, and switch to "
+                                                          "auto mode · auto mode handles these prompts for you\n   3. No\n")
+        self.assertEqual((ok, keys), (False, []))
 
     def test_each_paste_has_its_own_buffer(self):
         # two replies typed at once (each in its own process) mustn't paste each other's text

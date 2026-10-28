@@ -1180,8 +1180,8 @@ def answer_with_keys(entry, decision, note="", still=None):
         return False, "Its screen shows no permission question now"
     if decision == "allow":
         key = next((n for n, t in sorted(options.items()) if t.startswith("Yes")), None)
-    elif decision == "always":
-        key = next((n for n, t in sorted(options.items()) if t.startswith("Yes, and don")), None)
+    elif decision == "always":  # (a command's "and don't ask again for …", an edit's "allow all edits during this session")
+        key = next((n for n, t in sorted(options.items()) if t.startswith(("Yes, and don", "Yes, allow "))), None)
     else:
         key = next((n for n, t in sorted(options.items()) if t == "No" or t.startswith("No,") or t.startswith("No ")), None)
     if key is None:

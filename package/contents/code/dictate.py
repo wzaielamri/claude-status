@@ -89,6 +89,7 @@ from faster_whisper import download_model
 download_model(sys.argv[1], output_dir=sys.argv[2])
 """
 LONGEST_S = 300
+LEFTOVER_S = 3600  # (a recording's files, kept no longer than that: see tidy)
 VALID_ID = set("abcdefghijklmnopqrstuvwxyz0123456789-")
 
 
@@ -292,15 +293,33 @@ def paths(rid):
     return folder / (rid + ".wav"), folder / (rid + ".pid")
 
 
+def tidy():
+    """What a recording left behind (a pane closed or a widget gone while
+    it recorded) goes once its recorder surely has: LONGEST_S, then up to
+    10 minutes writing it down."""
+    folder = cache_dir()
+    for path in folder.iterdir():
+        try:
+            if time.time() - path.stat().st_mtime > LEFTOVER_S:
+                path.unlink()
+        except OSError:
+            pass
+
+
 def start(rid):
     wav, pid_file = paths(rid)
     cmd = recorder(wav)
     if cmd is None:
         return {"ok": False, "message": "To dictate, install PipeWire's pw-record (or arecord)"}
+    tidy()
     # (its own session: the widget's command ends now, the recording goes on; at most LONGEST_S)
     proc = subprocess.Popen(["timeout", "--signal=INT", str(LONGEST_S)] + cmd, stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     pid_file.write_text(str(proc.pid))
+    cancelled = wav.with_suffix(".cancel")
+    if cancelled.exists():  # (cancelled while it started: see cancel)
+        cancel(rid)
+        return {"ok": False, "message": "Not written down"}
     time.sleep(0.3)
     if proc.poll() is not None:
         return {"ok": False, "message": "The microphone didn't start recording"}
@@ -369,12 +388,19 @@ def stop(rid, language="auto"):
 
 
 def cancel(rid):
+    """Stop a recording and drop it. One cancelled before its --start wrote
+    its recorder down (the pane closed while it started) is marked first,
+    and its --start stops it once it has."""
     wav, pid_file = paths(rid)
+    marked = wav.with_suffix(".cancel")
+    marked.touch()
+    started = pid_file.exists()
     stop_recording(pid_file)
-    try:
-        wav.unlink()
-    except OSError:
-        pass
+    for path in ([wav, marked] if started else [wav]):
+        try:
+            path.unlink()
+        except OSError:
+            pass
     return {"ok": True, "message": "Not written down"}
 
 
@@ -479,6 +505,7 @@ def main(argv=None):
         del args[i:i + 2]
     try:
         if args == ["--status"]:
+            tidy()
             result = status()
         elif args[:1] == ["--setup"] and len(args) <= 2:
             result = setup(*args[1:])

@@ -605,7 +605,10 @@ Window {
     // The microphone button: record, then whisper (whisper.cpp, or the
     // faster-whisper the widget sets up) writes it down here (dictate.py;
     // nothing leaves the computer) and it goes in at the cursor
-    property string dictating: ""        // "", "recording", "writing", "model" (a model being downloaded), "setup"
+    // "", "starting" (--status, --start on their way: no second recorder
+    // meanwhile), "recording", "writing", "model" (a model being downloaded), "setup"
+    property string dictating: ""
+    property bool cancelStart: false     // cancelled (or the pane closed) while it started: stopped once it has
     property string dictateId: ""
     property real dictateSince: 0
     property var dictateState: null      // dictate.py --status
@@ -620,10 +623,21 @@ Window {
             dictating = "writing"
             dictateRun("--stop " + dictateId + " --language " + root.shellQuote(Plasmoid.configuration.dictateLanguage || "auto"))
         } else if (dictating === "") {
+            dictating = "starting"
+            cancelStart = false
+            dictateId = ""
             dictateRun("--status")
         }
     }
     function cancelDictation() {
+        if (dictating === "starting") {
+            // (the start sees it; when the pane closes, its answers don't
+            // come, and dictate.py's --start stops one cancelled meanwhile)
+            cancelStart = true
+            if (dictateId)
+                dictateRun("--cancel " + dictateId)
+            return
+        }
         if (dictating === "recording")
             dictateRun("--cancel " + dictateId)
         dictating = ""
@@ -639,14 +653,18 @@ Window {
             disconnectSource(source)
             const result = root.helperResult(data)
             if (source.indexOf(" --status") >= 0) {
+                if (pane.dictating !== "starting" || pane.dictateId)
+                    return   // (an answer that came too late: dictateStale gave up on it)
                 pane.dictateState = result
-                if (result.ok) {
+                if (result.ok && !pane.cancelStart) {
                     pane.dictateId = "r" + Date.now()
-                    pane.dictating = "recording"
-                    pane.dictateSince = Date.now()
-                    pane.recordedMs = 0
-                    pane.dictateRun("--start " + pane.dictateId)
-                } else if (result.recorder && result.canSetup) {
+                    pane.dictateRun("--start " + pane.dictateId)   // (still "starting")
+                    return
+                }
+                pane.dictating = ""
+                if (pane.cancelStart || result.ok)
+                    return   // (cancelled before it started)
+                if (result.recorder && result.canSetup) {
                     pane.offerSetup = true
                 } else if (result.recorder && result.tool && !result.model) {
                     pane.offerModel = true
@@ -654,7 +672,18 @@ Window {
                     pane.noteDictation(i18n("To dictate, install %1.", (result.missing || []).join(i18n(" and "))), true)
                 }
             } else if (source.indexOf(" --start ") >= 0) {
-                if (!result.ok) {
+                const id = source.split(" --start ")[1].split(" ")[0]
+                if (pane.cancelStart || id !== pane.dictateId || pane.dictating !== "starting") {
+                    // (cancelled while it started, or given up on: it stops now, and its recording is deleted)
+                    if (result.ok)
+                        pane.dictateRun("--cancel " + id)
+                    if (id === pane.dictateId)
+                        pane.dictating = ""
+                } else if (result.ok) {
+                    pane.dictating = "recording"
+                    pane.dictateSince = Date.now()
+                    pane.recordedMs = 0
+                } else {
                     pane.dictating = ""
                     pane.noteDictation(result.message, true)
                 }
@@ -671,6 +700,15 @@ Window {
                 pane.dictating = ""
                 pane.noteDictation(result.message, !result.ok)
             }
+        }
+    }
+    Timer {
+        id: dictateStale   // (an answer plasmashell lost doesn't keep the microphone greyed out)
+        interval: 20000
+        running: pane.dictating === "starting"
+        onTriggered: {
+            pane.cancelDictation()   // (what answers late stops)
+            pane.dictating = ""
         }
     }
     property real recordedMs: 0          // (the time on the button while it records)
@@ -1701,8 +1739,10 @@ Window {
                         text: pane.dictating === "recording" ? i18n("Stop: write it down") + " · " + root.duration(Math.max(1000, pane.recordedMs))
                               : pane.dictating === "writing" ? i18n("Writing it down…")
                               : pane.dictating === "model" ? i18n("Downloading the speech model…")
-                              : pane.dictating === "setup" ? i18n("Setting up dictation (a few minutes)…") : i18n("Dictate")
-                        display: pane.dictating === "" ? PlasmaComponents3.AbstractButton.IconOnly : PlasmaComponents3.AbstractButton.TextBesideIcon
+                              : pane.dictating === "setup" ? i18n("Setting up dictation (a few minutes)…")
+                              : pane.dictating === "starting" ? i18n("Starting the microphone…") : i18n("Dictate")
+                        display: pane.dictating === "" || pane.dictating === "starting" ? PlasmaComponents3.AbstractButton.IconOnly
+                                                                                          : PlasmaComponents3.AbstractButton.TextBesideIcon
                         onClicked: pane.dictate()
 
                         PlasmaCore.ToolTipArea {

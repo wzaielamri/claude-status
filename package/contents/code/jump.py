@@ -541,6 +541,26 @@ def host_names(host):
     return names
 
 
+def proc_env_value(pid, name):
+    """A variable (bytes name) of a process's environment, or None."""
+    try:
+        env = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+    except OSError:
+        return None
+    return next((e[len(name) + 1:].decode(errors="replace") for e in env if e.startswith(name + b"=")), None)
+
+
+def typed_in_vscode(ssh, main):
+    """Is this ssh one you ran in a terminal of VS Code (main), not
+    Remote-SSH's? Its shells get TERM_PROGRAM=vscode, while the extension
+    host that runs Remote-SSH's ssh has VS Code's own environment; and
+    Remote-SSH's has a -D, also when it shows in a terminal. No telling for
+    a VS Code started from one of those terminals: it counts then."""
+    argv = proc_cmdline(ssh)
+    return (proc_env_value(ssh, b"TERM_PROGRAM") == "vscode" and proc_env_value(main, b"TERM_PROGRAM") != "vscode"
+            and not any(a.startswith("-D") for a in argv[1:]))
+
+
 def vscode_connected_to(host):
     """(VS Code's main processes with a window connected to host, the caption
     of that window): Remote-SSH's ssh to it runs under them, and its title
@@ -550,7 +570,7 @@ def vscode_connected_to(host):
     mains, caption = [], f"[SSH: {host}]"
     for main in vscode_main_pids():
         target = next((t for t in (ssh_target(proc_cmdline(pid)) for pid in descendants(main, children)
-                                   if proc_name(pid) == "ssh") if t in names), None)
+                                   if proc_name(pid) == "ssh" and not typed_in_vscode(pid, main)) if t in names), None)
         if target is not None:
             mains.append(main)
             caption = f"[SSH: {target}]" if len(mains) == 1 else caption
@@ -1733,15 +1753,22 @@ def chat_comparison(home, extra_dirs, session_id, profile_dir=None, turn=False):
         full = cs.absolute_path(key, cwd)
         if cs.project_file(full, skip):
             wanted[full] = backup
+    told = {}
+    if not turn:  # (what the chat's first Edit or Write of a file gave back, as the pane's review takes it)
+        import pane
+        unbacked = {full for full, backup in wanted.items() if backup is False}
+        told = pane.tool_originals([path, *cs.subagent_transcripts(path)], unbacked) if unbacked else {}
     folder, items, unknown = None, [], 0
     for full in sorted(wanted):
         backup = wanted[full]
+        created = backup is None
         if backup is None:
             original = b""  # it didn't exist yet
         elif backup is False:
-            # no backup on record: git's last commit (a file git doesn't have
-            # may have been there before the chat: unknown, not new)
-            original = git_original(full, missing=None)
+            # no backup on record: what its first call gave back, else git's
+            # last commit (a file git doesn't have may have been there before
+            # the chat: unknown, not new)
+            original, created = told[full] if full in told else (git_original(full, missing=None), False)
         else:
             original = backup_content(profiles, rec["sessions"], backup)
             if original is None:
@@ -1752,7 +1779,7 @@ def chat_comparison(home, extra_dirs, session_id, profile_dir=None, turn=False):
             unknown += 1
             continue
         current = read_bytes(full)
-        if current == original or (current is None and original == b"" and backup is None):
+        if current == original or (current is None and original == b"" and created):
             continue  # unchanged (or made and removed again)
         if folder is None:
             folder = changes_folder(home)
@@ -1760,7 +1787,7 @@ def chat_comparison(home, extra_dirs, session_id, profile_dir=None, turn=False):
         copy.parent.mkdir()
         copy.write_bytes(original)
         items.append({"label": cs.file_label(full, cwd, home), "path": full, "original": str(copy),
-                      "created": backup is None,  # (one git has empty was there, empty)
+                      "created": created,  # (one git has empty was there, empty)
                       "deleted": current is None})
     what = "in its last turn" if turn else "since it started"
     if not items:

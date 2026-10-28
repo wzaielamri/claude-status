@@ -93,6 +93,27 @@ class DictateTests(unittest.TestCase):
         self.assertNotIn("-m ", self.log.read_text())
         self.assertEqual(list((self.home / "cache/talpy-den/dictation").iterdir()), [])
 
+    def test_cancelled_before_it_started(self):
+        # the pane closed while the recording started: the cancel can come
+        # first, and the start then stops at once
+        self.tool("pw-record", FAKE_RECORDER)
+        self.assertEqual(self.run_it("--cancel", "r4"), {"ok": True, "message": "Not written down"})
+        self.assertEqual(self.run_it("--start", "r4"), {"ok": False, "message": "Not written down"})
+        self.assertEqual(list((self.home / "cache/talpy-den/dictation").iterdir()), [])
+
+    def test_a_recording_left_behind_goes(self):
+        # (a widget that stopped while it recorded): gone once the recorder
+        # surely has, at the next look; a recent one stays
+        folder = self.home / "cache/talpy-den/dictation"
+        folder.mkdir(parents=True)
+        for name in ("r5.wav", "r5.pid", "r6.cancel", "r7.wav"):
+            (folder / name).write_text("2147483646" if name.endswith(".pid") else "x")
+        for name in ("r5.wav", "r5.pid", "r6.cancel"):
+            os.utime(folder / name, (time.time() - 2 * 3600,) * 2)
+        self.tool("pw-record", FAKE_RECORDER)
+        self.run_it("--status")
+        self.assertEqual(sorted(p.name for p in folder.iterdir()), ["r7.wav"])
+
     def test_nothing_to_write_with_offers_the_setup(self):
         self.tool("pw-record", FAKE_RECORDER)
         got = self.run_it("--status", model=False)

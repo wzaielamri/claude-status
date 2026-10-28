@@ -75,7 +75,7 @@ export function AskBox({ ask, onAnswer, onWholePlan, busy = false, max = 12, com
               type="button"
               class="btn secondary"
               disabled={busy}
-              title={ask.answer === "keys" ? "Like “Yes, and don't ask again” in its dialog."
+              title={ask.answer === "keys" ? "Like “Yes, and don't ask again” in its dialog (for an edit, “Yes, allow all edits during this session”)."
                 : `From now on, without asking: ${ask.always}. Saved in the project's .claude/settings.local.json, as Claude's own “don't ask again” does.`}
               onClick={() => onAnswer("always", "")}
             >

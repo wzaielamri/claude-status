@@ -77,6 +77,18 @@
   with `--` or `++` (a Markdown rule `---`, YAML front matter, `++i`)
   wasn't counted, so an edit could say *1 line removed* for one line added
   and two removed.
+- **Compare in VS Code shows what the review shows:** a file Claude keeps
+  no copy of (one outside the chat's folder, say) has its earlier version
+  in what the chat's first edit of it gave back; the review used that, but
+  *Compare in VS Code* asked git only, so it left such a file out or said
+  it had *no earlier version to compare with*.
+- **Always allow for an edit in a tmux chat:** Claude's dialog for an edit
+  offers *Yes, allow all edits during this session* rather than *Yes, and
+  don't ask again*, so *Always allow* said *That answer isn't one of the
+  choices it shows*. It picks that option now.
+- **Dictation leaves nothing behind:** a recording that the chat tab
+  cancelled while it was still starting is stopped as soon as it starts,
+  and recordings left behind are removed after an hour.
 
 ## 1.16.1
 

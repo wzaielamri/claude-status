@@ -1290,6 +1290,24 @@ class RemoteShowTests(unittest.TestCase):
             self.assertTrue(jump.jump_remote_vscode("labserver", "abc-123", "/home/me/proj")[0])
         self.assertEqual(raised, [(([100], "[SSH: labserver.uni.example]"), {"require": True, "prefer": "proj"})])
 
+    def test_an_ssh_typed_in_a_vscode_terminal_isnt_remote_ssh(self):
+        # VS Code's terminals give their shells TERM_PROGRAM=vscode; Remote-SSH's
+        # ssh (the extension host's, with its -D) has VS Code's own environment
+        tree = {100: [110, 130], 110: [120], 130: [131]}
+        names = {100: "code", 120: "ssh", 131: "ssh"}
+        argvs = {100: ["/usr/share/code/code"], 120: ["ssh", "labserver"], 131: ["ssh", "-T", "-D", "1", "gpu"]}
+        env = {120: "vscode", 131: None, 100: None}
+        with Patch(vscode_main_pids=lambda: [100], proc_env_value=lambda pid, name: env.get(pid),
+                   **self.procs(tree, names, argvs)):
+            self.assertEqual(jump.vscode_connected_to("labserver"), ([], "[SSH: labserver]"))
+            self.assertEqual(jump.vscode_connected_to("gpu"), ([100], "[SSH: gpu]"))
+            # Remote-SSH's own, shown in a terminal (its -D says it's the connection)
+            env[131] = "vscode"
+            self.assertEqual(jump.vscode_connected_to("gpu")[0], [100])
+            # a VS Code started from such a terminal: no telling, so it counts
+            env[100] = "vscode"
+            self.assertEqual(jump.vscode_connected_to("labserver")[0], [100])
+
     def test_vscode_opened_on_the_host_when_not_connected(self):
         opened = []
         fake = type("S", (), {"Popen": staticmethod(lambda args, **k: opened.append(args)), "DEVNULL": None})
@@ -1499,6 +1517,27 @@ class ChangesTests(Fixture):
         self.assertTrue(ok)
         self.assertEqual([i["label"] for i in comparison["items"]], ["src/new.py"])
         self.assertIn("4 more with no earlier version to compare with", message)  # edited, same, gone, notes
+
+    def test_a_file_without_backups_as_its_calls_gave_it_back(self):
+        # as in the pane's review: what the chat's first Edit or Write of it
+        # gave back (Claude keeps no backups of a file outside its folder)
+        today = self.home / "notes/today.md"
+        write(today, "# Today\n")
+        with open(self.home / ".claude-work/projects/-app/chat1.jsonl", "a") as f:
+            for e in ({"type": "assistant", "sessionId": "chat1", "message": {"content": [
+                          {"type": "tool_use", "id": "w", "name": "Write", "input": {"file_path": str(today)}}]}},
+                      {"type": "user", "sessionId": "chat1", "toolUseResult": {"type": "create", "filePath": str(today)},
+                       "message": {"content": [{"type": "tool_result", "tool_use_id": "w", "content": "ok"}]}},
+                      {"type": "user", "sessionId": "chat1",
+                       "toolUseResult": {"filePath": str(self.proj / "notes.md"), "originalFile": "before\n"},
+                       "message": {"content": [{"type": "tool_result", "tool_use_id": "t", "content": "ok"}]}}):
+                f.write(json.dumps(e) + "\n")
+        with Patch(git_original=lambda path, missing=b"": None):
+            ok, message, comparison = self.compare()
+        items = {i["label"]: i for i in comparison["items"]}
+        self.assertEqual(Path(items["notes.md"]["original"]).read_text(), "before\n")
+        self.assertEqual((items["~/notes/today.md"]["created"], Path(items["~/notes/today.md"]["original"]).read_text()),
+                         (True, ""))
 
     def test_a_removed_backup_of_a_file_git_doesnt_have(self):
         # it was there before the chat (Claude backed it up): not empty then;

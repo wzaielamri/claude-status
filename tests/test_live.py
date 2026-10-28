@@ -325,6 +325,24 @@ class WaitTests(unittest.TestCase):
         self.assertTrue(answer["urgent"])
         self.assertLess(took, live.MIN_GAP_S * 0.5)
 
+    def test_a_clock_set_back_doesnt_hold_steps_back(self):
+        # the last answer's time is later than now (the clock went back an
+        # hour): a step comes at once, not an hour later, and so does the timeout
+        self.wait()
+        self.put("d", "PreToolUse", "Bash: ls")
+        answers = []
+        run = threading.Thread(target=lambda: answers.append(live.wait(self.home, (), "test", 2,
+                                                                       clock=lambda: time.time() - 3600)), daemon=True)
+        run.start()
+        run.join(5)
+        self.assertEqual([a["live"][0]["doing"] for a in answers], ["Bash: ls"])
+        answers.clear()
+        run = threading.Thread(target=lambda: answers.append(live.wait(self.home, (), "test", 1,
+                                                                       clock=lambda: time.time() - 7200)), daemon=True)
+        run.start()
+        run.join(5)
+        self.assertEqual([a["timeout"] for a in answers], [True])
+
     def test_nothing_between_two_runs_is_missed(self):
         self.wait()
         self.put("c", "UserPromptSubmit")  # (while no watcher runs)
