@@ -303,6 +303,11 @@ export function resetText(ms: number | null, now: number): string {
   return `resets ${ms - now < 86400000 ? clockText(ms) : whenText(ms)}`;
 }
 
+// What a plan window's line says beside its fill: "60% · resets 14:00", "0% · reset"
+export function planText(w: WeekPlanWindow, now: number): string {
+  return `${Math.round(w.pct)}%` + (w.reset ? " · reset" : w.resetsAt ? ` · ${resetText(w.resetsAt, now)}` : "");
+}
+
 export function promptsText(p: WeekRecap["prompts"] | undefined): string {
   if (!p || !p.answered) return "";
   const answered = plural(p.answered, "%1 permission prompt", "%1 permission prompts");

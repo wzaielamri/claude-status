@@ -7,7 +7,7 @@ import * as vscode from "vscode";
 import { demoPerms, demoState, demoWeek } from "../src/shared/demo";
 import type { WeekDay } from "../src/shared/types";
 import {
-  coldText, currencyOf, dayTip, deltaText, factsText, fillPaths, footText, hoursText, hoverText, moneyText, periodText, promptsText, ruleMeta,
+  coldText, currencyOf, dayTip, deltaText, factsText, fillPaths, footText, hoursText, hoverText, moneyText, periodText, planText, promptsText, ruleMeta,
   weekAsked, weekRevokeAsked, weekRuleAsked, weekTiles, windowSpan, workText, grantMeta, grantedIntro,
   dateText, periodWaiting, rowDay, shortDay,
 } from "../src/shared/week";
@@ -116,6 +116,9 @@ test("a plan window's fill, from its start to its reset", () => {
   assert.equal(line, "M0.0,13.8 L40.0,8.1 L60.0,8.1"); // (the point before the window's start left out; level up to now)
   assert.equal(area, "M0.0,20 L0.0,13.8 L40.0,8.1 L60.0,8.1 L60.0,20 Z");
   assert.deepEqual(fillPaths({ ...w, points: [] }, NOW, 100, 20), { line: "", area: "" });
+  assert.equal(planText(w, NOW), `60% · resets ${new Date(NOW + 2 * HOUR).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+  // one past its reset (week.py: plan_windows) says so, as on the Chats tab
+  assert.equal(planText({ ...w, pct: 0, resetsAt: null, reset: true, points: [] }, NOW), "0% · reset");
 });
 
 test("a rule message is taken only in the shapes the tab sends", () => {
@@ -275,6 +278,14 @@ test("the Recap's card draws the period shown, the projects named only when aske
   texts.length = 0;
   drawCard(canvas, recap, true);
   assert.ok(texts.some((t) => t.includes(recap.projects[0].name)));
+  // Overall: a row per 7 days, newest first; the card draws its last 20 weeks oldest first, so they fit
+  const bars: number[][] = [];
+  ctx.roundRect = (...a: number[]) => void (ctx.fillStyle === "#d97757" && bars.push(a));
+  const weeks = Array.from({ length: 52 }, (_, i) => ({ ...recap.days[0], workedMs: i ? HOUR : 9 * HOUR }));
+  drawCard(canvas, { ...recap, span: "all", days: weeks }, false);
+  assert.equal(bars.length, 20);
+  assert.ok(bars[19][3] > bars[0][3], "the newest week is the last bar");
+  assert.ok(bars[19][0] + bars[19][2] - bars[0][0] <= 320 * 2, "within the card's column (drawn at twice its size)");
 });
 
 test("the Recap's card is copied from a folder of its own, removed after; a failure is said, not thrown", async () => {

@@ -117,6 +117,15 @@
   read *Go on at 09:01*, as if it were today. The button, its tooltips, a
   recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or
   *Fri 30 Oct 09:01* now.
+- **The Recap's plan limits after a reset:** *Your plan's limits now*
+  showed a window that had reset since the last reply (the usual case after
+  a limit stopped your chats) at its old percentage, in red, with a reset
+  time already past (*97% · resets 14:00*) and the old window's fill. It
+  shows *0% · reset* now, as the usage bars do.
+- **The Overall share card's bars:** they ran from the newest week to the
+  oldest, backwards against the Week card's, and with more than about 30
+  weeks of history they ran off the card's right edge. They show the last 20
+  weeks now, oldest first.
 
 ## 1.16.1
 

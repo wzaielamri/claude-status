@@ -1380,6 +1380,12 @@ export function weekResetText(ms, now) {
     return `resets ${ms - now < 86400000 ? clock(ms) : weekWhenText(ms)}`;
 }
 
+// What a plan window's line says beside its fill: "60% · resets 14:00", "0% · reset"
+export function weekPlanText(w, now) {
+    const reset = w.reset ? 'reset' : weekResetText(w.resetsAt, now);
+    return `${Math.round(w.pct)}%${reset ? ` · ${reset}` : ''}`;
+}
+
 export function weekPromptsText(p) {
     if (!p || !p.answered)
         return '';

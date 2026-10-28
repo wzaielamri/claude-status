@@ -19,7 +19,9 @@ PlasmaComponents3.ScrollView {
     readonly property real gu: Kirigami.Units.gridUnit
     property string confirmRule: ""   // the rule whose Allow asks first: its id
     property string confirmGrant: ""  // the permission whose Revoke asks first: its id
-    property bool allGranted: false   // all the permissions you gave shown, not the first few
+    // the hosts ("" this computer) whose permissions you gave are all shown, not the first few
+    // (kept here: a revoke reloads the tab)
+    property var allGranted: ({})
     readonly property int grantedFew: 8
 
     readonly property var emptyRule: ({ kind: "", value: "", project: "", count: 0, waitMs: 0, example: "", id: "",
@@ -105,17 +107,18 @@ PlasmaComponents3.ScrollView {
             text: i18n("Couldn't read your permissions: %1", root.permsError)
         }
 
-        // This computer's, then each SSH host's shown (as listed there)
+        // This computer's, then each SSH host's shown (as listed there); by
+        // count, so a reload refreshes them in place
         Repeater {
-            model: view.sources
+            model: view.sources.length
             delegate: ColumnLayout {
                 id: origin
-                required property var modelData
-                readonly property var src: modelData
+                required property int index
+                readonly property var src: view.sources[index] || ({ host: "", ok: true, prompts: null, granted: [] })
                 readonly property string host: src.host || ""
                 readonly property var granted: src.granted || []
                 readonly property var prompts: src.prompts || null
-                property bool allGranted: false   // all its permissions shown, not the first few
+                readonly property bool allGranted: view.allGranted[origin.host] === true
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.largeSpacing
 
@@ -262,7 +265,7 @@ PlasmaComponents3.ScrollView {
                 PlasmaComponents3.ToolButton {
                     visible: !origin.allGranted && origin.granted.length > view.grantedFew
                     text: i18np("Show %1 more", "Show %1 more", origin.granted.length - view.grantedFew)
-                    onClicked: origin.allGranted = true
+                    onClicked: view.allGranted = Object.assign({}, view.allGranted, { [origin.host]: true })
                 }
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText

@@ -49,6 +49,10 @@
 - **Go on at … says the day:** a weekly limit that resets on another day read *Go on at 09:01*, as if it were today. The button, its tooltips, a recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or *Fri 30 Oct 09:01* now (Plasma and VS Code).
 - **The hero's session counts stay put:** their lines were made anew at every check, even when no count had changed; only their numbers change now.
 - **How long a turn must take can be set with its notifications off:** *…if the turn took at least* was greyed out while notifications for finished turns were off, though it still picks which finished turns the keyboard shortcut goes to (and, in Plasma, the icon's green count). It can be changed either way now, and says so (Plasma and GNOME).
+- **The Recap's plan limits after a reset:** *Your plan's limits now* showed a window that had reset since the last reply (the usual case after a limit stopped your chats) at its old percentage, in red, with a reset time already past (*97% · resets 14:00*) and the old window's fill. It shows *0% · reset* now, as the Chats tab does (Plasma, GNOME and VS Code).
+- **Permissions tab: the list stays unfolded:** after *Show 12 more* and a *Revoke*, the list folded back to its first 8, so the next one down needed *Show more* again. It stays as you left it now.
+- **Recap's Chat by chat:** the times under the lanes were always 24-hour (*14:05*), where the rest of the widget follows your locale (*2:05 PM*); they follow it too now. A chat of an SSH host there is no longer a link that only said *the widget can't bring it here* (its row on the Chats tab opens it), as in the Recap's other lists.
+- **The Overall share card's bars:** they ran from the newest week to the oldest, backwards against the Week card's, and with more than about 30 weeks of history they ran off the card's right edge. They show the last 20 weeks now, oldest first (Plasma and VS Code).
 - **GNOME checks as often as the others while nothing runs:** its *…while nothing runs* setting started at 10 seconds, where Plasma and VS Code start at 20; it starts at 20 now (a value you set yourself stays).
 
 ## 1.16.1 (2026-10-27)

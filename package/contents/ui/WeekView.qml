@@ -79,7 +79,8 @@ PlasmaComponents3.ScrollView {
 
     // What a plan window's bar says beside it: "45% · resets 20:10"
     function planText(win) {
-        return Math.round(win.pct) + "%" + (win.resetsAt ? " · " + resetText(win.resetsAt) : "")
+        // (one past its reset, week.py plan_windows: "reset", as on the Chats tab)
+        return Math.round(win.pct) + "%" + (win.reset ? " · " + i18n("reset") : win.resetsAt ? " · " + resetText(win.resetsAt) : "")
     }
 
     // 3h 05m, 45m: a week of work reads better in hours than in days
@@ -1149,8 +1150,9 @@ PlasmaComponents3.ScrollView {
 
                         MouseArea {
                             anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.openChatById(laneRow.lane.id, laneRow.lane.profileDir || "", "", "", "", laneRow.lane.host || "")
+                            enabled: !laneRow.lane.host && !!laneRow.lane.id   // (an SSH host's chat: its row in the Chats tab opens it)
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: root.openChatById(laneRow.lane.id, laneRow.lane.profileDir || "", "", "", "", "")
                         }
                     }
                     Item {
@@ -1189,7 +1191,7 @@ PlasmaComponents3.ScrollView {
                 Layout.leftMargin: lanesBox.nameWidth + Kirigami.Units.smallSpacing
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText
-                    text: Qt.formatTime(new Date(lanesBox.t0), "hh:mm")
+                    text: root.clockText(lanesBox.t0)
                     font: Kirigami.Theme.smallFont
                     opacity: 0.6
                 }
@@ -1198,7 +1200,7 @@ PlasmaComponents3.ScrollView {
                 }
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText
-                    text: Qt.formatTime(new Date(lanesBox.t1), "hh:mm")
+                    text: root.clockText(lanesBox.t1)
                     font: Kirigami.Theme.smallFont
                     opacity: 0.6
                 }

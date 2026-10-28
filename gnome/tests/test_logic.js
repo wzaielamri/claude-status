@@ -589,6 +589,9 @@ test('trend lines, what Claude did, where the money went, the prompts you answer
     const w = {key: 'five_hour', resetsAt: 10 * HOUR, points: [[HOUR, 5]]};
     eq(L.weekWindowSpan(w), [5 * HOUR, 10 * HOUR]);
     eq(L.weekResetText(10 * HOUR, 9 * HOUR), `resets ${new Date(10 * HOUR).getHours().toString().padStart(2, '0')}:00`);
+    eq(L.weekPlanText({...w, pct: 60}, 9 * HOUR), `60% · ${L.weekResetText(10 * HOUR, 9 * HOUR)}`);
+    // one past its reset (week.py: plan_windows) says so, as on the Chats tab
+    eq(L.weekPlanText({...w, pct: 0, resetsAt: null, reset: true, points: []}, 11 * HOUR), '0% · reset');
 });
 
 print(`${count - failures}/${count} passed`);

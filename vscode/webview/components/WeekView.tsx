@@ -15,7 +15,7 @@ import {
   moneyText,
   periodText,
   periodWaiting,
-  resetText,
+  planText,
   rowDay,
   shareText,
   toolsText,
@@ -328,7 +328,7 @@ function Plan({ recap }: { recap: WeekRecap }) {
               <span class="week-bar-name">{(plans.length > 1 ? p.name + " · " : "") + w.label}</span>
               <FillChart w={w} now={recap.generatedAt} />
               <span class={"week-bar-value small" + (w.pct >= 90 ? " over" : " muted")}>
-                {Math.round(w.pct)}%{w.resetsAt ? ` · ${resetText(w.resetsAt, recap.generatedAt)}` : ""}
+                {planText(w, recap.generatedAt)}
               </span>
             </li>
           )),

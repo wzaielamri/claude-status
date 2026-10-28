@@ -696,6 +696,7 @@ export interface WeekPlanWindow {
   key: string; // "five_hour", "seven_day", …
   label: string; // "5h", "7d", …
   resetsAt: number | null;
+  reset?: boolean; // past its reset: at 0%, nothing filled yet
   pct: number;
   points: [number, number][]; // [ms, percent used]
 }

@@ -2065,10 +2065,12 @@ def revoke_rule(home, cache_root, profiles, rid):
 # ---------------------------------------------------------------- plan limits
 
 
-def plan_windows(cache_root, profiles):
+def plan_windows(cache_root, profiles, now_ms):
     """This computer's accounts' plan windows now, with how each filled up
     (the widget's usage history, usage.json): [{"account", "name", "windows":
-    [{"key", "label", "resetsAt", "pct", "points": [[ms, pct], ...]}]}]."""
+    [{"key", "label", "resetsAt", "pct", "reset", "points": [[ms, pct], ...]}]}].
+    One past its reset is at 0% with nothing filled yet, as on the Chats tab
+    (talpy_den.py: limit_window)."""
     data = cs.read_json(cache_root / "usage.json")
     groups = data.get("groups") if isinstance(data, dict) and isinstance(data.get("groups"), dict) else {}
     out = []
@@ -2080,8 +2082,11 @@ def plan_windows(cache_root, profiles):
             if not points or key not in cs.WINDOW_ORDER:
                 continue
             step = max(1, len(points) // 60)  # (60 points draw it)
-            windows.append({"key": key, "label": cs.WINDOW_LABELS.get(key, key), "resetsAt": rec.get("resetsAt"),
-                            "pct": points[-1][1], "points": points[::step] + ([points[-1]] if (len(points) - 1) % step else [])})
+            resets = rec.get("resetsAt")
+            reset = isinstance(resets, (int, float)) and resets <= now_ms
+            windows.append({"key": key, "label": cs.WINDOW_LABELS.get(key, key), "resetsAt": None if reset else resets,
+                            "pct": 0 if reset else points[-1][1], "reset": reset,
+                            "points": [] if reset else points[::step] + ([points[-1]] if (len(points) - 1) % step else [])})
         windows.sort(key=lambda w: cs.WINDOW_ORDER.index(w["key"]))
         if windows:
             out.append({"account": cs.short_id(gid), "name": named.label, "windows": windows})
@@ -2561,7 +2566,7 @@ def main(argv=None):
                 starts = [x for src in sources[1:] for c in (src.get("chats") or {}).values()
                           for x in [t[0] for t in c.get("turns", [])[:1]] + c.get("prompts", [])[:1]]
                 first_ms = min([first_ms] * (first_ms is not None) + starts) if starts else first_ms
-            result = recap(sources, back, account, now_ms, home, plan_windows(cache_root, profiles), load_added(cache_root),
+            result = recap(sources, back, account, now_ms, home, plan_windows(cache_root, profiles, now_ms), load_added(cache_root),
                            span, first_ms)
             result["currency"] = currency_of(currency, cache_root, now_ms / 1000)
     except Exception as exc:  # the widget must always get parseable output

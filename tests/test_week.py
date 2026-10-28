@@ -719,16 +719,29 @@ class PlanTests(Home):
         gid = {m.label: cs.short_id(g) for g, members in cs.group_profiles(profiles) for m in members}
         t0 = self.t0
         usage = {"groups": {gid["work"]: {"five_hour": {"resetsAt": t0 + 3600_000, "points": [[t0, 10], [t0 + 60_000, 25]]},
-                                          "seven_day": {"resetsAt": t0, "points": [[t0, 40]]},
+                                          "seven_day": {"resetsAt": t0 + 7 * week.DAY_MS, "points": [[t0, 40]]},
                                           "somewhere": {"points": [[t0, 1]]}}}}
         cs.write_json_atomic(self.cache_root / "usage.json", usage)
-        plans = week.plan_windows(self.cache_root, profiles)
+        plans = week.plan_windows(self.cache_root, profiles, t0 + 60_000)
         self.assertEqual([(p["name"], [(w["key"], w["label"], w["pct"]) for w in p["windows"]]) for p in plans],
                          [("work", [("five_hour", "5h", 25), ("seven_day", "7d", 40)])])
         self.assertEqual(plans[0]["windows"][0]["points"], [[t0, 10], [t0 + 60_000, 25]])
         self.assertEqual(self.recap(usage=plans)["plan"], plans)
         self.assertEqual(self.recap(account=gid["personal"], usage=plans)["plan"], [])
         self.assertEqual(self.recap(back=1, usage=plans)["plan"], [])
+
+    def test_a_window_past_its_reset_is_at_0(self):
+        # as on the Chats tab: no reply since the 5-hour window reset at 11:00
+        # (after a limit stop), and its 97% and "resets 11:00" were shown at 18:00
+        profiles = self.profiles()
+        gid = {m.label: cs.short_id(g) for g, members in cs.group_profiles(profiles) for m in members}
+        t0 = self.t0
+        usage = {"groups": {gid["work"]: {"five_hour": {"resetsAt": t0 + 3600_000, "points": [[t0, 10], [t0 + 60_000, 97]]},
+                                          "seven_day": {"resetsAt": t0 + 7 * week.DAY_MS, "points": [[t0, 40]]}}}}
+        cs.write_json_atomic(self.cache_root / "usage.json", usage)
+        five, seven = week.plan_windows(self.cache_root, profiles, self.now)[0]["windows"]
+        self.assertEqual((five["pct"], five["resetsAt"], five["reset"], five["points"]), (0, None, True, []))
+        self.assertEqual((seven["pct"], seven["resetsAt"], seven["reset"]), (40, t0 + 7 * week.DAY_MS, False))
 
 
 class Projects(Home):
