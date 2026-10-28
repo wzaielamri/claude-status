@@ -3,9 +3,9 @@
 ## Unreleased
 
 - **Chats stopped at the 5-hour limit with Claude Code 2.1.312:** Claude
-  now calls it the *5-hour limit* (before, the *session limit*), and such a
-  stop wasn't tied to the account's 5-hour window: its bar didn't show it
-  full, and *Go on at …* and **Keep going** guessed the reset from the
+  now calls it the *5-hour limit* (before, the *session limit*), and such
+  a stop wasn't tied to the account's 5-hour window: its bar didn't show
+  it full, and *Go on at …* and **Keep going** guessed the reset from the
   message. Both names work now, and the reset Claude notes with the stop
   comes first, so a shared chat that another account's limit stopped no
   longer fills this account's bar and goes on when that account's limit
@@ -16,45 +16,13 @@
   time adding a go-on and a limit error to the chat, and a notification.
   Dates in Claude's message are read now; with no reset to go by, it tries
   again after 2, 5, 15, 30 and 60 minutes, then gives up and says so.
-- **One notification when two chats change the same files:** a chat open
-  on two accounts made it two.
 - **The Permissions tab no longer suggests rules that let more through
   than they say:** *Allow “rg”*, *“tree”*, *“git branch”*, *“git diff”*,
   *“git log”* and *“git show”* let a chat run those with any options, and
-  some options run another program (`rg --pre`), write any file
-  (`git diff --output=…`, `tree -o`) or delete a branch (`git branch -D`),
-  all without asking. They aren't offered any more; rules you added with
-  them stay until you revoke them.
-- **An SSH host's chats in the Recap of an earlier day or week:** with a
-  host whose clock is set to a time zone west of yours (a UTC server seen
-  from Singapore, a New York one from Berlin), the Recap of yesterday or
-  last week left out the last 16 to 19 hours of the host's chats: the host
-  counted the days by its own calendar. It now sends the chats of the days
-  you see.
-- **VS Code and the Plasma widget don't slow each other down:** each made
-  the other read its chats' transcripts again from the start, on every
-  check, when they list different chats.
-- **SSH hosts whose login shell is fish or tcsh:** what the extension runs
-  there (in a host's terminal too) went through that shell's own quoting
-  first, so a prompt, a folder or a picture with a backslash, a newline or
-  a `!` (and with tcsh every pasted picture) failed or arrived changed.
-  Commands now reach `sh` there in a form every shell passes on as it is.
-- **Disconnect leaves your terminals open:** disconnecting from an SSH host
-  also ended the chats you had open in terminals over that connection. Now
-  nothing new uses the connection, and it closes once the last of those
-  terminals does.
-- **Make default keeps every account listed:** when `~/.claude` linked to
-  an account's folder with another name (say `~/accounts/work`), making
-  another account the default dropped that one from every list, with no
-  word. It now says so instead, until that folder is in
-  `talpyDen.extraConfigDirs`.
-- **A reply to a chat in VS Code arrives whole:** a message from the chat
-  tab (or one queued for after the turn) to a chat in VS Code's Claude was
-  cut off at an `&`, and a `+` in it became a space. It now reaches the
-  chat's input as you wrote it.
-- **Two replies typed into tmux chats at once go each to its own chat:**
-  both went through one shared paste buffer, so one chat could get (and
-  run) the other's message while the other got *no buffer*.
+  some options run another program (`rg --pre`), write any file (`git diff
+  --output=…`, `tree -o`) or delete a branch (`git branch -D`), all
+  without asking. They aren't offered any more; rules you added with them
+  stay until you revoke them.
 - **Allow and Deny answer what the chat asks now:** after you answered a
   permission prompt in the chat and it asked again right away, the chat's
   row, its tab, the notification and *Allow the oldest prompt* could still
@@ -62,173 +30,74 @@
   said *Allowed* or *Denied*. They show the newest prompt now, and an
   answer to one the chat asked again after isn't taken: you're told it
   asks something else now.
-- **Undo and Commit in the review:** Undo brought a file the chat deleted
-  (and its folder) back private to you, so a script came back not
-  executable; it comes back as git has it, with your usual permissions.
-  *Commit* also committed your own changes to files that a chat's file
-  name matched as a pattern (`app/[id]/page.tsx`, `a[1].txt`); names are
-  taken as they are now.
-- **Live mode keeps every step of a chat that runs for days:** a new
-  session elsewhere removed the lock of a chat older than three days, so
-  two of its events could arrive at once and one was lost (a finished turn
-  could show as working). The hook you have updates itself at the next
-  check.
-- **The chat tab counts an edit's lines right:** a changed line starting
-  with `--` or `++` (a Markdown rule `---`, YAML front matter, `++i`)
-  wasn't counted, so an edit could say *1 line removed* for one line added
-  and two removed.
-- **Compare in VS Code shows what the review shows:** a file Claude keeps
-  no copy of (one outside the chat's folder, say) has its earlier version
-  in what the chat's first edit of it gave back; the review used that, but
-  *Compare in VS Code* asked git only, so it left such a file out or said
-  it had *no earlier version to compare with*.
-- **Always allow for an edit in a tmux chat:** Claude's dialog for an edit
-  offers *Yes, allow all edits during this session* rather than *Yes, and
-  don't ask again*, so *Always allow* said *That answer isn't one of the
-  choices it shows*. It picks that option now.
-- **Dictation leaves nothing behind:** a recording that the chat tab
-  cancelled while it was still starting is stopped as soon as it starts,
-  and recordings left behind are removed after an hour.
 - **The next permission prompt is told at once:** when a chat asked again
   within a minute of its last prompt (you allowed a command, and it asked
   for the next), its notification came a check later and without a sound,
   and the same prompt asked again could be told twice. A new prompt is
   told right away now, and only the same one asked again is held back.
-- **Back from Review or Output:** a chat tab showed the chat's beginning
-  and stopped following new steps. It's at its end and follows it again if
-  it was when you left, else where you were.
-- **Show earlier in a very long chat:** past the 2000th step it stayed and
-  did nothing; a note says only the last 2000 steps are shown there now.
-- **Lists in a chat tab:** a numbered list with bullets under a step
-  numbered the bullets too, and the next step got a later number (*1. Step
-  one, 2. detail, 3. detail, 4. Step two*). The bullets are a list of their
-  own under their step now, as in the widget's pane.
-- **Claude's replies show as Claude wrote them:** globs and arguments such
-  as `*.py and *.js`, `*args` or `**kwargs` lost their asterisks and turned
-  part of the reply italic or bold; a `\|` in a table split its cell in two
-  with the backslash showing; a code block under a numbered step was shown
-  and copied with the step's indentation on every line. They show and copy
-  as written now, and a bare `https://` address is a link.
-- **What you opened on a chat stays open when its session ends:** when a
-  background session finished, its row folded the details or the subagents
-  you had open, and faded in as if it were a new chat. They're kept by the
-  chat now.
-- **Go on at … says the day:** a weekly limit that resets on another day
-  read *Go on at 09:01*, as if it were today. The button, its tooltips, a
-  recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or
-  *Fri 30 Oct 09:01* now.
-- **The Recap's plan limits after a reset:** *Your plan's limits now*
-  showed a window that had reset since the last reply (the usual case after
-  a limit stopped your chats) at its old percentage, in red, with a reset
-  time already past (*97% · resets 14:00*) and the old window's fill. It
-  shows *0% · reset* now, as the usage bars do.
-- **The Overall share card's bars:** they ran from the newest week to the
-  oldest, backwards against the Week card's, and with more than about 30
-  weeks of history they ran off the card's right edge. They show the last 20
-  weeks now, oldest first.
-- **A pet waves goodbye when its account's last chat leaves:** the
-  account's stage folded away at once with the pet frozen, and the pet
-  waved and dug away later, beside the next chat's pet. The stage stays
-  open until the pet is gone now, as in the widget.
-- **News from while the view was hidden:** a chat that finished (or
-  failed, or hit a limit) while the view was hidden was acted out with its
-  words when you next looked, however long ago that was. Now a pet acts
-  out only what happened in the last minute, and leaves older news be.
-- **The pets follow the theme's text color:** after switching to another
-  dark theme (or another light one), the pets' words, z's and sparks kept
-  the old theme's color until the view reloaded.
-- **Notifications about several chats offer only Open:** *Two chats change
-  the same files* showed the first chat's Allow once and Deny (or its plan,
-  or its question's options) when that chat was asking something, so Allow
-  approved a command the notification never named; and *the usage limit
-  reset* had a *Reply…* that went to the first chat it named only. Both
-  have just *Open* now, as in the widget.
-- **A reply from a notification that isn't sent says so:** when the
-  message typed into a notification's *Reply…* couldn't be sent, only the
-  Talpy Den view said why, which usually isn't on screen then, and the text
-  was gone. A notification says so now, and its *Open* shows the chat's
-  tab with your message ready to send again.
-- **Find a Chat shows an SSH host's chats with the right ages:** the
-  chats, folders and plans found on a host whose clock is off said how
-  long ago by the host's clock. They go by this computer's clock now, as
-  the host's own rows do.
-- **New chats on an SSH host follow `talpyDen.openIn`:** set to your
-  desktop's terminal, a new chat on a host (with a task or without) still
-  opened in a VS Code terminal; it opens in your desktop's terminal now,
-  as the host's other chats do.
-- **Send Feedback for plans in your other Claude folders:** a plan in a
-  folder of `talpyDen.extraConfigDirs` (or `$CLAUDE_CONFIG_DIR`) took
-  comments, but the editor showed no button to send them.
-- **A Remote-SSH window opened with a port:** a window connected to
-  `user@host:2222` had its host checked on ssh's own port (22 unless
-  `~/.ssh/config` says otherwise), so the host showed *no answer*, or
-  another machine's chats. Such a host isn't added by itself any more;
-  you're told once that a `Host` entry with that `Port` lets it.
-- **A check that ended isn't waited for:** when a helper had answered but
-  something it started still held its output, the view waited until that
-  ended, then said the check took too long (and no other check of this
-  computer started meanwhile).
-- **Plans, memories and subagent runs in a Remote-SSH window:** they
-  opened through an address the window doesn't serve, so *Couldn't open
-  the plan* (or the memory, or the subagent's run) came instead, a plan of
-  this computer took no comments there, and the window host's own plans
-  and memories opened this computer's file of the same path. Each opens
-  from where it is now.
-- **A usage bar's forecast in the widget's words:** the red line under a
-  bar said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it
-  says how long before the reset it runs out now (*full in 1h 20m, 45m
-  before it resets*), and its tooltip gives your pace with one decimal, the
-  time it runs out, and no *about N% when it resets* for a full window.
-- **Open the Recap opens it once:** after *Open the Recap* from the Monday
-  notification, the next Talpy Den page that loaded (*Open in Editor*
-  hours later, say) started on the Recap too instead of Chats.
-- **A chat's tab shows the newest reply as soon as you switch back:**
-  nothing reads a hidden tab's conversation, and on showing it again the
-  first read came only after up to 5 seconds (and moving focus between
-  editors put it off again), so Claude's last reply was missing while the
-  header already said the turn was done.
+- **Your replies arrive whole:** a message from the chat tab (or one
+  queued for after the turn) to a chat in VS Code's Claude was cut off at
+  an `&`, and a `+` in it became a space. A message of more than about
+  43,000 characters in Japanese or Chinese (65,000 with accents or
+  Cyrillic), or a few thousand to an SSH host's chat, passed the tab's
+  length check and then failed with only *spawn E2BIG*. A reply reaches
+  the chat as you wrote it now; a long one goes over in a file private to
+  you, removed once read, and over 100,000 characters still says *That
+  message is too long*.
 - **A reply queued for after an SSH host's turn waits for it:** one check
   of the host that failed (a VPN or Wi-Fi blip, the laptop waking up) made
   its chat look gone, so the reply was sent while the chat was still
   working, or failed and stayed in the queue with an error. It waits until
   the host answers and lists the chat as done; a task due on a host at its
   usage limit waits for the reset there too.
-- **Long replies are sent:** a message of more than about 43,000
-  characters in Japanese or Chinese (65,000 with accents or Cyrillic), or
-  a few thousand to an SSH host's chat, passed the tab's length check and
-  then failed with only *spawn E2BIG*. It goes over in a file private to
-  you now, removed once read; over 100,000 characters still says *That
-  message is too long*.
+- **Two replies typed into tmux chats at once go each to its own chat:**
+  both went through one shared paste buffer, so one chat could get (and
+  run) the other's message while the other got *no buffer*.
+- **Disconnect leaves your terminals open:** disconnecting from an SSH
+  host also ended the chats you had open in terminals over that
+  connection. Now nothing new uses the connection, and it closes once the
+  last of those terminals does.
+- **SSH hosts whose login shell is fish or tcsh:** what the extension runs
+  there (in a host's terminal too) went through that shell's own quoting
+  first, so a prompt, a folder or a picture with a backslash, a newline or
+  a `!` (and with tcsh every pasted picture) failed or arrived changed.
+  Commands now reach `sh` there in a form every shell passes on as it is.
+- **Make default keeps every account listed:** when `~/.claude` linked to
+  an account's folder with another name (say `~/accounts/work`), making
+  another account the default dropped that one from every list, with no
+  word. It now says so instead, until that folder is in
+  `talpyDen.extraConfigDirs`.
+- **An account reads as in the Plasma widget:** its token line gives
+  today's and the week's totals with their output (*Tokens today 378.3k
+  (12.0k out) · 7 days 502.9k (15.0k out)*); the week's two biggest
+  models, cut off mid-name in a narrow sidebar, are in its tooltip. How
+  old the plan usage is shows in a dim line under the bars (*Plan usage as
+  of 5m ago*, *…, on lab*), not as *usage updated …* at the right of the
+  heading. A chat's state words are colored only when it needs you or a
+  usage limit holds it (*Working* blue and *Done* green drowned out *Needs
+  input*); the dot carries every state's color. Removing a finished chat
+  from the list is a − (it was the × that also cancels a queued task and
+  hides a host). An account with nothing running reads *No chats running*
+  in the hero, and the files-changed tag reads *±3*, with *3 files
+  changed* over its list.
 - **The focus view's Finished lines are the chats you haven't looked at
   yet:** they listed every chat whose turn ended in the last 15 minutes,
   also ones you had opened and short turns, and left out failed ones. As
   in the widget, they now list each chat whose turn (as long as the
-  finished notification asks) ended while its tab wasn't showing it, failed
-  ones too (*Failed: look at what happened*), until you open that chat.
-- **The Recap's dates as in the widget:** *Everything since …*, the price
-  list's date and the exchange rate's read *24 Oct 2026*, not *24 October
-  2026*.
-- **Links in Claude's replies keep their parentheses:** a link to a page
-  with parentheses in its address (Wikipedia's *C_(programming_language)*)
-  opened a cut-off address and left a stray `)` after its text. The whole
-  address is the link now.
-- **The sidebar at its narrowest:** below about 330 px the Focus button was
-  pushed off the right edge with no way to reach it, and around 220 px the
-  Projects tab too. There the tabs you aren't on are icons now (named in
-  their tooltips), so every tab and the Focus button stay in sight down to
-  200 px.
+  finished notification asks) ended while its tab wasn't showing it,
+  failed ones too (*Failed: look at what happened*), until you open that
+  chat.
+- **The sidebar at its narrowest:** below about 330 px the Focus button
+  was pushed off the right edge with no way to reach it, and around 220 px
+  the Projects tab too. There the tabs you aren't on are icons now (named
+  in their tooltips), so every tab and the Focus button stay in sight down
+  to 200 px.
 - **High Contrast themes:** a chat that needs you and one at work had the
-  same color (two oranges in High Contrast Dark, two blues in High Contrast
-  Light), on rows, dots, counts and usage bars. Needs you is orange and
-  working blue in both now. In High Contrast Light the chat tab's inline
-  code, code blocks and syntax colors were pale on white (the dark theme's);
-  they're the light theme's now.
-- **Permission prompts:** a Deny note begun for one prompt stayed open,
-  with its text, when the chat went on to ask the next, and Enter then
-  denied that one with your note; and the Enter that picks a word in an
-  input method (Chinese, Japanese, Korean…) sent the Deny with a
-  half-written note. A new prompt starts afresh now, and Enter waits for
-  the word.
+  same color (two oranges in High Contrast Dark, two blues in High
+  Contrast Light), on rows, dots, counts and usage bars. Needs you is
+  orange and working blue in both now. In High Contrast Light the chat
+  tab's inline code, code blocks and syntax colors were pale on white (the
+  dark theme's); they're the light theme's now.
 - **The chat tab stays quick in a long chat:** each key typed in the reply
   drew the whole conversation again, some 200 ms a key after a few *Show
   earlier*; typing, a dictation's running seconds and the chat's checks
@@ -238,6 +107,127 @@
   focus ring; it's an input in the editor's font now. A JSON or YAML key,
   and an HTML tag, in a diff is green as in the widget, not grey like a
   comment.
+- **A chat's tab shows the newest reply as soon as you switch back:**
+  nothing reads a hidden tab's conversation, and on showing it again the
+  first read came only after up to 5 seconds (and moving focus between
+  editors put it off again), so Claude's last reply was missing while the
+  header already said the turn was done.
+- **Claude's replies show as Claude wrote them:** globs and arguments such
+  as `*.py and *.js`, `*args` or `**kwargs` lost their asterisks and
+  turned part of the reply italic or bold; a `\|` in a table split its
+  cell in two with the backslash showing; a code block under a numbered
+  step was shown and copied with the step's indentation on every line; a
+  numbered list with bullets under a step numbered the bullets too, and
+  the next step got a later number (*1. Step one, 2. detail, 3. detail, 4.
+  Step two*); and a link to a page with parentheses in its address
+  (Wikipedia's *C_(programming_language)*) opened a cut-off address and
+  left a stray `)` after its text. They show and copy as written now (the
+  bullets a list of their own under their step, as in the widget's pane,
+  the whole address the link), and a bare `https://` address is a link.
+- **Back from Review or Output:** a chat tab showed the chat's beginning
+  and stopped following new steps. It's at its end and follows it again if
+  it was when you left, else where you were. *Show earlier* past the
+  2000th step stayed and did nothing; a note says only the last 2000 steps
+  are shown there now.
+- **Permission prompts:** a Deny note begun for one prompt stayed open,
+  with its text, when the chat went on to ask the next, and Enter then
+  denied that one with your note; and the Enter that picks a word in an
+  input method (Chinese, Japanese, Korean…) sent the Deny with a
+  half-written note. A new prompt starts afresh now, and Enter waits for
+  the word.
+- **Undo and Commit in the review:** Undo brought a file the chat deleted
+  (and its folder) back private to you, so a script came back not
+  executable; it comes back as git has it, with your usual permissions.
+  *Commit* also committed your own changes to files that a chat's file
+  name matched as a pattern (`app/[id]/page.tsx`, `a[1].txt`); names are
+  taken as they are now.
+- **Compare in VS Code shows what the review shows:** a file Claude keeps
+  no copy of (one outside the chat's folder, say) has its earlier version
+  in what the chat's first edit of it gave back; the review used that, but
+  *Compare in VS Code* asked git only, so it left such a file out or said
+  it had *no earlier version to compare with*.
+- **The chat tab counts an edit's lines right:** a changed line starting
+  with `--` or `++` (a Markdown rule `---`, YAML front matter, `++i`)
+  wasn't counted, so an edit could say *1 line removed* for one line added
+  and two removed.
+- **Always allow for an edit in a tmux chat:** Claude's dialog for an edit
+  offers *Yes, allow all edits during this session* rather than *Yes, and
+  don't ask again*, so *Always allow* said *That answer isn't one of the
+  choices it shows*. It picks that option now.
+- **Notifications about several chats offer only Open:** *Two chats change
+  the same files* showed the first chat's Allow once and Deny (or its
+  plan, or its question's options) when that chat was asking something, so
+  Allow approved a command the notification never named; and *the usage
+  limit reset* had a *Reply…* that went to the first chat it named only.
+  Both have just *Open* now, as in the widget. A chat open on two accounts
+  made two *same files* notifications; it makes one.
+- **A reply from a notification that isn't sent says so:** when the
+  message typed into a notification's *Reply…* couldn't be sent, only the
+  Talpy Den view said why, which usually isn't on screen then, and the
+  text was gone. A notification says so now, and its *Open* shows the
+  chat's tab with your message ready to send again.
+- **Live mode keeps every step of a chat that runs for days:** a new
+  session elsewhere removed the lock of a chat older than three days, so
+  two of its events could arrive at once and one was lost (a finished turn
+  could show as working). The hook you have updates itself at the next
+  check.
+- **Dictation leaves nothing behind:** a recording that the chat tab
+  cancelled while it was still starting is stopped as soon as it starts,
+  and recordings left behind are removed after an hour.
+- **What you opened on a chat stays open when its session ends:** when a
+  background session finished, its row folded the details or the subagents
+  you had open, and faded in as if it were a new chat. They're kept by the
+  chat now.
+- **Go on at … says the day:** a weekly limit that resets on another day
+  read *Go on at 09:01*, as if it were today. The button, its tooltips, a
+  recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or
+  *Fri 30 Oct 09:01* now.
+- **A usage bar's forecast in the widget's words:** the red line under a
+  bar said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it
+  says how long before the reset it runs out now (*full in 1h 20m, 45m
+  before it resets*), and its tooltip gives your pace with one decimal,
+  the time it runs out, and no *about N% when it resets* for a full
+  window.
+- **Remote-SSH windows:** plans, memories and subagent runs opened through
+  an address the window doesn't serve, so *Couldn't open the plan* (or the
+  memory, or the subagent's run) came instead, a plan of this computer
+  took no comments there, and the window host's own plans and memories
+  opened this computer's file of the same path; each opens from where it
+  is now. A window connected to `user@host:2222` had its host checked on
+  ssh's own port (22 unless `~/.ssh/config` says otherwise), so the host
+  showed *no answer*, or another machine's chats; such a host isn't added
+  by itself any more, and you're told once that a `Host` entry with that
+  `Port` lets it.
+- **New chats on an SSH host follow `talpyDen.openIn`:** set to your
+  desktop's terminal, a new chat on a host (with a task or without) still
+  opened in a VS Code terminal; it opens in your desktop's terminal now,
+  as the host's other chats do.
+- **Find a Chat shows an SSH host's chats with the right ages:** the
+  chats, folders and plans found on a host whose clock is off said how
+  long ago by the host's clock. They go by this computer's clock now, as
+  the host's own rows do.
+- **Send Feedback for plans in your other Claude folders:** a plan in a
+  folder of `talpyDen.extraConfigDirs` (or `$CLAUDE_CONFIG_DIR`) took
+  comments, but the editor showed no button to send them.
+- **An SSH host's chats in the Recap of an earlier day or week:** with a
+  host whose clock is set to a time zone west of yours (a UTC server seen
+  from Singapore, a New York one from Berlin), the Recap of yesterday or
+  last week left out the last 16 to 19 hours of the host's chats: the host
+  counted the days by its own calendar. It now sends the chats of the days
+  you see.
+- **The Recap's plan limits after a reset:** *Your plan's limits now*
+  showed a window that had reset since the last reply (the usual case
+  after a limit stopped your chats) at its old percentage, in red, with a
+  reset time already past (*97% · resets 14:00*) and the old window's
+  fill. It shows *0% · reset* now, as the usage bars do.
+- **The Recap's share card and dates:** the Overall share card's bars ran
+  from the newest week to the oldest, backwards against the Week card's,
+  and with more than about 30 weeks of history they ran off the card's
+  right edge; they show the last 20 weeks now, oldest first. *Everything
+  since …*, the price list's date and the exchange rate's read *24 Oct
+  2026*, not *24 October 2026*, as in the widget. *Open the Recap* from
+  the Monday notification no longer makes the next Talpy Den page that
+  loads (*Open in Editor* hours later, say) start on the Recap too.
 - **The Recap, Permissions and Projects tabs:** a day's chats and a
   folder's chats open from the keyboard too (Tab to it, then Enter or
   Space). In *Chats it worked on most* the folder gives way before the
@@ -249,18 +239,22 @@
   0m*) beside a dot in that state's color, not a blue dot for all and the
   word *done*; and the tab no longer reads every chat every 10 minutes
   while the view is hidden.
-- **An account reads as in the Plasma widget:** its token line gives
-  today's and the week's totals with their output (*Tokens today 378.3k
-  (12.0k out) · 7 days 502.9k (15.0k out)*); the week's two biggest models,
-  cut off mid-name in a narrow sidebar, are in its tooltip. How old the plan
-  usage is shows in a dim line under the bars (*Plan usage as of 5m ago*,
-  *…, on lab*), not as *usage updated …* at the right of the heading. A
-  chat's state words are colored only when it needs you or a usage limit
-  holds it (*Working* blue and *Done* green drowned out *Needs input*); the
-  dot carries every state's color. Removing a finished chat from the list is
-  a − (it was the × that also cancels a queued task and hides a host). An
-  account with nothing running reads *No chats running* in the hero, and the
-  files-changed tag reads *±3*, with *3 files changed* over its list.
+- **Pets:** when an account's last chat left, its stage folded away at
+  once with the pet frozen, and the pet waved and dug away later, beside
+  the next chat's pet; the stage stays open until the pet is gone now, as
+  in the widget. A chat that finished (or failed, or hit a limit) while
+  the view was hidden was acted out with its words when you next looked,
+  however long ago that was; now a pet acts out only what happened in the
+  last minute, and leaves older news be. After switching to another dark
+  theme (or another light one), the pets' words, z's and sparks kept the
+  old theme's color until the view reloaded; they follow it now.
+- **A check that ended isn't waited for:** when a helper had answered but
+  something it started still held its output, the view waited until that
+  ended, then said the check took too long (and no other check of this
+  computer started meanwhile).
+- **VS Code and the Plasma widget don't slow each other down:** each made
+  the other read its chats' transcripts again from the start, on every
+  check, when they list different chats.
 
 ## 1.16.1
 

@@ -77,8 +77,10 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   **⏱ Go on at 10:41** has it go on by itself in the background once the
   limit resets, in the permission mode it had (an idle Claude that still has
   it open quits first). **↻ Keep going** beside it does that after every
-  later limit too, until the chat is done; a chat at work gets the same from
-  its ↻ button. In **Recent chats**, click a chat's **limit** tag (once) or
+  later limit too, until the chat is done (with no reset to go by, out of
+  usage credits say, it tries again after 2, 5, 15, 30 and 60 minutes, then
+  gives up and says so); a chat at work gets the same from its ↻ button.
+  In **Recent chats**, click a chat's **limit** tag (once) or
   **↻** (keep going) for the same.
 - **Star chats and plans** (the star button next to them): each account
   lists its starred ones under **Recent chats → ★ Starred** and **Plans → ★
@@ -172,7 +174,8 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   computer's. A host that wants a password shows **Log in…**: a terminal
   where `ssh` asks for it, so the extension never sees it; the checks then
   use that connection (until 30 minutes after their last use, logging out,
-  or the host's **Disconnect** button).
+  or the host's **Disconnect** button; terminals already open over it go on,
+  and it closes with the last of them).
 - **Notifications** (and a sound) when a chat needs you or finishes a long turn,
   or a usage limit stops it.
 - **The status bar**: how many chats need you, the 5-hour usage, and with
