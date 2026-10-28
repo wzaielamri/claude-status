@@ -1039,6 +1039,17 @@ class SearchAndNewChatBoxTests(unittest.TestCase):
 
 
 class SettingsPageTests(unittest.TestCase):
+    def test_the_check_intervals_default_alike_in_plasma_gnome_and_vs_code(self):
+        # GNOME checked twice as often while nothing ran (10 s, the others 20 s)
+        repo = ROOT.parent.parent
+        plasma = dict(re.findall(r'<entry name="(\w+)" type="Int">\s*<label>[^<]*</label>\s*<default>(\d+)<',
+                                 (ROOT / "config/main.xml").read_text()))
+        gnome = dict(re.findall(r'<key name="([\w-]+)" type="i">\s*<default>(\d+)<',
+                                (repo / "gnome/extension/schemas/org.gnome.shell.extensions.talpy-den.gschema.xml").read_text()))
+        code = json.loads((repo / "vscode/package.json").read_text())["contributes"]["configuration"]["properties"]
+        for key, gkey in (("pollInterval", "poll-interval"), ("idlePollInterval", "idle-poll-interval")):
+            self.assertEqual({int(plasma[key]), int(gnome[gkey]), code["talpyDen." + key]["default"]}, {int(plasma[key])}, key)
+
     def test_a_closable_message_box_isnt_bound_to_visible(self):
         # Kirigami's close button sets the box's visible, which ends a binding
         # like `visible: page.message !== ""`: the next message never showed

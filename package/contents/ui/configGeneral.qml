@@ -391,10 +391,17 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: notifyDoneMinSeconds
             Kirigami.FormData.label: i18n("…if the turn took at least (s):")
-            enabled: notifyDone.checked
             from: 0
             to: 3600
             stepSize: 10
+        }
+
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+            wrapMode: Text.Wrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            text: i18n("Also picks which finished turns the keyboard shortcut goes to, notifications on or off.")
         }
 
         QQC2.CheckBox {

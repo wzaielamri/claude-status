@@ -48,6 +48,8 @@
 - **What you opened on a chat stays open when its session ends:** when a background session finished, its row folded the details, the subagents or the stop question you had open, and faded in as if it were a new chat. They're kept by the chat now (Plasma, GNOME and VS Code).
 - **Go on at … says the day:** a weekly limit that resets on another day read *Go on at 09:01*, as if it were today. The button, its tooltips, a recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or *Fri 30 Oct 09:01* now (Plasma and VS Code).
 - **The hero's session counts stay put:** their lines were made anew at every check, even when no count had changed; only their numbers change now.
+- **How long a turn must take can be set with its notifications off:** *…if the turn took at least* was greyed out while notifications for finished turns were off, though it still picks which finished turns the keyboard shortcut goes to (and, in Plasma, the icon's green count). It can be changed either way now, and says so (Plasma and GNOME).
+- **GNOME checks as often as the others while nothing runs:** its *…while nothing runs* setting started at 10 seconds, where Plasma and VS Code start at 20; it starts at 20 now (a value you set yourself stays).
 
 ## 1.16.1 (2026-10-27)
 

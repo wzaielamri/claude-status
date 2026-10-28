@@ -71,8 +71,8 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         const notify = new Adw.PreferencesGroup({title: 'Notifications'});
         notify.add(toggle('notify-waiting', 'When a session needs input', 'a permission prompt or a question'));
         notify.add(toggle('notify-done', 'When a session finishes its turn'));
-        notify.add(needs(spin('notify-done-min-seconds', '…if the turn took at least', 'seconds', 0, 3600, 10),
-            'notify-done'));
+        notify.add(spin('notify-done-min-seconds', '…if the turn took at least',
+            'seconds; also picks which finished turns the shortcut goes to, notifications on or off', 0, 3600, 10));
         notify.add(toggle('away-digest', 'A summary when you come back',
             'after the screen was locked: what finished, failed or needs you, at the top of the menu, and as one notification while the ones above are on'));
         notify.add(needs(spin('away-minutes', '…if you were away at least', 'minutes', 1, 240, 1), 'away-digest'));

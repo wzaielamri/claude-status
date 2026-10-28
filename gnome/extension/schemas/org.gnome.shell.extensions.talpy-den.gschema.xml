@@ -8,7 +8,7 @@
       <summary>Milliseconds between status checks</summary>
     </key>
     <key name="idle-poll-interval" type="i">
-      <default>10000</default>
+      <default>20000</default>
       <range min="1000" max="300000"/>
       <summary>Milliseconds between status checks while nothing runs and the menu is closed</summary>
       <description>Never more often than poll-interval.</description>
