@@ -35,6 +35,8 @@
 - **SSH hosts are checked every 30 seconds, as the setting says:** with no chat of this computer at work, a host was checked every 40 seconds (a check runs only at the widget's own beat, every 20 seconds then).
 - **A computer that only watches SSH hosts:** with no Claude Code here and hosts shown, a big *No Claude Code config found* sat under the hosts' chats as if something were wrong. One quiet line says it now; the big message stays for a widget with nothing to show at all.
 - **The hero's ticker rests while the popup is closed:** it went on taking turns between the chats at work (a timer twice a second) with nobody to see it, and on the desktop while a window covered it.
+- **Claude's replies in the chat pane show as Claude wrote them:** globs and arguments such as `*.py and *.js`, `*args` or `**kwargs` lost their asterisks and turned part of the reply italic or bold; a `\|` in a table split its cell in two with the backslash showing, and `\*` showed its backslash; a code block under a numbered step was shown and copied with the step's indentation on every line, so pasted Python or YAML came out indented wrong. They show and copy as written now (Plasma and VS Code).
+- **Lists and web addresses in a VS Code chat tab look as in the widget's pane:** a numbered list with bullets under a step numbered the bullets too, and the next step got a later number (*1. Step one, 2. detail, 3. detail, 4. Step two*); the bullets are a list of their own under their step now. A bare `https://` address is a link there too.
 
 ## 1.16.1 (2026-10-27)
 

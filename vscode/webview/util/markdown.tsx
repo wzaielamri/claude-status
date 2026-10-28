@@ -14,14 +14,34 @@ const QUOTE = /^\s*>\s?(.*)$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
 const TABLE_RULE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
 const SAFE_LINK = /^(https?:|mailto:)/i;
+const WORD = /\w/;
+const MARK = /[^\w\s]/;
 
-// Inline Markdown: `code`, **bold**, *italics* / _italics_, [links](url)
+// Whether the marks around m (a **, __, *, _ or ~~ match ending at end) make
+// emphasis, as in CommonMark: a closing mark comes after text and isn't
+// written \*, no mark sits between punctuation and a word (f(*args, **kw)
+// stays as written), and _ or __ only at words' edges (snake_case_names)
+function emphasis(text: string, m: RegExpExecArray, end: number): boolean {
+  const d = m[2] !== undefined || m[3] !== undefined || m[8] !== undefined ? 2 : 1;
+  const before = m.index > 0 ? text[m.index - 1] : " ";
+  const after = end < text.length ? text[end] : " ";
+  const last = text[end - d - 1];
+  if (last === "\\" || (MARK.test(text[m.index + d]) && WORD.test(before)) || (MARK.test(last) && WORD.test(after))) return false;
+  return (m[3] === undefined && m[5] === undefined) || !(WORD.test(before) || WORD.test(after));
+}
+
+// Inline Markdown: `code`, **bold**, *italics* / _italics_, ~~struck~~, [links](url), bare web addresses
 export function inline(text: string, key = "i"): ComponentChildren[] {
   const out: ComponentChildren[] = [];
-  const pattern = /`([^`]+)`|\*\*(.+?)\*\*|__(.+?)__|\*([^*\s][^*]*?)\*|(?<![\w])_([^_\s][^_]*?)_(?![\w])|\[([^\]]+)\]\(([^)\s]+)\)|~~(.+?)~~/g;
+  const pattern =
+    /`([^`]+)`|\*\*(\S(?:.*?\S)?)\*\*|__(\S(?:.*?\S)?)__|\*([^*\s](?:[^*]*?[^*\s])?)\*|_([^_\s](?:[^_]*?[^_\s])?)_|\[([^\]]+)\]\(([^)\s]+)\)|~~(\S(?:.*?\S)?)~~|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|\\([\\`*_{}\[\]()#+\-.!|~<>])/g;
   let last = 0;
   let n = 0;
   for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
+    if (m[1] === undefined && m[6] === undefined && m[9] === undefined && m[10] === undefined && !emphasis(text, m, pattern.lastIndex)) {
+      pattern.lastIndex = m.index + 1; // (snake_case_names, *.py and *.js stay as they are)
+      continue;
+    }
     if (m.index > last) out.push(text.slice(last, m.index));
     const k = `${key}-${n++}`;
     if (m[1] !== undefined) out.push(<code key={k}>{m[1]}</code>);
@@ -31,14 +51,53 @@ export function inline(text: string, key = "i"): ComponentChildren[] {
       const href = m[7];
       out.push(SAFE_LINK.test(href) ? <a key={k} href={href} title={href}>{inline(m[6], k)}</a> : <span key={k}>{inline(m[6], k)}</span>);
     } else if (m[8] !== undefined) out.push(<s key={k}>{inline(m[8], k)}</s>);
+    else if (m[9] !== undefined) out.push(<a key={k} href={m[9]} title={m[9]}>{m[9]}</a>);
+    else out.push(m[10]); // (\*, \_, \| …: the mark itself)
     last = pattern.lastIndex;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
 }
 
+// A table line's cells: split at each | but one written \|, a | in its cell
 function cells(line: string): string[] {
-  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  const out = [""];
+  const t = line.trim().replace(/^\|/, "");
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "\\" && t[i + 1] === "|") out[out.length - 1] += t[++i];
+    else if (t[i] === "|") out.push("");
+    else out[out.length - 1] += t[i];
+  }
+  if (out.length > 1 && !out[out.length - 1].trim()) out.pop(); // (the line's closing |)
+  return out.map((c) => c.trim());
+}
+
+type Item = { depth: number; ordered: boolean; start: number; text: string };
+
+// List items as nested lists, as the Plasma pane shows them: a run of items
+// at one depth (and of one kind) is an <ol>/<ul>, deeper items under an item
+// a list of their own inside it
+function lists(items: Item[], key: string): JSX.Element[] {
+  const out: JSX.Element[] = [];
+  for (let i = 0; i < items.length; ) {
+    const { depth, ordered, start } = items[i];
+    const lis: JSX.Element[] = [];
+    while (i < items.length && items[i].depth === depth && items[i].ordered === ordered) {
+      const k = `${key}-${i}`;
+      let j = i + 1;
+      while (j < items.length && items[j].depth > depth) j++;
+      lis.push(
+        <li key={k}>
+          {inline(items[i].text, k)}
+          {j > i + 1 ? lists(items.slice(i + 1, j), k) : null}
+        </li>,
+      );
+      i = j;
+    }
+    const l = `${key}.${out.length}`;
+    out.push(ordered ? <ol key={l} start={start}>{lis}</ol> : <ul key={l}>{lis}</ul>);
+  }
+  return out;
 }
 
 // Block Markdown: the reply as paragraphs, headings, lists, code blocks, …
@@ -46,20 +105,13 @@ export function Markdown({ text, onCopy }: { text: string; onCopy?: (code: strin
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
   const blocks: JSX.Element[] = [];
   let para: string[] = [];
-  let list: { ordered: boolean; items: { depth: number; text: string }[]; start: number } | null = null;
+  let list: Item[] | null = null;
   const flushPara = () => {
     if (para.length) blocks.push(<p key={`p${blocks.length}`}>{inline(para.join(" "), `p${blocks.length}`)}</p>);
     para = [];
   };
   const flushList = () => {
-    if (!list) return;
-    const l = list;
-    const items = l.items.map((it, i) => (
-      <li key={i} style={it.depth ? { marginLeft: `${it.depth * 1.2}em` } : undefined}>
-        {inline(it.text, `l${blocks.length}-${i}`)}
-      </li>
-    ));
-    blocks.push(l.ordered ? <ol key={`l${blocks.length}`} start={l.start}>{items}</ol> : <ul key={`l${blocks.length}`}>{items}</ul>);
+    if (list) blocks.push(...lists(list, `l${blocks.length}`));
     list = null;
   };
   for (let i = 0; i < lines.length; i++) {
@@ -68,8 +120,10 @@ export function Markdown({ text, onCopy }: { text: string; onCopy?: (code: strin
     if (fence) {
       flushPara();
       flushList();
+      // (a block in a list item: its lines without the fence's indent)
       const body: string[] = [];
-      for (i++; i < lines.length && !(lines[i].trim().startsWith(fence[2]) && !lines[i].trim().replace(/[`~]/g, "")); i++) body.push(lines[i]);
+      for (i++; i < lines.length && !(lines[i].trim().startsWith(fence[2]) && !lines[i].trim().replace(/[`~]/g, "")); i++)
+        body.push(lines[i].replace(/^[ \t]*/, (w) => w.slice(fence[1].length)));
       const code = body.join("\n");
       blocks.push(
         <div key={`c${blocks.length}`} class="md-codeblock">
@@ -146,14 +200,14 @@ export function Markdown({ text, onCopy }: { text: string; onCopy?: (code: strin
       flushPara();
       const m = (bullet ?? numbered)!;
       const ordered = !!numbered;
-      if (list && list.ordered !== ordered && Math.floor(m[1].length / 2) === 0) flushList();
-      if (!list) list = { ordered, items: [], start: numbered ? Number(numbered[2]) : 1 };
-      list.items.push({ depth: Math.floor(m[1].replace(/\t/g, "  ").length / 2), text: m[3] });
+      const depth = Math.floor(m[1].replace(/\t/g, "  ").length / 2);
+      if (list && list[0].ordered !== ordered && depth === 0) flushList();
+      (list ??= []).push({ depth, ordered, start: numbered ? Number(numbered[2]) : 1, text: m[3] });
       continue;
     }
     if (list && /^\s{2,}\S/.test(line)) {
       // (a list item that goes on on the next line)
-      list.items[list.items.length - 1].text += " " + line.trim();
+      list[list.length - 1].text += " " + line.trim();
       continue;
     }
     flushList();

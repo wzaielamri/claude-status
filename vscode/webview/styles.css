@@ -2882,7 +2882,9 @@ body.vscode-light .pane {
   padding-left: 1.5em;
 }
 
-.md li + li {
+.md li + li,
+.md li > ul,
+.md li > ol {
   margin-top: 0.2em;
 }
 

@@ -1455,6 +1455,32 @@ class PaneMarkdownTests(unittest.TestCase):
         self.assertIn('href="copy:0"', html)
         self.assertEqual(markdown(f"Md.codeBlocks({json.dumps(text)})"), ["print(1)"])
 
+    def test_asterisks_in_globs_and_args_stay(self):
+        # (a closing * or ** comes right after text, and not between punctuation and a word;
+        # __x__ like _x_ only between words' edges)
+        for text in ["Look at the *.py and *.js files", "Use **kwargs and *args in f(*args, **kwargs)",
+                     "foo__bar__baz", "2 * 3 * 4"]:
+            html = markdown(f"Md.toHtml({json.dumps(text)}, style)")
+            self.assertNotIn("<i>", html, text)
+            self.assertNotIn("<b>", html, text)
+            self.assertEqual(html.count("*"), text.count("*"), text)
+        html = markdown('Md.toHtml("**Note:** a *b* and __c__, a*b*c, ~~d~~", style)')
+        for part in ["<b>Note:</b>", "<i>b</i>", "<b>c</b>", "a<i>b</i>c", "<s>d</s>"]:
+            self.assertIn(part, html)
+
+    def test_escapes_and_pipes_in_a_table(self):
+        html = markdown('Md.toHtml("| cmd | what |\\n|---|---|\\n| `a \\\\| b` | pipe \\\\| x |", style)')
+        self.assertEqual(len(re.findall(r"<td>", html)), 2)
+        self.assertIn("a | b", html)
+        self.assertIn("pipe | x", html)
+        self.assertNotIn("\\", html)
+        html = markdown('Md.toHtml("text with \\\\*escaped\\\\* stars and \\\\_this\\\\_", style)')
+        self.assertIn("text with *escaped* stars and _this_", html)
+
+    def test_a_code_block_in_a_list_item_loses_the_lists_indent(self):
+        text = "1. Run:\n   ```python\n   if x:\n       go()\n   ```\n2. Next"
+        self.assertEqual(markdown(f"Md.codeBlocks({json.dumps(text)})"), ["if x:\n    go()"])
+
     def test_tables_have_no_margin_of_their_own(self):
         # (Qt Quick paints a table's background over its margin: the gap above
         # one is a spacer line, never the table's own margin)

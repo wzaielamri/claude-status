@@ -94,6 +94,16 @@
   for the next), its notification came a check later and without a sound,
   and the same prompt asked again could be told twice. A new prompt is
   told right away now, and only the same one asked again is held back.
+- **Lists in a chat tab:** a numbered list with bullets under a step
+  numbered the bullets too, and the next step got a later number (*1. Step
+  one, 2. detail, 3. detail, 4. Step two*). The bullets are a list of their
+  own under their step now, as in the widget's pane.
+- **Claude's replies show as Claude wrote them:** globs and arguments such
+  as `*.py and *.js`, `*args` or `**kwargs` lost their asterisks and turned
+  part of the reply italic or bold; a `\|` in a table split its cell in two
+  with the backslash showing; a code block under a numbered step was shown
+  and copied with the step's indentation on every line. They show and copy
+  as written now, and a bare `https://` address is a link.
 
 ## 1.16.1
 

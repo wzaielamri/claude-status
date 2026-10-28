@@ -12,7 +12,7 @@
 // muted, accent (bullets, quote bars), heading, code (inline code), codeBg,
 // blockBg (code blocks), border, link}: colors as "#rrggbb".
 
-const FENCE = /^\s*(```+|~~~+)\s*([^\s`]*)/;
+const FENCE = /^(\s*)(```+|~~~+)\s*([^\s`]*)/;
 const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
 const BULLET = /^(\s*)([-*+])\s+(.*)$/;
 const NUMBERED = /^(\s*)(\d{1,9})[.)]\s+(.*)$/;
@@ -20,8 +20,23 @@ const QUOTE = /^\s*>\s?(.*)$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
 const TABLE_RULE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
 const SAFE_LINK = /^(https?:|mailto:)/i;
-const INLINE = /`([^`]+)`|\*\*(.+?)\*\*|__(.+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|~~(.+?)~~|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])/g;
+const INLINE = /`([^`]+)`|\*\*(\S(?:.*?\S)?)\*\*|__(\S(?:.*?\S)?)__|\*([^*\s](?:[^*]*?[^*\s])?)\*|_([^_\s](?:[^_]*?[^_\s])?)_|~~(\S(?:.*?\S)?)~~|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|\\([\\`*_{}\[\]()#+\-.!|~<>])/g;
 const WORD = /\w/;
+const MARK = /[^\w\s]/;
+
+// Whether the marks around m (a **, __, *, _ or ~~ match ending at end) make
+// emphasis, as in CommonMark: a closing mark comes after text and isn't
+// written \*, no mark sits between punctuation and a word (f(*args, **kw)
+// stays as written), and _ or __ only at words' edges (snake_case_names)
+function emphasis(text, m, end) {
+    const d = m[2] !== undefined || m[3] !== undefined || m[6] !== undefined ? 2 : 1;
+    const before = m.index > 0 ? text[m.index - 1] : " ";
+    const after = end < text.length ? text[end] : " ";
+    const last = text[end - d - 1];
+    if (last === "\\" || (MARK.test(text[m.index + d]) && WORD.test(before)) || (MARK.test(last) && WORD.test(after)))
+        return false;
+    return (m[3] === undefined && m[5] === undefined) || !(WORD.test(before) || WORD.test(after));
+}
 
 export function escape(text) {
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -48,8 +63,7 @@ export function inline(text, s) {
     const pattern = new RegExp(INLINE.source, "g");
     for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
         const end = pattern.lastIndex;
-        // _x_ only between words' edges (snake_case_names stay as they are)
-        if (m[5] !== undefined && ((m.index > 0 && WORD.test(text[m.index - 1])) || (end < text.length && WORD.test(text[end])))) {
+        if (m[1] === undefined && m[7] === undefined && m[9] === undefined && m[10] === undefined && !emphasis(text, m, end)) {
             pattern.lastIndex = m.index + 1;
             continue;
         }
@@ -64,15 +78,30 @@ export function inline(text, s) {
             out += `<s>${inline(m[6], s)}</s>`;
         else if (m[7] !== undefined)
             out += SAFE_LINK.test(m[8]) ? `<a href="${escape(m[8])}" style="color:${s.link}">${inline(m[7], s)}</a>` : inline(m[7], s);
-        else
+        else if (m[9] !== undefined)
             out += `<a href="${escape(m[9])}" style="color:${s.link}">${escape(m[9])}</a>`;
+        else
+            out += escape(m[10]);   // (\*, \_, \| …: the mark itself)
         last = end;
     }
     return out + escape(text.slice(last));
 }
 
+// A table line's cells: split at each | but one written \|, a | in its cell
 function cells(line) {
-    return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+    const out = [""];
+    const t = line.trim().replace(/^\|/, "");
+    for (let i = 0; i < t.length; i++) {
+        if (t[i] === "\\" && t[i + 1] === "|")
+            out[out.length - 1] += t[++i];
+        else if (t[i] === "|")
+            out.push("");
+        else
+            out[out.length - 1] += t[i];
+    }
+    if (out.length > 1 && !out[out.length - 1].trim())
+        out.pop();   // (the line's closing |)
+    return out.map(c => c.trim());
 }
 
 // The reply's blocks: {kind: "para"|"heading"|"list"|"code"|"quote"|"rule"|"table", …}
@@ -97,10 +126,11 @@ export function blocks(text) {
         if (fence) {
             flushPara();
             flushList();
+            // (a block in a list item: its lines without the fence's indent)
             const body = [];
-            for (i++; i < lines.length && !(lines[i].trim().indexOf(fence[1]) === 0 && lines[i].trim().replace(/[`~]/g, "") === ""); i++)
-                body.push(lines[i]);
-            out.push({ kind: "code", lang: fence[2], text: body.join("\n") });
+            for (i++; i < lines.length && !(lines[i].trim().indexOf(fence[2]) === 0 && lines[i].trim().replace(/[`~]/g, "") === ""); i++)
+                body.push(lines[i].replace(/^[ \t]*/, w => w.slice(fence[1].length)));
+            out.push({ kind: "code", lang: fence[3], text: body.join("\n") });
             continue;
         }
         if (!line.trim()) {

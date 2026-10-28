@@ -239,6 +239,41 @@ test("Claude's Markdown: ~~struck~~ text, and a code block keeps its text for Co
   assert.deepEqual(copied, ["if (a < b) return 1;"]);
 });
 
+// A Markdown() tree as HTML (tags, their plain props and the text), to compare
+const asHtml = (n: unknown): string => {
+  if (n === null || n === undefined || typeof n === "boolean") return "";
+  if (Array.isArray(n)) return n.map(asHtml).join("");
+  if (typeof n !== "object") return String(n);
+  const { type, props } = n as { type: string; props: Record<string, unknown> };
+  const attrs = Object.entries(props)
+    .filter(([k, v]) => k !== "children" && (typeof v === "string" || typeof v === "number"))
+    .map(([k, v]) => ` ${k}="${v}"`)
+    .join("");
+  return `<${type}${attrs}>${asHtml(props.children)}</${type}>`;
+};
+const md = (text: string) => asHtml(Markdown({ text })).replace(/^<div class="md">|<\/div>$/g, "");
+
+test("Claude's Markdown: a numbered list with bullets under a step, as the Plasma pane shows it", () => {
+  assert.equal(
+    md("1. Step one\n   - detail a\n   - detail b\n2. Step two"),
+    '<ol start="1"><li>Step one<ul><li>detail a</li><li>detail b</li></ul></li><li>Step two</li></ol>',
+  );
+  assert.equal(md("- a\n  1. x\n  2. y\n- b"), '<ul><li>a<ol start="1"><li>x</li><li>y</li></ol></li><li>b</li></ul>');
+});
+
+test("Claude's Markdown: bare web addresses, \\| in a table, globs and *args, a code block in a step", () => {
+  assert.equal(md("see https://example.com/x."), '<p>see <a href="https://example.com/x" title="https://example.com/x">https://example.com/x</a>.</p>');
+  const table = md("| cmd | what |\n|---|---|\n| `a \\| b` | pipe \\| x |");
+  assert.ok(table.includes("<td><code>a | b</code></td><td>pipe | x</td></tr>"), table);
+  assert.equal(md("text with \\*escaped\\* stars"), "<p>text with *escaped* stars</p>");
+  for (const text of ["Look at the *.py and *.js files", "Use **kwargs and *args in f(*args, **kwargs)", "foo__bar__baz"])
+    assert.equal(md(text), `<p>${text}</p>`);
+  assert.equal(md("**Note:** a *b* and __c__, a*b*c"), "<p><strong>Note:</strong> a <em>b</em> and <strong>c</strong>, a<em>b</em>c</p>");
+  const copied: string[] = [];
+  const tree = Markdown({ text: "1. Run:\n   ```python\n   if x:\n       go()\n   ```", onCopy: (code) => copied.push(code) });
+  assert.ok(asHtml(tree).includes("<code>if x:\n    go()</code>"), asHtml(tree));
+});
+
 test("a picture pasted in a chat's tab is saved, an SSH host's chat gets a copy there; nothing else is taken", async () => {
   const saved: string[][] = [];
   const backend = {
