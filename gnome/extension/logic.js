@@ -960,20 +960,22 @@ export function forecastWarning(w, now) {
     const f = w.forecast;
     if (!f || !f.fullAt || !w.resetsAt)
         return '';
-    return fmt('At this pace: full in %1 (resets in %2)', duration(f.fullAt - now), duration(w.resetsAt - now));
+    return fmt('At this pace: full in %1, %2 before it resets', duration(f.fullAt - now), duration(w.resetsAt - f.fullAt));
 }
 
+// (Plasma's forecastText)
 export function forecastTooltip(w, now) {
     const f = w.forecast;
     if (!f)
         return null;
-    const rate = Math.round(f.rate * 10) / 10;
-    const pace = f.basis === 'hour' ? fmt('%1%/h over the last hour', rate) : fmt('%1%/h so far in this window', rate);
-    const lines = [f.fullAt
-        ? fmt('At this pace (%1) it runs out in %2, %3 before it resets.', pace, duration(f.fullAt - now),
-            duration(w.resetsAt - f.fullAt))
-        : fmt('At this pace (%1) it would be at %2% when it resets.', pace, Math.round(f.atReset)),
-    fmt('An even pace through the window would be at %1% by now (the tick).', Math.round(f.evenPct))];
+    const when = ms => (ms - now > 20 * 3600000 ? `${WEEKDAYS[new Date(ms).getDay()]} ${clock(ms)}` : clock(ms));
+    const lines = [f.basis === 'hour' ? fmt('Your pace over the last hour: %1% an hour.', f.rate.toFixed(1))
+        : fmt('Your pace in this window so far: %1% an hour.', f.rate.toFixed(1))];
+    if (f.fullAt && w.resetsAt)
+        lines.push(fmt('At this pace it runs out at %1, %2 before it resets.', when(f.fullAt), duration(w.resetsAt - f.fullAt)));
+    else if (w.pct < 100)
+        lines.push(fmt('At this pace: about %1% when it resets (the faded part of the bar).', Math.round(f.atReset)));
+    lines.push(fmt('An even pace through the window would be at %1% by now (the mark).', Math.round(f.evenPct)));
     return [fmt('%1 limit: %2% used', w.label, Math.round(w.pct)), lines.join('\n')];
 }
 

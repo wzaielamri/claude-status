@@ -77,6 +77,7 @@
 - **GNOME notifies what changed while the screen was locked:** after a lock shorter than the away summary's minutes (or with the summary off), a chat that started needing you or finished meanwhile never notified: GNOME starts the extension afresh at unlocking and it took what it found for the way things were. It remembers what it saw before the lock now, so the first check notifies what changed.
 - **GNOME's pets when a chat comes while the popup is open:** the new chat's pet stood too low, its name tag at the top of the stage, and from then on the popup could stop placing what changed in it until it was closed. It digs up in its spot now. A double click on the hero dances again (it only got petted), and a pet's sparkle or idea bulb no longer stops its own drawing in its first frame.
 - **Search shows an SSH host's chats with the right ages:** the chats, folders, plans and memories found on a host whose clock is off said how long ago by the host's clock (a few minutes in the future came out as *now*, or too old). They go by this computer's clock now, as the host's own rows do.
+- **GNOME's usage forecast in Plasma's words:** the line under a bar said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it says how long before the reset it runs out now (*full in 1h 20m, 45m before it resets*), and the bar's tooltip gives your pace, the time it runs out, and no *would be at N%* for a full window.
 
 ## 1.16.1 (2026-10-27)
 

@@ -174,6 +174,19 @@
   this computer took no comments there, and the window host's own plans
   and memories opened this computer's file of the same path. Each opens
   from where it is now.
+- **A usage bar's forecast in the widget's words:** the red line under a
+  bar said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it
+  says how long before the reset it runs out now (*full in 1h 20m, 45m
+  before it resets*), and its tooltip gives your pace with one decimal, the
+  time it runs out, and no *about N% when it resets* for a full window.
+- **Open the Recap opens it once:** after *Open the Recap* from the Monday
+  notification, the next Talpy Den page that loaded (*Open in Editor*
+  hours later, say) started on the Recap too instead of Chats.
+- **A chat's tab shows the newest reply as soon as you switch back:**
+  nothing reads a hidden tab's conversation, and on showing it again the
+  first read came only after up to 5 seconds (and moving focus between
+  editors put it off again), so Claude's last reply was missing while the
+  header already said the turn was done.
 
 ## 1.16.1
 

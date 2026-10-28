@@ -214,6 +214,7 @@ class Pane implements vscode.Disposable {
   private closed = new vscode.EventEmitter<void>();
   readonly onClosed = this.closed.event;
   private ready = false;
+  private shown = false; // (the tab showed at its last view-state change)
   private pendingDraft = "";
   private terminalHere = false;
 
@@ -232,11 +233,19 @@ class Pane implements vscode.Disposable {
       localResourceRoots: [vscode.Uri.joinPath(uri, "dist")],
     });
     this.panel.iconPath = vscode.Uri.joinPath(uri, "media", "talpy.svg");
+    this.shown = this.panel.visible;
     this.panel.webview.html = this.html(tab);
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((m: unknown) =>
         void this.receive(m).catch((e) => this.owner.ext.log?.warn?.(`The chat tab's request failed: ${e instanceof Error ? e.message : String(e)}`))),
-      this.panel.onDidChangeViewState(() => this.schedule()),
+      // shown again: the conversation at once (nothing read it while hidden);
+      // focus moving between editors changes nothing
+      this.panel.onDidChangeViewState(() => {
+        if (this.disposed || this.panel.visible === this.shown) return;
+        this.shown = this.panel.visible;
+        if (this.shown && this.ready) void this.load();
+        this.schedule();
+      }),
       this.panel.onDidDispose(() => this.dispose()),
       owner.ext.dash.onState(() => void this.pushChat()),
       // live mode: the chat did a step: what it does now, and the conversation at once

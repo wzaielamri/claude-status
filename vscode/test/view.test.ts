@@ -41,6 +41,33 @@ function setup(state: ViewState = demoState(NOW)) {
   };
 }
 
+// "Open the Recap" (the Monday notification): the view's page shows it now
+// if it's loaded, else once it is; a page that loads later starts on Chats
+test("a tab shown goes to the view's page once, not to a page that loads hours later", () => {
+  const dash = { onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), state: () => demoState(NOW), setVisible() {} };
+  const host = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, {} as never);
+  const priv = host as unknown as { receive(webview: unknown, m: unknown): void };
+  const page = () => {
+    const got: unknown[] = [];
+    return { got, webview: { options: {}, html: "", postMessage: async (m: { type: string }) => (m.type === "showTab" && got.push(m), true), onDidReceiveMessage: () => ({ dispose() {} }), asWebviewUri: (u: unknown) => u, cspSource: "" } };
+  };
+  const view = page();
+  host.resolveWebviewView({ webview: view.webview, visible: true, onDidChangeVisibility: () => ({}), onDidDispose: () => ({}) } as never);
+  priv.receive(view.webview, { type: "ready" });
+  host.showTab("week");
+  assert.deepEqual(view.got, [{ type: "showTab", tab: "week" }], "the loaded page shows it now");
+  const later = page();
+  priv.receive(later.webview, { type: "ready" });
+  assert.deepEqual(later.got, [], "a page loading later starts on Chats");
+  // the view's page not loaded yet: it shows the tab once it is
+  const fresh = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, {} as never);
+  fresh.showTab("week");
+  const first = page();
+  fresh.resolveWebviewView({ webview: first.webview, visible: true, onDidChangeVisibility: () => ({}), onDidDispose: () => ({}) } as never);
+  (fresh as unknown as { receive(webview: unknown, m: unknown): void }).receive(first.webview, { type: "ready" });
+  assert.deepEqual(first.got, [{ type: "showTab", tab: "week" }]);
+});
+
 test("a chat the page names is the extension's own row, not what the page says about it", () => {
   const { state, calls, receive } = setup();
   const local = state.status!.groups[0].sessions[0];

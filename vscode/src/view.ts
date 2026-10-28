@@ -124,10 +124,13 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     return true;
   }
 
-  // A tab of the view (also for a page that loads after this: it asks when it's ready)
+  // A tab of the view, shown in its loaded pages now; the view's own page
+  // that isn't loaded yet (the caller shows it next) asks when it's ready.
+  // No page that loads later (Open in Editor, hours on) starts on it.
   private shownTab: "chats" | "week" | "perms" | null = null;
+  private ready = new WeakSet<vscode.Webview>(); // the pages that said they're ready
   showTab(tab: "chats" | "week" | "perms"): void {
-    this.shownTab = tab;
+    this.shownTab = this.view && this.ready.has(this.view.webview) ? null : tab;
     this.broadcast({ type: "showTab", tab });
   }
 
@@ -157,6 +160,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     const chat = "chat" in m ? this.chatOf(m) : null;
     switch (m.type) {
       case "ready":
+        this.ready.add(webview);
         void webview.postMessage({ type: "state", state: this.dash.state() } satisfies HostMessage);
         void webview.postMessage({ type: "visible", visible: this.isVisible(webview) } satisfies HostMessage);
         if (this.shownTab) void webview.postMessage({ type: "showTab", tab: this.shownTab } satisfies HostMessage);

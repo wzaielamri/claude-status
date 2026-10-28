@@ -5,6 +5,7 @@ import {
   allGroups,
   changesTitle,
   chatsNeedingYou,
+  clockText,
   forecastTitle,
   forecastWarning,
   hasPeek,
@@ -56,14 +57,17 @@ function win(partial: Partial<LimitWindow>): LimitWindow {
 
 test("the forecast warns when the pace runs out before the reset", () => {
   const fast = win({ forecast: { evenPct: 60, rate: 30, atReset: 120, fullAt: NOW + 80 * MIN, basis: "hour" } });
-  assert.equal(forecastWarning(fast, NOW), "At this pace: full in 1h 20m (resets in 2h 0m)");
+  // (Plasma's words: the time between running out and the reset)
+  assert.equal(forecastWarning(fast, NOW), "At this pace: full in 1h 20m, 40m before it resets");
   assert.equal(
     forecastTitle(fast, NOW),
-    "At this pace (30% an hour over the last hour): full in 1h 20m, 40m before it resets.\nAn even pace through the window would be at 60% by now.",
+    `Your pace over the last hour: 30.0% an hour.\nAt this pace it runs out at ${clockText(NOW + 80 * MIN)}, 40m before it resets.\nAn even pace through the window would be at 60% by now (the mark).`,
   );
   const slow = win({ forecast: { evenPct: 60, rate: 5.25, atReset: 70.5, fullAt: null, basis: "window" } });
   assert.equal(forecastWarning(slow, NOW), "");
-  assert.match(forecastTitle(slow, NOW), /^At this pace \(5\.3% an hour so far in this window\): about 71% when it resets in 2h 0m\./);
+  assert.match(forecastTitle(slow, NOW), /^Your pace in this window so far: 5\.3% an hour\.\nAt this pace: about 71% when it resets \(the faded part of the bar\)\.\n/);
+  // a full window: nothing about where it would be
+  assert.equal(forecastTitle(win({ pct: 100, forecast: slow.forecast }), NOW).split("\n").length, 2);
   assert.equal(forecastWarning(win({ reset: true, forecast: fast.forecast }), NOW), "");
   assert.equal(forecastTitle(win({}), NOW), "");
 });

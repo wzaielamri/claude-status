@@ -298,14 +298,20 @@ test('usage forecast text', () => {
     eq(L.projectedPct(w), 100, 'capped at 100');
     eq(L.projectedPct({pct: 40, forecast: null}), 40);
     eq(L.projectedPct({pct: 40, forecast: {atReset: 30}}), 40, 'never below the use so far');
-    eq(L.forecastWarning(w, T), 'At this pace: full in 1h 20m (resets in 2h 0m)');
+    // (Plasma's words: the time between running out and the reset)
+    eq(L.forecastWarning(w, T), 'At this pace: full in 1h 20m, 40m before it resets');
     eq(L.forecastWarning({...w, forecast: {...w.forecast, fullAt: null}}, T), '');
     const [title, text] = L.forecastTooltip(w, T);
     eq(title, '5h limit: 60% used');
-    eq(text.split('\n'), ['At this pace (30%/h over the last hour) it runs out in 1h 20m, 40m before it resets.',
-        'An even pace through the window would be at 60% by now (the tick).']);
-    eq(L.forecastTooltip({...w, forecast: {evenPct: 50, rate: 2.04, atReset: 64.4, fullAt: null, basis: 'window'}}, T)[1]
-        .split('\n')[0], 'At this pace (2%/h so far in this window) it would be at 64% when it resets.');
+    const at = new Date(T + 80 * 60000);
+    const hhmm = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+    eq(text.split('\n'), ['Your pace over the last hour: 30.0% an hour.',
+        `At this pace it runs out at ${hhmm}, 40m before it resets.`,
+        'An even pace through the window would be at 60% by now (the mark).']);
+    const slow = {evenPct: 50, rate: 2.04, atReset: 64.4, fullAt: null, basis: 'window'};
+    eq(L.forecastTooltip({...w, forecast: slow}, T)[1].split('\n').slice(0, 2),
+        ['Your pace in this window so far: 2.0% an hour.', 'At this pace: about 64% when it resets (the faded part of the bar).']);
+    eq(L.forecastTooltip({...w, pct: 100, forecast: slow}, T)[1].split('\n').length, 2, 'a full window: not where it would be');
     eq(L.forecastTooltip({...w, forecast: null}, T), null);
 });
 

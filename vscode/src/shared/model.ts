@@ -907,27 +907,23 @@ export function changesTitle(c: ChangeSummary, host?: string): string {
 
 // ---------------------------------------------------------------- usage forecast
 
-function percent(n: number): string {
-  return `${Math.round(n * 10) / 10}%`;
-}
-
-// "At this pace: full in 1h 20m (resets in 2h 5m)", when a plan window would
-// run out before it resets
+// "At this pace: full in 1h 20m, 45m before it resets", when a plan window
+// would run out before it resets (the widget's words)
 export function forecastWarning(w: LimitWindow, now: number): string {
   const f = w.forecast;
   if (!f || f.fullAt === null || !w.resetsAt || w.reset) return "";
-  return `At this pace: full in ${duration(f.fullAt - now)} (resets in ${duration(w.resetsAt - now)})`;
+  return `At this pace: full in ${duration(f.fullAt - now)}, ${duration(w.resetsAt - f.fullAt)} before it resets`;
 }
 
 export function forecastTitle(w: LimitWindow, now: number): string {
   const f = w.forecast;
   if (!f || w.reset) return "";
-  const pace = f.basis === "hour" ? `${percent(f.rate)} an hour over the last hour` : `${percent(f.rate)} an hour so far in this window`;
-  const where =
-    f.fullAt !== null && w.resetsAt
-      ? `full in ${duration(f.fullAt - now)}, ${duration(w.resetsAt - f.fullAt)} before it resets`
-      : `about ${Math.round(f.atReset)}% when it resets${w.resetsAt ? ` in ${duration(w.resetsAt - now)}` : ""}`;
-  return `At this pace (${pace}): ${where}.\nAn even pace through the window would be at ${Math.round(f.evenPct)}% by now.`;
+  const when = (ms: number) => (ms - now > 20 * 3600000 ? `${new Date(ms).toLocaleDateString([], { weekday: "short" })} ${clockText(ms)}` : clockText(ms));
+  const lines = [f.basis === "hour" ? `Your pace over the last hour: ${f.rate.toFixed(1)}% an hour.` : `Your pace in this window so far: ${f.rate.toFixed(1)}% an hour.`];
+  if (f.fullAt !== null && w.resetsAt) lines.push(`At this pace it runs out at ${when(f.fullAt)}, ${duration(w.resetsAt - f.fullAt)} before it resets.`);
+  else if (w.pct < 100) lines.push(`At this pace: about ${Math.round(f.atReset)}% when it resets (the faded part of the bar).`);
+  lines.push(`An even pace through the window would be at ${Math.round(f.evenPct)}% by now (the mark).`);
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------- the chat that needs you

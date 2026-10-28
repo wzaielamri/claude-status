@@ -327,6 +327,33 @@ test("a picture pasted in a chat's tab is saved, an SSH host's chat gets a copy 
   assert.deepEqual(saved.map((c) => c[0] + " " + c[1]), ["save image/png", "save image/png", "put lab", "save image/png", "put down"]);
 });
 
+// Nothing reads a hidden tab's conversation: shown again, it's read at once
+// (Claude's last reply), and focus moving between editors doesn't put that off
+test("a chat's tab shown again reads its conversation at once", async () => {
+  let reads = 0;
+  const backend = { pane: async (args: string[]) => (args[0] === "--conversation" && reads++, { ok: true, unchanged: true }) };
+  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: true };
+  const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { canMoveToClaudeCode: () => false } as never,
+                          { find: async () => undefined } as never, {} as never);
+  p.open({ chatId: "shown-again", sessionId: "shown-again", profileDir: ".claude", name: "x" } as never);
+  const panel = recorded.panels.at(-1)!;
+  try {
+    panel.show(true);
+    panel.receive({ type: "ready" });
+    await new Promise((r) => setTimeout(r, 10));
+    const first = reads;
+    panel.show(false);
+    panel.show(true);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(reads, first + 1, "read when shown, not 5 s later");
+    panel.show(true); // (another view-state event: focus moved)
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(reads, first + 1);
+  } finally {
+    p.dispose();
+  }
+});
+
 test("the pictures a reply names, each once, and taking one out", () => {
   const a = "/cache-here/talpy-den/images/a.png";
   const text = `look [Image: ${a}] and [Image: /x/b.jpg] again [Image: ${a}]`;
