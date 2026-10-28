@@ -744,6 +744,13 @@ def make_default(home, extra, key, vscode=True):
     switchable, on = vscode_state(home, profiles) if vscode else (False, None)
     moves_vscode = switchable and (on is None or on.real != profile.real)
     if moves_link:
+        # (a folder not named ~/.claude-*, nor an extra config folder, is
+        # found only through the link: moved, it would drop out of every list)
+        old = next((p for p in profiles if p.real == current), None)
+        if old is not None and old.path == link:
+            return False, (f"{profile.label} isn't the default yet: ~/.claude links to "
+                           f"{cs.short_folder(str(current), home)}, which is found only through that link. Add that "
+                           "folder to the extra config folders in the settings first, or it would drop out of every list")
         busy = through_link(home, profiles)
         if busy:
             what = "a Claude process runs" if busy == 1 else f"{busy} Claude processes run"

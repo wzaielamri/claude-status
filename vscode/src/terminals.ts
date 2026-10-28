@@ -19,7 +19,23 @@ export type Place = { kind: "local" } | { kind: "windowHost" } | { kind: "ssh"; 
 // (it's POSIX shell; the login shell there may be csh or fish).
 export function sshCommand(host: string, command: string): string {
   const opts = [...controlOptions(), "-o", "ServerAliveInterval=10", "-o", "RemoteCommand=none", "-o", "ClearAllForwardings=yes"];
-  return ["ssh", ...opts, "-t", host, "sh -c " + shellQuote(command)].map(shellQuote).join(" ");
+  return ["ssh", ...opts, "-t", host, posixCommand(command)].map(shellQuote).join(" ");
+}
+
+// What every login shell (sh, bash, zsh, fish, csh, tcsh) leaves as it is in
+// a single-quoted word, and sh in a double-quoted one
+const POSIX_PLAIN = /^[A-Za-z0-9 +,\-./:;=?@_^~#&|<>()[\]{}*]$/;
+
+// command for the host's login shell, run by sh (remote.py's posix): fish
+// and csh read a single-quoted word their own way (fish: a backslash before
+// another or a '; csh: no newline, !history), so it goes as one word with
+// none of that in it: sh's printf makes the other characters from octal escapes
+export function posixCommand(command: string): string {
+  const bytes = [...Buffer.from(command, "utf8")];
+  const plain = (b: number, i: number) => POSIX_PLAIN.test(String.fromCharCode(b)) && (i > 0 || b !== 0x2d);
+  if (bytes.every(plain)) return "sh -c " + shellQuote(command);
+  const escaped = bytes.map((b, i) => (plain(b, i) ? String.fromCharCode(b) : "\\" + b.toString(8).padStart(3, "0"))).join("");
+  return "sh -c " + shellQuote(`eval "$(printf "${escaped}")"`);
 }
 
 const JUST_STARTED_MS = 10000; // a second click this soon shows the terminal the first one opened

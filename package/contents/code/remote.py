@@ -199,11 +199,7 @@ def ssh_options(batch=True):
     return opts
 
 
-def posix(command):
-    """command for the host's login shell, run by sh: the commands the
-    widget builds (`cd … 2>/dev/null; VAR=… claude …`) are POSIX shell, and
-    the login shell may be csh or fish."""
-    return "sh -c " + shlex.quote(command)
+posix = cs.posix  # command for the host's login shell (fish and csh too), run by sh
 
 
 def answer_after_mark(stdout):
@@ -678,7 +674,9 @@ def login_here(host):
 
 
 def disconnect(host):
-    """Close the shared connection to host (the one you logged in with)."""
+    """Close the shared connection to host (the one you logged in with):
+    nothing new can use it (ssh -O stop), and it ends with the last terminal
+    open over it (-O exit would end those too)."""
     host = check_host(host)
     marker = login_marker(host)
     if marker is not None:
@@ -687,7 +685,7 @@ def disconnect(host):
         except FileNotFoundError:
             pass
     try:
-        r = subprocess.run(["ssh", *ssh_options(), "-O", "exit", host], capture_output=True, text=True, timeout=15)
+        r = subprocess.run(["ssh", *ssh_options(), "-O", "stop", host], capture_output=True, text=True, timeout=15)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, f"Can't close the connection to {host}: {exc}"
     return True, f"Disconnected from {host}" if r.returncode == 0 else f"No open connection to {host}"

@@ -472,6 +472,22 @@ class DefaultTests(Home):
         self.assertTrue(ok, message)
         self.assertEqual(os.path.realpath(self.home / ".claude"), str(extra.resolve()))
 
+    def test_an_account_found_only_through_the_link_isnt_dropped(self):
+        # ~/.claude links to a folder not named ~/.claude-*: moving the link
+        # would leave it out of every list
+        (self.home / ".claude").unlink()
+        work = Path(self.tmp.name) / "accounts/work"
+        write(work / ".profile-name", "work")
+        os.symlink(str(work), self.home / ".claude")
+        ok, message = accounts.make_default(self.home, [], ".claude-personal")
+        self.assertFalse(ok)
+        self.assertIn("found only through that link", message)
+        self.assertEqual(os.readlink(self.home / ".claude"), str(work))
+        # one in the extra config folders is found without it
+        ok, message = accounts.make_default(self.home, [str(work)], ".claude-personal")
+        self.assertTrue(ok, message)
+        self.assertEqual(os.readlink(self.home / ".claude"), str(self.home / ".claude-personal"))
+
     def test_refused_while_a_chat_runs_through_the_link(self):
         self.chat_through(self.home / ".claude")
         ok, message = accounts.make_default(self.home, [], ".claude-personal")

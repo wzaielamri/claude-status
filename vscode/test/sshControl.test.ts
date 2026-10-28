@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";
 import { controlDir } from "../src/sshControl";
+import { sshCommand } from "../src/terminals";
 
 const posix = process.platform !== "win32";
 
@@ -45,4 +46,18 @@ test("the same folder as the widget's remote.py", { skip: !posix && "Unix socket
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test("a host's terminal runs the command as sh would, whatever its login shell (as remote.py does)", { skip: !posix && "sh" }, () => {
+  const command = "cd '/srv/it'\\''s' 2>/dev/null; printf '%s|' 'a\\b' 'c:\\' 'x!y' \"$X\" '100%' 'Grüße\nzwei'";
+  const line = sshCommand("lab", command);
+  const word = line.slice(line.lastIndexOf(" lab ") + " lab ".length);
+  const inner = spawnSync("sh", ["-c", `printf '%s' ${word}`], { encoding: "utf8" }).stdout; // (ssh's argument)
+  assert.match(inner, /^sh -c '(?:[^'\\!\n]|\\[0-7])*'$/, "nothing in it that fish or tcsh reads its own way");
+  const py = spawnSync("python3", ["-I", "-c", "import sys; sys.path.insert(0, sys.argv[1]); import talpy_den; print(talpy_den.posix(sys.argv[2]), end='')",
+                                   path.resolve("vendor/code"), command], { encoding: "utf8" });
+  assert.equal(inner, py.stdout);
+  const ran = spawnSync("sh", ["-c", inner], { encoding: "utf8", env: { ...process.env, X: "$HOME" } });
+  assert.equal(ran.stdout, "a\\b|c:\\|x!y|$HOME|100%|Grüße\nzwei|");
+  assert.ok(sshCommand("lab", "claude --resume x").endsWith(` lab 'sh -c '"'"'claude --resume x'"'"''`));
 });

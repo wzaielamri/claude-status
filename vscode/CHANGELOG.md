@@ -34,6 +34,20 @@
 - **VS Code and the Plasma widget don't slow each other down:** each made
   the other read its chats' transcripts again from the start, on every
   check, when they list different chats.
+- **SSH hosts whose login shell is fish or tcsh:** what the extension runs
+  there (in a host's terminal too) went through that shell's own quoting
+  first, so a prompt, a folder or a picture with a backslash, a newline or
+  a `!` (and with tcsh every pasted picture) failed or arrived changed.
+  Commands now reach `sh` there in a form every shell passes on as it is.
+- **Disconnect leaves your terminals open:** disconnecting from an SSH host
+  also ended the chats you had open in terminals over that connection. Now
+  nothing new uses the connection, and it closes once the last of those
+  terminals does.
+- **Make default keeps every account listed:** when `~/.claude` linked to
+  an account's folder with another name (say `~/accounts/work`), making
+  another account the default dropped that one from every list, with no
+  word. It now says so instead, until that folder is in
+  `talpyDen.extraConfigDirs`.
 
 ## 1.16.1
 

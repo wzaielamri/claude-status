@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -46,6 +47,9 @@ case "$FAKE_SSH_MODE" in
   slow) sleep 5 ;;
   noisy) echo "Welcome to the cluster! Quota: 80%" ;;
   latin1) printf 'Gr\374\337 Gott\n' ;;
+  fish|tcsh)  # a login shell that reads quotes its own way (LOGIN_SHELL)
+    cd "$FAKE_HOME" && exec env -i HOME="$FAKE_HOME" PATH="$FAKE_PATH" XDG_CACHE_HOME="$FAKE_HOME/.cache" \
+      python3 -I "$(dirname "$0")/login_shell.py" "$FAKE_SSH_MODE" "$cmd" ;;
   warning)  # the host's shell warns on stderr after the command's output
     cd "$FAKE_HOME" && env -i HOME="$FAKE_HOME" PATH="$FAKE_PATH" XDG_CACHE_HOME="$FAKE_HOME/.cache" bash -c "$cmd"
     rc=$?; echo "bash: warning: setlocale: LC_ALL: cannot change locale (de_DE.UTF-8)" >&2; exit $rc ;;
@@ -54,10 +58,70 @@ cd "$FAKE_HOME" && exec env -i HOME="$FAKE_HOME" PATH="$FAKE_PATH" XDG_CACHE_HOM
 '''
 
 
+# A stand-in for fish or tcsh as the host's login shell: it splits the
+# command into words its way and runs them. In single quotes, fish takes \\
+# and \' as escapes; tcsh refuses a newline and expands !history.
+LOGIN_SHELL = r'''
+import os, sys
+kind, line = sys.argv[1], sys.argv[2]
+
+def fail(message):
+    sys.stderr.write(message + "\n")
+    sys.exit(1)
+
+words, word, inword, i = [], "", False, 0
+while i < len(line):
+    c = line[i]
+    if c in " \t":
+        if inword:
+            words.append(word)
+        word, inword, i = "", False, i + 1
+        continue
+    inword = True
+    if c == "'":
+        i += 1
+        while True:
+            if i >= len(line) or (kind == "tcsh" and line[i] == "\n"):
+                fail("Unmatched '.")
+            if line[i] == "'":
+                break
+            if kind == "tcsh" and line[i] == "!" and line[i + 1:i + 2] not in ("", " ", "\t", "\n", "="):
+                fail(line[i:].split()[0] + ": Event not found.")
+            if kind == "fish" and line[i] == "\\" and line[i + 1:i + 2] in ("\\", "'"):
+                i += 1
+            word += line[i]
+            i += 1
+        i += 1
+    elif c == '"':
+        i += 1
+        while i < len(line) and line[i] != '"':
+            if line[i] in "$`\\!":
+                fail("not imitated in double quotes: " + line[i])
+            word += line[i]
+            i += 1
+        if i >= len(line):
+            fail('Unmatched ".')
+        i += 1
+    elif c.isalnum() or c in "-_./=:,+@%":
+        word += c
+        i += 1
+    else:
+        fail("not imitated: " + c)
+if inword:
+    words.append(word)
+os.execvp(words[0], words)
+'''
+
+
 def unwrapped(command):
-    """The command inside remote.posix()'s `sh -c '…'`."""
+    """The command inside remote.posix()'s `sh -c '…'` (or the printf of it there)."""
     words = shlex.split(command)
-    return words[2] if words[:2] == ["sh", "-c"] and len(words) == 3 else command
+    if words[:2] != ["sh", "-c"] or len(words) != 3:
+        return command
+    escaped = re.fullmatch(r'eval "\$\(printf "(.*)"\)"', words[2], re.DOTALL)
+    if escaped is None:
+        return words[2]
+    return re.sub(rb"\\([0-7]{3})", lambda m: bytes([int(m.group(1), 8)]), escaped.group(1).encode()).decode()
 
 
 class HostListTests(unittest.TestCase):
@@ -134,6 +198,7 @@ class FakeSSH(unittest.TestCase):
         self.bin.mkdir()
         (self.bin / "ssh").write_text(FAKE_SSH)
         (self.bin / "ssh").chmod(0o755)
+        (self.bin / "login_shell.py").write_text(LOGIN_SHELL)
         # the remote: one profile with a finished background job
         prof = self.fake_home / ".claude"
         (prof / "sessions").mkdir(parents=True)
@@ -168,6 +233,30 @@ class FakeSSH(unittest.TestCase):
 
     def calls(self):
         return [[host, unwrapped(command)] for host, command in self.raw_calls()]
+
+
+class LoginShellTests(FakeSSH):
+    """A host whose login shell is fish or tcsh runs the widget's POSIX
+    commands as sh would (sh gets them in a word those shells leave alone)."""
+
+    def test_any_login_shell(self):
+        words = ["a\\b", "c:\\", "it's", "x!y", "$HOME", "100%", '"q"', "`id`", "Grüße", "two\nlines", "-n"]
+        command = "printf '%s|' " + " ".join(shlex.quote(w) for w in words)
+        for shell in ("", "fish", "tcsh"):
+            self.mode(shell)
+            r = remote.ssh("lab", command)
+            self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "|".join(words) + "|", ""), shell)
+        self.assertEqual(self.calls()[0], ["lab", command])
+        self.assertEqual(remote.posix("python3 -I - --remote"), "sh -c 'python3 -I - --remote'")  # (as it is, when it can)
+
+    def test_a_picture_goes_to_a_tcsh_host(self):
+        here = cs.images_dir(Path.home()) / "20261026-101500.png"
+        here.parent.mkdir(parents=True)
+        here.write_bytes(b"\x89PNG\r\n\x1a\n\x00\xff a picture")
+        self.mode("tcsh")
+        answer = remote.put_image("lab", str(here))
+        self.assertTrue(answer["ok"], answer)
+        self.assertEqual((self.fake_home / ".cache/talpy-den/images" / here.name).read_bytes(), here.read_bytes())
 
 
 class StatusTests(FakeSSH):
@@ -812,7 +901,7 @@ class LoginTests(FakeSSH):
         self.assertTrue(ok)
         self.assertEqual(message, "Disconnected from lab")
         ((*options, op, what, host),) = self.argvs()
-        self.assertEqual((op, what, host), ("-O", "exit", "lab"))
+        self.assertEqual((op, what, host), ("-O", "stop", "lab"))  # (terminals open over it go on)
         self.assertFalse(remote.login_marker("lab").exists())
 
     def test_login_opens_a_terminal_that_closes_once_in(self):

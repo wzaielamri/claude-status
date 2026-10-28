@@ -4938,9 +4938,8 @@ def short_folder(folder, home=None):
 
 TASK_PLAN_MAX = 100_000  # bytes of a plan that go into a prompt
 # ...as long as the prompt fits in one argument (128 KB) once quoted for an
-# SSH host's terminal: in the host's command, its sh -c and the ssh line
+# SSH host's terminal: in the host's command, its sh -c (posix) and the ssh line
 TASK_ARG_MAX = 120_000
-TASK_ARG_QUOTES = 3
 TASK_PLAN_CUT = "\n\n(The plan goes on in that file.)"
 BACKGROUND_WAIT = 60  # seconds `claude --bg` gets (it may start Claude's background service first)
 # What a Claude session puts into the environment of what it runs: a claude
@@ -4975,9 +4974,7 @@ def task_prompt(text, plan=None, home=None):
     cut = len(data) > TASK_PLAN_MAX
     while True:
         prompt = plan_prompt(text, body.rstrip() + TASK_PLAN_CUT if cut else body, where)
-        quoted = prompt
-        for _ in range(TASK_ARG_QUOTES):  # each quote turns a ' into 4 more characters
-            quoted = shlex.quote(quoted)
+        quoted = shlex.quote(posix(prompt_word(prompt)))  # (each quote makes a ' 4 more characters, and posix more)
         if len(quoted.encode("utf-8", "replace")) <= TASK_ARG_MAX or not body:
             return prompt
         shorter = body[:len(body) * 9 // 10]
@@ -4998,6 +4995,26 @@ def prompt_arg(prompt):
 
 def prompt_word(prompt):
     return shlex.quote(prompt_arg(prompt))
+
+
+# What every login shell (sh, bash, zsh, fish, csh, tcsh) leaves as it is in
+# a single-quoted word, and sh in a double-quoted one
+POSIX_PLAIN = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 +,-./:;=?@_^~#&|<>()[]{}*")
+
+
+def posix(command):
+    """command for an SSH host's login shell, run by sh: the commands the
+    widget builds (`cd … 2>/dev/null; VAR=… claude …`) are POSIX shell, and
+    the login shell may be fish or csh, which read a single-quoted word their
+    own way (fish: a backslash before another or a '; csh: no newline,
+    !history). So it goes as one word with none of that in it: sh's printf
+    makes the characters other than POSIX_PLAIN from octal escapes."""
+    data = command.encode()
+    if all(chr(b) in POSIX_PLAIN for b in data) and not command.startswith("-"):
+        return "sh -c " + shlex.quote(command)
+    escaped = "".join(chr(b) if chr(b) in POSIX_PLAIN and (i or b != ord("-")) else "\\%03o" % b
+                      for i, b in enumerate(data))
+    return "sh -c " + shlex.quote('eval "$(printf "%s")"' % escaped)
 
 
 def task_command(profile, prompt, home=None, claude="claude", options=()):
