@@ -154,8 +154,8 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   prompts, how long Claude worked (each turn from your prompt to its last
   step), its tool calls by tool, its tokens with its subagents', and what it
   would cost at API prices when the status line says so.
-- **The chat that needs you, one key away**: **Ctrl+Alt+Shift+C** (**Claude
-  Status: Go to the Chat That Needs You**) opens the chat that has waited
+- **The chat that needs you, one key away**: **Ctrl+Alt+Shift+C** (**Talpy
+  Den: Go to the Chat That Needs You**) opens the chat that has waited
   longest; press it again for the next one, then the chats that finished
   while you weren't looking. With none, it shows the view.
 - **While you were away**: back at VS Code after 5 minutes or more, one

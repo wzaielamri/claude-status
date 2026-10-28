@@ -322,3 +322,43 @@ test("a chat the Recap names that isn't running reopens: with the command its ac
     else process.env.XDG_CURRENT_DESKTOP = desktop;
   }
 });
+
+// talpyDen.openIn = system: a new chat on an SSH host opens in your
+// desktop's terminal (remote.py), as its other chats do
+test("with openIn system, a new chat on an SSH host opens in the desktop's terminal", async () => {
+  const stub = vscode as unknown as typeof import("./vscode-stub");
+  const window = stub.window as unknown as Record<string, unknown>;
+  stub.overrides.set("openIn", "system");
+  const pickFolder = window.showQuickPick;
+  window.showQuickPick = async (items: { folder?: { path: string } }[]) => items.find((i) => i.folder?.path === "/srv/app");
+  try {
+    const lab = {
+      id: "l", title: "work", chatProfile: ".claude", profileKeys: [".claude"], sessions: [], homeChatCommand: "cd /home/me 2>/dev/null; claude",
+      projects: [{ path: "/srv/app", short: "~/app", newChatCommand: "cd /srv/app 2>/dev/null; claude", trusted: true }],
+    } as unknown as Group;
+    const helpers: [string, string[]][] = [];
+    const runs: string[] = [];
+    const dash = {
+      demo: false,
+      state: () => ({ status: { groups: [], cli: { installed: true } }, hosts: [{ name: "lab", result: { groups: [lab], cli: { installed: true } } }] }),
+      setActionError: () => undefined,
+      isVisible: () => true,
+    };
+    const actions = new Actions(
+      { action: async (script: string, args: string[]) => (helpers.push([script, args]), { ok: true, message: "" }) } as unknown as Backend,
+      dash as unknown as Dashboard,
+      { run: async (_key: string, _name: string, command: string) => void runs.push(command) } as unknown as Terminals,
+      { warn: () => undefined } as unknown as vscode.LogOutputChannel,
+      {} as AccountSwitch,
+    );
+    await actions.newChat("l", "lab");
+    assert.deepEqual(runs, [], "not in a VS Code terminal");
+    assert.equal(helpers.length, 1);
+    const [script, args] = helpers[0];
+    assert.deepEqual([script, args.slice(0, 2)], ["remote.py", ["--open", "lab"]]);
+    assert.match(args[2], /^cd \/srv\/app 2>\/dev\/null; claude/);
+  } finally {
+    window.showQuickPick = pickFolder;
+    stub.overrides.delete("openIn");
+  }
+});

@@ -148,6 +148,26 @@
   Talpy Den view said why, which usually isn't on screen then, and the text
   was gone. A notification says so now, and its *Open* shows the chat's
   tab with your message ready to send again.
+- **Find a Chat shows an SSH host's chats with the right ages:** the
+  chats, folders and plans found on a host whose clock is off said how
+  long ago by the host's clock. They go by this computer's clock now, as
+  the host's own rows do.
+- **New chats on an SSH host follow `talpyDen.openIn`:** set to your
+  desktop's terminal, a new chat on a host (with a task or without) still
+  opened in a VS Code terminal; it opens in your desktop's terminal now,
+  as the host's other chats do.
+- **Send Feedback for plans in your other Claude folders:** a plan in a
+  folder of `talpyDen.extraConfigDirs` (or `$CLAUDE_CONFIG_DIR`) took
+  comments, but the editor showed no button to send them.
+- **A Remote-SSH window opened with a port:** a window connected to
+  `user@host:2222` had its host checked on ssh's own port (22 unless
+  `~/.ssh/config` says otherwise), so the host showed *no answer*, or
+  another machine's chats. Such a host isn't added by itself any more;
+  you're told once that a `Host` entry with that `Port` lets it.
+- **A check that ended isn't waited for:** when a helper had answered but
+  something it started still held its output, the view waited until that
+  ended, then said the check took too long (and no other check of this
+  computer started meanwhile).
 
 ## 1.16.1
 

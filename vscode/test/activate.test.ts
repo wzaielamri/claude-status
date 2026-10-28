@@ -29,10 +29,21 @@ test("activates, registers everything, and shows the first poll", { skip: proces
     );
     const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"));
     const subscriptions: { dispose(): void }[] = [];
+    const contexts: [string, unknown][] = [];
+    const commands = stub.commands as unknown as Record<string, unknown>;
+    const execute = commands.executeCommand;
+    commands.executeCommand = async (id: string, key: string, value: unknown) => void (id === "setContext" && contexts.push([key, value]));
     activate({ subscriptions, extensionPath: path.resolve("."), extensionUri: vscode.Uri.file(path.resolve(".")) } as unknown as vscode.ExtensionContext);
 
     for (const c of manifest.contributes.commands) assert.ok(stub.recorded.commands.has(c.command), `command ${c.command} registered`);
     assert.ok(stub.recorded.viewProviders.has("talpyDen.view"));
+    // Send Feedback's button on plans of the extra config folders too
+    assert.deepEqual(contexts.filter(([k]) => k === "talpyDen.planFolders").at(-1), ["talpyDen.planFolders", []]);
+    stub.overrides.set("extraConfigDirs", ["/data/claude-alt"]);
+    stub.changeSettings("talpyDen.extraConfigDirs");
+    stub.overrides.delete("extraConfigDirs");
+    assert.deepEqual(contexts.filter(([k]) => k === "talpyDen.planFolders").at(-1), ["talpyDen.planFolders", ["/data/claude-alt/plans"]]);
+    commands.executeCommand = execute;
 
     const item = stub.recorded.statusBarItems[0];
     for (let i = 0; i < 100 && !item.text.includes("bell-dot"); i++) await new Promise((r) => setTimeout(r, 100));

@@ -10,6 +10,7 @@ import type { ProjectsData, FoundChat, FoundMemory, FoundPlan, FoundProject, Per
 
 export const REMOTE_MARK = "@@talpy-den@@";
 const KILL_GRACE_MS = 3000;
+const PIPE_GRACE_MS = 1000; // a helper's output, read after it exited
 
 export interface RunResult {
   code: number | null;
@@ -72,8 +73,10 @@ export function runProcess(
     // Too slow: SIGTERM first, so remote.py can end the ssh it runs (SIGKILL
     // would leave that behind), and SIGKILL if it's still there after a bit
     let killer: NodeJS.Timeout | undefined;
+    let drained: NodeJS.Timeout | undefined;
     const timer = opts.timeoutMs
       ? setTimeout(() => {
+          if (child.exitCode !== null || child.signalCode !== null) return; // (it exited: its output is coming)
           timedOut = true;
           child.kill("SIGTERM");
           killer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
@@ -84,12 +87,22 @@ export function runProcess(
       settled = true;
       if (timer) clearTimeout(timer);
       if (killer) clearTimeout(killer);
+      if (drained) clearTimeout(drained);
       resolve(result);
     };
     child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
     child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
     child.on("error", (err: NodeJS.ErrnoException) => done({ code: null, stdout, stderr, spawnError: err }));
     child.on("close", (code) => done({ code, stdout, stderr, timedOut }));
+    // Exited, but a process it left behind still holds its output open: what
+    // came within a moment is its answer, however long that one runs
+    child.on("exit", (code) => {
+      drained = setTimeout(() => {
+        child.stdout.destroy();
+        child.stderr.destroy();
+        done({ code, stdout, stderr, timedOut });
+      }, PIPE_GRACE_MS);
+    });
     child.stdin.on("error", () => undefined); // the child may exit before reading
     child.stdin.end(opts.input ?? "");
   });
@@ -192,11 +205,14 @@ export class Backend {
       }
       if (!r) r = { ok: false, message: run.spawnError?.message ?? (lastLine(run.stderr) || "no answer") };
     }
-    const list = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
     if (!r || !r.ok) return { ok: false, results: [], more: false, message: String(r?.message ?? r?.error ?? "no answer"), projects: [], plans: [], memories: [] };
+    // an SSH host's times on this computer's clock (as toLocalClock puts its status)
+    const offset = host && typeof r.generatedAt === "number" ? Date.now() - r.generatedAt : 0;
+    const list = <T>(v: unknown, key: string): T[] =>
+      Array.isArray(v) ? v.map((x) => (Math.abs(offset) < 5000 || typeof x?.[key] !== "number" ? x : { ...x, [key]: x[key] + offset })) : [];
     return {
-      ok: true, results: list<FoundChat>(r.results), more: !!r.more, message: "",
-      projects: list<FoundProject>(r.projects), plans: list<FoundPlan>(r.plans), memories: list<FoundMemory>(r.memories),
+      ok: true, results: list<FoundChat>(r.results, "lastActive"), more: !!r.more, message: "",
+      projects: list<FoundProject>(r.projects, "lastActive"), plans: list<FoundPlan>(r.plans, "updatedAt"), memories: list<FoundMemory>(r.memories, "updatedAt"),
     };
   }
 

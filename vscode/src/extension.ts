@@ -91,6 +91,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const a = actions;
   const review = new PlanReview(extraConfigDirs);
   a.planReview = review;
+  // (Send Feedback's button: plans in ~/.claude* and in talpyDen.extraConfigDirs' folders)
+  const planFolders = () => void vscode.commands.executeCommand("setContext", "talpyDen.planFolders", extraConfigDirs().map((d) => path.join(d, "plans")));
+  planFolders();
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("talpyDen.extraConfigDirs") && planFolders()));
   // each chat's tab: its conversation, a reply box, what it asks, its review
   const panes = new ChatPanes(context.extensionUri, backend, dash, actions, terminals, log);
   view.panes = panes;

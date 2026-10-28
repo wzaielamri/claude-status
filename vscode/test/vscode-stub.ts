@@ -159,6 +159,11 @@ export const comments = {
   createCommentController: (id: string, label: string) => ({ id, label, options: undefined, commentingRangeProvider: undefined, dispose: () => undefined }),
 };
 
+export enum QuickPickItemKind {
+  Separator = -1,
+  Default = 0,
+}
+
 export enum CommentMode {
   Editing = 0,
   Preview = 1,

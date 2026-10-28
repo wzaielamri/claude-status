@@ -1024,8 +1024,10 @@ export class Actions {
       if (this.report(answer, "Couldn't start it in the background")) this.dash.setActionInfo(answer.message);
       return this.refresh(host);
     }
-    // In a terminal: the widget's way (your desktop's terminal), or VS Code's
-    if (settings.openIn() === "system" && !host) {
+    // In a terminal: the widget's way (your desktop's terminal; an SSH host's
+    // chat in one running ssh there, as remote.py opens it), or VS Code's
+    const system = settings.openIn() === "system";
+    if (system && !host) {
       const args = ["--new-chat", group.chatProfile, ...(folder ? ["--cwd", folder] : ["--choose-folder"]), ...taskArgs, ...opts, ...configDirArgs()];
       this.report(await this.backend.action("jump.py", args, 600000), "Couldn't open a new chat");
       return;
@@ -1033,15 +1035,16 @@ export class Actions {
     let command: string | undefined;
     if (hasTask) {
       const answer = host
-        ? await this.backend.action("remote.py", ["--task", host, group.chatProfile, folder || "~", ...(task ? ["--prompt", task] : []), ...(plan ? ["--plan", plan.slug, plan.profileDir] : []), ...opts, "--print-command"])
+        ? await this.backend.action("remote.py", ["--task", host, group.chatProfile, folder || "~", ...(task ? ["--prompt", task] : []), ...(plan ? ["--plan", plan.slug, plan.profileDir] : []), ...opts, ...(system ? [] : ["--print-command"])])
         : await this.backend.action("talpy_den.py", ["--task-command", folder || os.homedir(), "--profile", group.chatProfile, ...taskArgs, ...opts, ...configDirArgs()]);
-      if (!this.report(answer, "Couldn't start it")) return;
+      if (!this.report(answer, "Couldn't start it") || system) return;
       command = answer.command;
     } else {
       // (the backend's command ends with claude itself: its options go after it)
       const plain = pick.folder?.newChatCommand ?? (chat ? inFolder(folder, chat) : undefined);
       command = plain ? plain + opts.map((w) => " " + shellQuote(w)).join("") : undefined;
     }
+    if (command && host && system) return void this.report(await this.backend.action("remote.py", ["--open", host, command]), "Couldn't open a new chat");
     if (command) await this.terminals.run(`new|${Date.now()}`, plan ? plan.title : "new chat", command, this.place(host));
   }
 

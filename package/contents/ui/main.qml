@@ -3099,10 +3099,14 @@ PlasmoidItem {
             if (!asked || asked[1] !== root.searchQuery.trim())
                 return   // an answer to what you looked for before
             const result = root.helperResult(data)
+            // a host's times on this computer's clock (as toLocalClock puts its status)
+            const offset = asked[0] && result.ok && result.generatedAt ? Date.now() - result.generatedAt : 0
+            const local = (list, key) => (list || []).map(x => Math.abs(offset) < 5000 || typeof x[key] !== "number" ? x
+                                                               : Object.assign({}, x, { [key]: x[key] + offset }))
             root.searchResults = Object.assign({}, root.searchResults, { [asked[0]]: {
-                busy: false, results: result.ok ? result.results || [] : [], more: !!result.more,
-                projects: result.ok ? result.projects || [] : [], plans: result.ok ? result.plans || [] : [],
-                memories: result.ok ? result.memories || [] : [],
+                busy: false, results: result.ok ? local(result.results, "lastActive") : [], more: !!result.more,
+                projects: result.ok ? local(result.projects, "lastActive") : [], plans: result.ok ? local(result.plans, "updatedAt") : [],
+                memories: result.ok ? local(result.memories, "updatedAt") : [],
                 error: result.ok ? "" : (result.message || result.error || i18n("no answer")) } })
         }
     }

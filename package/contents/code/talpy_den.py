@@ -4610,7 +4610,9 @@ def find_chats(home, cache_root, extra_dirs, query, limit=FIND_LIMIT):
             "shared": st.st_nlink > 1,
             "match": snippet(hit, words) if hit and hit.strip() != name.strip() else "",
         })
-    found = {"ok": True, "results": results, "more": more, **find_more(ctx, words, accounts)}
+    # (generatedAt: an SSH host's times go on the asking computer's clock)
+    found = {"ok": True, "results": results, "more": more, "generatedAt": int(time.time() * 1000),
+             **find_more(ctx, words, accounts)}
     ctx.links.save()
     return found
 

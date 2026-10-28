@@ -437,6 +437,11 @@ class FindTests(Fixture):
         self.assertEqual(self.find("nothing like this")["results"], [])
         self.assertEqual(self.find("   ")["results"], [])
 
+    def test_says_when_by_its_clock(self):
+        # (an SSH host's answer: its times are put on this computer's clock by it)
+        before = int(time.time() * 1000)
+        self.assertTrue(before <= self.find("parser")["generatedAt"] <= int(time.time() * 1000))
+
     def test_project_folders_plans_and_memories_too(self):
         w = self.home / ".claude-work"
         write(w / "plans/calm-red-owl.md", "# Release plan\n\nBump the PARSER version.\n")

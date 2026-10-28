@@ -14,7 +14,7 @@ import { claudePanelAvailable, localPanelProfileKey } from "./claudePanel";
 import { cacheDir, extraConfigDirs, settings, statusArgs, configDirArgs, viewSettings } from "./config";
 import { LiveWatch } from "./live";
 import type { Notifier } from "./notify";
-import { currentRemoteHost } from "./remoteHost";
+import { currentRemoteAuthority, hostFromAuthority, portFromAuthority, sshPort } from "./remoteHost";
 import { demoPerms, demoProjects, demoState, demoWeek } from "./shared/demo";
 import { allGroups, chatsNeedingYou, keptChat, limitReset, liveFromRows, queuedWhat, shareUsage, toLocalClock, trackKey, withLive, type ChatSpot } from "./shared/model";
 import { chatRef } from "./notify";
@@ -71,7 +71,7 @@ export class Dashboard implements vscode.Disposable {
     private notifier: Notifier,
     private log: vscode.LogOutputChannel,
   ) {
-    this.windowHost = currentRemoteHost(vscode);
+    this.windowHost = this.windowHostNow();
     this.polledWith = this.pollSettings();
     this.away = new AwayWatch((now, lastUse) => this.cameBack(now, lastUse));
     this.live = new LiveWatch(
@@ -103,7 +103,7 @@ export class Dashboard implements vscode.Disposable {
       vscode.extensions.onDidChange(() => void this.checkClaudeCode()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
         void this.checkClaudeCode();
-        const host = currentRemoteHost(vscode);
+        const host = this.windowHostNow();
         if (host !== this.windowHost) {
           this.windowHost = host;
           this.polledWith = { ...this.polledWith, hosts: this.pollSettings().hosts };
@@ -117,6 +117,25 @@ export class Dashboard implements vscode.Disposable {
   // The host this window is connected to (Remote-SSH), if any
   get currentHost(): string | undefined {
     return this.windowHost;
+  }
+
+  // ... and whether its checks would reach it: a window that got there on a
+  // port ssh <host> doesn't use (user@host:2222 typed into Remote-SSH) would
+  // check another sshd, so its host isn't added by itself; that's said once
+  private windowHostOff = false;
+  private windowHostNow(): string | undefined {
+    const authority = currentRemoteAuthority(vscode);
+    const host = hostFromAuthority(authority);
+    const port = portFromAuthority(authority);
+    const sshTo = host && port ? sshPort(host) : undefined;
+    const off = !!host && !!port && sshTo !== port;
+    if (off && (!this.windowHostOff || host !== this.windowHost)) {
+      const why = `this window reached ${host} on port ${port}, and ssh ${host} goes to ${sshTo ? `port ${sshTo}` : "another port"}, so Talpy Den doesn't list its chats. A Host entry for it with Port ${port} in ~/.ssh/config lets it.`;
+      this.log.warn(why);
+      void vscode.window.showInformationMessage(`Talpy Den: ${why}`);
+    }
+    this.windowHostOff = off;
+    return host;
   }
 
   get demo(): boolean {
@@ -240,7 +259,7 @@ export class Dashboard implements vscode.Disposable {
   // The hosts to check: the window's own host first, then the picked ones
   shownHosts(): string[] {
     const list = settings.sshHosts();
-    if (this.windowHost && settings.includeCurrentRemote() && !list.includes(this.windowHost)) list.unshift(this.windowHost);
+    if (this.windowHost && !this.windowHostOff && settings.includeCurrentRemote() && !list.includes(this.windowHost)) list.unshift(this.windowHost);
     return list;
   }
 

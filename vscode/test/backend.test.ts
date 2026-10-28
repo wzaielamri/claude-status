@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, test } from "node:test";
-import { Backend } from "../src/backend";
+import { Backend, runProcess } from "../src/backend";
 
 const children: ChildProcess[] = [];
 after(() => children.forEach((c) => c.kill()));
@@ -151,4 +151,28 @@ test("an action's answer keeps how plan feedback reaches the chat", async () => 
 test("a missing Python is explained", async () => {
   const backend = new Backend(path.resolve("."), () => "python3-that-does-not-exist");
   assert.match(await backend.checkPython(), /Install Python 3\.7 or newer/);
+});
+
+// What Find a Chat finds on an SSH host whose clock is 2 minutes behind:
+// its chats', folders', plans' and memories' times on this computer's clock
+test("an SSH host's search results come onto this computer's clock", async () => {
+  const backend = new Backend(path.resolve("."), () => "python3");
+  const t = Date.now() - 3600000;
+  (backend as unknown as { json: unknown }).json = async () => ({
+    ok: true, generatedAt: Date.now() - 120000, more: false,
+    results: [{ sessionId: "a", lastActive: t }], projects: [{ folder: "/srv", lastActive: t }],
+    plans: [{ slug: "p", updatedAt: t }], memories: [{ name: "m", updatedAt: t }],
+  });
+  const r = await backend.find("parser", "lab");
+  const shifted = [r.results[0].lastActive, r.projects[0].lastActive, r.plans[0].updatedAt, r.memories[0].updatedAt];
+  for (const at of shifted) assert.ok(Math.abs(at - (t + 120000)) < 1000, `${at - t} ms later`);
+});
+
+// A helper that answered and exited is done, even when something it left
+// behind still holds its output; and that isn't a timeout
+test("a helper's answer comes when it exits, whatever it left running", async () => {
+  const started = Date.now();
+  const r = await runProcess("sh", ["-c", "echo '{\"ok\": true}'; sleep 5 & exit 0"], { timeoutMs: 3000 });
+  assert.deepEqual([r.code, r.timedOut, r.stdout], [0, false, '{"ok": true}\n']);
+  assert.ok(Date.now() - started < 2500, `settled after ${Date.now() - started} ms`);
 });
