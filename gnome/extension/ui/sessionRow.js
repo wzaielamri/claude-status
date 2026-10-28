@@ -38,7 +38,9 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
         style_class: 'claude-pet-bar', y_expand: true,
         style: petColor ? `background-color: ${petColor};` : '',
     }));
-    const stateDot = dot(s.reason === 'failed' ? 'bad' : L.stateClass(s.state));
+    // (red while a usage limit or an expired login stops it)
+    const stopped = s.stopped || null;
+    const stateDot = dot(s.reason === 'failed' || (stopped && !stopped.over) ? 'bad' : L.stateClass(s.state));
     stateDot.y_align = Clutter.ActorAlign.START;
     row.add_child(stateDot);
 
@@ -68,8 +70,9 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
             ctx.toggleAgents(rowKey);
             return Clutter.EVENT_STOP;
         });
-        tags.push(tips.add(t, () => ['Subagents', L.fmt('%1 done, %2 running, %3 stopped. Click to %4 what each one is doing.',
-            agents.done, agents.running, agents.stopped + (agents.failed || 0), showAgents ? 'hide' : 'show')]));
+        tags.push(tips.add(t, () => ['Subagents', L.fmt('%1 done, %2 running, %3 stopped%4. Click to %5 what each one is doing.',
+            agents.done, agents.running, agents.stopped, agents.failed ? L.fmt(', %1 failed', agents.failed) : '',
+            showAgents ? 'hide' : 'show')]));
     }
     if (tasks) {
         // its task list (TaskCreate), done/total; outlined while it's on one
@@ -95,7 +98,8 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     }
     const end = box('claude-line');
     end.add_child(label(L.stateText(s, ctx.now),
-        `claude-state${s.state === 'waiting' ? ' claude-fg-waiting claude-strong' : ''}`));
+        `claude-state${s.state === 'waiting' ? ' claude-fg-waiting claude-strong'
+            : stopped ? ` claude-strong ${stopped.over ? 'claude-fg-ok' : 'claude-fg-bad'}` : ''}`));
 
     const hoverButtons = [];
     if (canShare) {

@@ -70,6 +70,13 @@ test('durations, tokens, reset text', () => {
     eq([L.resetText({resetsAt: 15000}, 0), L.resetText({resetsAt: 59999}, 0), L.resetText({resetsAt: 60000}, 0),
         L.resetText({resetsAt: 0}, 0)], ['resets in <1m', 'resets in <1m', 'resets in 1m', '']);
     eq(L.fmt('%1 of %2', 'a', 'b'), 'a of b');
+    // a chat a usage limit (or an expired login) stopped says so, as in Plasma and VS Code
+    const idle = {state: 'idle', reason: '', since: 0};
+    eq(L.stateText({...idle, stopped: {kind: 'limit', resetsAt: 7380000}}, 300000), 'Limit · resets in 1h 58m');
+    eq(L.stateText({...idle, stopped: {kind: 'limit', resetsAt: 0}}, 300000), 'Hit a usage limit');
+    eq(L.stateText({...idle, stopped: {kind: 'limit', over: true}}, 300000), 'Limit reset · go on');
+    eq(L.stateText({...idle, state: 'done', stopped: {kind: 'login'}}, 300000), 'Login expired');
+    eq(L.stateText({...idle, state: 'working', since: 60000, stopped: {kind: 'limit'}}, 300000), 'Working · 4m');
 });
 
 test('panel shows the active account first', () => {

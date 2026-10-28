@@ -53,6 +53,10 @@
 - **Permissions tab: the list stays unfolded:** after *Show 12 more* and a *Revoke*, the list folded back to its first 8, so the next one down needed *Show more* again. It stays as you left it now.
 - **Recap's Chat by chat:** the times under the lanes were always 24-hour (*14:05*), where the rest of the widget follows your locale (*2:05 PM*); they follow it too now. A chat of an SSH host there is no longer a link that only said *the widget can't bring it here* (its row on the Chats tab opens it), as in the Recap's other lists.
 - **The Overall share card's bars:** they ran from the newest week to the oldest, backwards against the Week card's, and with more than about 30 weeks of history they ran off the card's right edge. They show the last 20 weeks now, oldest first (Plasma and VS Code).
+- **Projects tab reads as the Recap:** a project's worked time read *1d 2h* where the Recap (and VS Code's Projects) read *26h 5m*; it's in hours now. Its *… ago* ages stayed as they were when the tab's data came (up to 10 minutes); they move on now. A few cents read *$0*; they read *<$0.01* as in the Recap.
+- **A chat's tags stay put:** a chat whose name and tags just fit on its line had its tags jump under the name and back each time its turn started or ended (another button came and went on hover), and as its time ticked (*Idle · 59m* → *Idle · 1h 0m*), moving every row below it. The hover buttons have a fixed place now, and the state beside the name keeps its widest width.
+- **GNOME shows a chat a usage limit stopped:** it read *Idle · 5m* with a green dot, like a healthy chat. It reads *Limit · resets in 2h 3m* (or *Login expired*) with a red dot now, as in Plasma and VS Code.
+- **Failed subagents are called failed:** the subagents tag's tooltip counted them as stopped, while the tree right under it says *failed* (Plasma and GNOME).
 - **GNOME checks as often as the others while nothing runs:** its *…while nothing runs* setting started at 10 seconds, where Plasma and VS Code start at 20; it starts at 20 now (a value you set yourself stays).
 
 ## 1.16.1 (2026-10-27)

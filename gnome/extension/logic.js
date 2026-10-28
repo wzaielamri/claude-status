@@ -188,6 +188,15 @@ export function resetText(window, now) {
 export function stateText(s, now) {
     const since = s.since ? ` · ${duration(now - s.since)}` : '';
     const reason = s.reason ? ` · ${s.reason}` : '';
+    if (s.stopped && (s.state === 'idle' || s.state === 'done')) {
+        if (s.stopped.kind === 'login')
+            return 'Login expired';
+        if (s.stopped.over)
+            return 'Limit reset · go on';
+        return s.stopped.resetsAt
+            ? `Limit · resets in ${s.stopped.resetsAt - now < 60000 ? '<1m' : duration(s.stopped.resetsAt - now)}`
+            : 'Hit a usage limit';
+    }
     switch (s.state) {
     case 'waiting': return `Needs input${reason}`;
     case 'working': return `Working${reason}${since}`;

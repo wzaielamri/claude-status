@@ -50,7 +50,10 @@ RowLayout {
     // move, or a moment after it's made, at the top)
     transform: Translate { id: slide }
     property bool laidOut: false
-    onRowKeyChanged: Qt.callLater(row.placed)
+    onRowKeyChanged: {
+        stateLabel.widest = stateLabel.implicitWidth
+        Qt.callLater(row.placed)
+    }
     onYChanged: {
         laidOut = true
         Qt.callLater(row.placed)
@@ -303,9 +306,9 @@ RowLayout {
                         onClicked: root.toggleAgents(row.rowKey)
                         tooltipTitle: i18n("Subagents")
                         tooltip: !row.agents ? ""
-                                 : i18n("%1 done, %2 running, %3 stopped. Click to %4 what each one is doing.",
-                                        row.agents.done, row.agents.running, row.agents.stopped + (row.agents.failed || 0),
-                                        row.showAgents ? i18n("hide") : i18n("show"))
+                                 : i18n("%1 done, %2 running, %3 stopped", row.agents.done, row.agents.running, row.agents.stopped)
+                                   + (row.agents.failed ? i18n(", %1 failed", row.agents.failed) : "") + ". "
+                                   + i18n("Click to %1 what each one is doing.", row.showAgents ? i18n("hide") : i18n("show"))
                     }
                     Tag {
                         // plan mode, auto mode, …: how freely it may act
@@ -389,6 +392,10 @@ RowLayout {
                 }
             }
             PlasmaComponents3.Label {
+                id: stateLabel
+                // (as wide as it was at its widest for this chat: "Working · 12m"
+                // turning "Idle · 0m", or the next minute, doesn't move its tags)
+                property real widest: 0
                 textFormat: Text.PlainText
                 text: root.stateText(row.session)
                 color: row.session.state === "waiting" ? Kirigami.Theme.neutralTextColor
@@ -396,6 +403,8 @@ RowLayout {
                      : row.stopped ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.textColor
                 font.bold: row.session.state === "waiting" || !!row.stopped
                 elide: Text.ElideRight
+                onImplicitWidthChanged: widest = Math.max(widest, implicitWidth)
+                Layout.preferredWidth: Math.max(implicitWidth, widest)
                 Layout.maximumWidth: Kirigami.Units.gridUnit * 11
                 Layout.alignment: Qt.AlignTop
 
@@ -406,125 +415,137 @@ RowLayout {
                     mainText: active ? root.resetAtText(row.stopped.resetsAt) : ""
                 }
             }
-            PlasmaComponents3.ToolButton {
-                // the other way to open it than a click on its name: its window, or the pane
-                opacity: rowHover.hovered ? 1 : 0
-                icon.name: Plasmoid.configuration.clickOpensPane ? "window" : "dialog-messages"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
-                Layout.preferredHeight: nameLabel.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
+            // The buttons it shows on hover, in a slot as wide as the most a
+            // row has (4): Keep going while it works, Share and Remove once
+            // it's done don't move its tags beside or under its name
+            RowLayout {
                 Layout.alignment: Qt.AlignTop
-                onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
+                Layout.preferredWidth: 4 * nameLabel.implicitHeight + 3 * spacing
+                spacing: Kirigami.Units.smallSpacing
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: Plasmoid.configuration.clickOpensPane ? row.openHint : i18n("Open in the chat pane")
-                    subText: Plasmoid.configuration.clickOpensPane ? ""
-                             : i18n("Beside the popup: its conversation, a box to reply, and what it changed.")
+                Item {
+                    Layout.fillWidth: true
                 }
-            }
-            PlasmaComponents3.ToolButton {
-                // star it: once it isn't listed here any more, it stays under Recent chats → Starred
-                visible: !!(row.session.chatId || row.session.sessionId)
-                opacity: row.session.starred || rowHover.hovered ? 1 : 0
-                icon.name: row.session.starred ? "starred-symbolic" : "non-starred-symbolic"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: row.session.starred ? i18n("Unstar") : i18n("Star")
-                Layout.preferredHeight: nameLabel.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
-                Layout.alignment: Qt.AlignTop
-                onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, !row.session.starred)
+                PlasmaComponents3.ToolButton {
+                    // the other way to open it than a click on its name: its window, or the pane
+                    opacity: rowHover.hovered ? 1 : 0
+                    icon.name: Plasmoid.configuration.clickOpensPane ? "window" : "dialog-messages"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
+                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: row.session.starred ? i18n("Starred") : i18n("Star this chat")
-                    subText: row.session.starred ? i18n("Click to unstar it.")
-                                                 : i18n("Once it isn't listed here any more, a starred chat stays under Recent chats → Starred, however old it is.")
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: Plasmoid.configuration.clickOpensPane ? row.openHint : i18n("Open in the chat pane")
+                        subText: Plasmoid.configuration.clickOpensPane ? ""
+                                 : i18n("Beside the popup: its conversation, a box to reply, and what it changed.")
+                    }
                 }
-            }
-            PlasmaComponents3.ToolButton {
-                // keep going until it's done: on by itself after each usage limit
-                visible: row.kept === null && root.canKeepGoing(row.session, row.remoteHost)
-                opacity: rowHover.hovered ? 1 : 0
-                icon.name: "media-playlist-repeat"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: i18n("Keep going after usage limits")
-                Layout.preferredHeight: nameLabel.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
-                Layout.alignment: Qt.AlignTop
-                onClicked: root.keepGoing(row.session, true)
+                PlasmaComponents3.ToolButton {
+                    // star it: once it isn't listed here any more, it stays under Recent chats → Starred
+                    visible: !!(row.session.chatId || row.session.sessionId)
+                    opacity: row.session.starred || rowHover.hovered ? 1 : 0
+                    icon.name: row.session.starred ? "starred-symbolic" : "non-starred-symbolic"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: row.session.starred ? i18n("Unstar") : i18n("Star")
+                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, !row.session.starred)
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: i18n("Keep going until it's done")
-                    subText: i18n("When a usage limit stops this chat, it goes on by itself in the background a minute after the limit resets, in the permission mode it had, and again after each later one, until a turn of it ends by itself. Claude here quits first then (its terminal stays open); open the chat from here to see it.")
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: row.session.starred ? i18n("Starred") : i18n("Star this chat")
+                        subText: row.session.starred ? i18n("Click to unstar it.")
+                                                     : i18n("Once it isn't listed here any more, a starred chat stays under Recent chats → Starred, however old it is.")
+                    }
                 }
-            }
-            PlasmaComponents3.ToolButton {
-                id: shareButton
-                visible: row.canShare
-                opacity: rowHover.hovered ? 1 : 0
-                icon.name: "document-share"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: i18n("Share or continue on another account…")
-                Layout.preferredHeight: nameLabel.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
-                Layout.alignment: Qt.AlignTop
-                onClicked: root.openShareMenu(shareButton, {
-                    chatId: row.session.chatId, name: row.session.name, profileDir: row.session.profileDir,
-                    shared: !!row.session.shared && !row.session.shared.forkOf, host: row.remoteHost
-                }, row.rowKey)
+                PlasmaComponents3.ToolButton {
+                    // keep going until it's done: on by itself after each usage limit
+                    visible: row.kept === null && root.canKeepGoing(row.session, row.remoteHost)
+                    opacity: rowHover.hovered ? 1 : 0
+                    icon.name: "media-playlist-repeat"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: i18n("Keep going after usage limits")
+                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: root.keepGoing(row.session, true)
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: i18n("Continue on another account")
-                    subText: root.shareHint(row.remoteHost)
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: i18n("Keep going until it's done")
+                        subText: i18n("When a usage limit stops this chat, it goes on by itself in the background a minute after the limit resets, in the permission mode it had, and again after each later one, until a turn of it ends by itself. Claude here quits first then (its terminal stays open); open the chat from here to see it.")
+                    }
                 }
-            }
-            PlasmaComponents3.ToolButton {
-                // Remove a finished session from the list (nothing is deleted)
-                visible: row.session.state === "done"
-                opacity: rowHover.hovered ? 1 : 0
-                icon.name: "list-remove"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: i18n("Remove from list")
-                Layout.preferredHeight: nameLabel.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
-                Layout.alignment: Qt.AlignTop
-                onClicked: row.remoteHost ? root.remoteDismiss(row.remoteHost, row.session.sessionId)
-                                          : root.dismissSession(row.session.sessionId)
+                PlasmaComponents3.ToolButton {
+                    id: shareButton
+                    visible: row.canShare
+                    opacity: rowHover.hovered ? 1 : 0
+                    icon.name: "document-share"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: i18n("Share or continue on another account…")
+                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: root.openShareMenu(shareButton, {
+                        chatId: row.session.chatId, name: row.session.name, profileDir: row.session.profileDir,
+                        shared: !!row.session.shared && !row.session.shared.forkOf, host: row.remoteHost
+                    }, row.rowKey)
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: i18n("Remove from the list")
-                    subText: i18n("Only hides it here; nothing is deleted. It comes back if the session runs again, or via right-click → Show removed sessions again.")
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: i18n("Continue on another account")
+                        subText: root.shareHint(row.remoteHost)
+                    }
                 }
-            }
-            PlasmaComponents3.ToolButton {
-                visible: row.canStop
-                opacity: rowHover.hovered || row.confirmingStop ? 1 : 0
-                icon.name: "media-playback-stop"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
-                Layout.preferredHeight: nameLabel.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
-                Layout.alignment: Qt.AlignTop
-                onClicked: {
-                    root.stopConfirmBusy = row.session.state !== "idle"
-                    root.stopConfirmSession = row.confirmingStop ? "" : row.rowKey
-                }
+                PlasmaComponents3.ToolButton {
+                    // Remove a finished session from the list (nothing is deleted)
+                    visible: row.session.state === "done"
+                    opacity: rowHover.hovered ? 1 : 0
+                    icon.name: "list-remove"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: i18n("Remove from list")
+                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: row.remoteHost ? root.remoteDismiss(row.remoteHost, row.session.sessionId)
+                                              : root.dismissSession(row.session.sessionId)
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: row.stopTitle
-                    subText: row.stopTip
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: i18n("Remove from the list")
+                        subText: i18n("Only hides it here; nothing is deleted. It comes back if the session runs again, or via right-click → Show removed sessions again.")
+                    }
+                }
+                PlasmaComponents3.ToolButton {
+                    visible: row.canStop
+                    opacity: rowHover.hovered || row.confirmingStop ? 1 : 0
+                    icon.name: "media-playback-stop"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
+                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: {
+                        root.stopConfirmBusy = row.session.state !== "idle"
+                        root.stopConfirmSession = row.confirmingStop ? "" : row.rowKey
+                    }
+
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: row.stopTitle
+                        subText: row.stopTip
+                    }
                 }
             }
         }

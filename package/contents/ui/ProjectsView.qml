@@ -55,8 +55,18 @@ PlasmaComponents3.ScrollView {
         const amount = (usd || 0) * (currency.rate || 1)
         const symbol = symbols[currency.code]
         const put = text => symbol ? symbol + text : text + " " + currency.code
+        if (!amount)
+            return put("0")
         const whole = amount >= 100 || ["JPY", "KRW", "HUF", "ISK", "IDR"].indexOf(currency.code) >= 0
-        return amount < (whole ? 1 : 0.01) ? put("0") : put(Number(amount).toLocaleString(Qt.locale(), "f", whole ? 0 : 2))
+        if (amount < (whole ? 1 : 0.01))
+            return "<" + put(whole ? "1" : Number(0.01).toLocaleString(Qt.locale(), "f", 2))
+        return put(Number(amount).toLocaleString(Qt.locale(), "f", whole ? 0 : 2))
+    }
+    // (as the Recap shows worked time: 26h 5m, 45m)
+    function hours(ms) {
+        const m = Math.round(Math.max(0, ms) / 60000)
+        return m < 60 ? i18nc("duration in minutes", "%1m", m)
+                      : i18nc("duration in hours and minutes", "%1h %2m", Math.floor(m / 60), m % 60)
     }
 
     ColumnLayout {
@@ -128,7 +138,7 @@ PlasmaComponents3.ScrollView {
                         PlasmaComponents3.Label {
                             textFormat: Text.PlainText
                             Layout.fillWidth: true
-                            text: card.project.short + " · " + i18n("last at work %1 ago", root.duration(Math.max(60000, Date.now() - card.project.lastAt)))
+                            text: card.project.short + " · " + i18n("last at work %1 ago", root.duration(Math.max(60000, root.now - card.project.lastAt)))
                             font: Kirigami.Theme.smallFont
                             opacity: 0.65
                             elide: Text.ElideMiddle
@@ -136,7 +146,7 @@ PlasmaComponents3.ScrollView {
                     }
                     PlasmaComponents3.Label {
                         textFormat: Text.PlainText
-                        text: i18n("7 days: %1", root.duration(card.project.weekMs)) + "\n" + i18n("all: %1 · %2", root.duration(card.project.workedMs), view.money(card.project.cost))
+                        text: i18n("7 days: %1", view.hours(card.project.weekMs)) + "\n" + i18n("all: %1 · %2", view.hours(card.project.workedMs), view.money(card.project.cost))
                         font: Kirigami.Theme.smallFont
                         horizontalAlignment: Text.AlignRight
                         opacity: 0.8
@@ -188,8 +198,8 @@ PlasmaComponents3.ScrollView {
                         required property int index
                         readonly property var c: card.project.chats[index] || ({ id: "", name: "", profileDir: "", cwd: "", lastAt: 0, workedMs: 0, cost: 0 })
                         chat: ({ name: c.name, chatId: c.id, host: "", profileDir: c.profileDir, folder: "", cwd: c.cwd })
-                        where: i18n("%1 ago", root.duration(Math.max(60000, Date.now() - c.lastAt)))
-                        numbers: root.duration(c.workedMs) + " · " + view.money(c.cost)
+                        where: i18n("%1 ago", root.duration(Math.max(60000, root.now - c.lastAt)))
+                        numbers: view.hours(c.workedMs) + " · " + view.money(c.cost)
                         indent: Kirigami.Units.iconSizes.small
                     }
                 }
