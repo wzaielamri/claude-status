@@ -1470,8 +1470,10 @@ PlasmaComponents3.ScrollView {
                 if (!view.recap)
                     return ""
                 const failed = view.recap.sources.filter(s => !s.ok)
+                // (the hosts whose chats it was read from: not one left out or that couldn't be read)
+                const hosts = view.recap.sources.filter(s => s.host && s.ok).map(s => s.host)
                 let text = i18n("Read from the chats on this computer%1, without using any tokens. Prices: Claude's API list prices of %2%3.",
-                                root.shownHosts.length ? i18n(" and on %1", root.shownHosts.join(", ")) : "",
+                                hosts.length ? i18n(" and on %1", hosts.join(", ")) : "",
                                 Qt.locale().toString(view.date(view.recap.prices.asOf), "d MMM yyyy"),
                                 view.recap.prices.guessed.length
                                     ? i18n(" (%1 at the price of its family's newest model)", view.recap.prices.guessed.join(", ")) : "")

@@ -550,7 +550,7 @@ test("the week's days, tiles and facts", () => {
     // a day, everything kept
     eq(L.weekPeriodText({...r, span: 'day', back: 0, from: '2026-10-24', to: '2026-10-24'}), 'Today · Sat 24 Oct');
     eq(L.weekPeriodText({...r, span: 'day', back: 1, from: '2026-10-23', to: '2026-10-23'}), 'Yesterday · Fri 23 Oct');
-    eq(L.weekPeriodText({...r, span: 'all', first: '2026-10-14'}), 'Everything since 14 October 2026');
+    eq(L.weekPeriodText({...r, span: 'all', first: '2026-10-14'}), 'Everything since 14 Oct 2026');
     eq([L.weekPeriodWaiting('day', 0), L.weekPeriodWaiting('all', 0), L.weekPeriodWaiting('week', 2)], ['Today', 'Everything', '']);
     eq([L.weekRowDay('2026-10-19'), L.weekRowDay('2026-10-19', true)], ['Mon 19', '19 Oct']);
     const tiles = L.weekTiles(r);
@@ -583,7 +583,7 @@ test('amounts in another currency, at the rate week.py sends', () => {
         L.moneyText(12, {code: 'CHF', rate: 0.8})], ['€841', '€21.26', '<€0.01', '¥1,828', '9.60 CHF']);
     const r = weekRecap({currency: {code: 'EUR', rate: 0.9, date: '2026-10-23', error: ''}});
     eq(L.weekTiles(r)[2].value, '€816');
-    eq(L.weekFootText(r).split('\n')[1], "Amounts in EUR at the European Central Bank's rate of 23 October 2026: 1 USD = 0.9000 EUR.");
+    eq(L.weekFootText(r).split('\n')[1], "Amounts in EUR at the European Central Bank's rate of 23 Oct 2026: 1 USD = 0.9000 EUR.");
     const failed = weekRecap({currency: {code: 'USD', rate: 1, date: '', error: 'no EUR rate from the European Central Bank yet'}});
     eq(L.weekCurrency(failed).code, 'USD');
     eq(L.weekArgs(0, '', [], {}, [], 'EUR'), ['--span', 'week', '--back', '0', '--currency', 'EUR']);

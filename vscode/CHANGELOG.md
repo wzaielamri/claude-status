@@ -205,6 +205,9 @@
   in the widget, they now list each chat whose turn (as long as the
   finished notification asks) ended while its tab wasn't showing it, failed
   ones too (*Failed: look at what happened*), until you open that chat.
+- **The Recap's dates as in the widget:** *Everything since …*, the price
+  list's date and the exchange rate's read *24 Oct 2026*, not *24 October
+  2026*.
 
 ## 1.16.1
 

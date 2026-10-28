@@ -87,7 +87,7 @@ test("amounts in another currency, at the rate week.py sends", () => {
   const recap = { ...demoWeek(NOW), currency: { code: "EUR", rate: 0.9, date: "2026-10-23", error: "" } };
   assert.deepEqual(currencyOf(recap), recap.currency);
   assert.match(weekTiles(recap)[2].value, /^€/);
-  assert.match(footText(recap), /Amounts in EUR at the European Central Bank's rate of 23 October 2026: 1 USD = 0\.9000 EUR\./);
+  assert.match(footText(recap), /Amounts in EUR at the European Central Bank's rate of 23 Oct 2026: 1 USD = 0\.9000 EUR\./);
   const failed = { ...recap, currency: { code: "USD", rate: 1, date: "", error: "no EUR rate from the European Central Bank yet" } };
   assert.equal(currencyOf(failed).code, "USD");
   assert.match(footText(failed), /Amounts in US dollars: no EUR rate/);

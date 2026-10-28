@@ -1261,9 +1261,10 @@ function shortDay(day) {
     return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+// "24 Oct 2026" (Plasma's "d MMM yyyy")
 function dateText(day) {
     const d = dayDate(day);
-    return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function weekPeriodText(recap) {

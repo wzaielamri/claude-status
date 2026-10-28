@@ -63,10 +63,10 @@ export function longDay(day: string): string {
   return `${WEEKDAYS_LONG[d.getDay()]} ${d.getDate()} ${MONTHS_LONG[d.getMonth()]}`;
 }
 
-// "24 October 2026"
+// "24 Oct 2026" (the widget's "d MMM yyyy")
 export function dateText(day: string): string {
   const d = localDate(day);
-  return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // "Sat 24": a timeline row's day ("19 Oct": Overall's 7 days)
