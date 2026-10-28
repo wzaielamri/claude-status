@@ -10,12 +10,12 @@ import { SessionRow } from "./SessionRow";
 import type { FocusItem } from "../../src/shared/model";
 
 // The focus view (the header's filter button): only what needs you, as full
-// rows (their questions, Allow / Deny), the chats that finished a turn
-// lately, one line for each chat at work with what it does now, and how the
-// rest stands; Show everything goes back to the whole dashboard.
+// rows (their questions, Allow / Deny), the chats that finished a turn you
+// haven't opened yet, one line for each chat at work with what it does now,
+// and how the rest stands; Show everything goes back to the whole dashboard.
 export function FocusView({ groups }: { groups: Group[] }) {
   const view = useView();
-  const lists = focusLists(groups, view.now);
+  const lists = focusLists(groups, view.finished);
   const rest = [
     lists.rest.idle ? `${lists.rest.idle} idle` : "",
     lists.rest.limit ? `${lists.rest.limit} at the usage limit` : "",
@@ -52,7 +52,7 @@ function FocusLine({ item, finished = false }: { item: FocusItem; finished?: boo
     host = item.group.host;
   const live = useLiveView(s.sessionId, !finished && !host && !!s.pid);
   const what = finished
-    ? "Finished: results to look at"
+    ? s.reason === "failed" ? "Failed: look at what happened" : "Finished: results to look at"
     : doingText(s, liveMatch(s, live)) || stateText(s, view.now);
   const color = pets.petColor(petKeyOf(s, host));
   return (

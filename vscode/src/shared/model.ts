@@ -223,10 +223,10 @@ export function stopOf(s: Pick<Session, "state" | "stopped">): Stop["kind"] | ""
 }
 
 // The focus view (webview FocusView.tsx): the chats waiting for you (the one
-// waiting longest first), the ones that finished a turn lately (newest
-// first), the ones at work (longest first), the rest counted, and each
-// account's 5-hour usage. A chat listed twice counts once, its first (most
-// urgent) row.
+// waiting longest first), the ones that finished a turn you haven't opened
+// yet (finished: Dashboard's, as the widget's; newest first), the ones at
+// work (longest first), the rest counted, and each account's 5-hour usage.
+// A chat listed twice counts once, its first (most urgent) row.
 export interface FocusItem {
   key: string;
   session: Session;
@@ -239,11 +239,10 @@ export interface FocusLists {
   rest: { idle: number; done: number; limit: number };
   usage: { name: string; pct: number }[];
 }
-export const FINISHED_LATELY_MS = 15 * 60 * 1000;
-
-export function focusLists(groups: Group[], now: number): FocusLists {
+export function focusLists(groups: Group[], finished: readonly string[] = []): FocusLists {
   const out: FocusLists = { needs: [], finished: [], working: [], rest: { idle: 0, done: 0, limit: 0 }, usage: [] };
   const seen = new Set<string>();
+  const unopened = new Set(finished);
   for (const g of groups) {
     const five = g.limits?.windows.find((w) => w.key === "five_hour");
     if (five) out.usage.push({ name: (g.host ? g.host + ": " : "") + g.title, pct: five.pct });
@@ -254,8 +253,8 @@ export function focusLists(groups: Group[], now: number): FocusLists {
       const item = { key, session: s, group: g };
       if (s.state === "waiting") out.needs.push(item);
       else if (s.state === "working") out.working.push(item);
+      else if (unopened.has(key)) out.finished.push(item);
       else if (atLimit(s)) out.rest.limit += 1;
-      else if (s.reason !== "failed" && s.since && now - s.since < FINISHED_LATELY_MS && !s.stopped) out.finished.push(item);
       else out.rest[s.state === "idle" ? "idle" : "done"] += 1;
     }
   }
@@ -422,7 +421,7 @@ export function highUsageText(groups: Group[]): string {
 // and whether you've seen it stay the same while its row changes (e.g. a
 // background session's row from running to finished, …/live to …/job). A
 // chat shared with two accounts is two chats here.
-export function petKeyOf(session: Pick<Session, "chatId" | "sessionId" | "key"> & { profileDir?: string }, host?: string): string {
+export function petKeyOf(session: Pick<Session, "sessionId" | "key"> & { chatId?: string; profileDir?: string }, host?: string): string {
   return `${host ? `ssh:${host}|` : ""}${session.profileDir ?? ""}/${session.chatId || session.sessionId || session.key}`;
 }
 
@@ -929,7 +928,7 @@ export function forecastTitle(w: LimitWindow, now: number): string {
 // ---------------------------------------------------------------- the chat that needs you
 
 // A chat's key as the transition tracker keeps it ("ssh:<host>|…" for a host's)
-export function trackKey(s: Pick<Session, "chatId" | "sessionId" | "key"> & { profileDir?: string }, host?: string): string {
+export function trackKey(s: Pick<Session, "sessionId" | "key"> & { chatId?: string; profileDir?: string }, host?: string): string {
   return petKeyOf(s, host);
 }
 

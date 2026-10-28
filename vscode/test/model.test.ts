@@ -12,7 +12,6 @@ import {
   countStates,
   findChatRef,
   focusLists,
-  FINISHED_LATELY_MS,
   duration,
   formatTokens,
   handoverTarget,
@@ -56,10 +55,10 @@ test("counts, overall state, headline and mood follow the most urgent chat", () 
   assert.equal(heroMood({ status: null, errorText: "broken" }, "none", []), "error");
 });
 
-test("the focus view lists what waits for you, what finished lately and what works; the rest counted", () => {
+test("the focus view lists what waits for you, what finished that you haven't opened and what works; the rest counted", () => {
   const s = demoState(NOW);
   const groups = allGroups(s.status, s.hosts);
-  const lists = focusLists(groups, NOW);
+  const lists = focusLists(groups);
   assert.deepEqual(lists.needs.map((i) => i.session.state), ["waiting"]);
   assert.equal(lists.working.length, 2);
   assert.ok(lists.working.every((i, k) => k === 0 || (lists.working[k - 1].session.since ?? 0) <= (i.session.since ?? 0)));
@@ -67,15 +66,16 @@ test("the focus view lists what waits for you, what finished lately and what wor
   assert.equal(lists.needs.length + lists.working.length + lists.finished.length + lists.rest.idle + lists.rest.done + lists.rest.limit,
     countStates(groups).waiting + countStates(groups).working + countStates(groups).idle + countStates(groups).done + countStates(groups).limit);
   assert.ok(lists.usage.length >= 1);
-  // a chat that finished a minute ago is new; one from an hour ago is only counted
-  const done = groups.flatMap((g) => g.sessions).find((x) => x.state === "done")!;
-  const lately = focusLists(groups.map((g) => ({ ...g, sessions: g.sessions.map((x) => (x === done ? { ...x, since: NOW - 60_000 } : x)) })), NOW);
-  assert.equal(lately.finished.length, 1);
-  const old = focusLists(groups.map((g) => ({ ...g, sessions: g.sessions.map((x) => (x === done ? { ...x, since: NOW - FINISHED_LATELY_MS - 1 } : x)) })), NOW);
-  assert.equal(old.finished.length, 0);
-  assert.equal(old.rest.done, 1);
+  // a chat that finished a turn you haven't opened is listed (a failed one
+  // too, as in the widget), however long ago; once opened, it's only counted
+  const g = groups.find((x) => x.sessions.some((y) => y.state === "done"))!;
+  const done = g.sessions.find((x) => x.state === "done")!;
+  const unopened = focusLists(groups, [petKeyOf(done, g.host)]);
+  assert.deepEqual(unopened.finished.map((i) => i.session), [done]);
+  assert.equal(unopened.rest.done, lists.rest.done - 1);
+  assert.deepEqual(focusLists(groups, ["ssh:gone|.claude/nothing"]).finished, []);
   // a chat listed twice (a shared chat) counts once
-  const twice = focusLists([...groups, groups[0]], NOW);
+  const twice = focusLists([...groups, groups[0]]);
   assert.equal(twice.needs.length + twice.working.length, lists.needs.length + lists.working.length);
 });
 

@@ -145,6 +145,7 @@ export class Actions {
 
   async open(chat: ChatRef): Promise<void> {
     if (this.demoOnly()) return;
+    this.dash.opened(chat); // (looked at: off the focus view's Finished lines)
     // A chat no Claude has open: where the switch of Recent chats says (from
     // its row, its tab, the search alike)
     if (chat.kind === "chat" && !chat.pid && reopensInClaudeCode(settings.reopenIn(), this.cliOn(chat.host), this.claudeCodeFor(chat)))

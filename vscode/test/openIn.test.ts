@@ -88,7 +88,7 @@ test("a plan's chat reopens in a Claude Code tab only when Claude Code is on the
     } as PlanItem;
     const helpers: string[][] = [];
     const runs: string[] = [];
-    const dash = {
+    const dash = { opened() {},
       demo: false,
       state: () => ({ status: { groups: [work, personal], cli: { installed: true } }, hosts: [] }),
       claudeCodeInfo: () => ({ available: true, profileKey: "work" }),
@@ -176,7 +176,7 @@ function actionsHere(answers: { ok: boolean; message: string; command?: string }
   const helpers: string[][] = [];
   const runs: string[] = [];
   const failures: string[] = [];
-  const dash = {
+  const dash = { opened() {},
     demo: false,
     currentHost: undefined,
     state: () => ({ status: { groups: [work], cli: { installed: true } }, hosts: [] }),
@@ -338,7 +338,7 @@ test("with openIn system, a new chat on an SSH host opens in the desktop's termi
     } as unknown as Group;
     const helpers: [string, string[]][] = [];
     const runs: string[] = [];
-    const dash = {
+    const dash = { opened() {},
       demo: false,
       state: () => ({ status: { groups: [], cli: { installed: true } }, hosts: [{ name: "lab", result: { groups: [lab], cli: { installed: true } } }] }),
       setActionError: () => undefined,

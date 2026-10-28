@@ -18,7 +18,7 @@ import { currentRemoteAuthority, hostFromAuthority, portFromAuthority, sshPort }
 import { demoPerms, demoProjects, demoState, demoWeek } from "./shared/demo";
 import { allGroups, chatsNeedingYou, keptChat, limitReset, liveFromRows, queuedWhat, shareUsage, toLocalClock, trackKey, withLive, type ChatSpot } from "./shared/model";
 import { chatRef } from "./notify";
-import type { ClaudeCodeInfo, DigestCard, Group, HostState, LiveView, PermsData, PetEventKind, ProjectsData, QueuedTask, Status, ViewState, WeekRecap, WeekSpan } from "./shared/types";
+import type { ChatRef, ClaudeCodeInfo, DigestCard, Group, HostState, LiveView, PermsData, PetEventKind, ProjectsData, QueuedTask, Status, ViewState, WeekRecap, WeekSpan } from "./shared/types";
 import type { WeekRuleAsk } from "./shared/week";
 import { mergeChanges, TransitionTracker, type Changes, type PetEvent } from "./transitions";
 
@@ -52,6 +52,11 @@ export class Dashboard implements vscode.Disposable {
   private claudeCodeCheckedAt = 0;
   // Chats that finished a turn while you weren't looking (trackKey -> when)
   private unseen = new Map<string, number>();
+  // Chats that finished a turn you haven't looked at yet (the focus view's
+  // Finished lines, as in the widget): trackKey -> when, until you open that
+  // chat (its tab, or the chat itself). Unlike unseen, showing the view leaves them.
+  private finishedUnopened = new Map<string, number>();
+  lookingAt: (id: string) => boolean = () => false; // (a chat's tab shows it: ChatPanes)
   private away: AwayWatch;
   private digest: DigestCard | null = null;
   private readonly onStateEmitter = new vscode.EventEmitter<ViewState>();
@@ -504,10 +509,32 @@ export class Dashboard implements vscode.Disposable {
   // long enough to notify about) waits for you: the shortcut to the chat that
   // needs you goes there too
   private noteUnseen(changes: Changes): void {
-    for (const f of changes.finished) if (f.stop) this.unseen.delete(f.id); // (a limit broke it off: nothing to look at)
-    if (this.visible && vscode.window.state.focused) return;
     const min = settings.notifyDoneMinSeconds() * 1000;
+    for (const f of changes.finished) {
+      if (f.stop) this.unseen.delete(f.id); // (a limit broke it off: nothing to look at)
+      if (f.stop) this.finishedUnopened.delete(f.id);
+      else if (f.took >= min && !this.lookingAt(f.id)) this.finishedUnopened.set(f.id, f.at);
+    }
+    if (this.visible && vscode.window.state.focused) return;
     for (const f of changes.finished) if (!f.stop && f.took >= min) this.unseen.set(f.id, f.at);
+  }
+
+  // You opened a chat: it's looked at
+  opened(chat: ChatRef): void {
+    if (this.finishedUnopened.delete(trackKey(chat, chat.host))) this.emit();
+  }
+
+  // The finished chats you haven't opened (newest first); one that works
+  // again, or that its machine no longer lists, is let go
+  private finishedNow(status: Status | null, hosts: HostState[]): string[] {
+    const states = new Map<string, string>();
+    for (const g of allGroups(status, hosts)) for (const s of g.sessions) states.set(trackKey(s, g.host), s.state);
+    const checked = (id: string) => (id.startsWith("ssh:") ? hosts.some((h) => id.startsWith(`ssh:${h.name}|`) && h.result && !h.error) : !!status);
+    for (const id of [...this.finishedUnopened.keys()]) {
+      const state = states.get(id);
+      if (state === "working" || state === "waiting" || (state === undefined && checked(id))) this.finishedUnopened.delete(id);
+    }
+    return [...this.finishedUnopened.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
   }
 
   // The chats that need you, most urgent first (model.chatsNeedingYou)
@@ -700,6 +727,7 @@ export class Dashboard implements vscode.Disposable {
       digest: this.digest && now - this.digest.at < DIGEST_SHOWN_MS ? this.digest : null,
       now,
       live: this.liveViews,
+      finished: this.finishedNow(this.status, hosts),
     };
   }
 

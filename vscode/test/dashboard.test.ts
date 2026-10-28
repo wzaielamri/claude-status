@@ -9,9 +9,47 @@ import type { Backend } from "../src/backend";
 import { Dashboard } from "../src/dashboard";
 import type { Notifier } from "../src/notify";
 import { demoState } from "../src/shared/demo";
-import type { Status } from "../src/shared/types";
+import { chatRefOf, petKeyOf } from "../src/shared/model";
+import type { Session, Status } from "../src/shared/types";
 
 const NOW = 1_800_000_000_000;
+
+// The focus view's Finished lines: a turn that ended (long enough to tell)
+// stays there until you open that chat, also after you looked at the view;
+// one its tab showed, one a limit broke off, or one that works again, doesn't
+test("a finished chat stays on the focus view until you open it", () => {
+  const log = { warn() {}, info() {}, error() {} } as unknown as vscode.LogOutputChannel;
+  const dash = new Dashboard({} as unknown as Backend, { handle() {}, isLeader: () => true } as unknown as Notifier, log);
+  const priv = dash as unknown as { status: Status; noteUnseen(c: unknown): void };
+  try {
+    const status = structuredClone(demoState(NOW).status!);
+    priv.status = status;
+    const chat = (id: string): Session => ({ ...status.groups[0].sessions[0], key: id, chatId: id, sessionId: id, state: "idle", stopped: null });
+    const [a, b] = [chat("fin-a"), chat("fin-b")];
+    status.groups[0].sessions.push(a, b);
+    const id = (s: typeof a) => petKeyOf(s);
+    const ended = (s: typeof a, took: number, stop = "") => priv.noteUnseen({ finished: [{ id: id(s), session: s, took, at: NOW, stop }] });
+    ended(a, 600_000);
+    ended(b, 1000); // (shorter than notifyDoneMinSeconds)
+    assert.deepEqual(dash.state().finished, [id(a)]);
+    dash.setVisible(true);
+    assert.deepEqual(dash.state().finished, [id(a)], "showing the view leaves it");
+    dash.opened(chatRefOf(a));
+    assert.deepEqual(dash.state().finished, []);
+    dash.lookingAt = (x) => x === id(a);
+    ended(a, 600_000);
+    assert.deepEqual(dash.state().finished, [], "its tab showed it");
+    dash.lookingAt = () => false;
+    ended(a, 600_000);
+    ended(a, 600_000, "limit");
+    assert.deepEqual(dash.state().finished, [], "a limit broke it off");
+    ended(a, 600_000);
+    a.state = "working";
+    assert.deepEqual(dash.state().finished, [], "at work again");
+  } finally {
+    dash.dispose();
+  }
+});
 
 // A reply queued for when an SSH host's chat ends its turn waits while the
 // host's last check failed (its chat isn't gone, nor reachable), and goes

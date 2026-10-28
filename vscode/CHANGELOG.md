@@ -199,6 +199,12 @@
   then failed with only *spawn E2BIG*. It goes over in a file private to
   you now, removed once read; over 100,000 characters still says *That
   message is too long*.
+- **The focus view's Finished lines are the chats you haven't looked at
+  yet:** they listed every chat whose turn ended in the last 15 minutes,
+  also ones you had opened and short turns, and left out failed ones. As
+  in the widget, they now list each chat whose turn (as long as the
+  finished notification asks) ended while its tab wasn't showing it, failed
+  ones too (*Failed: look at what happened*), until you open that chat.
 
 ## 1.16.1
 

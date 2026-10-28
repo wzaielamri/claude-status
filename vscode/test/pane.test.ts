@@ -32,7 +32,7 @@ const own = (args: string[]) => (args.includes("--config-dir") ? args.slice(0, a
 function panes(state: ViewState, answers: Record<string, unknown> = {}) {
   const calls: string[][] = [];
   const backend = { pane: async (args: string[]) => (calls.push(own(args)), { ok: true, message: "Allowed", ...answers }) };
-  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {} };
+  const dash = { opened() {}, state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {} };
   const opened: unknown[] = [];
   const actions = { open: async (c: unknown) => void opened.push(c), unqueue: async () => undefined };
   const terminals = { find: async () => undefined };
@@ -105,7 +105,7 @@ test("a long reply goes to pane.py in a file of its own, removed after", async (
       return { ok: true, message: "Sent" };
     },
   };
-  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {} };
+  const dash = { opened() {}, state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {} };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
   const long = "語".repeat(60000);
   assert.equal((await p.send(chatRefOf(row), long, "auto", false)).ok, true);
@@ -146,7 +146,7 @@ test("a click on a chat opens its tab, unless clicks open the chat itself; answe
   const calls: { name: string; args: unknown[] }[] = [];
   const record = (name: string) => (...args: unknown[]) => void calls.push({ name, args });
   const actions = new Proxy({}, { get: (_t, name: string) => record(name) });
-  const dash = { onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false, state: () => state, setVisible() {} };
+  const dash = { opened() {}, onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false, state: () => state, setVisible() {} };
   const host = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, actions as never);
   host.panes = { open: record("panes.open"), answer: record("panes.answer") } as never;
   const receive = (m: unknown) => (host as unknown as { receive(w: unknown, m: unknown): void }).receive({ postMessage: async () => true }, m);
@@ -270,7 +270,7 @@ test("Show earlier goes up to the most a tab shows, then the tab says only the l
   const row = demoState(NOW).status!.groups.flatMap((g) => g.sessions)[0];
   const limits: string[] = [];
   const backend = { pane: async (args: string[]) => (limits.push(args[args.indexOf("--limit") + 1]), { ok: true, items: [], more: true, stamp: `s${limits.length}` }) };
-  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const dash = { opened() {}, state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { canMoveToClaudeCode: () => false } as never,
                           { find: async () => undefined } as never, {} as never);
   const tick = () => new Promise((r) => setTimeout(r, 10));
@@ -332,7 +332,7 @@ test("a picture pasted in a chat's tab is saved, an SSH host's chat gets a copy 
     saveImage: async (mime: string, data: string) => (saved.push(["save", mime, data]), { path: "/cache-here/talpy-den/images/20261026-101500.png", message: "" }),
     putImage: async (host: string, path: string) => (saved.push(["put", host, path]), host === "down" ? { message: "no route" } : { path: "/cache-there/talpy-den/images/20261026-101500.png", message: "" }),
   };
-  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const dash = { opened() {}, state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
   let tabs = 0;
   const tab = async (host: string, m: unknown) => {
@@ -359,7 +359,7 @@ test("a picture pasted in a chat's tab is saved, an SSH host's chat gets a copy 
 test("a chat's tab shown again reads its conversation at once", async () => {
   let reads = 0;
   const backend = { pane: async (args: string[]) => (args[0] === "--conversation" && reads++, { ok: true, unchanged: true }) };
-  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: true };
+  const dash = { opened() {}, state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: true };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { canMoveToClaudeCode: () => false } as never,
                           { find: async () => undefined } as never, {} as never);
   p.open({ chatId: "shown-again", sessionId: "shown-again", profileDir: ".claude", name: "x" } as never);
@@ -426,7 +426,7 @@ test("the microphone: recorded, then written down; a missing model or setup is o
     dictate: async (args: string[]) => (calls.push(args), args[0] === "--status" ? status
       : args[0] === "--stop" ? { ok: true, text: "Fix the parser" } : { ok: true, message: "" }),
   };
-  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const dash = { opened() {}, state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
   p.open({ chatId: "mic-1", sessionId: "mic-1", profileDir: ".claude", name: "x" } as never);
   const panel = recorded.panels.at(-1)!;
@@ -504,7 +504,7 @@ test("what a page says it showed is taken only in its shape; the chat tab's answ
   const row = state.status!.groups.flatMap((g) => g.sessions).find((x) => x.state === "waiting")!;
   const calls: string[][] = [];
   const backend = { pane: async (args: string[]) => (calls.push(own(args)), args[0] === "--conversation" ? { ok: true, unchanged: true } : { ok: true, message: "Allowed" }) };
-  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const dash = { opened() {}, state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
   p.open(chatRefOf(row));
   const panel = recorded.panels.at(-1)!;
@@ -558,7 +558,7 @@ test("one message to a chat at a time: one sent while the last is on its way isn
       return fail ? Promise.reject(new Error("the helper fell over")) : new Promise((r) => waiting.push(r));
     },
   };
-  const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {},
+  const dash = { opened() {}, state: () => state, refresh: async () => undefined, pollHost: async () => undefined, setActionError() {}, setActionInfo() {},
                  onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { open: async () => undefined } as never,
                           { find: async () => undefined } as never, {} as never);
@@ -600,7 +600,7 @@ test("the microphone: no second recorder while one starts; one still starting wh
       return Promise.resolve(args[0] === "--status" ? { ok: true, tool: "/usr/bin/whisper-cli", model: "/m.bin" } : { ok: true, message: "" });
     },
   };
-  const dash = { state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+  const dash = { opened() {}, state: () => demoState(NOW), refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
   const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, {} as never, { find: async () => undefined } as never, {} as never);
   const tick = () => new Promise((r) => setTimeout(r, 10));
   const tab = (id: string) => {
@@ -660,7 +660,7 @@ test("a tab closed while it reads its chat, or looks up its row, does nothing mo
     let lookUp = false;
     const backend = { pane: (args: string[]) => (calls.push(args), new Promise((r) => (read = r))) };
     const terminals = { find: () => (lookUp ? new Promise((r) => (found = r)) : Promise.resolve(undefined)) };
-    const dash = { state: () => state, refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
+    const dash = { opened() {}, state: () => state, refresh: async () => undefined, pollHost: async () => undefined, onState: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false };
     const warnings: string[] = [];
     const p = new ChatPanes(vscode.Uri.file("/ext") as never, backend as never, dash as never, { canMoveToClaudeCode: () => false } as never,
                             terminals as never, { warn: (m: string) => void warnings.push(m) } as never);

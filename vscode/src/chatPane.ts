@@ -17,7 +17,7 @@ import type { Backend } from "./backend";
 import { openComparison } from "./changes";
 import { cacheDir, configDirArgs } from "./config";
 import type { Dashboard } from "./dashboard";
-import { chatRefOf, doingText, liveOf, recentRef, stateText } from "./shared/model";
+import { chatRefOf, doingText, liveOf, petKeyOf, recentRef, stateText } from "./shared/model";
 import { answersOf, askShownOf, PICTURE_TYPES, queuedReply, reviewPending, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage, type TermRun, type TermStyle } from "./shared/pane";
 import type { Answers, AskShown, ChatRef, Decision, RecentChat, Session, ViewState } from "./shared/types";
 import { isDecision } from "./shared/types";
@@ -54,9 +54,13 @@ export class ChatPanes implements vscode.Disposable {
     private actions: Actions,
     private terminals: Terminals,
     private log: vscode.LogOutputChannel,
-  ) {}
+  ) {
+    // a turn that ends while its tab shows it: you're looking
+    dash.lookingAt = (id) => [...this.panes.values()].some((p) => p.shows(id));
+  }
 
   open(chat: ChatRef, tab: "chat" | "review" = "chat"): void {
+    this.dash.opened(chat); // (looked at: off the focus view's Finished lines)
     const chatId = chat.chatId || chat.sessionId;
     const key = `${chat.host ?? ""}|${chatId}`;
     const pane = this.panes.get(key);
@@ -289,6 +293,11 @@ class Pane implements vscode.Disposable {
     this.panel.reveal();
     if (tab === "review") void this.loadReview();
     this.post({ type: "result", kind: "tab:" + tab, ok: true, message: "" });
+  }
+
+  // It's on screen with the chat id (petKeyOf) names
+  shows(id: string): boolean {
+    return !this.disposed && this.panel.visible && petKeyOf(this.chat, this.host || undefined) === id;
   }
 
   draft(text: string): void {

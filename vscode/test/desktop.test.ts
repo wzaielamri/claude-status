@@ -91,7 +91,7 @@ test("on GNOME without the GNOME Shell extension, a chat in another window says 
   } as ChatRef;
   const helpers: string[][] = [];
   const errors: string[] = [];
-  const dash = { demo: false, currentHost: undefined, setActionError: (m: string) => errors.push(m), isVisible: () => true };
+  const dash = { opened() {}, demo: false, currentHost: undefined, setActionError: (m: string) => errors.push(m), isVisible: () => true };
   const actions = new Actions(
     { action: async (_script: string, args: string[]) => (helpers.push(args), { ok: true, message: "" }) } as unknown as Backend,
     dash as unknown as Dashboard,

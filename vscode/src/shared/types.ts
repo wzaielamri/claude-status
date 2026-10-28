@@ -602,6 +602,7 @@ export interface ViewState {
   digest?: DigestCard | null;
   now: number;
   live?: Record<string, LiveView>; // this computer's running chats by session id (live mode), newest
+  finished?: string[]; // the chats that finished a turn you haven't opened yet (petKeyOf), newest first
 }
 
 export type PetEventKind = "waiting" | "done" | "failed" | "stopped" | "limit" | "reset" | "oops";

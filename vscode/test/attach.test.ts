@@ -60,7 +60,7 @@ test("a background job a terminal shows already comes up there, not attached twi
     let shown = 0;
     const actions = new Actions(
       { action: async (_script: string, args: string[]) => (helpers.push(args), { ok: true, message: "" }) } as unknown as Backend,
-      { demo: false, currentHost: undefined, setActionError: (m: string) => errors.push(m), isVisible: () => true } as unknown as Dashboard,
+      { demo: false, currentHost: undefined, opened() {}, setActionError: (m: string) => errors.push(m), isVisible: () => true } as unknown as Dashboard,
       {
         find: async (ancestors: Set<number>) => (inThisWindow && ancestors.has(client.pid!) ? { show: () => shown++ } : undefined),
         run: async (_key: string, _name: string, command: string) => void runs.push(command),
