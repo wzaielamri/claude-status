@@ -48,6 +48,27 @@ test("waiting notifies at most once a minute per chat, and failures sound differ
   assert.match(failed.notices[0].title, /failed/);
 });
 
+test("the next permission prompt within a minute is told, the same one isn't told again", () => {
+  const t = new TransitionTracker();
+  const asks = (state: SessionState, at: number, request: string | null, line = "Bash: ls") => {
+    const groups = oneChat(state, at);
+    groups[0].sessions[0] = { ...groups[0].sessions[0], permission: state !== "waiting" ? null
+      : { tool: "Bash", line, command: line.slice(6), file: "", diff: [], always: "", request, toolUse: null, answer: request ? "hook" : "" } };
+    return t.track("", groups, at, undefined, OPTS);
+  };
+  asks("working", NOW, null);
+  assert.equal(asks("waiting", NOW + 1000, "r1").notices.length, 1);
+  asks("working", NOW + 2000, null);
+  // you allowed it; 20 s later it asks for the next command
+  const next = asks("waiting", NOW + 20000, "r2", "Bash: npm test");
+  assert.deepEqual([next.notices.length, next.sound, next.petEvents.length], [1, "waiting", 1]);
+  assert.equal(asks("waiting", NOW + 22000, "r2", "Bash: npm test").notices.length, 0);
+  // it flaps: the same prompt isn't told again within the minute, then or a poll later
+  asks("working", NOW + 24000, null);
+  assert.equal(asks("waiting", NOW + 26000, "r2", "Bash: npm test").notices.length, 0);
+  assert.equal(asks("waiting", NOW + 28000, "r2", "Bash: npm test").notices.length, 0);
+});
+
 test("an SSH host's chats are tracked apart and name the host", () => {
   const t = new TransitionTracker();
   t.track("ssh:build-server", oneChat("working", NOW), NOW, "build-server", OPTS);

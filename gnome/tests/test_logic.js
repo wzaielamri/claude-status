@@ -114,6 +114,27 @@ test('short turns and repeated waiting stay quiet', () => {
     eq(out.notify.length, 0, 'second alert within a minute');
 });
 
+test('the next permission prompt within a minute is told', () => {
+    const t = new L.Tracker();
+    const asks = (request, toolUse = null) => ({permission: {answer: request ? 'hook' : '', request, toolUse}});
+    t.track('', [group([session('a', 'working')])], T, '', settings);
+    t.track('', [group([session('a', 'waiting', asks('r1'))])], T + 1000, '', settings);
+    t.track('', [group([session('a', 'working')])], T + 2000, '', settings);
+    let out = t.track('', [group([session('a', 'waiting', asks('r2'))])], T + 20000, '', settings);
+    eq(out.notify.map(n => n.key), ['/a'], 'it asks something new');
+    t.track('', [group([session('a', 'working')])], T + 21000, '', settings);
+    out = t.track('', [group([session('a', 'waiting', asks('r2'))])], T + 22000, '', settings);
+    eq(out.notify.length, 0, 'the same prompt again');
+    // nothing tells it apart yet; the hook's request comes a poll later
+    t.track('', [group([session('a', 'working')])], T + 23000, '', settings);
+    out = t.track('', [group([session('a', 'waiting', asks(null))])], T + 24000, '', settings);
+    eq(out.notify.length, 0, 'held back');
+    out = t.track('', [group([session('a', 'waiting', asks('r3'))])], T + 26000, '', settings);
+    eq(out.notify.map(n => n.key), ['/a'], 'told once it can be told apart');
+    out = t.track('', [group([session('a', 'waiting', asks('r3'))])], T + 28000, '', settings);
+    eq(out.notify.length, 0, 'once');
+});
+
 test('the most urgent sound wins, sources keep their own memory', () => {
     const t = new L.Tracker();
     t.track('', [group([session('a', 'working', {since: T}), session('b', 'working', {since: T})])], T, '', settings);
@@ -430,10 +451,13 @@ test("unticked host: its memory goes", () => {
 
 test("a host's clock", () => {
     const result = {generatedAt: 1000, groups: [group([session('a', 'working', {since: 500})], {
-        limits: {updatedAt: 900, windows: [{key: 'five_hour', resetsAt: 5000, forecast: {fullAt: 4000}}]}})]};
+        limits: {updatedAt: 900, windows: [{key: 'five_hour', resetsAt: 5000, forecast: {fullAt: 4000}}]},
+        recent: [{lastActive: 700}], starred: [{lastActive: 700}], starredPlans: [{updatedAt: 800}]})]};
     const local = L.toLocalClock(result, 60000);
     eq([local.generatedAt, local.groups[0].sessions[0].since, local.groups[0].limits.windows[0].forecast.fullAt],
         [61000, 60500, 64000]);
+    eq([local.groups[0].recent[0].lastActive, local.groups[0].starred[0].lastActive, local.groups[0].starredPlans[0].updatedAt],
+        [60700, 60700, 60800], 'a starred chat shows the age it shows under Recent');
     eq(result.groups[0].sessions[0].since, 500, 'the answer itself is left as it was');
     eq(L.toLocalClock(result, 2000), result, 'a few seconds: just the network');
 });

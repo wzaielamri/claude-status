@@ -1113,6 +1113,15 @@ class SettingsPageTests(unittest.TestCase):
         for name in re.findall(r'"(\w+)"', shared[:shared.index("]")]):
             self.assertIn(name, names, f"sharedKeys: {name}")
 
+    def test_the_copies_share_every_setting_but_the_focus_view_and_the_shortcut(self):
+        # Only one copy notifies (the Monday recap too), and the chat pane is
+        # any copy's: a setting left out was changed only where you changed it
+        names = set(re.findall(r'<entry name="(\w+)"', (ROOT / "config/main.xml").read_text()))
+        main = (ROOT / "ui/main.qml").read_text()
+        shared = main[main.index("readonly property var sharedKeys: ["):]
+        shared = set(re.findall(r'"(\w+)"', shared[:shared.index("]")]))
+        self.assertEqual(names - shared, {"focusView", "shortcutGoesToChat"})
+
 
 class PetLifeTests(unittest.TestCase):
     """What a pet shows of its chat, and what ends a drag: QML that can't be

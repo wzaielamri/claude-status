@@ -387,7 +387,8 @@ PlasmoidItem {
         "notifyDoneMinSeconds", "notifySound", "soundVolume", "soundWaiting", "soundDone", "soundFailed", "recentChats",
         "sshHosts", "remotePollSeconds", "sshUsage", "keepDoneHours", "showUsageInPanel", "showPet", "chatPets", "showTokens",
         "newChatInVscode", "iconBlink", "awayDigest", "awayMinutes", "phoneWhileAway", "phoneFinished", "phoneDevice",
-        "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "recapRules", "clickOpensPane"]
+        "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "recapRules", "clickOpensPane",
+        "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage"]
     property real settingsSeenAt: 0     // the newest shared settings this copy has seen
     property string settingsSeen: ""    // its own settings as of the last check (to see changes)
 
@@ -1259,7 +1260,7 @@ PlasmoidItem {
     // a chat shared across profiles is listed once per profile with the same
     // id, and keying by id made the two rows flip each other's state on every
     // poll (a notification each time).
-    property var lastWaitingAlert: ({})
+    property var lastWaitingAlert: ({})   // row -> {at, ask}: its last "needs input" alert, and what it asked (askId)
 
     // One sound per poll at most (several sessions can change at once): the
     // most urgent of the notifications sent.
@@ -1339,28 +1340,28 @@ PlasmoidItem {
                 // (that was answered in the chat, and the next prompt came before a
                 // check saw it at work)
                 const told = notifications[sid]
+                const alerted = lastWaitingAlert[sid]
                 if (prev === "waiting" && s.state === "waiting" && told && told.kind === "waiting"
                         && (told.allowAction === undefined ? canAnswerAsk(s) : told.asked !== askId(s))) {
                     const asks = s.permission ? askText(s) : [i18n("%1 needs your input", s.name), s.detail || reasonText(s.reason)]
                     notify(sid, s, "waiting", asks[0], asks[1] + "\n" + s.cwdShort + where, "dialog-warning", host)
+                    if (alerted)
+                        alerted.ask = askId(s)
+                } else if (prev === "waiting" && s.state === "waiting" && alerted && alerted.held && askId(s) && askId(s) !== alerted.ask) {
+                    // a new prompt the minute's quiet held back (nothing told it
+                    // apart from the last one then: the hook's request came a check later)
+                    alertWaiting(sid, s, host, nowMs)
                 }
                 if (prev === s.state)
                     continue
                 if (s.state === "waiting") {
                     markUnseen(sid, "waiting")
-                    // At most one "needs input" alert per session per minute
-                    const quiet = nowMs - (lastWaitingAlert[sid] || 0) < 60000
-                    if (!quiet) {
-                        lastWaitingAlert[sid] = nowMs
-                        petEvent("waiting", i18n("%1 needs you!", s.name), petKeyOf(s, host))
-                        toPhone(i18n("Claude: %1 needs you", s.name + where) + (s.detail ? " (" + s.detail + ")" : "")
-                                + " · " + s.cwdShort)
-                        if (Plasmoid.configuration.notifyWaiting && root.notifier && !holdingBack()) {
-                            const asks = s.permission ? askText(s) : [i18n("%1 needs your input", s.name), s.detail || reasonText(s.reason)]
-                            notify(sid, s, "waiting", asks[0], asks[1] + "\n" + s.cwdShort + where, "dialog-warning", host)
-                            queueSound("waiting")
-                        }
-                    }
+                    // At most one "needs input" alert per session per minute, unless
+                    // it asks something new (the next command after you allowed one)
+                    if (!alerted || nowMs - alerted.at >= 60000 || (askId(s) && askId(s) !== alerted.ask))
+                        alertWaiting(sid, s, host, nowMs)
+                    else
+                        alerted.held = true
                 } else if ((prev === "working" || (stop && prev === "waiting")) && (s.state === "idle" || s.state === "done")) {
                     // (a background session a limit stops can say it waits for a moment first)
                     const took = (s.since || nowMs) - (sid in startedAt ? startedAt[sid] : nowMs)
@@ -1392,6 +1393,20 @@ PlasmoidItem {
         lastEnded = Object.assign({}, lastEnded, { [source]: ends })
         primedSources = Object.assign({}, primedSources, { [source]: true })
         playQueuedSound()
+    }
+
+    // A chat waits for you: its pet, your phone and a notification say so
+    function alertWaiting(sid, s, host, nowMs) {
+        const where = host ? " · " + host : ""
+        lastWaitingAlert[sid] = { at: nowMs, ask: askId(s) }
+        petEvent("waiting", i18n("%1 needs you!", s.name), petKeyOf(s, host))
+        toPhone(i18n("Claude: %1 needs you", s.name + where) + (s.detail ? " (" + s.detail + ")" : "")
+                + " · " + s.cwdShort)
+        if (Plasmoid.configuration.notifyWaiting && root.notifier && !holdingBack()) {
+            const asks = s.permission ? askText(s) : [i18n("%1 needs your input", s.name), s.detail || reasonText(s.reason)]
+            notify(sid, s, "waiting", asks[0], asks[1] + "\n" + s.cwdShort + where, "dialog-warning", host)
+            queueSound("waiting")
+        }
     }
 
     // A chat's turn ended (it was working, it's idle or done now) after took ms:
@@ -1707,6 +1722,7 @@ PlasmoidItem {
         onNewData: (source, data) => {
             disconnectSource(source)
             const result = root.helperResult(data)
+            root.draftBack(source, result.ok)
             if (result.ok) {
                 root.actionError = ""
                 root.expanded = false
@@ -1757,6 +1773,7 @@ PlasmoidItem {
                      + " # " + Date.now()
         launcherHosts = Object.assign({}, launcherHosts, { [line]: host })
         launcher.connectSource(line)
+        return line
     }
 
     property var launcherHosts: ({})   // command -> SSH host it was for (checked again after: its accounts may have switched)
@@ -1896,12 +1913,12 @@ PlasmoidItem {
                 for (const a of (s.agents && s.agents.tree) || [])
                     shift(a, ["started", "updated"])
             }
-            for (const c of (g.recent || []).concat(g.sharedHere || [])) {
+            for (const c of (g.recent || []).concat(g.sharedHere || [], g.starred || [])) {
                 shift(c, ["lastActive", "since"])
                 shift(c.recap, ["at"])
                 shift(c.stopped, ["at", "resetsAt"])
             }
-            for (const plan of g.plans || [])
+            for (const plan of (g.plans || []).concat(g.starredPlans || []))
                 shift(plan, ["updatedAt"])
             for (const memory of g.memories || [])
                 shift(memory, ["updatedAt"])
@@ -2050,6 +2067,7 @@ PlasmoidItem {
         onNewData: (source, data) => {
             disconnectSource(source)
             const result = root.helperResult(data)
+            root.draftBack(source, result.ok)
             const what = root.remoteActionKinds[source] || ""
             const host = root.remoteActionHosts[source]
             delete root.remoteActionKinds[source]   // (each command is new: these would only grow)
@@ -2088,6 +2106,7 @@ PlasmoidItem {
         remoteActionKinds = Object.assign({}, remoteActionKinds, { [cmd]: kind })
         remoteActionHosts = Object.assign({}, remoteActionHosts, { [cmd]: host })
         remoteActions.connectSource(cmd)
+        return cmd
     }
 
     // Bring up a session of an SSH host: background sessions and finished chats
@@ -2509,6 +2528,7 @@ PlasmoidItem {
         onNewData: (source, data) => {
             disconnectSource(source)
             const result = root.helperResult(data)
+            root.draftBack(source, result.ok)
             if (result.ok) {
                 root.actionError = ""
                 if (result.message) {
@@ -3657,6 +3677,8 @@ PlasmoidItem {
             actionErrorTimer.restart()
             return
         }
+        const draft = text ? { text: taskText, background: taskBackground, queued: taskQueued, later: taskLater,
+                                group: newChatGroup, plan: planComposer } : null
         newChatGroup = ""
         planComposer = ""
         taskText = ""
@@ -3668,25 +3690,27 @@ PlasmoidItem {
             // to start a minute after the limit resets, or at the time picked
             if (!folder.path && !host)
                 root.expanded = false   // the folder dialog takes over
-            queuer.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --queue " + shellQuote(group.chatProfile)
-                                      + (folder.path || host ? " --cwd " + shellQuote(folder.path || "~") : " --choose-folder")
-                                      + " --at " + (later || Math.round(reset.at + 60000)) + (later ? " --scheduled" : "")
-                                      + (text ? " --prompt " + shellQuote(text) : "")
-                                      + (plan ? " --plan " + shellQuote(plan.slug) + " --plan-profile " + shellQuote(plan.profileDir) : "")
-                                      + (host ? " --host " + shellQuote(host) : "") + " --account " + shellQuote(group.title)
-                                      + chatOptions + configDirArgs + " # " + Date.now())
+            const queue = "python3 -I " + shellQuote(codeDir + "jump.py") + " --queue " + shellQuote(group.chatProfile)
+                          + (folder.path || host ? " --cwd " + shellQuote(folder.path || "~") : " --choose-folder")
+                          + " --at " + (later || Math.round(reset.at + 60000)) + (later ? " --scheduled" : "")
+                          + (text ? " --prompt " + shellQuote(text) : "")
+                          + (plan ? " --plan " + shellQuote(plan.slug) + " --plan-profile " + shellQuote(plan.profileDir) : "")
+                          + (host ? " --host " + shellQuote(host) : "") + " --account " + shellQuote(group.title)
+                          + chatOptions + configDirArgs + " # " + Date.now()
+            keepDraft(queue, draft)
+            queuer.connectSource(queue)
             return
         }
         if (host) {
             if (background || (hasTask && !inVscode)) {
                 // remote.py --task HOST PROFILE FOLDER [--prompt TEXT] [--plan SLUG PROFILE] [--model M] [--effort E]
                 //           [--permission-mode MODE] [--bg]
-                remoteAction(background ? "task" : "open", host, "--task " + shellQuote(host) + " " + shellQuote(group.chatProfile)
-                             + " " + shellQuote(folder.path || "~") + (text ? " --prompt " + shellQuote(text) : "")
-                             + (plan ? " --plan " + shellQuote(plan.slug) + " " + shellQuote(plan.profileDir) : "")
-                             + chatOptions + (background ? " --bg" : ""))
+                keepDraft(remoteAction(background ? "task" : "open", host, "--task " + shellQuote(host) + " " + shellQuote(group.chatProfile)
+                                       + " " + shellQuote(folder.path || "~") + (text ? " --prompt " + shellQuote(text) : "")
+                                       + (plan ? " --plan " + shellQuote(plan.slug) + " " + shellQuote(plan.profileDir) : "")
+                                       + chatOptions + (background ? " --bg" : "")), draft)
             } else if (inVscode) {
-                remoteNewChatVscode(host, folder.path, group, text, plan)
+                keepDraft(remoteNewChatVscode(host, folder.path, group, text, plan), draft)
             } else {
                 // (the host's command ends with claude itself: its options go after it)
                 remoteNewChat(host, folder.newChatCommand ? folder.newChatCommand + chatOptions : folder.newChatCommand)
@@ -3701,10 +3725,41 @@ PlasmoidItem {
                     + (background || !inVscode ? chatOptions : "") + configDirArgs + " # " + Date.now()
         if (!folder.path)
             root.expanded = false   // the folder dialog takes over
+        keepDraft(cmd, draft)
         if (background)
             taskStarter.connectSource(cmd)
         else
             launcher.connectSource(cmd)
+    }
+
+    // What you wrote for a chat that's starting, by the command that starts
+    // it: it comes back when the chat can't start, not to be typed again
+    property var taskDrafts: ({})
+
+    function keepDraft(cmd, draft) {
+        if (draft)
+            taskDrafts = Object.assign({}, taskDrafts, { [cmd]: draft })
+    }
+
+    // cmd's answer came: if it failed, its task is back in the box (opened
+    // again if the popup shows no other), unless you've begun another
+    function draftBack(cmd, ok) {
+        const draft = taskDrafts[cmd]
+        if (!draft)
+            return
+        const rest = Object.assign({}, taskDrafts)
+        delete rest[cmd]
+        taskDrafts = rest
+        if (ok || taskText.trim() !== "")
+            return
+        taskText = draft.text
+        taskBackground = draft.background
+        taskQueued = draft.queued
+        taskLater = draft.later
+        if (root.expanded && !newChatGroup && !planComposer) {
+            newChatGroup = draft.group
+            planComposer = draft.plan
+        }
     }
 
     // A task started in the background: the popup stays, and its row comes up
@@ -3713,6 +3768,7 @@ PlasmoidItem {
         onNewData: (source, data) => {
             disconnectSource(source)
             const result = root.helperResult(data)
+            root.draftBack(source, result.ok)
             if (result.ok) {
                 root.actionError = ""
                 if (result.message) {

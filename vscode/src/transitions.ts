@@ -81,7 +81,7 @@ export class TransitionTracker {
   private lastStates = new Map<string, Map<string, SessionState>>();
   private turnStarts = new Map<string, Map<string, number>>();
   private lastEnded = new Map<string, Map<string, number>>(); // the turns that ended at the last poll, told as finished: how long they took
-  private lastWaitingAlert = new Map<string, number>();
+  private lastWaitingAlert = new Map<string, { at: number; ask: AskShown | null }>(); // a chat's last "needs input" alert, and what it asked
   private lastWindows = new Map<string, number>();
   private toldAsks = new Map<string, AskShown>(); // chats told about with Allow / Deny buttons while they wait: the prompt told
 
@@ -133,9 +133,15 @@ export class TransitionTracker {
         if (prev === s.state) continue;
         const pk = petKeyOf(s, host);
         if (s.state === "waiting") {
-          // At most one "needs input" alert per session per minute
-          if (nowMs - (this.lastWaitingAlert.get(sid) ?? 0) < WAITING_QUIET_MS) continue;
-          this.lastWaitingAlert.set(sid, nowMs);
+          // At most one "needs input" alert per session per minute, unless it
+          // asks something new (the next command after you allowed one)
+          const last = this.lastWaitingAlert.get(sid);
+          const newAsk = !!s.permission && !(last?.ask && sameAsk(last.ask, s.permission));
+          if (last && nowMs - last.at < WAITING_QUIET_MS && !newAsk) {
+            if (asks) this.toldAsks.set(sid, shownAsk(s.permission)!); // (the same prompt: told within the minute)
+            continue;
+          }
+          this.lastWaitingAlert.set(sid, { at: nowMs, ask: shownAsk(s.permission) });
           changes.petEvents.push({ kind: "waiting", text: `${s.name} needs you!`, key: pk });
           if (asks) this.toldAsks.set(sid, shownAsk(s.permission)!);
           if (opts.notifyWaiting) {

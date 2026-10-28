@@ -100,6 +100,18 @@ export function petKeyOf(session, host) {
     return `${host ? `ssh:${host}|` : ''}${session.profileDir || ''}/${session.chatId || session.sessionId || session.key}`;
 }
 
+// What a waiting chat asks, to tell one prompt from the next: the hook's
+// request, else the tool call it's about; '' when there's nothing to tell
+// them apart by (main.qml: askId)
+export function askId(s) {
+    const p = s ? s.permission : null;
+    if (!p)
+        return '';
+    if (p.answer === 'hook')
+        return p.request ? `request:${p.request}` : '';
+    return p.toolUse ? `tool:${p.toolUse}` : '';
+}
+
 // The 5-hour usage that goes next to the panel icon: this computer's default
 // account (listed first; VS Code's Claude and plain claude run on it), else
 // the account with an active session, else the one with the freshest numbers.
@@ -363,7 +375,7 @@ export class Tracker {
         this.turnStarts = {};
         this.lastEnded = {};   // the turns that ended at the last poll, told as finished: {key: how long it took}
         this.primed = {};
-        this.lastWaitingAlert = {};
+        this.lastWaitingAlert = {};   // key -> {at, ask}: its last "needs input" alert, and what it asked (askId)
         this.lastWindows = {};
     }
 
@@ -408,23 +420,33 @@ export class Tracker {
                     this._turnEnded(out, sid, s, host, ended[sid], settings, sound);
                     continue;
                 }
+                const alerted = this.lastWaitingAlert[sid];
+                const alert = () => {
+                    this.lastWaitingAlert[sid] = {at: nowMs, ask: askId(s)};
+                    out.pets.push({kind: 'waiting', text: fmt('%1 needs you!', s.name), key: petKeyOf(s, host)});
+                    if (settings.notifyWaiting) {
+                        out.notify.push({
+                            key: sid, session: s, kind: 'waiting', host,
+                            title: fmt('%1 needs your input', s.name),
+                            body: `${s.detail || reasonText(s.reason)}\n${s.cwdShort}${where}`,
+                            icon: 'dialog-warning-symbolic',
+                        });
+                        sound('waiting');
+                    }
+                };
+                // a new prompt the minute's quiet held back (nothing told it
+                // apart from the last one then: the hook's request came a poll later)
+                if (prev === 'waiting' && s.state === 'waiting' && alerted && alerted.held && askId(s) && askId(s) !== alerted.ask)
+                    alert();
                 if (prev === s.state)
                     continue;
                 if (s.state === 'waiting') {
-                    // At most one "needs input" alert per session per minute
-                    if (nowMs - (this.lastWaitingAlert[sid] || 0) >= 60000) {
-                        this.lastWaitingAlert[sid] = nowMs;
-                        out.pets.push({kind: 'waiting', text: fmt('%1 needs you!', s.name), key: petKeyOf(s, host)});
-                        if (settings.notifyWaiting) {
-                            out.notify.push({
-                                key: sid, session: s, kind: 'waiting', host,
-                                title: fmt('%1 needs your input', s.name),
-                                body: `${s.detail || reasonText(s.reason)}\n${s.cwdShort}${where}`,
-                                icon: 'dialog-warning-symbolic',
-                            });
-                            sound('waiting');
-                        }
-                    }
+                    // At most one "needs input" alert per session per minute, unless
+                    // it asks something new (the next command after you allowed one)
+                    if (!alerted || nowMs - alerted.at >= 60000 || (askId(s) && askId(s) !== alerted.ask))
+                        alert();
+                    else
+                        alerted.held = true;
                 } else if ((prev === 'working' || (stop && prev === 'waiting')) && (s.state === 'idle' || s.state === 'done')) {
                     // (a background session a limit stops can say it waits for a moment first)
                     const took = (s.since || nowMs) - (sid in startedAt ? startedAt[sid] : nowMs);
@@ -577,8 +599,10 @@ export function toLocalClock(result, offset) {
             for (const a of (s.agents && s.agents.tree) || [])
                 shift(a, ['started', 'updated']);
         }
-        for (const c of (g.recent || []).concat(g.sharedHere || []))
+        for (const c of (g.recent || []).concat(g.sharedHere || [], g.starred || []))
             shift(c, ['lastActive', 'since']);
+        for (const plan of (g.plans || []).concat(g.starredPlans || []))
+            shift(plan, ['updatedAt']);
         if (g.limits) {
             shift(g.limits, ['updatedAt']);
             for (const w of g.limits.windows || []) {

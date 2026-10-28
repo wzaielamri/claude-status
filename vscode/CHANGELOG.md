@@ -89,6 +89,11 @@
 - **Dictation leaves nothing behind:** a recording that the chat tab
   cancelled while it was still starting is stopped as soon as it starts,
   and recordings left behind are removed after an hour.
+- **The next permission prompt is told at once:** when a chat asked again
+  within a minute of its last prompt (you allowed a command, and it asked
+  for the next), its notification came a check later and without a sound,
+  and the same prompt asked again could be told twice. A new prompt is
+  told right away now, and only the same one asked again is held back.
 
 ## 1.16.1
 
