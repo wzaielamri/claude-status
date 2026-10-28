@@ -18,6 +18,19 @@
   again after 2, 5, 15, 30 and 60 minutes, then gives up and says so.
 - **One notification when two chats change the same files:** a chat open
   on two accounts made it two.
+- **The Permissions tab no longer suggests rules that let more through
+  than they say:** *Allow “rg”*, *“tree”*, *“git branch”*, *“git diff”*,
+  *“git log”* and *“git show”* let a chat run those with any options, and
+  some options run another program (`rg --pre`), write any file
+  (`git diff --output=…`, `tree -o`) or delete a branch (`git branch -D`),
+  all without asking. They aren't offered any more; rules you added with
+  them stay until you revoke them.
+- **An SSH host's chats in the Recap of an earlier day or week:** with a
+  host whose clock is set to a time zone west of yours (a UTC server seen
+  from Singapore, a New York one from Berlin), the Recap of yesterday or
+  last week left out the last 16 to 19 hours of the host's chats: the host
+  counted the days by its own calendar. It now sends the chats of the days
+  you see.
 - **VS Code and the Plasma widget don't slow each other down:** each made
   the other read its chats' transcripts again from the start, on every
   check, when they list different chats.

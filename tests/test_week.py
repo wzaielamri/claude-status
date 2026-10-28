@@ -748,7 +748,7 @@ class Projects(Home):
                 ("Read", {"file_path": str(self.lib / "src/x.py")}, {"reason": "workingDir"}),
                 ("Read", {"file_path": str(self.lib / "README.md")}, {}),
                 ("Edit", {"file_path": str(self.app / "m.py"), "old_string": "a", "new_string": "b"}, {}),
-                ("Bash", {"command": "git log --oneline"}, {}),
+                ("Bash", {"command": "git status --short"}, {}),
                 ("Bash", {"command": "rm -rf build"}, {"source": "user_reject", "decision": "reject"}),
                 ("Bash", {"command": "cat x | sh"}, {}),
                 ("Bash", {"command": "grep -r x ."}, {"reason": "safetyCheck"}),
@@ -773,7 +773,7 @@ class PromptTests(Projects):
         self.assertEqual(p["byTool"][:3], [["Bash", 4], ["Read", 4], ["Edit", 1]])
         rules = [(r["kind"], r["value"], r["count"], r["state"]) for r in p["rules"]]
         self.assertEqual(rules, [("dir", str(self.lib), 2, "new"), ("edits", str(self.app), 1, "new"),
-                                 ("allow", "Bash(git log *)", 1, "new"),
+                                 ("allow", "Bash(git status *)", 1, "new"),
                                  ("allow", "WebFetch(domain:docs.example.org)", 1, "new")])
         self.assertEqual(p["rules"][0]["title"], "Let chats in app read ~/repos/lib")
         self.assertIn("additionalDirectories", p["rules"][0]["change"])
@@ -789,9 +789,9 @@ class PromptTests(Projects):
 
     def test_a_rule_your_settings_have_already(self):
         self.asked()
-        cs.write_json_atomic(self.home / ".claude-work/settings.json", {"permissions": {"allow": ["Bash(git log *)"]}})
+        cs.write_json_atomic(self.home / ".claude-work/settings.json", {"permissions": {"allow": ["Bash(git status *)"]}})
         states = {r["value"]: r["state"] for r in self.recap()["prompts"]["rules"]}
-        self.assertEqual(states["Bash(git log *)"], "allowed")
+        self.assertEqual(states["Bash(git status *)"], "allowed")
 
     def test_allow_and_undo(self):
         self.asked()
@@ -812,10 +812,10 @@ class PromptTests(Projects):
         mine = {"env": {"A": "1"}, "permissions": {"allow": ["Bash(make *)"], "defaultMode": "plan"}}
         cs.write_json_atomic(self.settings, mine)
         ids = [week.allow_rule(self.home, self.cache_root, kind, value, str(self.app))[2]
-               for kind, value in (("edits", str(self.app)), ("allow", "Bash(git log *)"))]
+               for kind, value in (("edits", str(self.app)), ("allow", "Bash(git status *)"))]
         self.assertEqual(json.loads(self.settings.read_text())["permissions"],
-                         {"allow": ["Bash(make *)", "Bash(git log *)"], "defaultMode": "acceptEdits"})
-        self.assertEqual(week.allow_rule(self.home, self.cache_root, "allow", "Bash(git log *)", str(self.app))[:2],
+                         {"allow": ["Bash(make *)", "Bash(git status *)"], "defaultMode": "acceptEdits"})
+        self.assertEqual(week.allow_rule(self.home, self.cache_root, "allow", "Bash(git status *)", str(self.app))[:2],
                          (True, "Already allowed in ~/repos/app/.claude/settings.local.json"))
         for rid in ids:
             self.assertTrue(week.undo_rule(self.home, self.cache_root, rid)[0])
@@ -826,13 +826,21 @@ class PromptTests(Projects):
         week.updated_cache(self.cache_root, self.profiles(), self.now)
         app = str(self.app)
         for kind, value, project in (("allow", "Bash(ls *)", str(self.lib)),  # (no chat started there)
-                                     ("allow", "Bash(rm *)", app), ("allow", "Bash(git log *) && rm", app),
+                                     ("allow", "Bash(rm *)", app), ("allow", "Bash(git status *) && rm", app),
                                      ("allow", "Read(**)", app), ("dir", str(self.lib / "src"), app),  # (not a project)
                                      ("dir", str(self.home / ".ssh"), app), ("dir", "/etc", app),
                                      ("edits", str(self.lib), app), ("allow", "Bash(ls *)", str(self.home / ".ssh")),
-                                     ("allow", "Bash(ls *)", "relative/app")):
+                                     ("allow", "Bash(ls *)", "relative/app"),
+                                     # (commands whose options run programs, write files or delete branches)
+                                     ("allow", "Bash(rg *)", app), ("allow", "Bash(tree *)", app),
+                                     ("allow", "Bash(git branch *)", app), ("allow", "Bash(git diff *)", app),
+                                     ("allow", "Bash(git log *)", app), ("allow", "Bash(git show *)", app)):
             ok, message, _ = week.allow_rule(self.home, self.cache_root, kind, value, project)
             self.assertFalse(ok, (kind, value, project))
+        for command in ("rg --pre ./run.sh x .", "tree -o /home/u/.profile", "git branch -D main",
+                        "git diff --output=/home/u/.bashrc", "git log -p", "git show HEAD"):
+            self.assertIsNone(week.rule_for("Bash", command, "", app, str(self.home)), command)
+        self.assertEqual(week.rule_for("Bash", "git status --short", "", app, str(self.home)), ("allow", "Bash(git status *)"))
         self.assertFalse(self.settings.exists())
         self.assertFalse((self.lib / ".claude").exists())
         cs.write_json_atomic(self.settings, ["not", "settings"])
@@ -856,7 +864,7 @@ class GrantedTests(Projects):
         data = json.loads((self.home / ".claude-work/.claude.json").read_text())
         data["projects"] = {str(self.app): {}, str(self.lib): {}, "/gone": {}}
         (self.home / ".claude-work/.claude.json").write_text(json.dumps(data))
-        cs.write_json_atomic(self.settings, {"permissions": {"allow": ["Bash(git log *)", "WebFetch(domain:docs.example.org)"],
+        cs.write_json_atomic(self.settings, {"permissions": {"allow": ["Bash(git status *)", "WebFetch(domain:docs.example.org)"],
                                                              "additionalDirectories": [str(self.lib)], "defaultMode": "acceptEdits"}})
         self.settings.chmod(0o644)
         cs.write_json_atomic(self.app / ".claude/settings.json", {"permissions": {"allow": ["WebSearch"], "deny": ["Bash(rm *)"]}})
@@ -875,17 +883,17 @@ class GrantedTests(Projects):
             ("allow", "Bash(npm test *)", "Run “npm test *”", "every chat of personal, work", "~/.claude-shared/settings.json"),
             ("mode", "acceptEdits", "Accept file edits without asking", "chats started in app", "~/repos/app/.claude/settings.local.json"),
             ("dir", str(self.lib), "Read files in ~/repos/lib", "chats started in app", "~/repos/app/.claude/settings.local.json"),
-            ("allow", "Bash(git log *)", "Run “git log *”", "chats started in app", "~/repos/app/.claude/settings.local.json"),
+            ("allow", "Bash(git status *)", "Run “git status *”", "chats started in app", "~/repos/app/.claude/settings.local.json"),
             ("allow", "WebFetch(domain:docs.example.org)", "Open pages from docs.example.org", "chats started in app",
              "~/repos/app/.claude/settings.local.json"),
             ("allow", "WebSearch", "WebSearch", "chats started in app (shared through git)", "~/repos/app/.claude/settings.json")])
         self.assertEqual([g["shared"] for g in self.granted()], [False] * 5 + [True])
         self.assertEqual(self.granted()[3]["change"],
-                         "takes Bash(git log *) out of permissions.allow in ~/repos/app/.claude/settings.local.json")
+                         "takes Bash(git status *) out of permissions.allow in ~/repos/app/.claude/settings.local.json")
 
     def test_revoke_takes_it_out_of_its_file(self):
         self.addCleanup(os.umask, os.umask(0o077))  # (as week.py runs)
-        self.assertTrue(self.revoke("allow", "Bash(git log *)")[0])
+        self.assertTrue(self.revoke("allow", "Bash(git status *)")[0])
         self.assertTrue(self.revoke("dir", str(self.lib))[0])
         self.assertEqual(self.revoke("mode", "acceptEdits"), (True, "Revoked: Accept file edits without asking "
                                                                     "(~/repos/app/.claude/settings.local.json)"))
@@ -1038,6 +1046,8 @@ class HostTests(FakeSSH):
         source = week.host_chats("lab", 0)
         self.assertTrue(source["ok"], source)
         self.assertEqual(list(source["chats"]), ["chat-r"])
+        # (the days shown here, not the host's: it sends what's between the times asked for)
+        self.assertEqual(week.host_chats("lab", 1, "day", since=now + 7200_000, until=now + 7300_000)["chats"], {})
         r = week.recap([{"host": "", "chats": {}, "accounts": []}, source], 0, "", now, Path(self.tmp.name))
         self.assertEqual((r["sum"]["workedMs"], r["projects"][0]["host"], r["sources"][1]["ok"]), (60_000, "lab", True))
 
@@ -1095,6 +1105,15 @@ class OutputTests(Home):
         text = out.getvalue()
         answer = json.loads(text[text.rfind("\n" + cs.REMOTE_MARK) + 1 + len(cs.REMOTE_MARK):])
         self.assertEqual(list(answer["chats"]), ["chat-a"])
+        # the times the computer asking wants (its days, by its calendar), as they are on this clock
+        for since, until, now, chats in ((t0 + 7200_000, self.now, self.now, []), (t0 - 60_000, t0 + 60_000, self.now, ["chat-a"]),
+                                         (t0 + 9000_000, self.now, self.now + 3 * 3600_000, ["chat-a"])):
+            out = io.StringIO()
+            with redirect_stdout(out):
+                week.main(["--data", "--remote", "--since", str(since), "--until", str(until), "--now", str(now)])
+            text = out.getvalue()
+            answer = json.loads(text[text.rfind("\n" + cs.REMOTE_MARK) + 1 + len(cs.REMOTE_MARK):])
+            self.assertEqual(list(answer["chats"]), chats, (since, until, now))
 
 
 if __name__ == "__main__":

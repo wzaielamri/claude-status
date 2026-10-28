@@ -239,7 +239,7 @@ past_work(".claude-work", "repos/parser", "9a1c7e2b-0000-4000-8000-000000000011"
           [(13, 9000), (12, 30000), (9, 21000), (8, 52000), (6, 18000), (2, 41000), (1, 26000)], "Parser rewrite",
           [("Read", {"file_path": str(home / "repos/site/src/grammar.ts")}, 140),
            ("Read", {"file_path": str(home / "repos/site/README.md")}, 40),
-           ("Bash", {"command": "git log --oneline -20"}, 25)], limit=True)
+           ("Bash", {"command": "git status --short"}, 25)], limit=True)
 past_work(".claude-work", "repos/site", "9a1c7e2b-0000-4000-8000-000000000012",
           [(12, 8000), (7, 15000), (5, 12000), (2, 9000)], "Site redesign",
           [("Edit", {"file_path": str(home / "repos/site/index.html"), "old_string": "a", "new_string": "b"}, 60)])

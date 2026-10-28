@@ -198,13 +198,13 @@ test("the page asks for a span, days or weeks back, for an account id or all", a
 
 test("Allow and Undo reach the backend only as rules; the answer goes back to the page", async () => {
   const { calls, posted, receive } = setup();
-  receive({ type: "weekRule", allow: true, kind: "allow", value: "Bash(git log *)", project: "/w/app", id: "" });
-  receive({ type: "weekRule", allow: true, kind: "allow", value: "Bash(git log *)", project: "../app", id: "" });
+  receive({ type: "weekRule", allow: true, kind: "allow", value: "Bash(git status *)", project: "/w/app", id: "" });
+  receive({ type: "weekRule", allow: true, kind: "allow", value: "Bash(git status *)", project: "../app", id: "" });
   receive({ type: "weekRule", allow: false, kind: "", value: "", project: "", id: "a1b2c3d4e5f6" });
   receive({ type: "weekRule", allow: false, kind: "", value: "", project: "", id: "a1b2c3d4e5f6", host: "lab" });
   receive({ type: "weekRule", allow: false, kind: "", value: "", project: "", id: "a1b2c3d4e5f6", host: "-oProxyCommand=x" });
   assert.deepEqual(calls, [
-    { name: "weekRule", args: [{ allow: true, kind: "allow", value: "Bash(git log *)", project: "/w/app" }, ""] },
+    { name: "weekRule", args: [{ allow: true, kind: "allow", value: "Bash(git status *)", project: "/w/app" }, ""] },
     { name: "weekRule", args: [{ allow: false, id: "a1b2c3d4e5f6" }, ""] },
     { name: "weekRule", args: [{ allow: false, id: "a1b2c3d4e5f6" }, "lab"] }, // (the dashboard acts only on a host shown)
   ]);

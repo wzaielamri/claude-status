@@ -28,6 +28,8 @@ off: then it keeps only what the transcripts still have.
     --host HOST   an SSH host's chats too: remote.py runs this file there
                   (python3 -I - with talpy_den.py loaded first) with
     --data        that host's chats of those days, for the computer asking
+                  (--since MS --until MS --now MS: of those times, by the
+                  clock of the computer asking, now at --now)
     --remote      the JSON after a marker line (login scripts may print first)
     --currency C  amounts in C (EUR, …) at the European Central Bank's rate
                   of the day (fetched at most every few hours, only then)
@@ -1538,9 +1540,11 @@ def claude_did(chats, lo, hi):
 
 RULES_FILE = "rules.json"  # in the widget's cache: the rules this tab added, to undo them
 TOP_RULES = 6
-SAFE_COMMANDS = ("ls", "pwd", "wc", "head", "tail", "grep", "rg", "which", "file", "stat", "du", "df", "tree", "date",
+# (a rule takes any options: not rg, tree, git branch/diff/log/show, whose
+# --pre, -o, -D and --output run programs, write files or delete branches)
+SAFE_COMMANDS = ("ls", "pwd", "wc", "head", "tail", "grep", "which", "file", "stat", "du", "df", "date",
                  "uname", "journalctl")
-GIT_READS = ("status", "log", "diff", "show", "branch", "rev-parse", "ls-files", "blame")
+GIT_READS = ("status", "rev-parse", "ls-files", "blame")
 SHELL_SIGNS = set(";&|<>`$()\\\n{}*?!~")
 BASH_RULE = re.compile(r"^Bash\((git (%s)|%s) \*\)$" % ("|".join(GIT_READS), "|".join(SAFE_COMMANDS)))
 FETCH_RULE = re.compile(r"^WebFetch\(domain:[a-z0-9][a-z0-9.-]{0,252}\)$")
@@ -2307,10 +2311,14 @@ def short_count(n):
 # ---------------------------------------------------------------- SSH hosts
 
 
-def host_chats(host, back, span="week"):
-    """A host's chats of the days asked for (this file run there), as a source."""
+def host_chats(host, back, span="week", since=None, until=None):
+    """A host's chats of the days asked for (this file run there), as a source:
+    those between since and until (ms) when given, the days shown here (by
+    this computer's calendar: the host's may be on another day)."""
     import remote
-    answer = remote.host_answer(host, ["--data", "--span", span, "--back", str(back)], name="week.py")
+    window = ["--since", str(int(since)), "--until", str(int(until)), "--now", str(int(time.time() * 1000))] \
+        if since is not None and until is not None else []
+    answer = remote.host_answer(host, ["--data", "--span", span, "--back", str(back)] + window, name="week.py")
     if not answer.get("ok"):
         return {"host": host, "ok": False, "error": answer.get("message") or answer.get("error") or "no answer",
                 "chats": {}, "accounts": []}
@@ -2414,6 +2422,7 @@ def main(argv=None):
     back, account, hosts, config_dirs, currency, span = 0, "", [], [], "USD", "week"
     pretty = remote = data = perms = status = forget = monday = projects_asked = False
     allow = undo = revoke = history = on = None
+    asked = {}  # --since, --until, --now: the times the computer asking wants (--data)
     while args:
         arg = args.pop(0)
         if arg == "--allow" and len(args) >= 3:
@@ -2430,6 +2439,8 @@ def main(argv=None):
             back = min(BACK_LIMIT, int(args.pop(0)))
         elif arg == "--span" and args and args[0] in SPANS:
             span = args.pop(0)
+        elif arg in ("--since", "--until", "--now") and args and args[0].lstrip("-").isdigit():
+            asked[arg] = int(args.pop(0))
         elif arg == "--history-status":
             status = True
         elif arg == "--history" and args and args[0] in ("on", "off"):
@@ -2529,7 +2540,13 @@ def main(argv=None):
             return emit(result)
         first_ms = first_activity(cache)
         days = span_days(span, back, now_ms, first_ms)
-        chats = chats_between(cache, profiles, span_since(span, back, now_ms, first_ms), days[-1][2], home)
+        since, until = span_since(span, back, now_ms, first_ms), days[-1][2]
+        if data and "--since" in asked and "--until" in asked:
+            # (the days the computer asking shows, by its calendar, moved to this clock if it differs)
+            moved = now_ms - asked.get("--now", now_ms)
+            moved = moved if abs(moved) > 5000 else 0
+            since, until = asked["--since"] + moved, asked["--until"] + moved
+        chats = chats_between(cache, profiles, since, until, home)
         _, accounts = account_ids(profiles)
         if data:  # ("now" as it answers: the computer asking sets this one's clock against its own)
             result = {"ok": True, "now": int(time.time() * 1000), "chats": chats, "accounts": accounts,
@@ -2539,7 +2556,7 @@ def main(argv=None):
             if hosts:
                 from concurrent.futures import ThreadPoolExecutor
                 with ThreadPoolExecutor(max_workers=min(8, len(hosts))) as pool:
-                    sources += list(pool.map(lambda h: host_chats(h, back, span), hosts))
+                    sources += list(pool.map(lambda h: host_chats(h, back, span, since, until), hosts))
             if span == "all":  # (a host's chats may go back further)
                 starts = [x for src in sources[1:] for c in (src.get("chats") or {}).values()
                           for x in [t[0] for t in c.get("turns", [])[:1]] + c.get("prompts", [])[:1]]
