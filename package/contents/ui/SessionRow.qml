@@ -544,7 +544,7 @@ RowLayout {
                     text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
@@ -566,7 +566,7 @@ RowLayout {
                     text: i18n("Star")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, true)
@@ -586,7 +586,7 @@ RowLayout {
                     text: i18n("Keep going after usage limits")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.keepGoing(row.session, true)
@@ -606,7 +606,7 @@ RowLayout {
                     text: i18n("Share or continue on another account…")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.openShareMenu(shareButton, {
@@ -629,7 +629,7 @@ RowLayout {
                     text: i18n("Remove from list")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: row.remoteHost ? root.remoteDismiss(row.remoteHost, row.session.sessionId)
@@ -649,7 +649,7 @@ RowLayout {
                     text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: {

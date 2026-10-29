@@ -769,7 +769,7 @@ ColumnLayout {
                         text: i18n("Reopen this chat")
                         Layout.preferredHeight: recentButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: recentButtons.buttonWidth
                         onClicked: recentLine.open()
 
@@ -789,7 +789,7 @@ ColumnLayout {
                         text: i18n("Star")
                         Layout.preferredHeight: recentButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: recentButtons.buttonWidth
                         onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, true)
 
@@ -808,7 +808,7 @@ ColumnLayout {
                         text: i18n("Share or continue on another account…")
                         Layout.preferredHeight: recentButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: recentButtons.buttonWidth
                         onClicked: root.openShareMenu(recentShare, {
                             chatId: recentLine.chat.sessionId, name: recentLine.chat.name,
@@ -1004,7 +1004,7 @@ ColumnLayout {
                         text: i18n("Star")
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, true)
 
@@ -1023,7 +1023,7 @@ ColumnLayout {
                         text: i18n("Edit the plan")
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.editPlan(planLine.plan, section.remoteHost)
 
@@ -1046,7 +1046,7 @@ ColumnLayout {
                         text: i18n("Send your changes to Claude")
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
 
@@ -1066,7 +1066,7 @@ ColumnLayout {
                         checked: root.planComposer === planLine.composerKey
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.togglePlanComposer(planLine.composerKey)
 
@@ -1084,7 +1084,7 @@ ColumnLayout {
                         text: i18n("Continue the chat that made it")
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.continuePlanChat(planLine.plan, section.group, section.remoteHost)
 
@@ -1103,7 +1103,7 @@ ColumnLayout {
                         text: i18n("Share it with another account…")
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: icon.width
+                        icon.height: Kirigami.Units.iconSizes.small
                         Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.openPlanMenu(planShare, planLine.plan, section.remoteHost)
 
@@ -1246,7 +1246,7 @@ ColumnLayout {
                     text: i18n("Edit this memory")
                     Layout.preferredHeight: memoryButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: icon.width
+                    icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: memoryButtons.buttonWidth
                     onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
 
