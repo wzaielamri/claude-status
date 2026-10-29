@@ -23,7 +23,6 @@ import { ViewContext } from "./context";
 import { GroupSection } from "./GroupSection";
 import { Header } from "./Header";
 import { HeroStage } from "./HeroStage";
-import { Ticker } from "./Ticker";
 import { HostSection } from "./HostSection";
 import { Messages } from "./Messages";
 import { PermsView } from "./PermsView";
@@ -120,8 +119,7 @@ export function App() {
             unavailable={!state.status && !!state.errorText}
             heroShown={state.settings.showPet}
           />
-          {state.settings.showPet && !week && !perms && !projectsTab ? <HeroStage input={hero} /> : null}
-          {!week && !perms && !projectsTab ? <Ticker groups={groups} /> : null}
+          {state.settings.showPet && !week && !perms && !projectsTab ? <HeroStage input={hero} groups={groups} /> : null}
         </div>
         {week ? (
           <main key="week" {...tabIn}>

@@ -1,6 +1,6 @@
-// Stopping idle chats, where chats reopen: a terminal or a Claude Code tab,
+// Stopping idle chats, where chats reopen: a terminal or a Claude Code panel,
 // whichever is there (no claude command, Claude Code missing or on another
-// account), and moving a running chat from its terminal to a Claude Code tab.
+// account), and moving a running chat from its terminal to a Claude Code panel.
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
@@ -30,7 +30,7 @@ const chat = { kind: "interactive", entrypoint: "cli", state: "idle", pid: 42 };
 test("a chat with a process can be stopped, whatever it's doing; a working one interrupted", () => {
   assert.equal(canEndChat(chat), true);
   assert.equal(canEndChat({ ...chat, state: "working" }), true, "it asks first");
-  assert.equal(canEndChat({ ...chat, entrypoint: "claude-vscode" }), true, "its Claude Code tab goes on");
+  assert.equal(canEndChat({ ...chat, entrypoint: "claude-vscode" }), true, "its Claude Code panel goes on");
   assert.equal(canEndChat({ ...chat, kind: "bg" }), false, "background sessions: claude stop");
   assert.equal(canEndChat({ ...chat, pid: null }), false, "no process");
   assert.equal(canEndChat({ kind: "chat", pid: null }), false, "a recent chat's reference");
@@ -68,10 +68,10 @@ test("each half says what it does, or why it's greyed out", () => {
   assert.match(terminalReopenHint("lab", false), /^Claude Code's claude command isn't installed on lab/);
   assert.match(claudeCodeReopenHint(personal, onWork, [work, personal]), /^Claude Code runs on work · Team, not personal · Pro/);
   assert.match(claudeCodeReopenHint(work, { available: false, profileKey: null }, []), /isn't installed or enabled/);
-  assert.match(claudeCodeReopenHint(work, onWork, [work]), /^Opens the chat in a Claude Code tab/);
+  assert.match(claudeCodeReopenHint(work, onWork, [work]), /^Opens the chat in a Claude Code panel/);
 });
 
-test("a plan's chat reopens in a Claude Code tab only when Claude Code is on the chat's account", async () => {
+test("a plan's chat reopens in a Claude Code panel only when Claude Code is on the chat's account", async () => {
   // (the plan is shared with work, Claude Code's account; the chat that made it is personal's)
   const stub = vscode as unknown as typeof import("./vscode-stub");
   const getConfiguration = stub.workspace.getConfiguration;
@@ -158,7 +158,7 @@ test("a recent chat reopens in this window when it has the chat's project open",
   }
 });
 
-test("a chat running in a terminal can move to a Claude Code tab, when Claude Code is on its account", () => {
+test("a chat running in a terminal can move to a Claude Code panel, when Claude Code is on its account", () => {
   assert.equal(canMoveToClaudeCode(chat, true), true);
   assert.equal(canMoveToClaudeCode({ ...chat, state: "working" }, true), true, "it asks to stop it first");
   assert.equal(canMoveToClaudeCode(chat, false), false, "Claude Code isn't on its account");
@@ -213,7 +213,7 @@ test("a chat that isn't running reopens where the switch says, from its tab or i
     t = actionsHere();
     await t.actions.open(finished);
     assert.deepEqual(t.runs, [], "not in a terminal");
-    assert.deepEqual(t.helpers, [["--resume", "c1", "--profile", "work", "--vscode"]], "in a Claude Code tab");
+    assert.deepEqual(t.helpers, [["--resume", "c1", "--profile", "work", "--vscode"]], "in a Claude Code panel");
 
     t = actionsHere();
     await t.actions.open({ ...finished, profileDir: "personal" });
@@ -227,7 +227,7 @@ test("a chat that isn't running reopens where the switch says, from its tab or i
   }
 });
 
-test("moving a chat to a Claude Code tab stops it first, a working one only once you say so", async () => {
+test("moving a chat to a Claude Code panel stops it first, a working one only once you say so", async () => {
   const stub = vscode as unknown as typeof import("./vscode-stub");
   const ask = stub.window.showWarningMessage;
   const asked: { title: string; buttons: string[] }[] = [];
@@ -262,7 +262,7 @@ test("moving a chat to a Claude Code tab stops it first, a working one only once
     t = actionsHere();
     await t.actions.moveToClaudeCode({ ...running, entrypoint: "claude-vscode" });
     await t.actions.moveToClaudeCode({ ...running, profileDir: "personal" });
-    assert.deepEqual(asked, [], "in a Claude Code tab already, or Claude Code isn't on its account: not asked");
+    assert.deepEqual(asked, [], "in a Claude Code panel already, or Claude Code isn't on its account: not asked");
     assert.deepEqual(t.helpers, []);
   } finally {
     (stub.window as { showWarningMessage: unknown }).showWarningMessage = ask;
@@ -297,7 +297,7 @@ test("a chat the Recap names that isn't running reopens: with the command its ac
       assert.deepEqual(t.runs, [listed.openCommand]);
       assert.deepEqual(t.helpers, []);
     }
-    // where the switch says: a Claude Code tab
+    // where the switch says: a Claude Code panel
     overrides.set("reopenIn", "claudeCode");
     t = actionsHere();
     await t.actions.openWeekChat(id, "work", "Ports", "/w/app");

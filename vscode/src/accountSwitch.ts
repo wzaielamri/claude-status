@@ -80,7 +80,7 @@ export class AccountSwitch implements vscode.Disposable {
       this.told = now;
       void vscode.window
         .showInformationMessage(
-          `VS Code's Claude runs on ${group ? group.name : path.basename(now)} now. Reload this window so its Claude panel does too.`,
+          `VS Code's Claude runs on ${group ? group.name : path.basename(now)} now. Reload this window so its Claude Code panel does too.`,
           "Reload Window",
         )
         .then((c) => c && vscode.commands.executeCommand(RELOAD));
@@ -147,7 +147,7 @@ export class AccountSwitch implements vscode.Disposable {
   // group becomes the default account (the widget's accounts.py --default):
   // VS Code's Claude runs on it (this setting; the window reloads) and plain
   // claude too where ~/.claude is a link. Not while that would cut a chat
-  // off: one working in VS Code's Claude panel (the reload), or any chat
+  // off: one working in VS Code's Claude Code panel (the reload), or any chat
   // running through ~/.claude (accounts.py refuses: it would go on on the
   // other account).
   async switchTo(group: Group): Promise<void> {

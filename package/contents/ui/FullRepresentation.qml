@@ -209,15 +209,6 @@ PlasmaExtras.Representation {
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
             }
-            // What the working chats do right now, one at a time: under the
-            // hero's stage, as in the VS Code extension (also with no pet)
-            Ticker {
-                visible: shown !== null && root.popupTab === "chats"
-                Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.smallSpacing * 2
-                Layout.rightMargin: Kirigami.Units.smallSpacing * 2
-                items: root.popupTab === "chats" ? root.tickerItems : []
-            }
 
             // Find a chat (the magnifier above): its words, then what matched
             PlasmaExtras.SearchField {

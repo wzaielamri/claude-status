@@ -848,7 +848,7 @@ class SeveralCopiesTests(unittest.TestCase):
         # what runs on a clock goes under the same name each time
         main = (ROOT / "ui/main.qml").read_text()
         self.assertRegex(main, r'ScreenSaver\.GetActive"\)')
-        self.assertIn('(kind === "conversation" || kind === "logs" ? "" : " # " + Date.now())', (ROOT / "ui/ChatPane.qml").read_text())
+        self.assertIn('(kind === "conversation" ? "" : " # " + Date.now())', (ROOT / "ui/ChatPane.qml").read_text())
 
     @NEEDS_PLASMA5SUPPORT
     def test_a_command_costs_the_same_after_thousands(self):

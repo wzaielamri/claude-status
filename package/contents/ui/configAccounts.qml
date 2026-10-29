@@ -332,8 +332,8 @@ KCM.SimpleKCM {
                             onClicked: page.act(["--default", card.account.key], card.account.key)
                             QQC2.ToolTip.visible: hovered
                             QQC2.ToolTip.text: page.linked
-                                ? i18n("Lists it first and shows its usage in the panel; VS Code's Claude (new chats, and a window's Claude panel once it reloads) and plain claude (~/.claude) run on it. Not while a chat runs through ~/.claude: it would go on on this account.")
-                                : i18n("Lists it first and shows its usage in the panel; VS Code's Claude runs on it (new chats, and a window's Claude panel once it reloads). Plain claude stays on ~/.claude, a folder.")
+                                ? i18n("Lists it first and shows its usage in the panel; VS Code's Claude (new chats, and a window's Claude Code panel once it reloads) and plain claude (~/.claude) run on it. Not while a chat runs through ~/.claude: it would go on on this account.")
+                                : i18n("Lists it first and shows its usage in the panel; VS Code's Claude runs on it (new chats, and a window's Claude Code panel once it reloads). Plain claude stays on ~/.claude, a folder.")
                         }
                         QQC2.Button {
                             visible: !card.account.loggedIn

@@ -84,7 +84,7 @@ export function PlansList({ group }: { group: Group }) {
         ) : null}
         {p.edited && p.chatId && !host ? (
           <Tag
-            text="↩ send"
+            text="↩ Send"
             active
             title="You changed this plan since Claude wrote it. Click to send what you changed (and your comments on it) to the chat that made it: Claude revises the plan, in plan mode."
             onClick={() => post({ type: "sendPlanFeedback", ...ref(p.key) })}
@@ -131,14 +131,14 @@ export function PlansList({ group }: { group: Group }) {
           <IconButton
             icon="play"
             label="Carry it out…"
-            title="Carry it out in a new chat: the plan is the chat's first message, with what you add; in a terminal, in the background or in a Claude Code tab, in the plan's folder or another one."
+            title="Carry it out in a new chat: the plan is the chat's first message, with what you add; in a terminal, in the background or in a Claude Code panel, in the plan's folder or another one."
             onClick={() => post({ type: "carryOutPlan", ...ref(p.key) })}
           />
           {p.chatId ? (
             <IconButton
               icon="back"
               label="Continue the chat that made it"
-              title="Continue the chat that made it, to change the plan with Claude: it comes up, or reopens (in a terminal or a Claude Code tab, as the switch of Recent chats says)."
+              title="Continue the chat that made it, to change the plan with Claude: it comes up, or reopens (in a terminal or a Claude Code panel, as the switch of Recent chats says)."
               onClick={() => post({ type: "continuePlanChat", ...ref(p.key) })}
             />
           ) : null}

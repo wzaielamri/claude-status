@@ -8,7 +8,7 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { changed, diffRows, highlight, language, pairs, readLines, splitRows, type DiffRow } from "../../vendor/codeview.mjs";
-import type { PaneItem, TermRun, TermStyle } from "../../src/shared/pane";
+import type { PaneItem } from "../../src/shared/pane";
 
 const TAB = "    ";
 
@@ -181,55 +181,6 @@ export function ToolDetail({ item, path }: { item: PaneItem; path: string }) {
         return <div key={i} class="cv-field">{k ? <><span class="cv-name">{k[1]}</span>{"  "}{k[2]}</> : l}</div>;
       })}
       {out}
-    </div>
-  );
-}
-
-// A background session's screen in its own colors (pane.py screen_view), on
-// a terminal's dark ground: a row that ends in a colored stretch (a diff's
-// line drawn across) is colored across
-const HEX = /^#[0-9a-fA-F]{6}$/;
-const TERM_FG = "#e3e3e3";
-const TERM_BG = "#1f2124";
-
-function termColors(st: TermStyle | undefined): { color: string; background?: string } {
-  let fg = st?.fg && HEX.test(st.fg) ? st.fg : TERM_FG;
-  let bg = st?.bg && HEX.test(st.bg) ? st.bg : undefined;
-  if (st?.inv) [fg, bg] = [bg ?? TERM_BG, fg];
-  return { color: fg, background: bg };
-}
-
-export function TermScreen({ lines, runs, styles }: { lines: string[]; runs?: TermRun[][]; styles?: TermStyle[] }) {
-  const rows: TermRun[][] = runs ?? lines.map((l) => [[l, 0]]);
-  const table = styles ?? [];
-  return (
-    <div class="term">
-      {rows.map((row, i) => {
-        let list = row;
-        let rowBg: string | undefined;
-        const last = row[row.length - 1];
-        if (last && /^\s+$/.test(last[0])) {
-          rowBg = termColors(table[last[1]]).background;
-          if (rowBg) list = row.slice(0, -1);
-        }
-        return (
-          <div key={i} class="term-row" style={rowBg ? { background: rowBg } : undefined}>
-            {list.length
-              ? list.map(([text, k], j) => {
-                  const st = table[k];
-                  const c = termColors(st);
-                  return (
-                    <span key={j} style={{
-                      color: c.color, background: c.background && c.background !== rowBg ? c.background : undefined,
-                      fontWeight: st?.b ? 700 : undefined, fontStyle: st?.i ? "italic" : undefined,
-                      textDecoration: st?.u ? "underline" : undefined, opacity: st?.d ? 0.6 : undefined,
-                    }}>{text}</span>
-                  );
-                })
-              : " "}
-          </div>
-        );
-      })}
     </div>
   );
 }

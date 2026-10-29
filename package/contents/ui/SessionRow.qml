@@ -13,8 +13,8 @@ RowLayout {
     property string remoteHost: ""   // set for a session on an SSH host
     property string account: ""      // its account's title
 
-    readonly property string tag: session.entrypoint === "claude-vscode" ? i18n("VS Code")
-                                  : session.kind === "bg" ? i18n("background") : ""
+    readonly property string tag: session.entrypoint === "claude-vscode" ? i18n("Claude Code panel")
+                                  : session.kind === "bg" ? i18n("Background") : ""
     // A background session with a running process can be stopped (`claude stop`),
     // and so can a chat with a process of its own, whatever it's doing: in a
     // terminal its claude quits (the chat is kept), in VS Code its tab shows it
@@ -361,14 +361,14 @@ RowLayout {
                         visible: row.tag !== ""
                         text: row.tag
                         tooltip: row.session.entrypoint === "claude-vscode"
-                                 ? i18n("Runs in VS Code's Claude panel. Click the name to open the conversation there.")
+                                 ? i18n("Runs in VS Code's Claude Code panel. Click the name to open the conversation there.")
                                  : i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
                     }
                     Tag {
                         // Chat shared across profiles (hard-linked transcript)
                         readonly property var info: row.session.shared
                         visible: !!info
-                        text: info && info.forkOf ? i18n("⇄ shared copy") : i18n("⇄ shared")
+                        text: info && info.forkOf ? i18n("⇄ Shared copy") : i18n("⇄ Shared")
                         tooltipTitle: info && info.forkOf ? i18n("Copy of a shared chat") : i18n("Shared chat")
                         tooltip: !info ? ""
                                  : info.forkOf
@@ -384,7 +384,7 @@ RowLayout {
                     }
                     Tag {
                         visible: row.agents !== null
-                        text: row.agents ? i18nc("subagents finished/total", "agents %1/%2", row.agents.done, row.agents.total) : ""
+                        text: row.agents ? i18nc("subagents finished/total", "Agents %1/%2", row.agents.done, row.agents.total) : ""
                         active: row.agents !== null && row.agents.running > 0
                         clickable: true
                         onClicked: root.toggleAgents(row.rowKey)
@@ -405,7 +405,7 @@ RowLayout {
                     Tag {
                         // the plan it made (talpy_den.py: plan_of)
                         visible: !!row.session.plan
-                        text: i18nc("a chat's plan, click to open it", "plan ↗")
+                        text: i18nc("a chat's plan, click to open it", "Plan ↗")
                         clickable: true
                         onClicked: root.openPlan(row.session.plan.slug, row.session.profileDir, row.remoteHost)
                         tooltipTitle: row.session.plan ? row.session.plan.title : ""
@@ -428,7 +428,7 @@ RowLayout {
                     Tag {
                         // you changed its plan since the chat last did anything (talpy_den.py: plan_edited)
                         visible: !!row.session.plan && !!row.session.plan.edited && !row.remoteHost && !!row.session.chatId
-                        text: i18nc("send your changes to the plan to the chat", "↩ send to Claude")
+                        text: i18nc("send your changes to the plan to the chat", "↩ Send to Claude")
                         active: true
                         clickable: true
                         onClicked: root.sendPlanFeedback(row.session.plan.slug, row.session.profileDir, row.session.chatId)
@@ -439,7 +439,7 @@ RowLayout {
                     Tag {
                         // another chat with a process changed some of the same files (talpy_den.py: note_overlaps)
                         visible: !!row.session.overlaps && row.session.overlaps.length > 0
-                        text: i18nc("two chats changed the same files", "⚠ same files")
+                        text: i18nc("two chats changed the same files", "⚠ Same files")
                         warning: true
                         clickable: true
                         onClicked: row.openOverlap()
@@ -463,7 +463,7 @@ RowLayout {
                     Tag {
                         // it changed files and is done: to review until you mark it reviewed (ChatPane.qml)
                         visible: root.reviewPending(row.session, row.remoteHost)
-                        text: i18nc("a finished chat's changes, not reviewed yet", "to review")
+                        text: i18nc("a finished chat's changes, not reviewed yet", "To review")
                         active: true
                         clickable: true
                         onClicked: root.openPane(row.session, row.remoteHost, "review")
@@ -475,32 +475,42 @@ RowLayout {
                     }
                 }
             }
-            PlasmaComponents3.Label {
-                id: stateLabel
-                opacity: row.buttonsShown ? 0 : 1
-                Behavior on opacity {
-                    NumberAnimation { duration: Kirigami.Units.shortDuration }
-                }
-                // (as wide as it was at its widest for this chat: "Working · 12m"
-                // turning "Idle · 0m", or the next minute, doesn't move its tags)
-                property real widest: 0
-                textFormat: Text.PlainText
-                text: root.stateText(row.session)
-                color: row.session.state === "waiting" ? Kirigami.Theme.neutralTextColor
-                     : row.stopped && !row.stopped.over ? Kirigami.Theme.negativeTextColor
-                     : row.stopped ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.textColor
-                font.bold: row.session.state === "waiting" || !!row.stopped
-                elide: Text.ElideRight
-                onImplicitWidthChanged: widest = Math.max(widest, implicitWidth)
-                Layout.preferredWidth: Math.max(implicitWidth, widest)
+            // Its state, at the line's end; the hover buttons cover its end
+            // (it stays where it is, as in the VS Code extension)
+            Item {
+                id: stateBox
+                Layout.preferredWidth: Math.max(stateLabel.implicitWidth, stateLabel.widest)
                 Layout.maximumWidth: Kirigami.Units.gridUnit * 11
                 Layout.alignment: Qt.AlignTop
+                implicitHeight: stateLabel.implicitHeight
 
-                PlasmaCore.ToolTipArea {
-                    textFormat: Text.PlainText
-                    anchors.fill: parent
-                    active: !!row.stopped && !row.stopped.over && row.stopped.resetsAt > root.now
-                    mainText: active ? root.resetAtText(row.stopped.resetsAt) : ""
+                Item {
+                    width: Math.max(0, stateBox.width - (row.buttonsShown ? rowButtons.width + Kirigami.Units.smallSpacing : 0))
+                    height: parent.height
+                    clip: true
+
+                    PlasmaComponents3.Label {
+                        id: stateLabel
+                        // (as wide as it was at its widest for this chat: "Working · 12m"
+                        // turning "Idle · 0m", or the next minute, doesn't move its tags)
+                        property real widest: 0
+                        width: stateBox.width
+                        textFormat: Text.PlainText
+                        text: root.stateText(row.session)
+                        color: row.session.state === "waiting" ? Kirigami.Theme.neutralTextColor
+                             : row.stopped && !row.stopped.over ? Kirigami.Theme.negativeTextColor
+                             : row.stopped ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.textColor
+                        font.bold: row.session.state === "waiting" || !!row.stopped
+                        elide: Text.ElideRight
+                        onImplicitWidthChanged: widest = Math.max(widest, implicitWidth)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            active: !!row.stopped && !row.stopped.over && row.stopped.resetsAt > root.now
+                            mainText: active ? root.resetAtText(row.stopped.resetsAt) : ""
+                        }
+                    }
                 }
             }
             // The buttons it shows on hover (and while it asks whether to
@@ -514,12 +524,16 @@ RowLayout {
                 implicitHeight: nameLabel.implicitHeight
                 z: 1
 
+                // (more buttons than its state is wide: the popup's ground under
+                // the ones over its name or tags, so they don't sit on the words)
                 Rectangle {
-                    anchors.fill: rowButtons
+                    anchors.left: rowButtons.left
+                    anchors.top: rowButtons.top
+                    anchors.bottom: rowButtons.bottom
                     anchors.leftMargin: -Kirigami.Units.smallSpacing
-                    visible: rowButtons.visible
+                    width: Math.max(0, rowButtons.width - stateBox.width + Kirigami.Units.smallSpacing)
+                    visible: rowButtons.visible && width > Kirigami.Units.smallSpacing
                     opacity: rowButtons.opacity
-                    radius: Kirigami.Units.cornerRadius
                     color: Kirigami.Theme.backgroundColor
                 }
                 RowLayout {
@@ -867,7 +881,7 @@ RowLayout {
                 // it keeps going: after each usage limit, on by itself (click: not any more)
                 Tag {
                     visible: row.kept !== null
-                    text: i18nc("a chat that goes on by itself after usage limits", "↻ keeps going")
+                    text: i18nc("a chat that goes on by itself after usage limits", "↻ Keeps going")
                     active: row.kept !== null && !row.kept.error
                     warning: row.kept !== null && (!!row.kept.error || !!row.kept.note)
                     clickable: true

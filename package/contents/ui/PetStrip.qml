@@ -415,6 +415,12 @@ Item {
                 opacity: 0.7
             }
         }
+
+        // What the working chats do right now, one at a time
+        Ticker {
+            Layout.fillWidth: true
+            items: strip.hero ? root.tickerItems : []
+        }
     }
 
     // ------------------------------------------------------------ the pets

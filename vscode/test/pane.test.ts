@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { ChatPanes } from "../src/chatPane";
 import { demoState } from "../src/shared/demo";
 import { chatRefOf } from "../src/shared/model";
-import { answersOf, chatWhere, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, WHERE, withoutPicture } from "../src/shared/pane";
+import { answersOf, chatWhere, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, whereTag, withoutPicture } from "../src/shared/pane";
 import type { ViewState } from "../src/shared/types";
 import { ViewHost } from "../src/view";
 import { clipboardWrites, overrides, recorded } from "./vscode-stub";
@@ -114,7 +114,7 @@ test("a long reply goes to pane.py in a file of its own, removed after", async (
   assert.deepEqual(await p.send(chatRefOf(row), "a".repeat(100001), "auto", false), { ok: false, message: "That message is too long" });
 });
 
-test("a reply goes to pane.py --send; copy goes to the clipboard and opens the chat; a Claude Code tab gets its link", async () => {
+test("a reply goes to pane.py --send; copy goes to the clipboard and opens the chat; a Claude Code panel gets its link", async () => {
   const state = demoState(NOW);
   const row = state.status!.groups.flatMap((g) => g.sessions)[0];
   const { p, calls, opened } = panes(state);
@@ -207,8 +207,8 @@ test("a chat waiting for a permission is told with its question, once more when 
 });
 
 test("the tests badge, a queued reply and how a reply goes", () => {
-  assert.equal(testsText({ editedAt: 1, tests: null })!.text, "not tested");
-  assert.equal(testsText({ editedAt: 1, tests: { command: "npm test", ok: true, at: 2 } })!.text, "tests ✓");
+  assert.equal(testsText({ editedAt: 1, tests: null })!.text, "Not tested");
+  assert.equal(testsText({ editedAt: 1, tests: { command: "npm test", ok: true, at: 2 } })!.text, "Tests ✓");
   assert.equal(testsText({ editedAt: 1, tests: { command: "npm test", ok: false, at: 2 } })!.ok, false);
   assert.equal(testsText(null), null);
   const status = { ...demoState(NOW).status!, queue: [{ id: "q1", afterTurn: true, chat: "c1", host: "" } as never] };
@@ -218,18 +218,18 @@ test("the tests badge, a queued reply and how a reply goes", () => {
   assert.match(routeHint("tmux", true, "interactive", "gpu"), /tmux pane\. \(on gpu\)/);
 });
 
-test("the tag under a chat's name says where it runs, and the Terminal tab what it can show", () => {
+test("the tag under a chat's name says where it runs", () => {
   const s = { pid: 7, kind: "interactive", entrypoint: "cli", tmux: false, vscodeTerminal: null };
   assert.equal(chatWhere(undefined, false), "closed");
   assert.equal(chatWhere({ ...s, pid: null }, false), "closed");
   assert.equal(chatWhere({ ...s, kind: "bg" }, false), "background");
   assert.equal(chatWhere({ ...s, entrypoint: "claude-vscode" }, false), "claude");
-  assert.equal(chatWhere({ ...s, tmux: true, vscodeTerminal: 41 }, false), "tmux");    // (tmux in a VS Code terminal: its pane can be read)
+  assert.equal(chatWhere({ ...s, tmux: true, vscodeTerminal: 41 }, false), "tmux");    // (tmux in a VS Code terminal)
   assert.equal(chatWhere({ ...s, vscodeTerminal: 41 }, false), "vscode");
   assert.equal(chatWhere(s, true), "vscode");                                          // (one of this window's terminals)
   assert.equal(chatWhere(s, false), "terminal");
-  // a screen shows for a background session and a tmux pane; the others say why not
-  for (const [where, info] of Object.entries(WHERE)) assert.equal(info.noScreen === "", where === "background" || where === "tmux", where);
+  assert.equal(whereTag("claude").tag, "Claude Code panel");
+  assert.equal(whereTag("terminal", "Konsole").title, "It runs in a terminal (Konsole).");
 });
 
 test("every file a page loads from dist/ is packaged (.vscodeignore names each one)", async () => {

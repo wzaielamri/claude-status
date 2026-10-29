@@ -1,6 +1,6 @@
 # Troubleshooting
 
-- **"No plan usage yet":** plan usage comes from the status line, so it shows up after the next reply in a session of that account (in VS Code's Claude panel, which runs no status line, Talpy Den asks Claude Code for it while the chat works). If it never does, check that `jq` is installed and that the snippet is in your status-line script (`./install.sh` adds it). Saved snapshots are in `~/.cache/talpy-den/statusline/`.
+- **"No plan usage yet":** plan usage comes from the status line, so it shows up after the next reply in a session of that account (in VS Code's Claude Code panel, which runs no status line, Talpy Den asks Claude Code for it while the chat works). If it never does, check that `jq` is installed and that the snippet is in your status-line script (`./install.sh` adds it). Saved snapshots are in `~/.cache/talpy-den/statusline/`.
 - **Talpy Den isn't in the widget list:** it needs Plasma 6. Check that it's installed: `kpackagetool6 -t Plasma/Applet --list | grep claude`.
 - **The old version is still showing after an update:** `systemctl --user restart plasma-plasmashell`.
 - **"Can't find the claude command":** the widget looks on PATH, in the usual install folders and on your login shell's PATH. If Claude is somewhere else, add its folder to PATH in `~/.profile` (not only `~/.bashrc`) and log in again.
@@ -13,7 +13,7 @@ Issues and ideas are welcome on the [issue tracker](https://github.com/wzaielamr
 ## Limitations
 
 - `sessions/*.json` is an internal Claude Code format and may change in a future version. The backend fails soft: the widget shows the error instead of breaking.
-- Plan usage only refreshes when a terminal session of that account gets a reply (that's when the status line runs), when Claude Code fetches it itself (`/usage`), or, while a chat of that account works with numbers more than 5 minutes old (VS Code's Claude panel), when Talpy Den has Claude Code fetch it (at most every 5 minutes, or what *Fetch plan usage older than* says). The popup shows how old the numbers are and treats windows whose reset time has passed as reset.
+- Plan usage only refreshes when a terminal session of that account gets a reply (that's when the status line runs), when Claude Code fetches it itself (`/usage`), or, while a chat of that account works with numbers more than 5 minutes old (VS Code's Claude Code panel), when Talpy Den has Claude Code fetch it (at most every 5 minutes, or what *Fetch plan usage older than* says). The popup shows how old the numbers are and treats windows whose reset time has passed as reset.
 - Token totals cover each machine's own transcripts (an SSH host shows its own). Plan limits are account-wide.
 - An SSH host's terminal sessions can't be brought to your screen; the widget shows them and opens background sessions and finished chats in a new terminal.
 - Jumping to the right tab is built for KDE Plasma (KWin) with Konsole. In other terminals the window is raised but the tab isn't selected.

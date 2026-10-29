@@ -81,10 +81,10 @@ export function isBackground(s: Session): boolean {
   return s.kind === "bg" || s.kind === "job";
 }
 
-// inCode: a chat no Claude has open reopens in a Claude Code tab (the switch
+// inCode: a chat no Claude has open reopens in a Claude Code panel (the switch
 // of Recent chats)
 export function openHint(s: Session, host?: string, inCode = false): string {
-  if (s.kind === "chat" && inCode) return host ? `Reopen this chat in a Claude Code tab (VS Code connected to ${host})` : "Reopen this chat in a Claude Code tab";
+  if (s.kind === "chat" && inCode) return host ? `Reopen this chat in a Claude Code panel (VS Code connected to ${host})` : "Reopen this chat in a Claude Code panel";
   if (host) {
     if (s.entrypoint === "claude-vscode" && !s.openCommand) return `Show this conversation in VS Code (connected to ${host})`;
     if (!s.openCommand) return `Switch to the terminal with the ssh session to ${host}`;

@@ -129,54 +129,24 @@ class CompleteTests(PaneFixture):
         self.assertEqual(sorted(got["files"]), [".gitignore", "lib/util.py"])
 
 
-class ScreenTests(PaneFixture):
-    """A background session's screen (pane.py --logs: claude logs, played into a grid)."""
-
-    def test_a_tui_stream_becomes_the_lines_it_shows(self):
-        e = "\x1b"
-        stream = (f"{e}7{e}8{e}[2J{e}[H{e}[H\r{e}[1B{e}[38;2;215;119;87m Claude Code{e}[39m\r{e}[1BHaiku"
-                  f"\r{e}[3B{e}[48;2;55;55;55m> count to 3{e}[49m\r{e}[37B· Thinking…\r{e}[1B status line"
-                  f"{e}[50;1H{e}[H\r{e}[8B● 1\r{e}[2C{e}[1B2\r{e}[2C{e}[1B3"
-                  f"{e}[H\r{e}[42B{e}[K{e}]0;title\x07✻ Done{e}[1G✻")
-        lines = pane.screen_of(stream)
-        self.assertEqual(lines[:8], [" Claude Code", "Haiku", "", "> count to 3", "", "● 1", "  2", "  3"])
-        self.assertIn("✻ Done", lines)          # (the spinner line erased, then written again)
-        self.assertNotIn("· Thinking…", lines)
-        self.assertNotIn("title", "".join(lines))  # (a window title isn't on the screen)
-        self.assertEqual(lines[-1], " status line")
-        self.assertFalse(any(a == b == "" for a, b in zip(lines, lines[1:])))   # (one empty line, at most)
-
-    def test_only_a_running_service_is_asked(self):
-        job = self.home / ".claude-work/jobs/0a1b2c3d/state.json"
-        write(job, {"state": "running"})
-        self.assertEqual(pane.job_screen(self.home, [], "0a1b2c3d"),
-                         {"ok": False, "message": "Its background service isn't running: it shows nothing now"})
-        self.assertEqual(pane.job_screen(self.home, [], "../x")["message"], "Not a background session: ../x")
-        self.assertEqual(pane.job_screen(self.home, [], "ffffffff")["message"], "That background session isn't there any more")
-
-    def test_a_tmux_chat_shows_its_pane_with_the_end_of_its_scrollback(self):
-        e = "\x1b"
-        captured = "older output\n" * 299 + f"{e}[38;2;215;119;87m● Done{e}[39m\n> \n\n\n"
-        with mock.patch.object(pane.cs, "find_chat_entry", return_value={"tmux": "main:1.%3", "pid": 7}), \
-                mock.patch.object(pane, "tmux_base", return_value=(["tmux"], "%3")), \
-                mock.patch.object(pane, "tmux_run", return_value=(True, captured)) as run:
-            got = pane.chat_screen(self.home, [], SID)
-        self.assertEqual(run.call_args.args[1], ["capture-pane", "-p", "-e", "-S", "-300", "-t", "%3"])
-        self.assertTrue(got["ok"])
-        self.assertEqual(len(got["lines"]), 301)             # (every line: the grid doesn't scroll)
-        self.assertEqual(got["lines"][-2:], ["● Done", ">"])
-        self.assertEqual(got["styles"][got["runs"][-2][0][1]]["fg"], "#d77757")
-
-    def test_a_chat_outside_tmux_has_no_screen_here(self):
-        with mock.patch.object(pane.cs, "find_chat_entry", return_value=None):
-            self.assertEqual(pane.chat_screen(self.home, [], SID), {"ok": False, "message": "That chat isn't running any more"})
-        with mock.patch.object(pane.cs, "find_chat_entry", return_value={"pid": 7}), \
-                mock.patch.object(pane, "tmux_base", return_value=(None, None)):
-            self.assertEqual(pane.chat_screen(self.home, [], SID)["message"],
-                             "It doesn't run in tmux: its screen can't be read from here")
-
-
 class ConversationTests(PaneFixture):
+    def test_thinking_shown_as_updates_is_a_reply(self):
+        # (Claude Code shows a thinking block's text as a reply when thinking is
+        # shown as updates; thinking it keeps to itself has no text)
+        t = self.now - 100
+
+        def thinking(text, ts, display="updates"):
+            return {"type": "assistant", "timestamp": iso(ts), "thinkingDisplay": display,
+                    "message": {"id": "m1", "role": "assistant", "content": [{"type": "thinking", "thinking": text, "signature": "x"}]}}
+        self.chat(prompt("tidy the tags", t, cwd=str(self.folder)),
+                  thinking("", t + 1),
+                  thinking("Making every tag start with a capital.", t + 2),
+                  tool_use("t1", "Bash", {"command": "ls"}, t + 3, "m1"),
+                  thinking("A thought of its own.", t + 4, display=None))
+        items, _ = pane.conversation(self.transcript)
+        self.assertEqual([(i["kind"], i.get("text") or i.get("line")) for i in items],
+                         [("you", "tidy the tags"), ("claude", "Making every tag start with a capital."), ("tool", "Bash: ls")])
+
     def test_items(self):
         t = self.now - 100
         a = str(self.folder / "a.py")
@@ -1609,23 +1579,3 @@ console.log(JSON.stringify({ diff: at(H.diffHtml(lines, 'a.py', guess, 0)), diff
         self.assertEqual(r["listing"], [21, 21])
 
 
-class ScreenColorTests(unittest.TestCase):
-    def test_colors_and_rows_drawn_in_part(self):
-        e = "\x1b"
-        stream = (f"{e}[H\r{e}[38;2;80;200;80m●{e}[39m {e}[1mBash{e}[22m(ls)"
-                  f"\r{e}[1B{e}[48;2;2;40;0m 12 +x{e}[K{e}[49m"
-                  f"\r{e}[1B{e}[7mon{e}[27m {e}[2mdim{e}[22m {e}[31mred{e}[39m"
-                  f"{e}[5;30H91{e}[5;40H8"                       # (numbers redrawn in place, the words around them never drawn)
-                  f"{e}[6;20HYou've used 91% of your limit"           # (a note drawn mid-row: words, it stays)
-                  f"\r{e}[1Bx")
-        view = pane.screen_view(stream)
-        self.assertEqual(view["lines"][:3], ["● Bash(ls)", " 12 +x" + " " * 194, "on dim red"])
-        self.assertFalse([l for l in view["lines"] if l.strip() and re.fullmatch(r"[\d\s]+", l)])
-        self.assertIn("You've used 91% of your limit", view["lines"][-2])
-        self.assertEqual(view["lines"][-1], " x")          # (a Nerd Font glyph: a space, its colors kept)
-        style = lambda row, k: view["styles"][view["runs"][row][k][1]]
-        self.assertEqual((style(0, 0)["fg"], style(0, 2)["b"]), ("#50c850", True))
-        self.assertEqual(style(1, 0)["bg"], "#022800")    # (erased in the background color: the diff line's bar)
-        self.assertTrue(style(2, 0)["inv"])
-        self.assertTrue(style(2, 2)["d"])
-        self.assertEqual(style(2, 4)["fg"], "#cd3131")

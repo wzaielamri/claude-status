@@ -539,6 +539,7 @@ def make_session(profile, home, *, sid, pid, name, cwd, kind, entrypoint, state,
         "agents": None,
         "shared": None,
         "tmux": False,  # runs in a tmux pane: it can be interrupted (Esc)
+        "terminalApp": None,  # the terminal it runs in otherwise, by name (Konsole, kitty…): terminal_name
         "peek": None,  # what it's doing, your last prompt, Claude's last reply (chat_peek)
         "changes": None,  # the files it changed: {"count", "files"} (ChatCache.changes)
         "tasks": None,  # its task list: {"done", "total", "current", "items"} (task_progress)
@@ -665,6 +666,8 @@ def live_row(entry, profile, holder, home, ctx):
         since=number(entry.get("statusUpdatedAt")) or number(entry.get("startedAt")),
         started_at=number(entry.get("startedAt")))
     row["tmux"] = isinstance(entry.get("tmux"), str) and bool(entry["tmux"])
+    if not row["tmux"] and row["entrypoint"] != "claude-vscode" and row["kind"] != "bg":
+        row["terminalApp"] = terminal_name(row["pid"]) or None
     return finish_row(row, job, job_id, profile, ctx, alive=True)
 
 
@@ -3829,12 +3832,12 @@ def kept_step(k, turn, row, queued, limits, now_ms):
     if row is not None and row.get("state") in ("working", "waiting"):
         return None  # at work, or waiting for you
     live = row is not None and row.get("pid") is not None
-    # (open in a Claude Code tab, or in a session it was resumed in: ending that isn't up to the widget)
+    # (open in a Claude Code panel, or in a session it was resumed in: ending that isn't up to the widget)
     in_tab = live and (row.get("entrypoint") == "claude-vscode" or row.get("sessionId") != row.get("chatId"))
 
     def go(start, why="", prompt=""):
         if in_tab:
-            k["note"] = "It's open in a Claude Code tab: it can't go on by itself while that's open"
+            k["note"] = "It's open in a Claude Code panel: it can't go on by itself while that's open"
             return None
         return "go on", int(start), why, prompt
 
@@ -5364,6 +5367,48 @@ def vscode_terminal(pid):
         seen.add(pid)
         child, pid = pid, parent_pid(pid)
     return None
+
+
+# The terminal a chat runs in, by name (the chat pane's tag says it): its
+# process name (the first 15 characters) -> its name
+TERMINAL_NAMES = {
+    "konsole": "Konsole", "yakuake": "Yakuake", "kitty": "kitty", "wezterm-gui": "WezTerm", "wezterm-mux-ser": "WezTerm",
+    "gnome-terminal-": "GNOME Terminal", "ptyxis-agent": "Ptyxis", "ptyxis": "Ptyxis", "kgx": "Console",
+    "alacritty": "Alacritty", "foot": "foot", "footclient": "foot", "ghostty": "Ghostty", "xterm": "xterm",
+    "uxterm": "xterm", "urxvt": "urxvt", "urxvtd": "urxvt", "rxvt": "rxvt", "st": "st", "tilix": "Tilix",
+    "terminator": "Terminator", "xfce4-terminal": "Xfce Terminal", "mate-terminal": "MATE Terminal",
+    "lxterminal": "LXTerminal", "qterminal": "QTerminal", "terminology": "Terminology", "deepin-terminal": "Deepin Terminal",
+    "cool-retro-term": "Cool Retro Term", "tabby": "Tabby", "hyper": "Hyper", "rio": "Rio", "contour": "Contour",
+    "warp": "Warp", "blackbox": "Black Box", "screen": "GNU screen", "zellij": "Zellij",
+}
+
+
+def process_name(pid):
+    try:
+        with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def terminal_name(pid):
+    """The name of the terminal pid runs in (Konsole, kitty, GNOME Terminal…),
+    from the processes it runs under, or "": none known (tmux, a VS Code
+    terminal, over SSH, a service)."""
+    child, seen = None, set()
+    while isinstance(pid, int) and pid > 1 and pid not in seen and len(seen) < 64:
+        if child is not None and is_vscode_terminal_host(pid):
+            return ""
+        comm = process_name(pid)
+        if not comm:
+            return ""
+        if comm.startswith("tmux") or comm in ("sshd", "sshd-session"):
+            return ""
+        if child is not None and comm in TERMINAL_NAMES:
+            return TERMINAL_NAMES[comm]
+        seen.add(pid)
+        child, pid = pid, parent_pid(pid)
+    return ""
 
 
 def interrupt_chat(entry):
@@ -7041,7 +7086,7 @@ def set_vscode_user_config_dir(home, value):
     """Have VS Code's Claude on this computer run with CLAUDE_CONFIG_DIR=value
     (None: without it) from now on, in VS Code's user settings: (ok,
     message). The Claude extension starts new chats with it; a window's
-    Claude panel follows once the window reloads."""
+    Claude Code panel follows once the window reloads."""
     command, folder = vscode_app()
     if command is None:
         return False, "VS Code isn't installed"

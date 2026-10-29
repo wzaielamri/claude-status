@@ -20,17 +20,30 @@
   camera for the two that were the text buttons *+* and *Screenshot…*;
   while dictation records or writes it down, what it's doing shows beside
   the microphone.
-- **The chat tab has four tabs: Chat, Steps, Terminal, Review:** **Chat**
-  shows only your messages and Claude's replies (and what needs you: a
-  permission, a question, a plan), with what it's doing on the working
-  line; **Steps** is what the Chat tab was, every tool call too.
-  **Terminal** is always there: a background session's screen as before
-  (it was the **Output** tab, shown only for those), now also a tmux
-  chat's pane with what scrolled by above it; for a chat elsewhere it
-  says why there's no screen and offers **Open its window**.
-- **A tag under a chat's name says where it runs:** *background*, *not
-  open*, *tmux*, *terminal*, *VS Code terminal* or *Claude Code tab*,
-  next to its folder in the chat tab.
+- **The chat tab's Chat tab is your messages and Claude's replies, and a
+  Steps tab has the rest:** **Chat** shows only what you and Claude say
+  (and what needs you: a permission, a question, a plan), with what it's
+  doing on the working line; **Steps** is what the Chat tab was, every tool
+  call too. The **Output** tab of a background session is gone: **Open its
+  window** shows any chat where it runs.
+- **A tag under a chat's name says where it runs:** *Background*, *Not
+  open*, *Tmux*, *Terminal* (its tooltip names the terminal: Konsole,
+  kitty…), *VS Code terminal* or *Claude Code panel*, next to its folder
+  in the chat tab.
+- **The same words everywhere:** a chat in the Claude Code extension is in
+  its *Claude Code panel*, as in the widget (it was *Claude Code tab* here,
+  *VS Code* on its row), the switch for reopened chats too, and every tag
+  starts with a capital: *Auto mode*, *To review*, *Not tested*,
+  *Background*, *Default*…
+- **What Claude tells you as it works shows in the chat tab:** with Claude
+  Code showing thinking as updates, those words are kept as thinking in
+  the transcript, and the tab left them out, in Chat and in Steps.
+- **A chat that hasn't started yet says so:** its tab said *That chat's
+  transcript isn't there any more*, in red; it says *This chat hasn't
+  started yet, or it isn't there any more* now, as a note.
+- **The ticker is in the big Talpy's box:** what the working chats do right
+  now is the box's last line, under the counts, as in the widget; it was a
+  line under the box.
 - **Pets wait for one that leaves:** when a chat left the list, the pets
   beside it tunnelled over to their new spots at once, onto the one still
   waving and digging away, and a chat that got a pet's place dug up where

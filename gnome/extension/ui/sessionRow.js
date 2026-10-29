@@ -55,16 +55,16 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
 
     if (showProfile)
         tags.push(tips.add(tag(s.profile), 'The Claude profile (config folder) this session runs in'));
-    const kindTag = s.entrypoint === 'claude-vscode' ? 'VS Code' : s.kind === 'bg' ? 'background' : '';
+    const kindTag = s.entrypoint === 'claude-vscode' ? 'Claude Code panel' : s.kind === 'bg' ? 'Background' : '';
     if (kindTag) {
         tags.push(tips.add(tag(kindTag), s.entrypoint === 'claude-vscode'
-            ? "Runs in VS Code's Claude panel. Click the name to open the conversation there."
+            ? "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."
             : "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."));
     }
     if (s.shared)
-        tags.push(tips.add(tag(s.shared.forkOf ? '⇄ shared copy' : '⇄ shared'), () => sharedTooltip(s)));
+        tags.push(tips.add(tag(s.shared.forkOf ? '⇄ Shared copy' : '⇄ Shared'), () => sharedTooltip(s)));
     if (agents) {
-        const t = tag(L.fmt('agents %1/%2', agents.done, agents.total), agents.running > 0);
+        const t = tag(L.fmt('Agents %1/%2', agents.done, agents.total), agents.running > 0);
         t.add_style_class_name('claude-clickable');
         t.connect('button-release-event', () => {
             ctx.toggleAgents(rowKey);
@@ -76,7 +76,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     }
     if (tasks) {
         // its task list (TaskCreate), done/total; outlined while it's on one
-        const t = tag(L.fmt('tasks %1/%2', tasks.done, tasks.total), tasks.items.some(i => i.status === 'in_progress'));
+        const t = tag(L.fmt('Tasks %1/%2', tasks.done, tasks.total), tasks.items.some(i => i.status === 'in_progress'));
         t.add_style_class_name('claude-clickable');
         t.connect('button-release-event', () => {
             ctx.togglePeek(rowKey);

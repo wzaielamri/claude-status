@@ -421,10 +421,10 @@
           ],
           "enumDescriptions": [
             "Reopen chats that aren't running in a terminal (claude --resume), as `#talpyDen.openIn#` says.",
-            "Reopen chats that aren't running in a Claude Code tab, in the VS Code window that has the chat's folder (on an SSH host's chats: connected to it)."
+            "Reopen chats that aren't running in a Claude Code panel, in the VS Code window that has the chat's folder (on an SSH host's chats: connected to it)."
           ],
           "default": "terminal",
-          "markdownDescription": "Where chats that aren't running reopen: the **Terminal | Claude Code tab** switch above Recent chats. It holds for those, a chat's tab (**Open its window**), its row and Find a Chat. Without a `claude` command they reopen in Claude Code.",
+          "markdownDescription": "Where chats that aren't running reopen: the **Terminal | Claude Code panel** switch above Recent chats. It holds for those, a chat's tab (**Open its window**), its row and Find a Chat. Without a `claude` command they reopen in Claude Code.",
           "order": 7
         },
         "talpyDen.notifyWaiting": {
@@ -540,7 +540,7 @@
           "default": 0,
           "minimum": 0,
           "maximum": 100,
-          "markdownDescription": "A usage cap, in percent (0 = none): once one of an account's plan windows (5 hours, a week) reaches it, the account's chats at work on this computer are stopped, once in that window (in tmux and in a Claude Code tab the turn is interrupted, the chat stays open). Queued tasks wait until the window resets, and chats that keep going go on then. Chats you start or answer yourself afterwards aren't stopped again.",
+          "markdownDescription": "A usage cap, in percent (0 = none): once one of an account's plan windows (5 hours, a week) reaches it, the account's chats at work on this computer are stopped, once in that window (in tmux and in a Claude Code panel the turn is interrupted, the chat stays open). Queued tasks wait until the window resets, and chats that keep going go on then. Chats you start or answer yourself afterwards aren't stopped again.",
           "order": 31
         },
         "talpyDen.usageRefreshMinutes": {
@@ -568,7 +568,7 @@
             "Claude's default"
           ],
           "default": "opus",
-          "markdownDescription": "The model new chats in a terminal or in the background start with (`claude --model`; **New Chat…** changes it). Not for a Claude Code tab: that has its own model setting.",
+          "markdownDescription": "The model new chats in a terminal or in the background start with (`claude --model`; **New Chat…** changes it). Not for a Claude Code panel: that has its own model setting.",
           "order": 32
         },
         "talpyDen.newChatEffort": {

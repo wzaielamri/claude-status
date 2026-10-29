@@ -9,7 +9,7 @@ import { useStore } from "./store";
 import { hostVisible, pageVisible } from "./stores";
 
 // A pet (its name tag, the hero's headline) goes to the chat's own window, its
-// terminal or Claude Code tab; only a click on the chat's name opens its tab
+// terminal or Claude Code panel; only a click on the chat's name opens its tab
 // here (as on Plasma)
 export const stageCallbacks: StageCallbacks = {
   open(chat: ChatRef) {
@@ -30,11 +30,13 @@ export function petFields(key: string, value: unknown): unknown {
   return [s.key, s.chatId, s.sessionId, s.state, s.reason, s.name, s.since, s.context, s.agents?.running ?? 0, s.openCommand ?? "", stopped];
 }
 
-// `active`: the stage is open (an account's stage folds away without chats)
+// `active`: the stage is open (an account's stage folds away without chats);
+// `made`: told of the stage once it's there (null once it's gone)
 export function usePetStage(
   create: (el: HTMLElement) => PetStage,
   input: HeroInput | AccountInput,
   active: boolean,
+  made?: (stage: PetStage | null) => void,
 ) {
   const ref = useRef<HTMLDivElement>(null);
   const stage = useRef<PetStage | null>(null);
@@ -48,6 +50,7 @@ export function usePetStage(
     const el = ref.current;
     if (!el) return;
     stage.current = create(el);
+    made?.(stage.current);
     lastInput.current = "";
     const io = new IntersectionObserver((entries) => setOnScreen(entries[entries.length - 1].isIntersecting));
     io.observe(el);
@@ -55,6 +58,7 @@ export function usePetStage(
       io.disconnect();
       stage.current?.destroy();
       stage.current = null;
+      made?.(null);
     };
   }, []);
 

@@ -139,7 +139,7 @@ export interface KeptChat {
   since: number;
   wentOnAt: number | null; // when it last went on by itself
   tries: number; // how often it went on again after a go-on that didn't take, or a turn that broke off
-  note: string; // why it can't go on right now (open in a Claude Code tab, its login expired)
+  note: string; // why it can't go on right now (open in a Claude Code panel, its login expired)
   error: string; // it gave up: why
 }
 
@@ -239,6 +239,7 @@ export interface Session {
   // --remote: the process of the VS Code terminal it runs in (that terminal's
   // processId, on the machine the session is on), if it does
   vscodeTerminal?: number | null;
+  terminalApp?: string | null; // the terminal it runs in otherwise, by name (Konsole, kitty…)
   // How it takes a message from the chat tab (talpy_den.py: reply_route);
   // older backends leave these out
   reply?: ReplyRoute;
@@ -247,7 +248,7 @@ export interface Session {
   live?: LiveView | null; // what it does now, step by step (live mode)
 }
 
-// "tmux": typed into its pane; "vscode": its Claude Code tab's input;
+// "tmux": typed into its pane; "vscode": its Claude Code panel's input;
 // "background": claude --bg --resume (no process, or a background session);
 // "terminal": a terminal that takes no text from outside
 export type ReplyRoute = "tmux" | "vscode" | "background" | "terminal";
@@ -867,10 +868,10 @@ export type WebviewMessage =
   | { type: "shareCard"; how: "save" | "copy"; name: string; png: string } // the Recap's card (base64 PNG)
   | { type: "open"; chat: ChatRef }
   | { type: "openPane"; chat: ChatRef; tab?: "chat" | "review" } // the chat's tab: its conversation, a reply box, its review
-  | { type: "openWindow"; chat: ChatRef } // its own terminal or Claude Code tab, whatever a click does
+  | { type: "openWindow"; chat: ChatRef } // its own terminal or Claude Code panel, whatever a click does
   | { type: "answerPermission"; chat: ChatRef; decision: Decision; note?: string; answers?: Answers; shown: AskShown | null } // what a waiting chat asks (shown: the prompt you answer)
   | { type: "openInClaudeCode"; chat: ChatRef }
-  | { type: "moveToClaudeCode"; chat: ChatRef } // a chat in a terminal: Claude quits there, the chat reopens in a Claude Code tab
+  | { type: "moveToClaudeCode"; chat: ChatRef } // a chat in a terminal: Claude quits there, the chat reopens in a Claude Code panel
   | { type: "setReopenIn"; where: ReopenIn }
   | { type: "stop"; chat: ChatRef }
   | { type: "dismiss"; chat: ChatRef }

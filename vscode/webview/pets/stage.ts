@@ -84,6 +84,7 @@ export class Stage implements PetStage, Animator {
   private readonly headlineEl: HTMLDivElement | null = null;
   private readonly countsEl: HTMLDivElement | null = null;
   private readonly textEl: HTMLDivElement | null = null;
+  private readonly tickerEl: HTMLDivElement | null = null;
   private readonly cb: StageCallbacks;
 
   // Each Talpy is drawn in a 64-unit box on a canvas with room around it
@@ -176,6 +177,8 @@ export class Stage implements PetStage, Animator {
         }
       });
       this.countsEl = el("div", "cs-hero-counts", this.textEl);
+      // what the working chats do right now: the UI puts its ticker here
+      this.tickerEl = el("div", "cs-hero-ticker", this.textEl);
     } else {
       // An account's floor; the stage itself is barely there, just a place to stand
       this.floorEl = el("div", "cs-stage-floor", this.root);
@@ -229,6 +232,10 @@ export class Stage implements PetStage, Animator {
   setLive(live: boolean): void {
     this.wantLive = live;
     this.applyLive();
+  }
+
+  tickerSlot(): HTMLElement | null {
+    return this.tickerEl;
   }
 
   destroy(): void {

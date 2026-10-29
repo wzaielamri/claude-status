@@ -2,7 +2,6 @@
 // chat, its conversation, and its review when the page asks for it.
 
 import "../webview/chat";
-import demoScreen from "./demoScreen.json";
 import type { PaneChat, PaneHostMessage, PaneItem, ReviewAnswer } from "../src/shared/pane";
 
 const params = new URLSearchParams(location.search);
@@ -54,9 +53,9 @@ const chat: PaneChat = {
   reviewPending: false,
   review: { editedAt: now - 60_000, tests: { command: "npm test -- parser", ok: true, at: now - 30_000 } },
   queued: params.get("queued") === "1" ? { id: "q1", prompt: "Then update the changelog.", error: "" } : null,
-  jobId: params.get("output") === "1" ? "c0ffee12" : undefined, // ?output=1: a background session (its screen in the Terminal tab)
-  // ?where=closed|claude|vscode|terminal: where it runs (else tmux, or a background session with ?output=1)
-  where: params.get("output") === "1" ? "background" : (params.get("where") as PaneChat["where"] | null) ?? (params.get("route") === "terminal" ? "terminal" : "tmux"),
+  // ?where=background|closed|claude|vscode|terminal: where it runs (else tmux)
+  where: (params.get("where") as PaneChat["where"] | null) ?? (params.get("route") === "terminal" ? "terminal" : "tmux"),
+  terminalApp: params.get("where") === "terminal" || params.get("route") === "terminal" ? "Konsole" : "",
 };
 
 const items: PaneItem[] = [
@@ -118,13 +117,11 @@ window.addEventListener("harness-post", (e: Event) => {
   if (m.type === "ready") {
     send({ type: "chat", chat });
     send({ type: "conversation", answer: { ok: true, items, more: true, stamp: "1" } });
-    const tab = params.get("tab") ?? (params.get("output") === "1" ? "terminal" : "");   // ?tab=steps|terminal
+    const tab = params.get("tab");   // ?tab=steps
     if (tab) send({ type: "result", kind: "tab:" + tab, ok: true, message: "" });
   } else if (m.type === "picture") {
     const id = (m as unknown as { id: string }).id;
     setTimeout(() => send({ type: "picture", id, path: `/home/alice/.cache/talpy-den/images/20261026-1015${id.slice(-2)}.png`, error: "" }), 200);
-  } else if (m.type === "logs") {
-    send({ type: "output", ...(demoScreen as { lines: string[] }), error: "" });
   } else if (m.type === "review") {
     send({ type: "review", answer: review, error: "" });
   } else if (m.type === "complete") {

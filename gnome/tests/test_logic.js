@@ -225,13 +225,13 @@ test('new chat folders', () => {
 
 test('new chat in VS Code: only on the account VS Code runs on', () => {
     const status = {vscode: {installed: true, on: 'work'}};
-    eq(L.vscodeHint({vscodeHere: true, title: 'work'}, '', status), 'Opens the folder in VS Code with a new chat in its Claude panel.');
+    eq(L.vscodeHint({vscodeHere: true, title: 'work'}, '', status), 'Opens the folder in VS Code with a new chat in its Claude Code panel.');
     eq(L.vscodeHint({vscodeHere: false, title: 'personal · Pro'}, '', status),
         "VS Code's Claude runs on work, not personal · Pro: switch its profile to use this account there.");
     eq(L.vscodeHint({vscodeHere: false, title: 'x'}, '', {vscode: {installed: true, on: null}}),
         "VS Code's Claude doesn't run on this account.");
-    eq(L.vscodeHint({vscodeHere: true}, 'lab', status), 'Opens VS Code connected to lab (Remote-SSH) with a new chat in its Claude panel.');
-    eq(L.vscodeHint({vscodeHere: true}, '', status, true), "Opens the chat's folder in VS Code, and the chat in its Claude panel.");
+    eq(L.vscodeHint({vscodeHere: true}, 'lab', status), 'Opens VS Code connected to lab (Remote-SSH) with a new chat in its Claude Code panel.');
+    eq(L.vscodeHint({vscodeHere: true}, '', status, true), "Opens the chat's folder in VS Code, and the chat in its Claude Code panel.");
     eq(L.vscodeHint({vscodeHere: true}, '', {vscode: {installed: false, on: null}}), "VS Code isn't installed on this computer.");
 });
 

@@ -229,7 +229,7 @@ export class Actions {
     this.report(answer, "Couldn't open the chat");
   }
 
-  // A recent chat, reopened in a Claude Code tab (the switch above the recent
+  // A recent chat, reopened in a Claude Code panel (the switch above the recent
   // chats). This window does it when it has the chat's folder open, on the
   // chat's machine and account; else VS Code opens that folder (the window
   // that has it, or a new one; a host's through Remote-SSH) and the chat
@@ -260,23 +260,23 @@ export class Actions {
     return canMoveToClaudeCode(chat, this.claudeCodeFor(chat));
   }
 
-  // A chat running in a terminal, moved to a Claude Code tab: Claude quits
+  // A chat running in a terminal, moved to a Claude Code panel: Claude quits
   // there as when you stop it (its terminal stays open), then the chat
-  // reopens in a Claude Code tab (openInClaudeCode). Asks first; a chat
+  // reopens in a Claude Code panel (openInClaudeCode). Asks first; a chat
   // that's working or waiting for you is stopped only once you say so, and
   // an idle one that got back to work since you asked isn't touched.
   async moveToClaudeCode(chat: ChatRef): Promise<void> {
     if (this.demoOnly()) return;
-    if (!this.canMoveToClaudeCode(chat)) return this.fail(`${chat.name} can't move to a Claude Code tab from here.`);
+    if (!this.canMoveToClaudeCode(chat)) return this.fail(`${chat.name} can't move to a Claude Code panel from here.`);
     const busy = hasTurn(chat);
     const detail =
       chat.state === "working"
-        ? "It's working right now, so it's stopped first: the current step is cut off and anything it was running stops. Then the chat reopens in a Claude Code tab, where you go on with it. Its terminal stays open."
+        ? "It's working right now, so it's stopped first: the current step is cut off and anything it was running stops. Then the chat reopens in a Claude Code panel, where you go on with it. Its terminal stays open."
         : chat.state === "waiting"
-          ? "It's waiting for you, so it's stopped first, without your answer. Then the chat reopens in a Claude Code tab, where you go on with it. Its terminal stays open."
-          : "Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code tab.";
+          ? "It's waiting for you, so it's stopped first, without your answer. Then the chat reopens in a Claude Code panel, where you go on with it. Its terminal stays open."
+          : "Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code panel.";
     const go = busy ? "Stop and Move" : "Move";
-    const choice = await vscode.window.showWarningMessage(`Move “${chat.name}” to a Claude Code tab?`, { modal: true, detail }, go);
+    const choice = await vscode.window.showWarningMessage(`Move “${chat.name}” to a Claude Code panel?`, { modal: true, detail }, go);
     if (choice !== go) return;
     const flags = busy ? ["--busy"] : [];
     const answer = chat.host
@@ -316,7 +316,7 @@ export class Actions {
 
   // A background session (`claude stop`), or a chat with a process of its
   // own. A working chat can be interrupted, as if Ctrl+C were pressed (what
-  // the stop button of the Claude Code tab does: the turn and its subagents
+  // the stop button of the Claude Code panel does: the turn and its subagents
   // stop, the chat stays), where that can be done: in a terminal of this
   // window (typed into it) or in tmux (the backend sends it to the pane; Esc
   // would leave background subagents running). Else, and when you choose to,
@@ -341,7 +341,7 @@ export class Actions {
     const detail = !chatProcess
       ? "It's interrupted; its conversation is kept, and `claude attach` resumes it."
       : interruptible
-        ? `Interrupt: like Ctrl+C in its ${terminal ? "terminal" : "tmux pane"}, or the stop button of a Claude Code tab; the current step and its subagents stop, and the chat stays open there.\n\nStop: Claude quits (the current step is cut off) and its terminal stays open; the chat is kept and shows under Recent chats.`
+        ? `Interrupt: like Ctrl+C in its ${terminal ? "terminal" : "tmux pane"}, or the stop button of a Claude Code panel; the current step and its subagents stop, and the chat stays open there.\n\nStop: Claude quits (the current step is cut off) and its terminal stays open; the chat is kept and shows under Recent chats.`
         : inTab
           ? chat.state === "working"
             ? "It's working right now: the current step is interrupted, as with the stop button in its tab, and anything it was running stops. The tab keeps the chat and goes on with your next message."
@@ -590,7 +590,7 @@ export class Actions {
   }
 
   // The chat that made a plan, to change the plan with Claude: its row's
-  // chat comes up, or it reopens (in a terminal or a Claude Code tab, as the
+  // chat comes up, or it reopens (in a terminal or a Claude Code panel, as the
   // switch of Recent chats says)
   async continuePlanChat(plan: PlanItem, group: Group): Promise<void> {
     if (this.demoOnly() || !plan.chatId) return;
@@ -795,7 +795,7 @@ export class Actions {
   }
 
   // A chat the search (or the Recap) found: its row's chat when it's listed,
-  // else reopened (in a terminal or a Claude Code tab, as the switch of Recent
+  // else reopened (in a terminal or a Claude Code panel, as the switch of Recent
   // chats says) with the command its account's recent or starred chats have
   // for it, or the one the search found, else as open() does without one
   private async openFound(found: FoundChat, host?: string): Promise<void> {
@@ -900,7 +900,7 @@ export class Actions {
     if (cli)
       items.push({
         label: `$(settings-gear) ${chatOptionsText(settings.newChatModel(), settings.newChatEffort(), settings.newChatMode())}`,
-        description: "the model, effort and permissions it starts with (not in a Claude Code tab): change…",
+        description: "the model, effort and permissions it starts with (not in a Claude Code panel): change…",
         start: "options",
       });
     if (cli) {

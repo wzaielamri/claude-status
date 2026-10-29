@@ -74,7 +74,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
   const petColor = pets.petColor(petKeyOf(s, host));
   const agents = s.agents;
   const showAgents = !!agents && !!ui.agents[rowKey];
-  const tag = s.entrypoint === "claude-vscode" ? "VS Code" : isBackground(s) ? "background" : "";
+  const tag = s.entrypoint === "claude-vscode" ? "Claude Code panel" : isBackground(s) ? "Background" : "";
   const line = peekLine(s, liveMatch(s, useLiveView(s.sessionId, !host && !!s.pid)));
   const canPeek = hasPeek(s);
   const showPeek = canPeek && !!ui.peek[rowKey];
@@ -138,15 +138,15 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
               text={tag}
               title={
                 s.entrypoint === "claude-vscode"
-                  ? "Runs in VS Code's Claude panel. Click the name to open the conversation there."
+                  ? "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."
                   : "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."
               }
             />
           ) : null}
-          {s.shared ? <Tag text={s.shared.forkOf ? "⇄ shared copy" : "⇄ shared"} title={sharedTagTitle(s)} /> : null}
+          {s.shared ? <Tag text={s.shared.forkOf ? "⇄ Shared copy" : "⇄ Shared"} title={sharedTagTitle(s)} /> : null}
           {agents ? (
             <Tag
-              text={`agents ${agents.done}/${agents.total}`}
+              text={`Agents ${agents.done}/${agents.total}`}
               active={agents.running > 0}
               pressed={showAgents}
               title={`Subagents: ${agents.done} done, ${agents.running} running, ${agents.stopped} stopped${agents.failed ? `, ${agents.failed} failed` : ""}. Click to ${showAgents ? "hide" : "show"} what each one is doing.`}
@@ -165,7 +165,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {s.overlaps?.length ? (
             <Tag
-              text="⚠ same files"
+              text="⚠ Same files"
               warning
               title={`${overlapText(s.overlaps)}\n\nTwo chats changing the same files can overwrite each other's work. Click to go to the other chat.`}
               onClick={() => post({ type: "openOverlap", chat })}
@@ -176,7 +176,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {s.plan ? (
             <Tag
-              text="plan ↗"
+              text="Plan ↗"
               title={`${s.plan.title}\nThe plan this chat made. Click to read it in the Markdown preview${host && host !== view.hosts.find((h) => h.current)?.name ? ` (a copy, fetched from ${host})` : " (its Open Source button edits it)"}.`}
               onClick={() => post({ type: "openPlan", chat })}
             />
@@ -190,7 +190,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {s.plan?.edited && !host ? (
             <Tag
-              text="↩ send to Claude"
+              text="↩ Send to Claude"
               active
               title={
                 "You changed this plan since Claude wrote it. Click to send what you changed (and your comments on it) to this chat: Claude revises the plan, in plan mode.\n\n" +
@@ -208,7 +208,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {toReview ? (
             <Tag
-              text="to review"
+              text="To review"
               active
               title="It changed files and its turn is over. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed."
               onClick={() => post({ type: "openPane", chat, tab: "review" })}
@@ -346,8 +346,8 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           {move ? (
             <IconButton
               icon="move"
-              label="Move to a Claude Code tab…"
-              title="Go on with this chat in a Claude Code tab: Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code tab. Asks first; a chat that's working or waiting for you is stopped only once you say so."
+              label="Move to a Claude Code panel…"
+              title="Go on with this chat in a Claude Code panel: Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code panel. Asks first; a chat that's working or waiting for you is stopped only once you say so."
               onClick={() => post({ type: "moveToClaudeCode", chat })}
             />
           ) : null}
@@ -390,9 +390,9 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
                 label={hasTurn(s) ? "Interrupt or stop this chat…" : "Stop this chat…"}
                 title={
                   s.entrypoint === "claude-vscode"
-                    ? "Stop this chat. Asks first; its Claude Code tab shows it as interrupted and goes on with your next message."
+                    ? "Stop this chat. Asks first; its Claude Code panel shows it as interrupted and goes on with your next message."
                     : hasTurn(s)
-                      ? "Interrupt or stop this chat. Asks first. Interrupting is like Ctrl+C or the stop button of a Claude Code tab (where it runs in a terminal of this window, or in tmux): its subagents stop too and the chat stays open. Stopping cuts off the current step, Claude quits and its terminal stays open."
+                      ? "Interrupt or stop this chat. Asks first. Interrupting is like Ctrl+C or the stop button of a Claude Code panel (where it runs in a terminal of this window, or in tmux): its subagents stop too and the chat stays open. Stopping cuts off the current step, Claude quits and its terminal stays open."
                       : "Stop this chat. Asks first; Claude quits and its terminal stays open. The chat is kept and shows under Recent chats."
                 }
                 onClick={() => post({ type: "stop", chat })}

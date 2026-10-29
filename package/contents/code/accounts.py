@@ -97,7 +97,7 @@ def claude_path(home, ask_shell=True):
 
 
 def vscode_chats(profiles):
-    """How many chats in VS Code's Claude panel work or wait for you right now
+    """How many chats in VS Code's Claude Code panel work or wait for you right now
     (switching VS Code's Claude to another account cuts them off once their
     window reloads)."""
     return sum(1 for entry, _, _ in cs.live_entries_all(profiles)
@@ -789,7 +789,7 @@ def make_default(home, extra, key, vscode=True):
                 failed.append("VS Code was started with another CLAUDE_CONFIG_DIR, which its Claude keeps: "
                               "start VS Code without it")
             elif moves_vscode:
-                done.append("VS Code's Claude (new chats there; a window's Claude panel once the window reloads)")
+                done.append("VS Code's Claude (new chats there; a window's Claude Code panel once the window reloads)")
     message = f"{profile.label} is the default account" + (f": {' and '.join(done)} run on it" if done
                                                             else "" if failed else " already")
     return not (failed and not done), "; ".join([message, *failed, *notes])

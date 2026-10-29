@@ -70,7 +70,7 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
         </h3>
         {g.defaultHere && accounts > 1 ? (
           <Tag
-            text="default"
+            text="Default"
             title={
               (host
                 ? `The default account on ${host}: listed first; Claude Code there (its VS Code server) and plain claude there run on it.`

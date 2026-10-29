@@ -197,7 +197,7 @@ test("the Claude Code extension starting after this one is found without a reloa
       mock.timers.tick(2000);
       await settle();
     }
-    assert.equal(dash.claudeCodeInfo().available, true, "a Claude Code tab can reopen chats");
+    assert.equal(dash.claudeCodeInfo().available, true, "a Claude Code panel can reopen chats");
     dash.dispose();
   } finally {
     stub.commands.getCommands = getCommands;

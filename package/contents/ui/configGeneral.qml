@@ -780,7 +780,7 @@ KCM.SimpleKCM {
             wrapMode: Text.Wrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: i18n("VS Code's Claude panel runs no status line, so its chats don't bring an account's plan usage up to date. While one of the account's chats works and its numbers are this old, Claude Code fetches them, as its /usage does (no tokens, no chat saved), at most this often. 0: never.")
+            text: i18n("VS Code's Claude Code panel runs no status line, so its chats don't bring an account's plan usage up to date. While one of the account's chats works and its numbers are this old, Claude Code fetches them, as its /usage does (no tokens, no chat saved), at most this often. 0: never.")
         }
 
         QQC2.SpinBox {

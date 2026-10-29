@@ -239,38 +239,3 @@ export function toolHtml(item, path, p) {
     }
     return `<div style="font-family:${family(p.mono)}; font-size:${(p.pt * 0.88).toFixed(1)}pt; color:${p.text}">${html}</div>`;
 }
-
-// A terminal's screen (pane.py screen_view: rows of [text, style] runs and
-// the styles), in its own colors on t.bg (t: {mono, pt, fg, bg}); a row that
-// ends in a colored stretch (a diff's line drawn across) is colored across
-export function termHtml(runs, styles, t) {
-    const colors = st => {
-        let fg = st.fg || t.fg, bg = st.bg || "";
-        if (st.inv) {
-            const was = fg;
-            fg = bg || t.bg;
-            bg = was;
-        }
-        return [st.d ? mix(bg || t.bg, fg, 0.6) : fg, bg];
-    };
-    const html = runs.map(row => {
-        let rowBg = "", list = row;
-        const last = row[row.length - 1];
-        if (last && /^\s+$/.test(last[0])) {
-            const bg = colors(styles[last[1]] || {})[1];
-            if (bg) {
-                rowBg = bg;
-                list = row.slice(0, -1);
-            }
-        }
-        const spans = list.map(r => {
-            const st = styles[r[1]] || {};
-            const c = colors(st);
-            return `<span style="color:${c[0]}${c[1] && c[1] !== rowBg ? "; background-color:" + c[1] : ""}${st.b ? "; font-weight:700" : ""}`
-                + `${st.i ? "; font-style:italic" : ""}${st.u ? "; text-decoration:underline" : ""}">${escape(r[0])}</span>`;
-        }).join("");
-        return `<p style="margin:0px; white-space:pre${rowBg ? "; background-color:" + rowBg : ""}">${spans || "&nbsp;"}</p>`;
-    }).join("");
-    return `<div style="font-family:${family(t.mono)}; font-size:${(t.pt * 0.88).toFixed(1)}pt; color:${t.fg}">${html}</div>`;
-}
-

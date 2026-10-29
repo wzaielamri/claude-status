@@ -24,7 +24,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
     head.add_child(label(group.title, 'claude-group-title'));
     // The default account: listed first, VS Code's Claude and plain claude run on it
     if (group.defaultHere && accounts > 1) {
-        const mark = tag('default');
+        const mark = tag('Default');
         tips.add(mark, [remoteHost ? L.fmt('The default account on %1', remoteHost) : 'The default account',
             (remoteHost
                 ? L.fmt("Listed first; VS Code's Claude on %1 (its VS Code server) and plain claude there run on it.", remoteHost)
@@ -265,7 +265,7 @@ function openInSwitch(ctx, group, host, resuming) {
         terminalHere, () => ctx.setNewChatInVscode(false),
         [!terminalHere ? 'No claude command' : resuming ? 'Reopen chats in a terminal' : 'New chats in a terminal',
             L.terminalHint(host, terminalHere, resuming)]));
-    line.add_child(half('vscode', 'text-editor-symbolic', 'VS Code', inVscode, vscodeHere,
+    line.add_child(half('vscode', 'text-editor-symbolic', 'Claude Code panel', inVscode, vscodeHere,
         () => ctx.setNewChatInVscode(true),
         [!ctx.vscodeInstalled ? "VS Code isn't installed" : !vscodeHere ? 'Not on this account'
             : resuming ? 'Reopen chats in VS Code' : 'New chats in VS Code',

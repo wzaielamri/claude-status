@@ -851,12 +851,12 @@ export function vscodeHint(group, host, status, resuming = false) {
             : "VS Code isn't installed on this computer.";
     }
     if (group.vscodeHere && resuming) {
-        return host ? fmt("Opens VS Code connected to %1 (Remote-SSH) in the chat's folder, and the chat in its Claude panel.", host)
-            : "Opens the chat's folder in VS Code, and the chat in its Claude panel.";
+        return host ? fmt("Opens VS Code connected to %1 (Remote-SSH) in the chat's folder, and the chat in its Claude Code panel.", host)
+            : "Opens the chat's folder in VS Code, and the chat in its Claude Code panel.";
     }
     if (group.vscodeHere) {
-        return host ? fmt('Opens VS Code connected to %1 (Remote-SSH) with a new chat in its Claude panel.', host)
-            : 'Opens the folder in VS Code with a new chat in its Claude panel.';
+        return host ? fmt('Opens VS Code connected to %1 (Remote-SSH) with a new chat in its Claude Code panel.', host)
+            : 'Opens the folder in VS Code with a new chat in its Claude Code panel.';
     }
     if (host)
         return fmt("VS Code's Claude on %1 runs on another account (the host's ~/.claude).", host);

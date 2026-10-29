@@ -54,7 +54,7 @@ Right-click the widget → **Configure Talpy Den…**
 | Recent chats per account | 5 | 0 hides the list |
 | Check SSH hosts every | 30 s | |
 | Plan usage on SSH hosts | once per account | An account on this computer and a host (or on two hosts) shows its plan usage where it's listed first, with the newest numbers of them all; or on every host, or on none |
-| Fetch plan usage older than | 5 min | VS Code's Claude panel runs no status line, so its chats don't bring plan usage up to date: while one of an account's chats works and its numbers are this old, Claude Code fetches them (`claude -p /usage`, as `/usage` does: no tokens, no chat saved), at most this often; on SSH hosts too. 0: never |
+| Fetch plan usage older than | 5 min | VS Code's Claude Code panel runs no status line, so its chats don't bring plan usage up to date: while one of an account's chats works and its numbers are this old, Claude Code fetches them (`claude -p /usage`, as `/usage` does: no tokens, no chat saved), at most this often; on SSH hosts too. 0: never |
 | Panel | on | The default account's 5-hour usage next to the icon |
 | Keyboard shortcut | goes to the chat | Goes to the chat that needs you (else opens the popup); the key itself is set on the Keyboard Shortcuts page |
 | Icon | on | Blink while a chat needs you (until you open the popup), pulse when one finishes |

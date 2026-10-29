@@ -41,6 +41,8 @@ export interface PetStage {
   // Run the stage's animations only while shown (view visible, stage on screen)
   setLive(live: boolean): void;
   destroy(): void;
+  // The hero's: where the UI puts its ticker, under the counts
+  tickerSlot?(): HTMLElement | null;
 }
 
 export interface PetsModule {

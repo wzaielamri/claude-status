@@ -133,7 +133,7 @@ export function toLocalClock(result: Status, offset: number): Status {
 
 // A chat with a process of its own can be stopped too (besides background
 // sessions), whatever it's doing: in a terminal its claude quits (the chat is
-// kept), in a Claude Code tab the tab shows it as interrupted and goes on with
+// kept), in a Claude Code panel the tab shows it as interrupted and goes on with
 // the next message (the widget's backend: stopping and interrupting chats).
 export function canEndChat(s: { kind?: string; pid?: number | null; state?: string; entrypoint?: string }): boolean {
   return s.kind === "interactive" && s.pid != null;
@@ -171,14 +171,14 @@ export function claudeCodeHere(g: Pick<Group, "host" | "vscodeHere" | "profileKe
   return g.host ? !!g.vscodeHere : !!info.profileKey && (g.profileKeys ?? []).includes(info.profileKey);
 }
 
-// Where recent chats reopen: in a Claude Code tab when you picked that, or
+// Where recent chats reopen: in a Claude Code panel when you picked that, or
 // when there's no claude command for a terminal
 export function reopensInClaudeCode(prefer: ReopenIn, cliHere: boolean, codeHere: boolean): boolean {
   return codeHere && (prefer === "claudeCode" || !cliHere);
 }
 
 // A chat running in a terminal (VS Code's or another, here or on an SSH
-// host) can move to a Claude Code tab when Claude Code is on its account
+// host) can move to a Claude Code panel when Claude Code is on its account
 // (codeHere): Claude quits in the terminal and the chat reopens in the tab
 export function canMoveToClaudeCode(s: { kind?: string; pid?: number | null; state?: string; entrypoint?: string }, codeHere: boolean): boolean {
   return codeHere && canEndChat(s) && s.entrypoint !== "claude-vscode";
@@ -195,13 +195,13 @@ export function claudeCodeReopenHint(g: Pick<Group, "host" | "vscodeHere" | "pro
   if (!info.available) return "The Claude Code extension isn't installed or enabled in this window.";
   if (g.host)
     return g.vscodeHere
-      ? `Opens the chat in a Claude Code tab, in a VS Code window connected to ${g.host} (Remote-SSH) on the chat's folder.`
+      ? `Opens the chat in a Claude Code panel, in a VS Code window connected to ${g.host} (Remote-SSH) on the chat's folder.`
       : `Claude Code on ${g.host} runs on another account: a new chat in its Claude Code chat tab on this one switches it, in a window connected to ${g.host}.`;
   if (!claudeCodeHere(g, info)) {
     const on = groups.find((o) => !o.host && !!info.profileKey && (o.profileKeys ?? []).includes(info.profileKey));
     return `Claude Code runs on ${on ? on.title : info.profileKey || "another account"}, not ${g.title}: switch it with “Use Account for VS Code's Claude…” to reopen this account's chats there.`;
   }
-  return "Opens the chat in a Claude Code tab, in the VS Code window that has the chat's folder (opened if it isn't).";
+  return "Opens the chat in a Claude Code panel, in the VS Code window that has the chat's folder (opened if it isn't).";
 }
 
 export function countStates(groups: Group[]): Counts {
@@ -713,7 +713,7 @@ export function stopText(stop: Stop): string {
 
 // Another account of the chat's machine with room left in the limit that
 // stopped it (the most, where known), to continue it there; null when there's
-// none, or the chat can't move now. Not for a chat open in a Claude Code tab
+// none, or the chat can't move now. Not for a chat open in a Claude Code panel
 // (the tab would start it again here with your next message), one that's at
 // work again, or a session that continues another chat (the one with the
 // chat's own id would be ended, not this one).
@@ -846,15 +846,15 @@ export function overlapText(overlaps: Overlap[]): string {
 export function modeText(mode: string | null | undefined): string {
   switch (mode) {
     case "plan":
-      return "plan mode";
+      return "Plan mode";
     case "acceptEdits":
-      return "accept edits";
+      return "Accept edits";
     case "auto":
-      return "auto mode";
+      return "Auto mode";
     case "bypassPermissions":
-      return "bypass permissions";
+      return "Bypass permissions";
     case "dontAsk":
-      return "don't ask";
+      return "Don't ask";
     case "default":
     case "":
     case null:

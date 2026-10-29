@@ -214,7 +214,7 @@ test("the pets are told when a usage limit has reset", () => {
 });
 
 test("a click on a pet goes to its chat's window; only the chat's name opens its tab", () => {
-  // (as on Plasma: the pets jump to the terminal or Claude Code tab, whatever
+  // (as on Plasma: the pets jump to the terminal or Claude Code panel, whatever
   // talpyDen.clickOpensPane says about the name)
   const { stageCallbacks, posted } = load();
   const ref = { key: "p/1", sessionId: "s-1", profileDir: "p", name: "chat 1" };

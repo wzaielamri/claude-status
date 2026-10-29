@@ -90,7 +90,7 @@ test("continuing a stopped chat on another account with room left", () => {
   assert.equal(handoverTarget(s, [here, full, roomy, roomier, unknown])!.shareProfile, ".claude-spare");
   assert.deepEqual(handoverTarget(s, [here, unknown]), { title: "new", shareProfile: ".claude-new", pct: null, label: "" });
   assert.equal(handoverTarget(s, [here, full]), null); // no room anywhere
-  // not when it's over, when the chat isn't idle, nor for a Claude Code tab or a session continuing another chat
+  // not when it's over, when the chat isn't idle, nor for a Claude Code panel or a session continuing another chat
   assert.equal(handoverTarget({ ...s, stopped: limit(true, null) }, [here, roomy]), null);
   assert.equal(handoverTarget({ ...s, state: "working" }, [here, roomy]), null);
   assert.equal(handoverTarget({ ...s, entrypoint: "claude-vscode" }, [here, roomy]), null);
@@ -100,8 +100,8 @@ test("continuing a stopped chat on another account with room left", () => {
 });
 
 test("permission modes as their tags say them", () => {
-  assert.equal(modeText("plan"), "plan mode");
-  assert.equal(modeText("bypassPermissions"), "bypass permissions");
+  assert.equal(modeText("plan"), "Plan mode");
+  assert.equal(modeText("bypassPermissions"), "Bypass permissions");
   assert.equal(modeText("default"), "");
   assert.equal(modeText(undefined), "");
   assert.equal(modeText("somethingNew"), "somethingNew");

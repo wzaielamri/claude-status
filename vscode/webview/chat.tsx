@@ -6,9 +6,9 @@
 
 import { render } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { WHERE, droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer, type TermRun, type TermStyle } from "../src/shared/pane";
+import { whereTag, droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer } from "../src/shared/pane";
 import { AskBox, askKey } from "./components/AskBox";
-import { Diff, Listing, TermScreen, ToolDetail } from "./components/CodeView";
+import { Diff, Listing, ToolDetail } from "./components/CodeView";
 import type { Answers, Decision } from "../src/shared/types";
 import { IconButton } from "./components/IconButton";
 import { Tag } from "./components/Tag";
@@ -27,9 +27,9 @@ const post = (m: PaneMessage) => api.postMessage(m);
 const copyCode = (code: string) => post({ type: "copy", text: code });
 const config = window.CLAUDE_CHAT;
 
-// Chat (your messages and Claude's replies), Steps (its tool calls too),
-// Terminal (its screen, where it can be read) and Review
-type Tab = "chat" | "steps" | "terminal" | "review";
+// Chat (your messages and Claude's replies), Steps (its tool calls too) and
+// Review; its screen is in its window (Open its window)
+type Tab = "chat" | "steps" | "review";
 
 function plural(n: number, one: string, many = one + "s"): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -85,29 +85,9 @@ function ChatApp() {
   const [capped, setCapped] = useState(false); // (Show earlier went as far as a tab goes)
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [loadMissing, setLoadMissing] = useState(false); // (no transcript: it hasn't started yet, or it's gone: a note, not an error)
   const [tab, setTab] = useState<Tab>(config.tab);
   const conversation = tab === "chat" || tab === "steps";
-  // Its screen (the Terminal tab): a background session's (claude logs) or a
-  // tmux pane's, read again every 2 s while it shows
-  const [output, setOutput] = useState<{ lines: string[]; runs?: TermRun[][]; styles?: TermStyle[]; error: string } | null>(null);
-  // (it stays at the end as the screen changes, unless you scrolled up)
-  const term = useRef<HTMLDivElement | null>(null);
-  const termAtEnd = useRef(true);
-  useLayoutEffect(() => {
-    const el = term.current;
-    if (el && termAtEnd.current) el.scrollTop = el.scrollHeight;
-  }, [output, tab]);
-  const screen = chat?.jobId ? "job" : chat?.where === "tmux" ? "tmux" : "";
-  // (another screen, or none: the one before doesn't show meanwhile)
-  useEffect(() => setOutput(null), [screen, chat?.jobId]);
-  useEffect(() => {
-    if (tab !== "terminal" || !screen) return undefined;
-    post({ type: "logs" });
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") post({ type: "logs" });
-    }, 2000);
-    return () => clearInterval(t);
-  }, [tab, screen, chat?.jobId]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [text, setText] = useState("");
   const [askHow, setAskHow] = useState(false);
@@ -305,9 +285,6 @@ function ChatApp() {
         }
       }
       else if (m.type === "offers") setOffers(m.offers);
-      else if (m.type === "output")   // (drawn again only when the screen changed)
-        setOutput((was) => (was && !was.error && !m.error && was.lines.join("\n") === m.lines.join("\n") ? was
-          : { lines: m.lines, runs: m.runs, styles: m.styles, error: m.error }));
       else if (m.type === "dictation") {
         setDictating(m.state);
         if (m.state === "recording") setRecordedAt(Date.now());
@@ -338,7 +315,10 @@ function ChatApp() {
       }
       else if (m.type === "conversation") {
         const a: Conversation = m.answer;
-        if (!a.ok) setLoadError(a.message || "Can't read this chat");
+        if (!a.ok) {
+          setLoadError(a.message || "Can't read this chat");
+          setLoadMissing(!!a.missing);
+        }
         else if (!a.unchanged) {
           const el = list.current;
           if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; // (on another tab: as when you left)
@@ -507,7 +487,7 @@ function ChatApp() {
           <button
             type="button"
             class="btn secondary small"
-            title="Go on with it in a Claude Code tab: Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code tab. Asks first; a chat that's working or waiting for you is stopped only once you say so."
+            title="Go on with it in a Claude Code panel: Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code panel. Asks first; a chat that's working or waiting for you is stopped only once you say so."
             onClick={() => post({ type: "moveToClaudeCode" })}
           >
             Move to Claude Code
@@ -516,20 +496,20 @@ function ChatApp() {
         <button
           type="button"
           class="btn secondary small"
-          title="The terminal or Claude Code tab the chat runs in; a chat that isn't open reopens, in a terminal or a Claude Code tab as the switch of Recent chats says."
+          title="The terminal or Claude Code panel the chat runs in; a chat that isn't open reopens, in a terminal or a Claude Code panel as the switch of Recent chats says."
           onClick={() => post({ type: "openWindow" })}
         >
           Open its window
         </button>
       </div>
       <div class="pane-folder">
-        {chat ? <Tag text={WHERE[chat.where].tag} title={WHERE[chat.where].title} /> : null}
+        {chat ? <Tag {...(({ tag, title }) => ({ text: tag, title }))(whereTag(chat.where, chat.terminalApp))} /> : null}
         <span class="pane-path">{(chat?.host ? chat.host + ":" : "") + (chat?.cwd ?? "")}</span>
       </div>
       <div class="pane-tabs" role="tablist">
-        {(["chat", "steps", "terminal"] as const).map((t) => (
+        {(["chat", "steps"] as const).map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-            {t === "chat" ? "Chat" : t === "steps" ? "Steps" : "Terminal"}
+            {t === "chat" ? "Chat" : "Steps"}
           </button>
         ))}
         <button type="button" role="tab" aria-selected={tab === "review"} class={tab === "review" ? "on" : ""} onClick={() => setTab("review")}>
@@ -538,31 +518,7 @@ function ChatApp() {
       </div>
       {info ? <div class={info.ok ? "pane-info" : "pane-info bad"}>{info.message}</div> : null}
 
-      {tab === "terminal" && !screen ? (
-        <div class="term-none">
-          <p>{chat ? WHERE[chat.where].noScreen : ""}</p>
-          <button type="button" class="btn secondary" onClick={() => post({ type: "openWindow" })}>
-            {chat?.where === "closed" ? "Open it again" : "Open its window"}
-          </button>
-        </div>
-      ) : tab === "terminal" ? (
-        <div class="term-pane">
-          <div class="term-head">
-            <span class={`term-dot${output?.error ? " off" : ""}`} aria-hidden="true" />
-            <span class="term-note">{output?.error || (screen === "job" ? "Its terminal right now, as Claude draws it in the background"
-              : "Its tmux pane right now, with what scrolled by above it")}</span>
-            <button type="button" class="btn secondary small" title="To the end of its screen"
-              onClick={() => { termAtEnd.current = true; if (term.current) term.current.scrollTop = term.current.scrollHeight; }}>
-              ⤓
-            </button>
-          </div>
-          <div class="term-card" ref={term} title={screen === "job" ? "Its terminal as Claude draws it now (claude logs)" : "Its tmux pane now (tmux capture-pane)"}
-            onScroll={(e) => { const el = e.currentTarget; termAtEnd.current = el.scrollTop >= el.scrollHeight - el.clientHeight - 24; }}>
-            {output && !output.error ? <TermScreen lines={output.lines} runs={output.runs} styles={output.styles} />
-              : <div class="term-wait">{output?.error ? "" : "Reading its screen…"}</div>}
-          </div>
-        </div>
-      ) : conversation ? (
+      {conversation ? (
         <>
           <div
             class="pane-list"
@@ -585,7 +541,7 @@ function ChatApp() {
             ) : capped ? (
               <div class="muted center small">Only its last 2000 steps are shown here.</div>
             ) : null}
-            {!loaded || loadError ? <div class={`muted center${loadError ? " bad" : ""}`}>{loadError || "Reading the chat…"}</div> : null}
+            {!loaded || loadError ? <div class={`muted center${loadError && !loadMissing ? " bad" : ""}`}>{loadError || "Reading the chat…"}</div> : null}
             {steps}
             {chat?.state === "working" ? (
               <div class="pane-item pane-working">

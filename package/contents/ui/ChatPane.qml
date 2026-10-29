@@ -35,13 +35,13 @@ Window {
     readonly property var permission: row && row.permission && chatState === "waiting" ? row.permission : null
     readonly property var queued: root.queuedMessage(chatId, host)
     readonly property bool reviewPending: row ? root.reviewPending(row, host) : false
-    // Chat (your messages and Claude's replies), Steps (its tool calls too),
-    // Terminal (its screen, where it can be read) and Review
+    // Chat (your messages and Claude's replies), Steps (its tool calls too)
+    // and Review; its screen is in its window (Open its window)
     property string tab: "chat"
     readonly property bool conversationTab: tab === "chat" || tab === "steps"
-    // Where it runs (the tag under its name; what the Terminal tab can show):
-    // "background" (a background session), "closed" (no process: a reply goes
-    // on in the background), "claude" (VS Code's Claude panel), "tmux",
+    // Where it runs (the tag under its name): "background" (a background
+    // session), "closed" (no process: a reply goes
+    // on in the background), "claude" (VS Code's Claude Code panel), "tmux",
     // "vscode" (a terminal of VS Code) or "terminal" (another terminal)
     readonly property string where: !row || !row.pid ? "closed" : row.kind === "bg" ? "background"
                                     : row.entrypoint === "claude-vscode" ? "claude" : row.tmux ? "tmux"
@@ -182,6 +182,7 @@ Window {
     property bool more: false
     property bool loaded: false
     property string loadError: ""
+    property bool loadMissing: false   // (no transcript: it hasn't started yet, or it's gone: a note, not an error)
     property var openTools: ({})   // key -> unfolded
     property string info: ""
     property bool infoBad: false
@@ -229,9 +230,6 @@ Window {
             cancelDictation()
         offerSetup = false
         offerModel = false
-        outputText = ""
-        outputHtml = ""
-        outputError = ""
         // (what's still on its way for the chat before is left out when it
         // comes, handle(): this one's is read now)
         loading = false
@@ -320,7 +318,7 @@ Window {
     // every executable DataSource in plasmashell keeps each name, hub/Exec.qml)
     function run(kind, args, sent) {
         const cmd = "python3 -I " + root.shellQuote(root.codeDir + "pane.py") + " " + args
-                    + (kind === "conversation" || kind === "logs" ? "" : " # " + Date.now())   // (read again and again: one name)
+                    + (kind === "conversation" ? "" : " # " + Date.now())   // (read again and again: one name)
         runs[cmd] = { kind: kind, chat: chatId, host: host, target: row || chat, sent: sent || "", draft: draftKey }
         runner.connectSource(cmd)
     }
@@ -544,7 +542,7 @@ Window {
                         delete drafts[asked.draft]
                 }
             }
-            if (kind !== "conversation" && kind !== "review" && kind !== "complete" && kind !== "logs") {
+            if (kind !== "conversation" && kind !== "review" && kind !== "complete") {
                 root.refresh()   // (what was done there shows in the popup)
                 if (asked.host)
                     root.pollHost(asked.host)
@@ -565,6 +563,7 @@ Window {
             }
             if (!result.ok) {
                 loadError = result.message || i18n("Can't read this chat")
+                loadMissing = !!result.missing
                 return
             }
             loadError = ""
@@ -577,18 +576,6 @@ Window {
             loaded = true
             if (following)
                 keepEnd()
-            return
-        }
-        if (kind === "logs") {
-            outputError = result.ok ? "" : (result.message || i18n("Its output can't be read now"))
-            const text = result.ok ? (result.lines || []).join("\n") : ""
-            if (result.ok && text !== outputText) {   // (made again only when the screen changed)
-                const following = outputText === "" || outputAtEnd()
-                outputText = text
-                outputHtml = Code.termHtml(result.runs || (result.lines || []).map(l => [[l, 0]]), result.styles || [{}], termStyle)
-                if (following)
-                    Qt.callLater(outputToEnd)
-            }
             return
         }
         if (kind === "review") {
@@ -885,8 +872,6 @@ Window {
     onTabChanged: {
         if (tab === "review" && review === null)
             loadReview()
-        if (tab === "terminal")
-            loadOutput()
         // (back on the Chat or Steps tab: at its end, following it, if it was when you left)
         if (!conversationTab && chatTab)
             chatAtEnd = !loaded || nearEnd()
@@ -897,44 +882,6 @@ Window {
     property bool chatTab: true
     property bool chatAtEnd: true
 
-    // Its screen (the Terminal tab): a background session's as Claude draws
-    // it (claude logs), a tmux pane's as it shows, in its colors on a
-    // terminal's dark ground (a light theme too)
-    readonly property string jobId: row && row.kind === "bg" && row.jobId && row.pid ? row.jobId : ""
-    readonly property bool screenShown: jobId !== "" || where === "tmux"
-    property string outputText: ""
-    property string outputHtml: ""
-    property string outputError: ""
-    readonly property var termStyle: ({ mono: monoFamily, pt: pt, fg: "#e3e3e3", bg: "#1f2124" })
-    function outputAtEnd() {
-        const f = outputView.contentItem
-        return !f || f.contentY >= f.contentHeight - f.height - Kirigami.Units.gridUnit
-    }
-    function outputToEnd() {
-        const f = outputView.contentItem
-        if (f)
-            f.contentY = Math.max(0, f.contentHeight - f.height)
-    }
-    function loadOutput() {
-        if (jobId)
-            run("logs", "--logs " + root.shellQuote(jobId) + paneArgs())
-        else if (where === "tmux" && sessionId)
-            run("logs", "--screen " + root.shellQuote(sessionId) + paneArgs())
-    }
-    Timer {
-        interval: 2000
-        repeat: true
-        running: pane.tab === "terminal" && pane.shown && pane.screenShown
-        onTriggered: pane.loadOutput()
-    }
-    // (another screen, or none: the one before doesn't show meanwhile)
-    onScreenShownChanged: {
-        outputText = ""
-        outputHtml = ""
-        outputError = ""
-        if (screenShown && tab === "terminal")
-            loadOutput()
-    }
     readonly property real editedAt: row && row.review ? row.review.editedAt || 0 : 0
     onEditedAtChanged: if (tab === "review") loadReview()
 
@@ -1093,18 +1040,19 @@ Window {
                 spacing: Kirigami.Units.smallSpacing
 
                 Tag {
-                    text: pane.where === "background" ? i18nc("where a chat runs", "background")
-                          : pane.where === "closed" ? i18nc("where a chat runs", "not open")
-                          : pane.where === "claude" ? i18nc("where a chat runs: the Claude Code extension's panel", "Claude panel")
-                          : pane.where === "tmux" ? "tmux"
+                    text: pane.where === "background" ? i18nc("where a chat runs", "Background")
+                          : pane.where === "closed" ? i18nc("where a chat runs", "Not open")
+                          : pane.where === "claude" ? i18nc("where a chat runs: the Claude Code extension's panel", "Claude Code panel")
+                          : pane.where === "tmux" ? "Tmux"
                           : pane.where === "vscode" ? i18nc("where a chat runs", "VS Code terminal")
-                          : i18nc("where a chat runs", "terminal")
-                    tooltip: pane.where === "background" ? i18n("A background session: Claude's background service runs it, with no terminal of its own. The Terminal tab shows its screen.")
+                          : i18nc("where a chat runs", "Terminal")
+                    tooltip: pane.where === "background" ? i18n("A background session: Claude's background service runs it, with no terminal of its own. Open its window to see it in a terminal (claude attach).")
                              : pane.where === "closed" ? i18n("No terminal or tab has it open: a reply goes on with it in the background.")
-                             : pane.where === "claude" ? i18n("It runs in VS Code's Claude panel (the Claude Code extension).")
-                             : pane.where === "tmux" ? i18n("It runs in a tmux pane: the Terminal tab shows its screen.")
+                             : pane.where === "claude" ? i18n("It runs in VS Code's Claude Code panel (the Claude Code extension).")
+                             : pane.where === "tmux" ? i18n("It runs in a tmux pane.")
                              : pane.where === "vscode" ? i18n("It runs in a terminal of VS Code.")
-                             : i18n("It runs in a terminal (Konsole or another).")
+                             : pane.row && pane.row.terminalApp ? i18n("It runs in a terminal (%1).", pane.row.terminalApp)
+                             : i18n("It runs in a terminal.")
                 }
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText
@@ -1117,14 +1065,14 @@ Window {
                 }
             }
 
-            // Chat | Steps | Terminal | Review, underlined in Claude's color
+            // Chat | Steps | Review, underlined in Claude's color
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.smallSpacing
                 spacing: 0
 
                 Repeater {
-                    model: ["chat", "steps", "terminal", "review"]
+                    model: ["chat", "steps", "review"]
                     delegate: MouseArea {
                         id: tabButton
                         required property string modelData
@@ -1143,7 +1091,6 @@ Window {
                             textFormat: Text.PlainText
                             text: tabButton.modelData === "chat" ? i18nc("tab: your messages and Claude's replies", "Chat")
                                   : tabButton.modelData === "steps" ? i18nc("tab: the chat with every tool call", "Steps")
-                                  : tabButton.modelData === "terminal" ? i18nc("tab: the chat's terminal screen", "Terminal")
                                   : pane.row && pane.row.changes
                                   ? (pane.reviewPending ? i18nc("tab: the files a chat changed, not reviewed yet", "Review ±%1 •", pane.row.changes.count)
                                                         : i18nc("tab: the files a chat changed", "Review ±%1", pane.row.changes.count))
@@ -1245,7 +1192,7 @@ Window {
                                 visible: !pane.loaded || pane.loadError !== ""
                                 horizontalAlignment: Text.AlignHCenter
                                 text: pane.loadError || i18n("Reading the chat…")
-                                color: pane.loadError ? Kirigami.Theme.negativeTextColor : pane.mutedColor
+                                color: pane.loadError && !pane.loadMissing ? Kirigami.Theme.negativeTextColor : pane.mutedColor
                                 font.pointSize: pane.pt
                                 wrapMode: Text.Wrap
                             }
@@ -1966,113 +1913,6 @@ Window {
                             onClicked: pane.send(pane.route === "terminal" || pane.askHow ? "background" : "auto", false)
                         }
                     }
-                }
-            }
-
-            // ---------------------------------------------------------------- Terminal
-            // Its screen now: a background session's (pane.py --logs: claude
-            // logs) or a tmux pane's (pane.py --screen), its tool calls, diffs
-            // and spinner as its terminal shows them, in their colors, read
-            // again every 2 s while shown; it stays at the end as it changes,
-            // unless you scrolled up
-            ColumnLayout {
-                visible: pane.tab === "terminal" && pane.screenShown
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: Kirigami.Units.smallSpacing
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: Kirigami.Units.smallSpacing
-
-                    Rectangle {
-                        implicitWidth: Kirigami.Units.smallSpacing * 1.5
-                        implicitHeight: implicitWidth
-                        radius: width / 2
-                        color: pane.outputError ? pane.mutedColor : Kirigami.Theme.positiveTextColor
-                    }
-                    PlasmaComponents3.Label {
-                        Layout.fillWidth: true
-                        textFormat: Text.PlainText
-                        text: pane.outputError || (pane.jobId ? i18n("Its terminal right now, as Claude draws it in the background")
-                                                              : i18n("Its tmux pane right now, with what scrolled by above it"))
-                        color: pane.outputError ? Kirigami.Theme.neutralTextColor : pane.mutedColor
-                        font: Kirigami.Theme.smallFont
-                        elide: Text.ElideRight
-                    }
-                    PlasmaComponents3.ToolButton {
-                        icon.name: "go-bottom"
-                        display: PlasmaComponents3.AbstractButton.IconOnly
-                        text: i18n("To the end")
-                        onClicked: pane.outputToEnd()
-                    }
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    radius: Kirigami.Units.cornerRadius
-                    color: pane.termStyle.bg
-                    border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.08)
-
-                    PlasmaComponents3.ScrollView {
-                        id: outputView
-                        anchors.fill: parent
-                        anchors.margins: Kirigami.Units.largeSpacing * 0.75
-                        PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AsNeeded
-
-                        TextEdit {
-                            text: pane.outputHtml
-                            textFormat: TextEdit.RichText
-                            readOnly: true
-                            selectByMouse: true
-                            color: pane.termStyle.fg
-                            selectionColor: Kirigami.Theme.focusColor
-                            selectedTextColor: Kirigami.Theme.highlightedTextColor
-                        }
-                    }
-                    PlasmaComponents3.Label {
-                        anchors.centerIn: parent
-                        visible: pane.outputHtml === ""
-                        textFormat: Text.PlainText
-                        text: pane.outputError ? "" : i18n("Reading its screen…")
-                        color: "#9a9a9a"
-                    }
-                }
-            }
-
-            // Elsewhere: why it shows no screen, and its window
-            ColumnLayout {
-                visible: pane.tab === "terminal" && !pane.screenShown
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: Kirigami.Units.largeSpacing
-
-                Item {
-                    Layout.fillHeight: true
-                }
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    Layout.leftMargin: Kirigami.Units.gridUnit * 2
-                    Layout.rightMargin: Kirigami.Units.gridUnit * 2
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    text: pane.where === "closed" ? i18n("No terminal or tab has this chat open, so it shows no screen now. A reply goes on with it in the background.")
-                          : pane.where === "claude" ? i18n("It runs in VS Code's Claude panel, which has no terminal: what it does is in the Steps tab.")
-                          : pane.where === "vscode" ? i18n("It runs in a terminal of VS Code, whose screen can't be read from here: what it does is in the Steps tab.")
-                          : i18n("It runs in a terminal whose screen can't be read from here (a chat in tmux shows it here): what it does is in the Steps tab.")
-                    color: pane.mutedColor
-                    font.pointSize: pane.pt
-                }
-                PlasmaComponents3.Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    icon.name: "window"
-                    text: pane.where === "closed" ? i18n("Open it in a terminal") : i18n("Open its window")
-                    onClicked: root.openRow(pane.row || pane.chat, pane.host)
-                }
-                Item {
-                    Layout.fillHeight: true
                 }
             }
 

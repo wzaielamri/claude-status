@@ -58,7 +58,7 @@ ColumnLayout {
         Tag {
             id: defaultTag
             visible: !!section.group.defaultHere && section.accounts > 1
-            text: i18n("default")
+            text: i18n("Default")
             tooltipTitle: section.remoteHost ? i18n("The default account on %1", section.remoteHost) : i18n("The default account")
             tooltip: (section.remoteHost
                       ? i18n("Listed first; VS Code's Claude on %1 (its VS Code server) and plain claude there run on it.", section.remoteHost)
@@ -691,7 +691,7 @@ ColumnLayout {
                 // it changed files: to review until you mark it reviewed (ChatPane.qml)
                 Tag {
                     visible: root.reviewPending(recentLine.chat, section.remoteHost)
-                    text: i18nc("a finished chat's changes, not reviewed yet", "to review")
+                    text: i18nc("a finished chat's changes, not reviewed yet", "To review")
                     active: true
                     clickable: true
                     onClicked: root.openPane(recentLine.chat, section.remoteHost, "review")

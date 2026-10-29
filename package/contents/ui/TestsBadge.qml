@@ -10,8 +10,8 @@ Tag {
     readonly property var run: review ? review.tests || null : null
 
     visible: review !== null
-    text: run === null ? i18nc("a chat ran no tests after its last edit", "not tested")
-        : run.ok ? i18nc("tests passed after a chat's last edit", "tests ✓") : i18nc("tests failed after a chat's last edit", "tests ✗")
+    text: run === null ? i18nc("a chat ran no tests after its last edit", "Not tested")
+        : run.ok ? i18nc("tests passed after a chat's last edit", "Tests ✓") : i18nc("tests failed after a chat's last edit", "Tests ✗")
     warning: run !== null && !run.ok
     active: run !== null && run.ok
     tooltipTitle: run === null ? i18n("No tests since its last edit")

@@ -1298,7 +1298,7 @@ class KeepGoingTests(TaskFixture):
             self.assertIsNone(cs.kept_step(dict(k), limit, dict(row, state=state), False, limits, self.now_ms))
         tab = dict(k)
         self.assertIsNone(cs.kept_step(tab, limit, dict(row, entrypoint="claude-vscode"), False, limits, self.now_ms))
-        self.assertIn("open in a Claude Code tab", tab["note"])
+        self.assertIn("open in a Claude Code panel", tab["note"])
         login = dict(k)
         self.assertIsNone(cs.kept_step(login, dict(limit, kind="login"), None, False, limits, self.now_ms))
         self.assertIn("log in again", login["note"])

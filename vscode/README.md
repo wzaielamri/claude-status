@@ -187,7 +187,7 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   Talpy lives in a burrow: it digs over to another spot instead of walking,
   a new chat's pet digs up out of the ground, and one whose chat leaves the
   list waves and digs away. Click a pet to go to its chat (its terminal or
-  Claude Code tab), drag one out of its burrow, double-click the big one.
+  Claude Code panel), drag one out of its burrow, double-click the big one.
 - **Shared chats**: with two or more Claude accounts on this computer (or
   on an SSH host), a finished chat's share button continues it on another
   account (say, when one hits its limit), shares it with all of them, or
@@ -242,7 +242,7 @@ box):
 **Send**, or **Send when this turn ends** (kept, and sent once the turn is
 over). Your message goes the way the chat can take it: typed into its
 terminal when it runs in one of this window's terminals, or into its tmux
-pane; put into the input of its Claude Code tab (press Enter there); or, for
+pane; put into the input of its Claude Code panel (press Enter there); or, for
 a background session or a chat that isn't open, the chat goes on with it in
 the background (`claude --bg --resume`, the same chat; a running background
 session stops first). A terminal outside VS Code takes no text from outside,
@@ -316,20 +316,20 @@ Without the `claude` command on that machine, the menu says so and offers only
 the chat tab.
 
 **Recent chats** reopen in a terminal (`claude --resume`) or in a Claude Code
-tab: the **Terminal | Claude Code tab** switch above them picks which (kept in
+tab: the **Terminal | Claude Code panel** switch above them picks which (kept in
 `talpyDen.reopenIn`), and so does every other way to reopen a chat that
 isn't running (**Open its window** in its tab, its row, **Find a Chat**). A
-Claude Code tab opens in the window that has the chat's folder: this one,
+Claude Code panel opens in the window that has the chat's folder: this one,
 another, or a new one (an SSH host's chat: connected to it). A half is greyed
 out where it can't work, and its tooltip says why: no `claude` command on the
 chat's machine (the chats then reopen in Claude Code), or Claude Code not
 installed or on another account.
 
-A running chat opens where it runs: its terminal, or its Claude Code tab. One
-in a terminal can **move to a Claude Code tab** (**Move to Claude Code** in its
+A running chat opens where it runs: its terminal, or its Claude Code panel. One
+in a terminal can **move to a Claude Code panel** (**Move to Claude Code** in its
 tab, or the → button of its row, when Claude Code is on the chat's account):
 it asks first, then Claude quits in the terminal, which stays open, and the
-chat reopens in a Claude Code tab (two Claudes on one chat would both write
+chat reopens in a Claude Code panel (two Claudes on one chat would both write
 to it). A chat that's working or waiting for you is stopped only once you say
 so (**Stop and Move**: the current step is cut off), and an idle one that got
 back to work since you asked isn't touched.
@@ -338,7 +338,7 @@ back to work since you asked isn't touched.
 background session is stopped with `claude stop`. Any other running chat can
 be stopped whatever it's doing: in a terminal, Claude quits as when its
 terminal closes (the current step is cut off, the terminal stays open, and the
-chat moves to Recent chats); in a Claude Code tab it's like the tab's own stop
+chat moves to Recent chats); in a Claude Code panel it's like the tab's own stop
 button (the tab says *Interrupted*, keeps the chat and goes on with your next
 message). A working chat in one of this window's terminals, or in tmux, can be
 **interrupted** instead: Ctrl+C, as if pressed there, which, like the Claude
@@ -426,7 +426,7 @@ editor at these.
 | `talpyDen.clickOpensPane` | `true` | A click on a chat opens its tab (conversation, reply, permission prompt, review); `false`: the chat itself |
 | `talpyDen.chatTextScale` | `1.15` | Text size in a chat's tab, times VS Code's font size (the tab's **A−** / **A+** and Ctrl+wheel set it) |
 | `talpyDen.openIn` | `vscode` | `system`: open chats in your desktop's terminal app instead |
-| `talpyDen.reopenIn` | `terminal` | `claudeCode`: reopen chats that aren't running in a Claude Code tab (the switch above Recent chats) |
+| `talpyDen.reopenIn` | `terminal` | `claudeCode`: reopen chats that aren't running in a Claude Code panel (the switch above Recent chats) |
 | `talpyDen.notifyWaiting` / `notifyDone` | `true` | Notifications; turn them off here if the Plasma or GNOME widget notifies too |
 | `talpyDen.notifyDoneMinSeconds` | `30` | Shortest turn that gets a "finished" notification |
 | `talpyDen.awayDigest` / `awayMinutes` | `true` / `5` | The "while you were away" summary, after this many minutes without using VS Code (with notifications off, only its card in the view) |

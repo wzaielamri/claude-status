@@ -55,10 +55,6 @@ its permission prompt and its review.
         what the reply box offers as you type: / commands (Claude's own, yours
         and the project's) and skills, the project's files for @, and your
         past prompts in its folder (newest first) for ↑
-  --logs JOB [--profile P]
-        a background session's screen now (claude logs), as lines of text
-  --screen CHAT [--profile P]
-        a chat's tmux pane now, with the end of its scrollback above it
   --oldest allow|deny [--osd]
         answer the oldest prompt a chat waits on (one the hook relayed; a plan:
         approve it, or keep planning), for a keyboard shortcut; --osd: say on
@@ -82,7 +78,6 @@ import shutil
 import subprocess
 import sys
 import time
-import unicodedata
 from pathlib import Path
 
 sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget...
@@ -106,6 +101,7 @@ DETAIL_CHARS = 1200  # of a tool call's input or output, unfolded
 DETAIL_LINES = 24
 PANE_LINE = re.compile(rb'"type":\s*"(?:user|assistant|system|queue-operation|queued_command)"')
 INTERRUPTED = "[Request interrupted"
+NO_CHAT = "This chat hasn't started yet, or it isn't there any more"   # (no transcript: none yet, or deleted)
 
 
 def clip(text, chars=DETAIL_CHARS, lines=DETAIL_LINES):
@@ -346,13 +342,18 @@ def conversation_items(lines):
                 items.append({"kind": "note", "key": uid, "text": cs.short_text(text, 300), "at": at, "error": True})
             continue
         mid = msg.get("id") if isinstance(msg.get("id"), str) else None
+        # (thinking shown as updates: Claude Code shows a thinking block's text
+        # as a reply then, what Claude tells you as it works; thinking it keeps
+        # to itself comes without text)
+        updates = e.get("thinkingDisplay") == "updates"
         for c in blocks:
-            if c.get("type") == "text" and isinstance(c.get("text"), str) and c["text"].strip():
+            said = c.get("text") if c.get("type") == "text" else c.get("thinking") if c.get("type") == "thinking" and updates else None
+            if isinstance(said, str) and said.strip():
                 last = items[-1] if items else None
                 if last is not None and last["kind"] == "claude" and mid is not None and last["key"] == mid:
-                    last["text"] = clip(last["text"] + "\n\n" + c["text"].strip(), TEXT_CHARS, 10 ** 6)
+                    last["text"] = clip(last["text"] + "\n\n" + said.strip(), TEXT_CHARS, 10 ** 6)
                 else:
-                    items.append({"kind": "claude", "key": mid or uid, "text": clip(c["text"].strip(), TEXT_CHARS, 10 ** 6),
+                    items.append({"kind": "claude", "key": mid or uid, "text": clip(said.strip(), TEXT_CHARS, 10 ** 6),
                                   "at": at})
             elif c.get("type") == "tool_use" and isinstance(c.get("id"), str):
                 inp = c.get("input") if isinstance(c.get("input"), dict) else {}
@@ -435,7 +436,7 @@ def chat_conversation(home, extra_dirs, chat_id, profile_key=None, limit=PANE_IT
         return {"ok": False, "message": f"Not a chat: {chat_id}"}
     profile, path = find_transcript(home, extra_dirs, chat_id, profile_key)
     if path is None:
-        return {"ok": False, "message": "That chat's transcript isn't there any more"}
+        return {"ok": False, "missing": True, "message": NO_CHAT}
     stamp = stamp_of(path)
     if if_changed and if_changed == f"{stamp}/{limit}":
         return {"ok": True, "unchanged": True}
@@ -690,7 +691,7 @@ def completions(home, extra_dirs, chat_id, profile_key=None):
         return {"ok": False, "message": f"Not a chat: {chat_id}"}
     profile, path = find_transcript(home, extra_dirs, chat_id, profile_key)
     if path is None:
-        return {"ok": False, "message": "That chat's transcript isn't there any more"}
+        return {"ok": False, "message": NO_CHAT}
     _, cwd, _ = cs.read_chat_info(path, path.stat().st_size)
     cwd = cwd or cs.chat_folder(path) or ""
     commands = [{"name": "/" + n, "about": a, "kind": "Claude"} for n, a in BUILTIN_COMMANDS]
@@ -706,263 +707,6 @@ def completions(home, extra_dirs, chat_id, profile_key=None):
     files, cut = project_files(cwd)
     return {"ok": True, "cwd": cwd, "commands": sorted(unique, key=lambda c: c["name"]), "files": files, "filesCut": cut,
             "history": past_prompts(profile, cwd)}
-
-
-# ---------------------------------------------------------------- a background session's screen
-#
-# claude logs ID gives a background session's recent terminal output: its
-# screen as Claude draws it (cursor moves, colors). screen_of plays that into
-# a grid and gives the lines that show, for the pane's Output tab. It only
-# asks the background service that runs (never starts one: claude would).
-
-ESCAPE = re.compile(r"\x1b(?:\[([0-9;:?]*)([A-Za-z@`])|\]([^\x07\x1b]*)(?:\x07|\x1b\\)|([78])|[()][0-9A-Za-z]|.)")
-# The 16 colors of an xterm, and its 256 (6×6×6 and greys)
-ANSI_COLORS = ("#000000", "#cd3131", "#0dbc79", "#e5e510", "#2472c8", "#bc3fbc", "#11a8cd", "#e5e5e5",
-               "#666666", "#f14c4c", "#23d18b", "#f5f543", "#3b8eea", "#d670d6", "#29b8db", "#ffffff")
-PLAIN = (None, None, False, False, False, False, False)   # fg, bg, bold, dim, italic, underline, inverse
-
-
-def color_256(n):
-    if n < 16:
-        return ANSI_COLORS[n]
-    if n < 232:
-        n -= 16
-        return "#%02x%02x%02x" % tuple((0, 95, 135, 175, 215, 255)[v] for v in (n // 36, n // 6 % 6, n % 6))
-    return "#%02x%02x%02x" % ((8 + 10 * (n - 232),) * 3)
-
-
-def sgr(style, args):
-    """style after an SGR sequence (ESC [ args m)."""
-    fg, bg, bold, dim, italic, under, inverse = style
-    nums = [int(n) if n.isdigit() else 0 for n in (args or "0").replace(":", ";").split(";")]
-    i = 0
-    while i < len(nums):
-        n = nums[i]
-        if n == 0:
-            fg, bg, bold, dim, italic, under, inverse = PLAIN
-        elif n in (38, 48) and i + 2 < len(nums) + 1:
-            color = None
-            if i + 1 < len(nums) and nums[i + 1] == 2 and i + 4 < len(nums):
-                color = "#%02x%02x%02x" % tuple(max(0, min(255, v)) for v in nums[i + 2:i + 5])
-                i += 4
-            elif i + 1 < len(nums) and nums[i + 1] == 5 and i + 2 < len(nums):
-                color = color_256(max(0, min(255, nums[i + 2])))
-                i += 2
-            if n == 38:
-                fg = color
-            else:
-                bg = color
-        elif n == 1:
-            bold = True
-        elif n == 2:
-            dim = True
-        elif n == 3:
-            italic = True
-        elif n in (4, 21):
-            under = True
-        elif n == 7:
-            inverse = True
-        elif n == 22:
-            bold = dim = False
-        elif n == 23:
-            italic = False
-        elif n == 24:
-            under = False
-        elif n == 27:
-            inverse = False
-        elif 30 <= n <= 37:
-            fg = ANSI_COLORS[n - 30]
-        elif 90 <= n <= 97:
-            fg = ANSI_COLORS[n - 82]
-        elif n == 39:
-            fg = None
-        elif 40 <= n <= 47:
-            bg = ANSI_COLORS[n - 40]
-        elif 100 <= n <= 107:
-            bg = ANSI_COLORS[n - 92]
-        elif n == 49:
-            bg = None
-        i += 1
-    return (fg, bg, bold, dim, italic, under, inverse)
-
-
-def wide(ch):
-    return unicodedata.east_asian_width(ch) in ("W", "F")
-
-
-def screen_cells(stream, width=200, height=60):
-    """A terminal after stream (a TUI's output): its rows of [char, style]
-    cells, and whether each row was drawn whole in it (erased, or written
-    from its start): a stream that begins in the middle of a session also
-    has the odd number a TUI redrew in place on a row it drew earlier."""
-    blank = (" ", PLAIN)
-    grid = [[blank] * width for _ in range(height)]
-    whole = [False] * height
-    row = col = 0
-    style = PLAIN
-    saved = (0, 0)
-    pos = 0
-    text = stream.replace("\r\n", "\n")
-
-    def put(ch):
-        nonlocal col
-        if col <= 2:
-            whole[row] = True
-        if 0xE000 <= ord(ch) <= 0xF8FF or ord(ch) >= 0xF0000:
-            ch = " "   # (a Nerd Font's glyph, a status line's arrows: its colors stay, a clean edge)
-        two = wide(ch)
-        if col < width:
-            grid[row][col] = (ch, style)
-            if two and col + 1 < width:
-                grid[row][col + 1] = ("", style)   # (the second half of a wide character)
-        col += 2 if two else 1
-
-    def chars(chunk):   # (text between escapes)
-        nonlocal row, col
-        for ch in chunk:
-            if ch == "\r":
-                col = 0
-            elif ch == "\n":
-                row, col = min(height - 1, row + 1), 0
-            elif ch == "\b":
-                col = max(0, col - 1)
-            elif ch >= " ":
-                put(ch)
-
-    for m in ESCAPE.finditer(text):
-        chars(text[pos:m.start()])
-        pos = m.end()
-        args, op = m.group(1), m.group(2)
-        if m.group(4) == "7":
-            saved = (row, col)
-        elif m.group(4) == "8":
-            row, col = saved
-        elif op == "m":
-            style = sgr(style, args)
-        elif op:
-            nums = [int(n) if n.isdigit() else 0 for n in (args or "").replace("?", "").split(";")]
-            n = nums[0] if nums and nums[0] else 1
-            erased = (" ", (None, style[1], False, False, False, False, False))   # (erased in the background color)
-            if op == "A":
-                row = max(0, row - n)
-            elif op == "B":
-                row = min(height - 1, row + n)
-            elif op == "C":
-                col = min(width - 1, col + n)
-            elif op == "D":
-                col = max(0, col - n)
-            elif op == "G":
-                col = min(width - 1, n - 1)
-            elif op in "Hf":
-                row = min(height - 1, max(0, (nums[0] if nums and nums[0] else 1) - 1))
-                col = min(width - 1, max(0, (nums[1] if len(nums) > 1 and nums[1] else 1) - 1))
-            elif op == "K":
-                mode = nums[0] if nums else 0
-                for c in (range(col, width) if mode == 0 else range(0, col + 1) if mode == 1 else range(width)):
-                    grid[row][c] = erased
-                if mode or col <= 2:
-                    whole[row] = True
-            elif op == "J":
-                mode = nums[0] if nums else 0
-                rows = range(row + 1, height) if mode == 0 else range(0, row) if mode == 1 else range(height)
-                for r in rows:
-                    grid[r] = [erased] * width
-                    whole[r] = True
-                if mode == 0:
-                    grid[row][col:] = [erased] * (width - col)
-    chars(text[pos:])
-    return grid, whole
-
-
-def screen_rows(grid, whole):
-    """The rows that show, as [[text, style], ...] runs (trailing plain
-    spaces left out); left out: a row not drawn whole that has no word in
-    it, the empty part of the screen (one empty row) and its end."""
-    out = []
-    for cells, drawn in zip(grid, whole):
-        end = len(cells)
-        while end and cells[end - 1][0] in (" ", "") and cells[end - 1][1][1] is None and not cells[end - 1][1][6]:
-            end -= 1
-        runs = []
-        for ch, st in cells[:end]:
-            if runs and runs[-1][1] == st:
-                runs[-1][0] += ch
-            else:
-                runs.append([ch, st])
-        if runs and not drawn and not re.search(r"[^\W\d_]{3}", "".join(t for t, _ in runs)):
-            continue   # (numbers a TUI redrew in place, without the words around them)
-        if runs or (out and out[-1]):
-            out.append(runs)
-    while out and not out[-1]:
-        out.pop()
-    return out
-
-
-def screen_of(stream, width=200, height=60):
-    """The lines a terminal shows after stream (a TUI's output), as text."""
-    return ["".join(t for t, _ in runs) for runs in screen_rows(*screen_cells(stream, width, height))]
-
-
-def screen_view(stream, width=200, height=60):
-    """The screen with its colors, for the Output tab: {"lines": [text],
-    "runs": [[[text, style index], ...]], "styles": [{"fg", "bg" ("#rrggbb"
-    or null: the terminal's), "b", "d" (dim), "i", "u", "inv"}]}."""
-    rows = screen_rows(*screen_cells(stream, width, height))
-    styles, index, runs = [], {}, []
-    for row in rows:
-        line = []
-        for text, st in row:
-            if st not in index:
-                index[st] = len(styles)
-                styles.append({"fg": st[0], "bg": st[1], "b": st[2], "d": st[3], "i": st[4], "u": st[5], "inv": st[6]})
-            line.append([text, index[st]])
-        runs.append(line)
-    return {"lines": ["".join(t for t, _ in row) for row in rows], "runs": runs, "styles": styles}
-
-
-def job_screen(home, extra_dirs, job_id, profile_key=None):
-    """A background session's screen now (claude logs): {"ok"} and screen_view's."""
-    if not re.fullmatch(r"[0-9a-f]{8}", job_id or ""):
-        return {"ok": False, "message": f"Not a background session: {job_id}"}
-    profiles = [p for p in cs.discover_profiles(home, extra_dirs) if profile_key in (None, p.key)]
-    profile = next((p for p in profiles if (p.path / "jobs" / job_id / "state.json").is_file()), None)
-    if profile is None:
-        return {"ok": False, "message": "That background session isn't there any more"}
-    service = cs.service_config_dir(profile)
-    if service is None:
-        return {"ok": False, "message": "Its background service isn't running: it shows nothing now"}
-    claude = cs.find_claude(home)
-    if not claude:
-        return {"ok": False, "message": "Claude Code isn't installed here"}
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE", "ANTHROPIC"))}
-    env["CLAUDE_CONFIG_DIR"] = service   # (the service's own name: another name of the folder would wait for ever)
-    try:
-        r = subprocess.run([claude, "logs", job_id], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           env=env, timeout=20)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"ok": False, "message": f"claude logs didn't answer: {exc}"}
-    if r.returncode != 0:
-        return {"ok": False, "message": (r.stderr or r.stdout).decode(errors="replace").strip()[:300] or "claude logs failed"}
-    return dict(screen_view(r.stdout.decode("utf-8", "replace")), ok=True)
-
-
-SCREEN_HISTORY = 300  # lines of a tmux pane's scrollback shown above its screen
-
-
-def chat_screen(home, extra_dirs, chat_id, profile_key=None):
-    """A chat's tmux pane now, in its colors, with the last SCREEN_HISTORY
-    lines of its scrollback above it: {"ok"} and screen_view's."""
-    entry = cs.find_chat_entry(home, extra_dirs, chat_id, profile_key)
-    if entry is None:
-        return {"ok": False, "message": "That chat isn't running any more"}
-    base, target = tmux_base(entry)
-    if base is None:
-        return {"ok": False, "message": "It doesn't run in tmux: its screen can't be read from here"}
-    ok, out = tmux_run(base, ["capture-pane", "-p", "-e", "-S", f"-{SCREEN_HISTORY}", "-t", target])
-    if not ok:
-        return {"ok": False, "message": out}
-    # (a row for each line: the grid doesn't scroll, and a line is never wider than its pane)
-    return dict(screen_view(out, width=1000, height=out.count("\n") + 2), ok=True)
 
 
 # ---------------------------------------------------------------- keyboard answers
@@ -1261,7 +1005,7 @@ def send(home, extra_dirs, profile_key, chat_id, text, session_id=None, how="aut
     profiles = cs.discover_profiles(home, extra_dirs)
     profile, path = find_transcript(home, extra_dirs, chat_id, profile_key)
     if path is None:
-        return {"ok": False, "message": "That chat's transcript isn't there any more"}
+        return {"ok": False, "message": NO_CHAT}
     if how == "copy":
         return copy_answer(text)
     entry = None
@@ -1543,7 +1287,7 @@ def chat_review(home, extra_dirs, chat_id, profile_key=None, reviewed_at=None):
     profiles = cs.discover_profiles(home, extra_dirs)
     profile, path = find_transcript(home, extra_dirs, chat_id, profile_key)
     if path is None:
-        return {"ok": False, "message": "That chat's transcript isn't there any more"}
+        return {"ok": False, "message": NO_CHAT}
     name, cwd, _ = cs.read_chat_info(path, path.stat().st_size)
     cwd = cwd or cs.chat_folder(path) or ""
     files, repos = [], set()
@@ -1585,7 +1329,7 @@ def undo(home, extra_dirs, chat_id, profile_key=None, wanted=()):
     profiles = cs.discover_profiles(home, extra_dirs)
     profile, path = find_transcript(home, extra_dirs, chat_id, profile_key)
     if path is None:
-        return False, "That chat's transcript isn't there any more"
+        return False, NO_CHAT
     for entry, _, _ in cs.live_entries_all(profiles):
         if entry.get("sessionId") == chat_id and cs.session_state(entry) == "working":
             return False, "It's at work: undo once its turn has ended"
@@ -1888,7 +1632,7 @@ def main(argv=None):
     session, text, stamp, limit, files, config_dirs, answers = None, None, None, PANE_ITEMS, [], [], None
     after, off, remote, pretty, source, expect, text_file = False, False, False, False, None, None, None
     actions = ("--conversation", "--send", "--answer", "--keys", "--review", "--undo", "--commit", "--reviewed",
-               "--relay", "--live", "--oldest", "--shortcuts", "--complete", "--logs", "--screen")
+               "--relay", "--live", "--oldest", "--shortcuts", "--complete")
     osd = False
     while args:
         arg = args.pop(0)
@@ -1993,10 +1737,6 @@ def main(argv=None):
             ok, said = answer_request(cache_root, target, decision, note, answers)
             # (changed: the request you answered is gone; the chat may ask something else now)
             result = {"ok": ok, "message": said, **({"changed": True} if not ok and said in (NOT_ASKING, ASKS_ELSE) else {})}
-        elif action == "--logs":
-            result = job_screen(home, config_dirs, target, profile)
-        elif action == "--screen":
-            result = chat_screen(home, config_dirs, target, profile)
         elif action == "--complete":
             result = completions(home, config_dirs, target, profile)
         elif action == "--oldest":

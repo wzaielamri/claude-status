@@ -27,7 +27,7 @@ import { Tag } from "./Tag";
 
 // The account's latest other chats, to pick one up again. Folded by default:
 // the running chats come first. A switch above them says where they reopen:
-// in a terminal, or in a Claude Code tab (kept in talpyDen.reopenIn). A
+// in a terminal, or in a Claude Code panel (kept in talpyDen.reopenIn). A
 // half is greyed out where it can't work: no claude command on the chat's
 // machine, or Claude Code not here or on another account. The chats you
 // starred come first, under their own fold (★ Starred), however old.
@@ -70,7 +70,7 @@ export function RecentChats({ group }: { group: Group }) {
         type="button"
         class="recent-toggle small"
         aria-expanded={open}
-        title="This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in a Claude Code tab (the switch at the top of the list)."
+        title="This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in a Claude Code panel (the switch at the top of the list)."
         onClick={() => toggleRecent(key)}
       >
         <Icon name="chevron" class={open ? "open" : ""} />
@@ -81,7 +81,7 @@ export function RecentChats({ group }: { group: Group }) {
           <div class="open-in small" role="group" aria-label="Where recent chats reopen">
             <span class="muted">Open in:</span>
             {half("terminal", "Terminal", cliHere, cliHere && !inCode, (cliHere ? "Reopen chats in a terminal\n" : "No claude command\n") + terminalHint)}
-            {half("claudeCode", "Claude Code tab", codeHere, inCode, (codeHere ? "Reopen chats in a Claude Code tab\n" : "Not here\n") + codeHint)}
+            {half("claudeCode", "Claude Code panel", codeHere, inCode, (codeHere ? "Reopen chats in a Claude Code panel\n" : "Not here\n") + codeHint)}
           </div>
           {!cliHere && !codeHere ? <div class="open-in-why small muted">{`${terminalHint} ${codeHint}`}</div> : null}
           {starred.length ? (
@@ -133,7 +133,7 @@ export function RecentChats({ group }: { group: Group }) {
         </button>
         {toReview ? (
           <Tag
-            text="to review"
+            text="To review"
             active
             title="It changed files. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed."
             onClick={() => post({ type: "openPane", chat, tab: "review" })}
@@ -154,7 +154,7 @@ export function RecentChats({ group }: { group: Group }) {
           />
         ) : c.stopped?.kind === "limit" && !c.stopped.over ? (
           <Tag
-            text="limit"
+            text="Limit"
             warning
             title={`A usage limit stopped it\n${c.stopped.text}` + (goOn ? `\n\nClick to have it go on by itself in the background at ${startText(goOn, view.now)}, a minute after the limit resets.${later}` : "")}
             onClick={goOn ? () => post({ type: "queueContinue", chat }) : undefined}

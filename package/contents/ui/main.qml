@@ -1731,13 +1731,13 @@ PlasmoidItem {
             return host ? i18n("VS Code would connect to %1 (Remote-SSH), but it isn't installed on this computer.", host)
                         : i18n("VS Code isn't installed on this computer.")
         if (group.vscodeHere && resuming)
-            return host ? i18n("Opens VS Code connected to %1 (Remote-SSH) in the chat's folder, and the chat in its Claude panel.", host)
-                        : i18n("Opens the chat's folder in VS Code, and the chat in its Claude panel.")
+            return host ? i18n("Opens VS Code connected to %1 (Remote-SSH) in the chat's folder, and the chat in its Claude Code panel.", host)
+                        : i18n("Opens the chat's folder in VS Code, and the chat in its Claude Code panel.")
         if (group.vscodeHere)
-            return host ? i18n("Opens VS Code connected to %1 (Remote-SSH) with a new chat in its Claude panel.", host)
-                        : i18n("Opens the folder in VS Code with a new chat in its Claude panel.")
+            return host ? i18n("Opens VS Code connected to %1 (Remote-SSH) with a new chat in its Claude Code panel.", host)
+                        : i18n("Opens the folder in VS Code with a new chat in its Claude Code panel.")
         if (host && !resuming && vscodeSwitches(group, host))
-            return i18n("Opens VS Code connected to %1 (Remote-SSH) with a new chat in its Claude panel. VS Code's Claude on %1 switches to %2 for it, and stays on it.", host, group.title)
+            return i18n("Opens VS Code connected to %1 (Remote-SSH) with a new chat in its Claude Code panel. VS Code's Claude on %1 switches to %2 for it, and stays on it.", host, group.title)
         if (host)
             return i18n("VS Code's Claude on %1 runs on another account: a new chat in VS Code on this one switches it.", host)
         const on = status && status.vscode ? status.vscode.on : null
@@ -2712,11 +2712,11 @@ PlasmoidItem {
     // A chat's permission mode (talpy_den.py: mode_of), "" for the default
     function modeText(mode) {
         switch (mode) {
-        case "plan": return i18n("plan mode")
-        case "acceptEdits": return i18n("accept edits")
-        case "auto": return i18n("auto mode")
-        case "bypassPermissions": return i18n("bypass permissions")
-        case "dontAsk": return i18n("don't ask")
+        case "plan": return i18n("Plan mode")
+        case "acceptEdits": return i18n("Accept edits")
+        case "auto": return i18n("Auto mode")
+        case "bypassPermissions": return i18n("Bypass permissions")
+        case "dontAsk": return i18n("Don't ask")
         case "default": case "": case null: case undefined: return ""
         default: return mode
         }

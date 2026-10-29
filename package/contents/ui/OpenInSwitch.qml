@@ -49,7 +49,7 @@ ColumnLayout {
             available: openIn.vscodeHere
             checked: openIn.inVscode
             iconName: "vscode"
-            text: i18n("VS Code")
+            text: i18n("Claude Code panel")
             tipTitle: !root.vscodeInstalled ? i18n("VS Code isn't installed")
                       : !openIn.vscodeHere ? i18n("Not on this account")
                       : openIn.switching ? i18n("New chats in VS Code, on this account")

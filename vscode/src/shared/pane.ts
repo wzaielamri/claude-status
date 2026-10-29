@@ -25,6 +25,7 @@ export interface Conversation {
   ok: boolean;
   message?: string;
   unchanged?: boolean; // as in the last answer (--if-changed)
+  missing?: boolean; // no transcript: the chat hasn't started yet, or it's gone
   chatId?: string;
   profileDir?: string;
   name?: string;
@@ -78,15 +79,15 @@ export interface PaneChat {
   reviewPending: boolean;
   review: Review | null;
   queued: { id: string; prompt: string; error: string } | null; // a reply waiting for its turn to end
-  canMove: boolean; // runs in a terminal, on the account Claude Code is on: it can move to a Claude Code tab
-  jobId?: string; // a running background session: its screen is in the Terminal tab (pane.py --logs)
+  canMove: boolean; // runs in a terminal, on the account Claude Code is on: it can move to a Claude Code panel
   where: ChatWhere;
+  terminalApp: string; // the terminal it runs in, by name (Konsole, kitty…), or ""
 }
 
-// Where a chat runs (the tag under its name; what the Terminal tab can show):
+// Where a chat runs (the tag under its name, the same words as the rows'):
 // a background session, closed (no process: a reply goes on in the
-// background), a Claude Code tab, tmux, a terminal of VS Code (this window's
-// or another's) or another terminal
+// background), a Claude Code panel, tmux, a terminal of VS Code (this
+// window's or another's) or another terminal
 export type ChatWhere = "background" | "closed" | "claude" | "tmux" | "vscode" | "terminal";
 
 export function chatWhere(s: Pick<Session, "pid" | "kind" | "entrypoint" | "tmux" | "vscodeTerminal"> | undefined, terminalHere: boolean): ChatWhere {
@@ -97,27 +98,23 @@ export function chatWhere(s: Pick<Session, "pid" | "kind" | "entrypoint" | "tmux
   return terminalHere || s.vscodeTerminal ? "vscode" : "terminal";
 }
 
-// Its tag, what the tag says on hover, and (where the Terminal tab shows no
-// screen) why
-export const WHERE: Record<ChatWhere, { tag: string; title: string; noScreen: string }> = {
-  background: { tag: "background", noScreen: "",
-                title: "A background session: Claude's background service runs it, with no terminal of its own. The Terminal tab shows its screen." },
-  closed: { tag: "not open", title: "No terminal or tab has it open: a reply goes on with it in the background.",
-            noScreen: "No terminal or tab has this chat open, so it shows no screen now. A reply goes on with it in the background." },
-  claude: { tag: "Claude Code tab", title: "It runs in a Claude Code tab (the Claude Code extension).",
-            noScreen: "It runs in a Claude Code tab, which has no terminal: what it does is in the Steps tab." },
-  tmux: { tag: "tmux", title: "It runs in a tmux pane: the Terminal tab shows its screen.", noScreen: "" },
-  vscode: { tag: "VS Code terminal", title: "It runs in a terminal of VS Code.",
-            noScreen: "It runs in a terminal of VS Code, whose screen an extension can't read: what it does is in the Steps tab." },
-  terminal: { tag: "terminal", title: "It runs in a terminal outside VS Code.",
-              noScreen: "It runs in a terminal whose screen can't be read from here (a chat in tmux shows it here): what it does is in the Steps tab." },
-};
-
-// A background session's screen in color (pane.py screen_view): each row's
-// runs of [text, index in styles]; a style's fg / bg ("#rrggbb", null: the
-// terminal's), bold, dim, italic, underline, inverse
-export type TermRun = [string, number];
-export interface TermStyle { fg: string | null; bg: string | null; b: boolean; d: boolean; i: boolean; u: boolean; inv: boolean }
+// Its tag, and what the tag says on hover (terminalApp: the terminal's name)
+export function whereTag(where: ChatWhere, terminalApp = ""): { tag: string; title: string } {
+  switch (where) {
+    case "background":
+      return { tag: "Background", title: "A background session: Claude's background service runs it, with no terminal of its own. Open its window to see it in a terminal (claude attach)." };
+    case "closed":
+      return { tag: "Not open", title: "No terminal or panel has it open: a reply goes on with it in the background." };
+    case "claude":
+      return { tag: "Claude Code panel", title: "It runs in a Claude Code panel in VS Code (the Claude Code extension)." };
+    case "tmux":
+      return { tag: "Tmux", title: "It runs in a tmux pane." };
+    case "vscode":
+      return { tag: "VS Code terminal", title: "It runs in a terminal of VS Code." };
+    default:
+      return { tag: "Terminal", title: terminalApp ? `It runs in a terminal (${terminalApp}).` : "It runs in a terminal." };
+  }
+}
 
 // extension -> tab
 export type PaneHostMessage =
@@ -135,7 +132,6 @@ export type PaneHostMessage =
   // text written down, or why not); offerModel: whisper is there but no speech model (engine: which
   // one), offerSetup: nothing writes it down yet (setupMb: what setting up downloads); the tab asks
   // before either
-  | { type: "output"; lines: string[]; runs?: TermRun[][]; styles?: TermStyle[]; error: string } // its screen (pane.py --logs or --screen)
   | { type: "dictation"; state: "" | "starting" | "recording" | "writing" | "model" | "setup"; text?: string; message?: string; offerModel?: boolean;
       engine?: string; offerSetup?: boolean; setupMb?: number };
 
@@ -152,7 +148,7 @@ export type PaneMessage =
   | { type: "commit"; message: string }
   | { type: "reviewed"; on: boolean }
   | { type: "openWindow" }
-  | { type: "moveToClaudeCode" } // Claude quits in its terminal, the chat reopens in a Claude Code tab (asks first)
+  | { type: "moveToClaudeCode" } // Claude quits in its terminal, the chat reopens in a Claude Code panel (asks first)
   | { type: "copy"; text: string } // a code block of a reply, to the clipboard
   | { type: "textSize"; scale: number } // A− / A+: talpyDen.chatTextScale
   | { type: "diffLayout"; split: boolean } // side by side or one after the other: talpyDen.diffSideBySide
@@ -161,7 +157,6 @@ export type PaneMessage =
   | { type: "attach"; id: string; path: string } // a file dropped from VS Code's Explorer: a picture saved as one, a file named
   | { type: "screenshot"; id: string } // a region of the screen you pick, as a picture
   | { type: "complete" } // what the reply box offers (answered with "offers")
-  | { type: "logs" } // its screen now: a background session's or a tmux pane's (answered with "output")
   | { type: "dictate"; action: "toggle" | "cancel" | "getModel" | "setup" }; // the microphone (answered with "dictation")
 
 // What the reply box offers as you type (pane.py --complete): / at the start
@@ -318,14 +313,14 @@ export function queuedReply(status: Status | null | undefined, chatId: string, h
   return status?.queue?.find((t) => t.afterTurn && t.chat === chatId && (t.host || "") === (host || "")) ?? null;
 }
 
-// The tests badge: "tests ✓", "tests ✗" or "not tested" (since the last edit)
+// The tests badge: "Tests ✓", "Tests ✗" or "Not tested" (since the last edit)
 export function testsText(review: Review | null | undefined): { text: string; title: string; ok: boolean | null } | null {
   if (!review) return null;
   const run = review.tests;
-  if (!run) return { text: "not tested", title: "Claude ran no test command (pytest, npm test, cargo test, …) after it last changed a file.", ok: null };
+  if (!run) return { text: "Not tested", title: "Claude ran no test command (pytest, npm test, cargo test, …) after it last changed a file.", ok: null };
   return run.ok
-    ? { text: "tests ✓", title: `Tests passed after its last edit: ${run.command}`, ok: true }
-    : { text: "tests ✗", title: `Tests failed after its last edit: ${run.command}`, ok: false };
+    ? { text: "Tests ✓", title: `Tests passed after its last edit: ${run.command}`, ok: true }
+    : { text: "Tests ✗", title: `Tests failed after its last edit: ${run.command}`, ok: false };
 }
 
 // How a reply reaches the chat, in a sentence
@@ -337,7 +332,7 @@ export function routeHint(route: PaneChat["route"], hasProcess: boolean, kind: s
     case "vscodeTerminal":
       return "Typed into its terminal in this window.";
     case "vscode":
-      return `Goes into the chat's input in its Claude Code tab: press Enter there.${where}`;
+      return `Goes into the chat's input in its Claude Code panel: press Enter there.${where}`;
     case "terminal":
       return `Its terminal takes no text from outside: send it, and Claude there quits and the chat goes on in the background, or copy it and open its terminal.${where}`;
     default:
