@@ -16,9 +16,6 @@ PlasmaExtras.Representation {
     Layout.preferredHeight: Kirigami.Units.gridUnit * 30
 
     collapseMarginsHint: true
-    // (a tab sliding in comes from the frame's edge: it was drawn over the
-    // desktop beside the popup until it got there)
-    clip: true
 
     header: PlasmaExtras.PlasmoidHeading {
         RowLayout {
@@ -155,25 +152,21 @@ PlasmaExtras.Representation {
     contentItem: ColumnLayout {
         id: tabContent
         spacing: Kirigami.Units.smallSpacing
-        // A tab slides in from the side it's on (Chats | Recap | Permissions)
-        transform: Translate { id: tabSlide }
+        // A tab fades in where it is (one that slid in from the side was drawn
+        // past the popup's frame, over the desktop, on its way: the sections
+        // reach into the frame's edge, so clipping cut their words instead)
         property int tabIndex: ["chats", "week", "perms", "projects"].indexOf(root.popupTab)
         onTabIndexChanged: {
             if (!root.animateRows)
                 return
-            const from = tabIndex > shownTab ? 1 : -1
-            shownTab = tabIndex
-            tabSlideIn.stop()
-            tabSlide.x = from * Kirigami.Units.gridUnit * 1.5
+            tabFadeIn.stop()
             tabContent.opacity = 0.35
-            tabSlideIn.start()
+            tabFadeIn.start()
         }
-        property int shownTab: tabIndex
-        ParallelAnimation {
-            id: tabSlideIn
-            NumberAnimation { target: tabSlide; property: "x"; to: 0; duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
-            NumberAnimation { target: tabContent; property: "opacity"; to: 1; duration: Kirigami.Units.longDuration; easing.type: Easing.OutQuad }
-            onStopped: { tabSlide.x = 0; tabContent.opacity = 1 }
+        NumberAnimation {
+            id: tabFadeIn
+            target: tabContent; property: "opacity"; to: 1; duration: Kirigami.Units.longDuration; easing.type: Easing.OutQuad
+            onStopped: tabContent.opacity = 1
         }
 
         // The big Talpy: the whole dashboard at a glance (stays put while the list scrolls)
