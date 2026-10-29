@@ -5,6 +5,8 @@
 // follows the whole dashboard (warm when a chat needs you, blue while chats
 // work, green when they wait for your next message, a starry night once
 // everything is done), with a headline and the session counts beside it.
+// Double-click its stage a little away from it and there's a cookie for it
+// (pet.ts); how many it ate shows in the corner.
 //
 // an account's stage: one pet per chat of that account in the list, up to a
 // few. A pet wears the chat's name on a tag in the chat's color (the chat's
@@ -19,9 +21,10 @@ import { editorTab, isDark } from "../env";
 import { plural } from "../../src/shared/model";
 import type { TalpyTheme } from "../../vendor/talpy/talpy.mjs";
 import type { AccountInput, HeroInput, PetStage, StageCallbacks, StageChat } from "./api";
-import type { ChatRef, Counts } from "../../src/shared/types";
+import type { ChatRef, Cookies, Counts } from "../../src/shared/types";
 import { PALETTE, allPetColors, freeColor, setPetColors } from "./colors";
-import { BOX, FLOOR } from "../../vendor/talpy/talpy.mjs";
+import { BOX, FLOOR, drawCookie } from "../../vendor/talpy/talpy.mjs";
+import { cookieCount } from "../../vendor/talpy/cookie.mjs";
 import { Clock, Timer, Tween, cssEase, reducedMotion, type Animator } from "./motion";
 import { Pet, SMALL } from "./pet";
 
@@ -30,6 +33,7 @@ export const allStages = new Set<Stage>();
 const world = {
   dark: isDark(),
   shownOnce: false, // pets have been on screen: from now on the hero digs its way up too
+  cookies: { eaten: 0, saved: 0 } as Cookies, // the hero's, as the extension keeps them
 };
 
 // The theme changed (or may have): the pets' words and particles take its
@@ -40,6 +44,12 @@ export function setDarkAll(dark: boolean): void {
     s.root.classList.toggle("cs-dark", dark);
     s.themeChanged();
   }
+}
+
+// The extension says how many cookies the hero ate
+export function setCookiesAll(cookies: Cookies): void {
+  world.cookies = { eaten: cookies.eaten, saved: cookies.saved };
+  for (const s of allStages) s.renderJar();
 }
 
 function pageVisible(): boolean {
@@ -85,6 +95,7 @@ export class Stage implements PetStage, Animator {
   private readonly countsEl: HTMLDivElement | null = null;
   private readonly textEl: HTMLDivElement | null = null;
   private readonly tickerEl: HTMLDivElement | null = null;
+  private readonly jarEl: HTMLDivElement | null = null;
   private readonly cb: StageCallbacks;
 
   // Each Talpy is drawn in a 64-unit box on a canvas with room around it
@@ -179,6 +190,18 @@ export class Stage implements PetStage, Animator {
       this.countsEl = el("div", "cs-hero-counts", this.textEl);
       // what the working chats do right now: the UI puts its ticker here
       this.tickerEl = el("div", "cs-hero-ticker", this.textEl);
+      // How many cookies it ate, in the corner
+      this.jarEl = el("div", "cs-cookie-jar", this.root);
+      el("canvas", "cs-cookie-jar-icon", this.jarEl);
+      el("span", "cs-cookie-jar-count", this.jarEl);
+      // A cookie where you double-click (pet.ts says if that's too close to
+      // it); the headline, the ticker and the pet keep their own clicks
+      this.root.addEventListener("dblclick", (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        if (target?.closest(".cs-hero-headline.cs-clickable, .cs-hero-ticker, .cs-pet-grab, .cs-cookie, .cs-cookie-jar")) return;
+        const p = this.local(e);
+        this.pets[0]?.placeCookie(p.x, p.y);
+      });
     } else {
       // An account's floor; the stage itself is barely there, just a place to stand
       this.floorEl = el("div", "cs-stage-floor", this.root);
@@ -201,6 +224,7 @@ export class Stage implements PetStage, Animator {
     this.root.addEventListener("pointermove", (e) => this.hover(e.clientX));
     this.root.addEventListener("pointerleave", () => this.hover(-1));
 
+    this.renderJar();
     this.resizeObserver = new ResizeObserver((entries) => {
       const r = entries[entries.length - 1].contentRect;
       this.resized(r.width, r.height);
@@ -526,6 +550,44 @@ export class Stage implements PetStage, Animator {
       if (this.live) a.play();
       else a.pause();
     }
+  }
+
+  // ------------------------------------------------------------ cookies
+
+  cookies(): Cookies {
+    return world.cookies;
+  }
+
+  // The hero ate one, or saved one: every hero shows it, the extension keeps it
+  saveCookies(cookies: Cookies): void {
+    setCookiesAll(cookies);
+    this.cb.saveCookies?.(cookies);
+  }
+
+  renderJar(): void {
+    const jar = this.jarEl;
+    if (!jar) return;
+    const { eaten, saved } = world.cookies;
+    const key = `${eaten}/${saved}`;
+    if (this.drawn.jar === key) return;
+    this.drawn.jar = key;
+    jar.hidden = eaten + saved <= 0;
+    if (jar.hidden) return;
+    (jar.lastElementChild as HTMLSpanElement).textContent = cookieCount(eaten);
+    jar.title = `${plural(eaten, "Talpy ate %1 cookie", "Talpy ate %1 cookies")}\n` +
+      (saved > 0 ? `${saved} more saved for later.\n` : "") +
+      "Double-click its stage, a little away from it, for another one.";
+    // (its cookie, drawn once)
+    const canvas = jar.firstElementChild as HTMLCanvasElement,
+      size = Math.round(this.gu * 0.75),
+      k = devicePixelRatio || 1;
+    if (canvas.width === Math.round(size * k)) return;
+    canvas.width = canvas.height = Math.round(size * k);
+    canvas.style.width = canvas.style.height = `${size}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform((k * size) / 12, 0, 0, (k * size) / 12, (k * size) / 2, (k * size) / 2);
+    drawCookie(ctx);
   }
 
   // ------------------------------------------------------------ shared by the pets

@@ -3,7 +3,7 @@
 // stages: the hero (big Talpy with the headline and counts) and one stage per
 // account (a pet per chat). Ported from the widget's PetStrip.qml + Pet.qml.
 
-import type { ChatRef, Counts, Session } from "../../src/shared/types";
+import type { ChatRef, Cookies, Counts, Session } from "../../src/shared/types";
 
 // A chat that may get a pet on its account's stage
 export interface StageChat {
@@ -34,6 +34,8 @@ export interface StageCallbacks {
   // An account's stage: how many pets stand on it now (one whose chat left
   // counts until it has waved and dug away)
   petsChanged?(count: number): void;
+  // The hero ate a cookie you gave it, or saved one: keep the new tally
+  saveCookies?(cookies: Cookies): void;
 }
 
 export interface PetStage {
@@ -56,4 +58,6 @@ export interface PetsModule {
   onColorsChanged(listener: () => void): () => void;
   // Light or dark theme changed (body.vscode-dark / vscode-light / vscode-high-contrast)
   setDark(dark: boolean): void;
+  // The hero's cookie tally, as the extension keeps it
+  setCookies(cookies: Cookies): void;
 }

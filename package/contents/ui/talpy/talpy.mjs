@@ -15,7 +15,7 @@
 // Plain ES2017 (see paths.mjs).
 
 import * as art from './art.mjs';
-import { ACTIONS, MOODS, dirt, random } from './actions.mjs';
+import { ACTIONS, COOKIE, MOODS, dirt, random } from './actions.mjs';
 
 export const BOX = 64;
 export const FLOOR = 57;     // where the stage's floor is, in the box
@@ -266,6 +266,15 @@ export function drawHoleSide(ctx, part, left) {
     ctx.restore();
 }
 
+// A cookie (the one it eats), 5.6 units round, centred at the context's
+// origin: a host draws the one it goes after with this (cookie.mjs)
+export function drawCookie(ctx) {
+    ctx.save();
+    ctx.translate(-32, -47.4);
+    art.propFront(ctx, 'cookie', 0, 0, { bite: 0 });
+    ctx.restore();
+}
+
 // ---------------------------------------------------------------- the creature
 
 export class Talpy {
@@ -292,6 +301,8 @@ export class Talpy {
         this.brainOn = opts.brain !== false;
         this.held = false;
         this.heldAt = 0;
+        this.chasing = false;     // after a cookie (chase): on its feet, the host moves it
+        this.chased = '';         // how (chaseAs)
         this.frameMs = 40;        // see tick()
         this.stepAt = 0;          // when the pose shown began
         this.big = false;         // a big move is under way (see stills), since bigAt
@@ -328,6 +339,8 @@ export class Talpy {
         this.lastAuto = '';
         if (this.held)
             return;
+        if (this.chasing)
+            return;
         if (!this.run || this.run.auto)
             this.cancel();
         if (!this.run)
@@ -337,7 +350,7 @@ export class Talpy {
 
     // An action now: a reaction to you or to an event (done(true) when it ran to the end)
     react(name, done) {
-        if (this.held || !ACTIONS[name]) {
+        if (this.held || this.chasing || !ACTIONS[name]) {
             if (done)
                 done(false);
             return;
@@ -346,7 +359,7 @@ export class Talpy {
     }
 
     get busy() {
-        return this.run !== null || this.held;
+        return this.run !== null || this.held || this.chasing;
     }
 
     // Its burrow is open or opening under it (a host swinging it puts it
@@ -364,6 +377,7 @@ export class Talpy {
             return 0;
         const left = this.st.tunnel === '1' ? 0 : clamp01(this.v.hole);
         this.cancel();
+        this.chasing = false;
         this.held = true;
         this.heldAt = this.now;
         this.apply({ depth: 'out', hole: 0, held: 1, arms: 'flail', eyes: 'wide', mouth: 'o', body: '', fx: dirt(8, 16) });
@@ -403,6 +417,71 @@ export class Talpy {
         const look = this.st.look || [0, 0];
         this.v.lx = look[0];
         this.v.ly = look[1];
+    }
+
+    // ------------------------------------------------------------ a cookie (cookie.mjs)
+
+    // It sees a cookie (look: where it is, from its eyes, ahead); asleep, it
+    // wakes up first. done(true): it has seen it
+    seeCookie(look, done) {
+        if (this.held) {
+            if (done)
+                done(false);
+            return;
+        }
+        this.chasing = false;
+        this.play({ steps: COOKIE.spot(look, this.mood === 'done') }, done, false);
+    }
+
+    // Off after it: out of its burrow at a jump, then on its feet. No action
+    // or mood moves it until it has it (eat, stash) or you pick it up.
+    // Returns how much of its hole it leaves behind, as setHeld
+    chase() {
+        const left = this.st.tunnel === '1' || this.held ? 0 : clamp01(this.v.hole);
+        this.cancel();
+        this.held = false;
+        this.chasing = true;
+        this.chased = 'out';
+        this.apply(COOKIE.chase.out());
+        const v = this.v;
+        v.hole = v.holeFrom = v.holeTo = 0;
+        return left > 0.02 ? left : 0;
+    }
+
+    // How it goes after it: 'run', 'stand', 'beg' (out of reach), 'leap',
+    // 'reach' (a jump for one out of reach), 'pout'; look: where it is, as for seeCookie (eased, as its glances)
+    chaseAs(pose, look) {
+        if (!this.chasing)
+            return;
+        if (pose !== this.chased && COOKIE.chase[pose]) {
+            this.chased = pose;
+            this.apply(COOKIE.chase[pose]());
+        }
+        if (look)
+            this.st.look = look;
+    }
+
+    // It has it: eats it (news: '', 'first', 'milestone', 'full'; caught:
+    // out of the air) and digs in where it is
+    eat(news, caught, done) {
+        this.chasing = false;
+        this.play({ steps: COOKIE.eat(news, caught) }, done, false);
+    }
+
+    // Stuffed: it takes it down a new burrow, for later
+    stash(done) {
+        this.chasing = false;
+        this.play({ steps: COOKIE.stash() }, done, false);
+    }
+
+    // One it saved: dug up and eaten
+    digUp(done) {
+        if (this.held || this.chasing) {
+            if (done)
+                done(false);
+            return;
+        }
+        this.play({ steps: COOKIE.digUp() }, done, false);
     }
 
     // ------------------------------------------------------------ steps
@@ -510,7 +589,7 @@ export class Talpy {
         this.now = now;
         if (this.run && now >= this.run.until)
             this.next();
-        if (!this.run && !this.held && this.brainOn && now >= this.nextBrain)
+        if (!this.run && !this.held && !this.chasing && this.brainOn && now >= this.nextBrain)
             this.think();
         if (this.held && now - this.heldAt > 2200 && this.st.eyes !== 'tiny') {
             this.st.eyes = 'tiny';     // held up for long: scared

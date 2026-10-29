@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **A cookie for Talpy:** double-click the big Talpy's stage a little away
+  from it and a cookie pops up there. It spots it, jumps out of its burrow
+  (which stays where it was) and runs to it; drag the cookie around and it
+  follows, hold it up out of reach and it begs and keeps jumping for it,
+  lower it a little and it snatches it out of your hand. It eats it and
+  digs a new burrow right there. The corner of its stage counts the cookies
+  it ate (the same in every window), with confetti for the first and for
+  10, 25, 50, 100…; five in ten minutes and it's stuffed: the next one it
+  takes down its burrow for later, and digs it up another time. Clicking it
+  still pets it, and the headline and the line under it still open your
+  chats.
 - **A gear for the settings, and the same buttons in the same order as the
   widget:** the gear at the end of the view's title bar (and of the editor
   tab's header; **Talpy Den: Open Settings** in the Command Palette) opens

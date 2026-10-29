@@ -4,6 +4,8 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "talpy/talpy.mjs" as T
+import "talpy/cookie.mjs" as C
 
 // A stage where pets (Pet.qml) live. Two kinds:
 //
@@ -11,6 +13,8 @@ import org.kde.kirigami as Kirigami
 // follows the whole dashboard (warm when a chat needs you, blue while chats
 // work, green when they wait for your next message, a starry night once
 // everything is done), with a headline and the session counts beside him.
+// Double-click his stage a little away from him and there's a cookie for him
+// (Pet.qml); how many he ate shows in the corner.
 //
 // an account's stage (in GroupSection): one pet per chat of that account in
 // the sessions list, up to a few. A pet wears the chat's name on a tag in the
@@ -420,6 +424,75 @@ Item {
         Ticker {
             Layout.fillWidth: true
             items: strip.hero ? root.tickerItems : []
+        }
+    }
+
+    // A cookie for the hero where you double-click (Pet.qml says if that's
+    // too close to him). Under everything else: the headline and the ticker
+    // keep their clicks
+    MouseArea {
+        anchors.fill: parent
+        enabled: strip.hero
+        acceptedButtons: Qt.LeftButton
+        onDoubleClicked: mouse => {
+            const hero = strip.petFor("")
+            if (hero)
+                hero.placeCookie(mouse.x, mouse.y)
+        }
+    }
+
+    // How many cookies he ate (kept in the settings, shared by the copies)
+    function cookieTally() {
+        return { eaten: Plasmoid.configuration.cookiesEaten, saved: Plasmoid.configuration.cookiesSaved }
+    }
+    function setCookieTally(eaten, saved) {
+        Plasmoid.configuration.cookiesEaten = eaten
+        Plasmoid.configuration.cookiesSaved = saved
+    }
+
+    Item {
+        visible: strip.hero && Plasmoid.configuration.cookiesEaten + Plasmoid.configuration.cookiesSaved > 0
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: Kirigami.Units.smallSpacing
+        width: cookieJar.implicitWidth
+        height: cookieJar.implicitHeight
+        opacity: 0.75
+        z: 1
+
+        Row {
+            id: cookieJar
+            spacing: Kirigami.Units.smallSpacing / 2
+
+            Canvas {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.round(strip.gu * 0.75)
+                height: width
+                renderStrategy: Canvas.Cooperative
+                onWidthChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.reset()
+                    ctx.translate(width / 2, height / 2)
+                    ctx.scale(width / 2 / 6, width / 2 / 6)
+                    T.drawCookie(ctx)
+                }
+            }
+            PlasmaComponents3.Label {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: C.cookieCount(Plasmoid.configuration.cookiesEaten)
+                font: Kirigami.Theme.smallFont
+            }
+        }
+
+        PlasmaCore.ToolTipArea {
+            textFormat: Text.PlainText
+            anchors.fill: parent
+            mainText: i18np("Talpy ate %1 cookie", "Talpy ate %1 cookies", Plasmoid.configuration.cookiesEaten)
+            subText: (Plasmoid.configuration.cookiesSaved > 0
+                      ? i18np("%1 more saved for later.", "%1 more saved for later.", Plasmoid.configuration.cookiesSaved) + "\n" : "")
+                     + i18n("Double-click his stage, a little away from him, for another one.")
         }
     }
 

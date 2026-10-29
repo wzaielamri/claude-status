@@ -253,6 +253,49 @@
   touch-action: none;
 }
 
+/* The cookie you gave the hero (grab it: it follows), its shadow on the
+   floor, and how many it ate, in the corner */
+.cs-cookie,
+.cs-cookie-shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.cs-cookie {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.cs-cookie.cs-held {
+  cursor: grabbing;
+}
+
+.cs-cookie-shadow {
+  border-radius: 50%;
+  background: rgb(20 25 45 / 20%);
+}
+
+.cs-cookie[hidden],
+.cs-cookie-shadow[hidden],
+.cs-cookie-jar[hidden] {
+  display: none;
+}
+
+.cs-cookie-jar {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--cs-small-font);
+  opacity: 0.75;
+}
+
 /* Speech bubble above whoever speaks */
 .cs-bubble {
   position: absolute;

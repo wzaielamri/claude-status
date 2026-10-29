@@ -413,7 +413,7 @@ PlasmoidItem {
         "sshHosts", "remotePollSeconds", "sshUsage", "keepDoneHours", "showUsageInPanel", "showPet", "chatPets", "showTokens",
         "newChatInVscode", "iconBlink", "awayDigest", "awayMinutes", "phoneWhileAway", "phoneFinished", "phoneDevice",
         "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "usageRefreshMinutes", "recapRules", "clickOpensPane",
-        "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage"]
+        "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage", "cookiesEaten", "cookiesSaved"]
     property real settingsSeenAt: 0     // the newest shared settings this copy has seen
     property string settingsSeen: ""    // its own settings as of the last check (to see changes)
 

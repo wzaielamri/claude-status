@@ -3,7 +3,9 @@
 // buttons that fire pet events. See dev/pets.html for how to run it.
 //
 // Query: ?theme=light|dark, ?mood=done (the hero's mood), ?pets=N (pets
-// per account), ?phase=N (the demo's story), ?still (no scheduled events).
+// per account), ?phase=N (the demo's story), ?still (no scheduled events),
+// ?cookie=X,Y (a double-click there on the hero's stage after a second: a
+// cookie), ?eaten=N (cookies it ate so far).
 
 import "../webview/styles.css";
 import { pets } from "../webview/pets";
@@ -71,7 +73,17 @@ function box(className: string, parent: HTMLElement = app): HTMLDivElement {
   return el;
 }
 
-const hero = pets.createHeroStage(box("dev-hero"), callbacks);
+const hero = pets.createHeroStage(box("dev-hero"), { ...callbacks, saveCookies: (c) => console.log("cookies", c) });
+if (query.has("eaten")) pets.setCookies({ eaten: Number(query.get("eaten")), saved: 0 });
+const cookieAt = query.get("cookie");
+if (cookieAt) {
+  setTimeout(() => {
+    const [x, y] = cookieAt.split(",").map(Number);
+    const stage = document.querySelector(".cs-stage--hero")!;
+    const r = stage.getBoundingClientRect();
+    stage.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: r.left + x, clientY: r.top + y }));
+  }, 1000);
+}
 const accounts = new Map<string, { stage: PetStage; title: HTMLDivElement }>();
 const list = box("dev-list");
 

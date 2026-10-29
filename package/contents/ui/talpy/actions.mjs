@@ -302,6 +302,69 @@ export const ACTIONS = {
         { depth: 'gone', hole: 0, fx: dirt(4, 8), t: 450 }] }   // the hole closes
 };
 
+// A cookie you give it (cookie.mjs): it sees it, goes after it out of its
+// burrow on its feet (the host moves it: chase poses), then eats it, or
+// stuffed saves it for later, and digs in where it is. Not picked by any
+// mood: only the cookie's game plays these.
+const hearts = n => repeat(n, i => [['heart', rnd(16, 48), rnd(16, 28), { dy: rnd(-16, -10), dx: rnd(-6, 6), delay: i * 0.2 }]]);
+const bites = keep => repeat(3, i => [
+    Object.assign({ prop: 'cookie', arms: 'both', bite: i + 1, eyes: 'closed', mouth: 'open', fx: crumbs(), t: 360 }, keep),
+    Object.assign({ prop: 'cookie', arms: 'both', bite: i + 1, eyes: 'happy', mouth: 'small', t: rnd(340, 480) }, keep)]);
+const OUT = { depth: 'out', hole: 0 };
+// (its hole opens under it, it spins round and digs in: the end of a fall too)
+const digIn = () => [
+    { depth: 'out', hole: 1, eyes: 'happy', mouth: 'smile', t: 500 },
+    { body: 'spin', eyes: 'squint', fx: dirt(10), t: 700 },
+    { eyes: 'happy', t: 400 }];
+export const COOKIE = {
+    // It sees it (look: towards it); asleep, it sniffs and wakes up first
+    spot: (look, sleepy) => w => [
+        ...(sleepy ? [{ depth: 'low', eyes: 'closed', mouth: 'small', plume: 'flick',
+                        fx: [['text', 46, 24, { text: w('sniff sniff'), size: 5, dy: -5, dur: 1.2 }]], t: 900 }] : []),
+        { depth: 'high', eyes: 'wide', mouth: 'o', plume: 'up', look: look,
+          fx: [['exclaim', 32, 6, { dy: -6, dur: 1.2, s0: 0.4, s1: 1.1 }]], t: 600 },
+        { depth: 'high', eyes: 'star', mouth: 'open', plume: 'wild', look: look, fx: sparkles(2), t: 450 }],
+    // After it: out of its burrow at a jump, then running, begging under it
+    // (out of reach), jumping for it (and trying to, out of reach), or cross
+    // that you keep it away
+    chase: {
+        out: () => Object.assign({ body: 'jump', arms: 'up', eyes: 'wide', mouth: 'open', plume: 'up', tail: 'wag', fx: dirt(8, 16) }, OUT),
+        run: () => Object.assign({ walk: 1, arms: 'flail', eyes: 'wide', mouth: 'open', plume: 'bob', tail: 'wag' }, OUT),
+        stand: () => Object.assign({ arms: 'both', eyes: 'wide', mouth: 'open', plume: 'up', tail: 'wag' }, OUT),
+        beg: () => Object.assign({ body: 'bounce', arms: 'up', eyes: 'wide', mouth: 'open', plume: 'up', tail: 'wag' }, OUT),
+        leap: () => Object.assign({ body: 'jump', arms: 'up', eyes: 'wide', mouth: 'o', plume: 'up', tail: 'up' }, OUT),
+        reach: () => Object.assign({ body: 'jump', arms: 'up', eyes: 'squint', mouth: 'open', plume: 'wild', tail: 'up' }, OUT),
+        pout: () => Object.assign({ body: 'shake', eyes: 'squint', mouth: 'frown', plume: 'wild', tail: 'droop' }, OUT)
+    },
+    // Got it (caught: out of the air): eats it, and is happy, over the moon
+    // for a milestone ('first', 'milestone') or full ('full': it burps)
+    eat: (news, caught) => w => [
+        Object.assign({ prop: 'cookie', arms: 'both', eyes: 'star', mouth: 'o', look: [0, 1.4],
+                        fx: [...sparkles(2), ...(caught ? [['text', 32, 4, { text: w('got it!'), size: 6, dy: -6 }]] : [])], t: 650 }, OUT),
+        ...bites(OUT),
+        ...(news === 'full'
+            ? [Object.assign({ eyes: 'closed', mouth: 'o', body: 'inhale', fx: [['text', 48, 22, { text: w('*burp*'), size: 5.5, dy: -6 }]], t: 700 }, OUT),
+               Object.assign({ eyes: 'tired', mouth: 'smile', blush: 1, t: 900 }, OUT)]
+            : [Object.assign({ eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }], ...hearts(3)], t: 1000 }, OUT)]),
+        ...(news === 'first' || news === 'milestone'
+            ? [Object.assign({ body: 'hop', it: 2, arms: 'up', eyes: 'star', mouth: 'grin', plume: 'wild', fx: confetti(10), t: 1100 }, OUT)] : []),
+        ...digIn()],
+    // Stuffed: it takes it down its new burrow for later
+    stash: () => w => [
+        Object.assign({ prop: 'cookie', arms: 'both', eyes: 'happy', mouth: 'smile', look: [0, 1.4], t: 600 }, OUT),
+        { depth: 'out', hole: 1, prop: 'cookie', arms: 'both', eyes: 'wink', mouth: 'smile', t: 500 },
+        { depth: 'half', hole: 1, eyes: 'closed', mouth: 'small', fx: dirt(8), t: 600 },
+        { depth: 'high', hole: 1, eyes: 'happy', mouth: 'grin', blush: 1,
+          fx: [['text', 46, 20, { text: w('for later!'), size: 5.5, dy: -6 }], ['sparkle', 40, 30, { dy: -6 }]], t: 1000 }],
+    // One it saved, dug up again (some time later) and eaten
+    digUp: () => w => [
+        { depth: 'hidden', eyes: 'closed', fx: dirt(8), t: 700 },
+        { depth: 'high', prop: 'cookie', arms: 'both', eyes: 'star', mouth: 'open',
+          fx: [...dirt(6), ['text', 46, 18, { text: w('found it!'), size: 5.5, dy: -6 }]], t: 900 },
+        ...bites({ depth: 'high' }),
+        { depth: 'high', eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }], ...hearts(2)], t: 1000 }]
+};
+
 // Moods: how it looks between actions (base) and what it picks (pool)
 export const MOODS = {
     idle: { base: { eyes: 'open', mouth: 'smile', depth: 'half', lamp: 'idle' }, pause: [700, 2000],

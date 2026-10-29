@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   actions = new Actions(backend, dash, terminals, log, account);
   const accounts = new Accounts(backend, dash, terminals, account, log);
-  const view = new ViewHost(context.extensionUri, dash, actions);
+  const view = new ViewHost(context.extensionUri, dash, actions, context.globalState);
   // The Monday recap: once a week, the last 7 days in a few words; Open the
   // Recap shows the view on its Recap tab (week.py marks the week: the widget
   // and other windows don't show it again)

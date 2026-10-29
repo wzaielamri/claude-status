@@ -6,7 +6,9 @@
 // The hero (key "") mirrors all your sessions and has a life of its own: it
 // digs over to wherever your mouse is, has hobbies, naps and reacts to you.
 // Click to pet it (many quick clicks tickle), double-click to make it dance,
-// drag it out of its burrow and drop it.
+// drag it out of its burrow and drop it. Double-click its stage a little away
+// from it and there's a cookie (vendor/talpy/cookie.mjs): it sees it, runs
+// after it as you drag it about, and eats it.
 //
 // A chat's pet stands for one chat in the list: it acts that chat out (works,
 // calls you, rests while it's idle, sleeps once it's done, looks sad if it
@@ -16,8 +18,9 @@
 
 import type { ChatRef, Session } from "../../src/shared/types";
 import { stateText } from "../../src/shared/model";
+import { CookieGame, type CookieWords } from "../../vendor/talpy/cookie.mjs";
 import { Films } from "../../vendor/talpy/films.mjs";
-import { BOX, LILAC, Talpy, calmColors, drawHole, drawHoleSide } from "../../vendor/talpy/talpy.mjs";
+import { BOX, LILAC, Talpy, calmColors, drawCookie, drawHole, drawHoleSide } from "../../vendor/talpy/talpy.mjs";
 import type { StageChat } from "./api";
 import { PALETTE, textOn } from "./colors";
 import { Spring, Timer, Tween, ease, reducedMotion } from "./motion";
@@ -61,6 +64,25 @@ export function chatRef(c: StageChat): ChatRef {
     stopCommand: s.stopCommand,
     vscodeTerminal: s.vscodeTerminal,
   };
+}
+
+// What the hero says about its cookie (n: how many it ate)
+function cookieWords(what: CookieWords, n: number): string {
+  switch (what) {
+    case "spot": return ["A cookie?!", "Is that for me?", "Cookie!!"][Math.floor(Math.random() * 3)];
+    case "wake": return "Did someone say cookie?";
+    case "full": return "I'm stuffed… but I'll save it for later!";
+    case "gimme": return "Gimme!";
+    case "cross": return "Hey! No fair!";
+    case "aww": return "Aww, so close!";
+    case "first": return "My first cookie! Thank you! ♥";
+    case "milestone": return `${n} cookies! You're the best!`;
+    case "yum": return `Mmm! Cookie number ${n}.`;
+    case "burp": return "…I'm stuffed.";
+    case "saved": return "Saving this one for later!";
+    case "found": return "Found a cookie I saved!";
+  }
+  return "";
 }
 
 function div(className: string): HTMLDivElement {
@@ -116,6 +138,13 @@ export class Pet {
   private leftDrawn = "";
   private readonly fill: Tween;
   private readonly tag: HTMLDivElement | null;
+  // The hero's cookie game (vendor/talpy/cookie.mjs): ticked only while a
+  // cookie is out or it eats one; the cookie on a canvas of its own, drawn
+  // once and moved about (grab it: it follows), its shadow on the floor
+  private readonly game: CookieGame | null = null;
+  private readonly cookie: HTMLCanvasElement | null = null;
+  private readonly cookieShadow: HTMLDivElement | null = null;
+  private cookieOn = false;
   private readonly grab: HTMLDivElement;
   private readonly drawn: Record<string, string> = {};
 
@@ -203,14 +232,23 @@ export class Pet {
     this.grab.style.width = `${stage.bodyWidth + LARGE}px`;
     this.grab.style.height = `${stage.bodyHeight + LARGE}px`;
     this.tag = null;
+    if (this.lone) {
+      this.game = this.makeGame();
+      this.cookieShadow = div("cs-cookie-shadow");
+      this.cookieShadow.hidden = true;
+      this.cookie = document.createElement("canvas");
+      this.cookie.className = "cs-cookie";
+      this.cookie.hidden = true;
+    }
     if (!this.lone) {
       this.tag = div("cs-pet-tag");
       this.tag.style.background = PALETTE[colorIndex];
       this.tag.style.color = textOn(PALETTE[colorIndex]);
       this.tag.addEventListener("click", () => this.clicked());
     }
-    // (the hole first: under the pet)
-    stage.petLayer.append(this.leftHole, this.sheets, ...(this.tag ? [this.tag] : []), this.grab);
+    // (the hole and the cookie first: under the pet)
+    stage.petLayer.append(this.leftHole, ...(this.cookie ? [this.cookieShadow!, this.cookie] : []), this.sheets,
+      ...(this.tag ? [this.tag] : []), this.grab);
     this.listen();
     this.describe();
 
@@ -274,10 +312,10 @@ export class Pet {
     const live = this.stage.live,
       mood = this.mood,
       working = mood === "working" || mood === "agents";
-    this.lookTimer.setRunning(live && this.lone && this.stage.hovering && !this.held && mood !== "done");
-    this.contextTimer.setRunning(live && this.contextFullText !== "" && working && !this.leaving);
+    this.lookTimer.setRunning(live && this.lone && this.stage.hovering && !this.held && !this.cookieOn && mood !== "done");
+    this.contextTimer.setRunning(live && this.contextFullText !== "" && working && !this.leaving && !this.cookieOn);
     this.usageTimer.setRunning(
-      live && this.isMain && (this.stage.heroInput?.highUsageText ?? "") !== "" && mood !== "done" && !this.leaving,
+      live && this.isMain && (this.stage.heroInput?.highUsageText ?? "") !== "" && mood !== "done" && !this.leaving && !this.cookieOn,
     );
   }
 
@@ -348,7 +386,8 @@ export class Pet {
       return;
     }
     const mood = this.mood;
-    if (!this.lone || mood === "done" || mood === "loading" || offFor < 1500) return;
+    if (!this.lone || this.cookieOn || mood === "done" || mood === "loading" || offFor < 1500) return;
+    if (this.game?.surprise()) return; // (it digs up a cookie it saved)
     const holiday = holidayGreeting();
     if (holiday) {
       this.talpy.react("celebrate");
@@ -446,6 +485,10 @@ export class Pet {
   }
 
   private petIt(): void {
+    if (this.cookieOn) {
+      this.say("Cookie first!");
+      return;
+    }
     if (this.mood === "done") {
       this.sleepyClicks += 1;
       this.tickleTimer.restart();
@@ -476,6 +519,10 @@ export class Pet {
   }
 
   private dance(): void {
+    if (this.cookieOn) {
+      this.say("Cookie first!");
+      return;
+    }
     if (this.mood === "done") {
       this.talpy.react("yawn");
       this.say("…five more minutes.");
@@ -493,6 +540,7 @@ export class Pet {
     // (its hole doesn't come along: it stays where it was, until it has landed)
     const open = this.talpy.setHeld(true);
     if (open > 0) this.leaveHole(open);
+    this.game?.picked(); // (put down, it goes after its cookie again)
     this.say("Whoa!");
     this.changed();
   }
@@ -519,6 +567,7 @@ export class Pet {
     const feel = this.talpy.land(fromHeight / (this.stage.box / 64), () => {
       this.landing = false;
       if (this.destroyed) return;
+      this.game?.landed();
       if (this.leaving) this.goAway(); // its chat left while you held it: now it goes
       else if (!this.lone && Math.abs(this.px - this.homeX) > this.stage.bodyWidth * 0.5) this.digTo(this.homeX);
     });
@@ -534,6 +583,7 @@ export class Pet {
     if (mood === "needs" && waiting) return `${waiting} needs you!`;
     if (mood === "agents") return "Juggling subagents!";
     if (mood === "working") return "Busy coding… thanks!";
+    if (this.lone && this.stage.cookies().eaten === 0 && Math.random() < 0.35) return "Psst… double-click my stage for a cookie!";
     const lines = ["Hi!", "♥", "Ship it!", "All quiet here.", "Pet me more!"];
     return lines[Math.floor(Math.random() * lines.length)];
   }
@@ -541,14 +591,95 @@ export class Pet {
   // Something happened to its chat (or, for the hero, to an account)
   event(kind: string, text: string): void {
     if (this.held || this.leaving) return; // (a reaction now would stop it digging away)
-    if (!this.stage.live) {
-      this.missed = { kind, text, at: Date.now() }; // (acted out when it shows)
+    if (!this.stage.live || this.cookieOn) {
+      this.missed = { kind, text, at: Date.now() }; // (acted out when it shows, or has its cookie)
       return;
     }
     const action = ({ done: Math.random() < 0.4 ? "yay" : "finished", failed: "failed", stopped: "shrug", limit: "battery", oops: "confused", reset: "charged" } as
       Record<string, string>)[kind];
     this.talpy.react(action || "alert");
     this.say(text);
+  }
+
+  // ------------------------------------------------------------ a cookie
+
+  private makeGame(): CookieGame {
+    const s = this.stage;
+    return new CookieGame(this.talpy, {
+      stage: () => ({ width: s.width, ground: this.ground, unit: s.box / 64, bodyWidth: s.bodyWidth, bodyHeight: s.bodyHeight,
+        minX: this.minX, maxX: this.maxX }),
+      px: () => this.px,
+      moveTo: (x) => {
+        this.stride.stop(); // (it was digging somewhere else)
+        this.travelTo = -1;
+        this.px = x;
+      },
+      face: (left) => (this.talpy.facingLeft = left),
+      say: (what, n) => this.say(cookieWords(what, n)),
+      leaveHole: (open) => this.leaveHole(open),
+      fillHole: () => {
+        if (!this.leftHole.hidden) this.fill.run(this.leftOpen, 0, 350, ease.linear, () => (this.leftHole.hidden = true));
+      },
+      tally: () => s.cookies(),
+      setTally: (eaten, saved) => s.saveCookies({ eaten, saved }),
+      changed: () => this.cookieChanged(),
+      instant: () => reducedMotion(), // (no running about: it just has it)
+    });
+  }
+
+  // A double-click on the stage at (x, y): false if it's too close to it
+  placeCookie(x: number, y: number): boolean {
+    return !!this.game && this.stage.live && this.game.place(x, y);
+  }
+
+  private cookieChanged(): void {
+    const on = this.game?.on ?? false;
+    if (on !== this.cookieOn) {
+      this.cookieOn = on;
+      // done with its cookie: what happened meanwhile
+      const missed = this.missed;
+      if (!on && missed && this.stage.live) {
+        this.missed = null;
+        if (Date.now() - missed.at < MISSED_MS) this.event(missed.kind, missed.text);
+      }
+    }
+    this.changed();
+  }
+
+  // Where the cookie is: its canvas painted once (again at another size or
+  // zoom), then only moved
+  private renderCookie(): void {
+    const c = this.game?.cookie ?? null,
+      el = this.cookie!,
+      shadow = this.cookieShadow!;
+    if (!c) {
+      if (!el.hidden) el.hidden = shadow.hidden = true;
+      return;
+    }
+    if (el.hidden) el.hidden = shadow.hidden = false;
+    const k = devicePixelRatio || 1,
+      size = Math.ceil(c.r * 2 + 4);
+    if (this.drawn.cookieSize !== `${size}@${k}`) {
+      this.drawn.cookieSize = `${size}@${k}`;
+      el.width = el.height = Math.round(size * k);
+      el.style.width = el.style.height = `${size}px`;
+      const ctx = el.getContext("2d");
+      if (ctx) {
+        ctx.setTransform((k * c.r) / 5.6, 0, 0, (k * c.r) / 5.6, (k * size) / 2, (k * size) / 2);
+        drawCookie(ctx);
+      }
+    }
+    const r1 = (v: number) => Math.round(v * 10) / 10;
+    this.put(el, "cookie", "transform",
+      `translate(${r1(c.x - size / 2)}px, ${r1(c.y - size / 2)}px) rotate(${r1(c.angle)}deg) scale(${Math.round(c.scale * 100) / 100})`);
+    el.classList.toggle("cs-held", c.held);
+    // its shadow on the floor, smaller and lighter the higher it is
+    const over = Math.min(1, Math.max(0, this.ground - c.y - c.r) / (this.stage.box * 0.8)),
+      w = c.r * 2 * (1 - 0.4 * over) * c.scale;
+    this.put(shadow, "shadow", "transform", `translate(${r1(c.x - w / 2)}px, ${r1(this.ground - w * 0.12)}px)`);
+    this.put(shadow, "shadowW", "width", `${r1(w)}px`);
+    this.put(shadow, "shadowH", "height", `${r1(w * 0.24)}px`);
+    this.put(shadow, "shadowO", "opacity", String(Math.round((1 - 0.6 * over) * 100) / 100));
   }
 
   // ------------------------------------------------------------ input
@@ -603,11 +734,31 @@ export class Pet {
     };
     g.addEventListener("pointercancel", cancel);
     g.addEventListener("lostpointercapture", cancel);
+    // The cookie: grab it and it comes along
+    const c = this.cookie;
+    if (!c) return;
+    c.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || !this.game) return;
+      e.preventDefault();
+      const p = this.stage.local(e);
+      if (!this.game.grab(p.x, p.y)) return;
+      c.setPointerCapture(e.pointerId);
+    });
+    c.addEventListener("pointermove", (e) => {
+      if (!c.hasPointerCapture(e.pointerId)) return;
+      const p = this.stage.local(e);
+      this.game?.drag(p.x, p.y);
+    });
+    const letGo = (): void => this.game?.drop();
+    c.addEventListener("pointerup", letGo);
+    c.addEventListener("pointercancel", letGo);
+    c.addEventListener("lostpointercapture", letGo);
   }
 
   // ------------------------------------------------------------ drawing
 
-  private put(el: HTMLElement, name: string, prop: "transform" | "transformOrigin" | "cursor" | "maxWidth", value: string): void {
+  private put(el: HTMLElement, name: string, prop: "transform" | "transformOrigin" | "cursor" | "maxWidth" | "width" | "height" | "opacity",
+    value: string): void {
     if (this.drawn[name] === value) return;
     this.drawn[name] = value;
     el.style[prop] = value;
@@ -620,6 +771,8 @@ export class Pet {
       ground = this.ground;
     const now = s.clock.now();
     this.talpy.tick(now); // (first: the frame its burrow starts to open, it's upright)
+    if (this.game?.on) this.game.tick(now);
+    if (this.cookie) this.renderCookie();
     this.spring(now);
     const px = Math.round(this.px * 10) / 10,
       shown = Math.round(this.shown.value * 10) / 10,
@@ -679,7 +832,7 @@ export class Pet {
   // live while you hold it, until it has landed.
   private draw(now: number): void {
     const f = this.film;
-    f.on = !this.landing && !reducedMotion();
+    f.on = !this.landing && !this.game?.chasing && !reducedMotion();
     let changed = f.tick(now);
     if (this.paintSheets()) changed = true; // (drawn at once: shown at once)
     if (changed) this.compose();
@@ -802,6 +955,6 @@ export class Pet {
     this.destroyed = true;
     for (const t of [this.stride, this.faller, this.fill]) t.stop();
     for (const t of [this.lookTimer, this.tickleTimer, this.contextTimer, this.usageTimer]) t.stop();
-    for (const el of [this.leftHole, this.sheets, this.tag, this.grab]) el?.remove();
+    for (const el of [this.leftHole, this.cookieShadow, this.cookie, this.sheets, this.tag, this.grab]) el?.remove();
   }
 }

@@ -18,6 +18,8 @@ export function calmColors(tint: string): TalpyColors;
 export function drawHole(ctx: unknown, hole: number): void;   // an empty hole in the 64 × 64 box (hole: 0 to 1.1, as it opens or closes)
 // the open hole's back or front, turned left or not, in the 64 × 64 box (for Talpy.holeImage)
 export function drawHoleSide(ctx: unknown, part: "back" | "front", left: boolean): void;
+// a cookie (the one it eats), 5.6 box units round, centred at the context's origin (cookie.mjs)
+export function drawCookie(ctx: unknown): void;
 
 // A film's picture of it (Talpy.still), see films.mjs
 export interface Still {
@@ -38,6 +40,9 @@ export class Talpy {
     readonly holeOpen: boolean;   // its burrow is open or opening under it
     readonly frameMs: number;   // how often a picture is worth drawing now: 40 (quick moves), 80 (slow) or 200 (at rest)
     readonly run: unknown;
+    readonly mood: string;
+    readonly held: boolean;
+    readonly chasing: boolean;   // after a cookie (cookie.mjs): on its feet, the host moves it
     readonly now: number;
     readonly settled: boolean;   // what's eased between poses is where it's going
     // the open hole's back or front drawn by drawHoleSide on a sheet the size of the canvas, at the
@@ -50,6 +55,13 @@ export class Talpy {
     setHeld(held: boolean): number;   // how much of its hole it leaves behind (0 to 1): draw that where it was, drawHole
     land(height: number, done?: ((ok: boolean) => void) | null): "sick" | "dizzy" | "fine";   // height in box units
     pose(step?: Record<string, unknown>): void;
+    // a cookie (cookie.mjs drives these)
+    seeCookie(look: [number, number], done?: ((ok: boolean) => void) | null): void;
+    chase(): number;   // how much of its hole it leaves behind, as setHeld
+    chaseAs(pose: "out" | "run" | "stand" | "beg" | "leap" | "reach" | "pout", look?: [number, number]): void;
+    eat(news: string, caught: boolean, done?: ((ok: boolean) => void) | null): void;
+    stash(done?: ((ok: boolean) => void) | null): void;
+    digUp(done?: ((ok: boolean) => void) | null): void;
     tick(now: number): void;
     draw(ctx: unknown, withoutParticles?: boolean): void;
     drawParticles(ctx: unknown, now: number): void;

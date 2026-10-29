@@ -11,13 +11,16 @@ import type { Dashboard } from "./dashboard";
 import { findChatRef, findMemory, findPlan, goOnAt, machineStatus, shareAccounts } from "./shared/model";
 import { answersOf, askShownOf } from "./shared/pane";
 import { permsHost, weekAsked, weekRevokeAsked, weekRuleAsked } from "./shared/week";
-import type { ChatRef, Group, HostMessage, PlanItem, WebviewMessage } from "./shared/types";
+import type { ChatRef, Cookies, Group, HostMessage, PlanItem, WebviewMessage } from "./shared/types";
 import { isDecision } from "./shared/types";
 
 const AGENT_ID = /^[A-Za-z0-9_-]{1,100}$/;
 const CHAT_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const PROFILE_DIR = /^[A-Za-z0-9._-]{1,100}$/;
 const TIP_COMMAND = /^\/[a-z][a-z-]{0,30}( [a-z0-9-]{1,30})?$/; // what a Recap tab tip suggests, e.g. "/effort xhigh"
+
+// Where the big Talpy's cookie tally is kept (global state)
+const COOKIES_KEY = "talpyDen.cookies";
 
 export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = "talpyDen.view";
@@ -32,6 +35,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     private extensionUri: vscode.Uri,
     private dash: Dashboard,
     private actions: Actions,
+    private memento?: vscode.Memento, // (the big Talpy's cookies)
   ) {
     this.disposables.push(
       dash.onState((state) => this.broadcast({ type: "state", state })),
@@ -134,6 +138,11 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     this.broadcast({ type: "showTab", tab });
   }
 
+  private cookies(): Cookies {
+    const c = this.memento?.get<Partial<Cookies>>(COOKIES_KEY);
+    return { eaten: c?.eaten ?? 0, saved: c?.saved ?? 0 };
+  }
+
   private broadcast(message: HostMessage): void {
     for (const w of this.webviews) void w.postMessage(message);
   }
@@ -165,6 +174,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
         void webview.postMessage({ type: "visible", visible: this.isVisible(webview) } satisfies HostMessage);
         if (this.shownTab) void webview.postMessage({ type: "showTab", tab: this.shownTab } satisfies HostMessage);
         this.shownTab = null;
+        void webview.postMessage({ type: "cookies", cookies: this.cookies() } satisfies HostMessage);
         break;
       case "open":
         // (a click on a chat: its tab, unless clicks open the chat itself)
@@ -393,6 +403,16 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
       case "openUsagePage":
         void vscode.commands.executeCommand("talpyDen.openUsagePage");
         break;
+      case "cookies": {
+        // (counts: whole numbers, never below 0)
+        const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0);
+        const c = m.cookies && typeof m.cookies === "object" ? m.cookies : null;
+        if (!c || !this.memento) break;
+        const cookies: Cookies = { eaten: count(c.eaten), saved: count(c.saved) };
+        void this.memento.update(COOKIES_KEY, cookies);
+        this.broadcast({ type: "cookies", cookies }); // (the other views show it too)
+        break;
+      }
     }
   }
 

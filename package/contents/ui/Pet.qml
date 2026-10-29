@@ -3,6 +3,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import "talpy/talpy.mjs" as T
+import "talpy/cookie.mjs" as C
 
 // One Talpy on the pet strip (PetStrip.qml). The creature itself (looks,
 // moods, what it does) is talpy/talpy.mjs, drawn by TalpyView.qml; this is
@@ -11,7 +12,9 @@ import "talpy/talpy.mjs" as T
 // The lone Talpy (petKey "") mirrors all your sessions and has a life of its
 // own: it digs over to wherever your mouse is, has hobbies, naps and reacts to
 // you. Click to pet it (many quick clicks tickle), double-click to make it
-// dance, drag it out of its burrow and drop it.
+// dance, drag it out of its burrow and drop it. Double-click its stage a
+// little away from it and there's a cookie (talpy/cookie.mjs): it sees it,
+// runs after it as you drag it about, and eats it.
 //
 // A chat's pet stands for one chat in the sessions list: it acts that chat out
 // (works, calls you, rests while it's idle, sleeps once it's done, looks sad if
@@ -100,6 +103,12 @@ Item {
     property string lastMood: ""
     property var missed: null       // {kind, text, at}: what happened while it couldn't be seen
     property real actedOutAt: 0     // when it last acted that out
+    // The lone Talpy's cookie game (talpy/cookie.mjs): ticked only while a
+    // cookie is out or it eats one (cookieOn); chasing: it runs after it,
+    // drawn live
+    property var game: null
+    property bool cookieOn: false
+    property bool chasing: false
     readonly property var talpy: view.talpy
 
     anchors.fill: parent
@@ -147,6 +156,8 @@ Item {
     function start() {
         talpy.setMood(mood)
         lastMood = mood
+        if (lone)
+            makeGame()
         if (lone && !strip.firstShown)
             return            // the first time the popup opens it's just there
         arriving = true       // a new chat: it digs up out of the ground
@@ -181,8 +192,10 @@ Item {
         }
     }
     onLiveChanged: {
-        if (!live || !lone || !talpy || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000)
+        if (!live || !lone || !talpy || cookieOn || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000)
             return   // (what it missed meanwhile comes instead, see onPlayingChanged)
+        if (game && game.surprise())
+            return   // (it digs up a cookie it saved)
         const holiday = holidayGreeting()
         if (holiday) {
             react("celebrate")
@@ -237,6 +250,10 @@ Item {
     }
 
     function petIt() {
+        if (cookieOn) {
+            say(i18n("Cookie first!"))
+            return
+        }
         if (mood === "done") {
             sleepyClicks += 1
             tickleTimer.restart()
@@ -267,6 +284,10 @@ Item {
     }
 
     function dance() {
+        if (cookieOn) {
+            say(i18n("Cookie first!"))
+            return
+        }
         if (mood === "done") {
             react("yawn")
             say(i18n("…five more minutes."))
@@ -288,6 +309,8 @@ Item {
             if (open > 0)
                 leaveHole(open)
         }
+        if (game)
+            game.picked()   // (put down, it goes after its cookie again)
         say(i18n("Whoa!"))
     }
 
@@ -315,6 +338,8 @@ Item {
         }
         const feel = talpy.land(fromHeight / unit, () => {
             pet.landing = false
+            if (pet.game)
+                pet.game.landed()
             if (pet.leaving)
                 pet.goAway()      // its chat left while you held it: now it goes
             else if (!pet.lone && Math.abs(pet.px - pet.homeX) > pet.bodyWidth * 0.5)
@@ -334,6 +359,8 @@ Item {
             return i18np("Juggling %1 agent!", "Juggling %1 agents!", root.agentsRunning)
         if (mood === "working")
             return i18n("Busy coding… thanks!")
+        if (lone && strip.cookieTally().eaten === 0 && Math.random() < 0.35)
+            return i18n("Psst… double-click my stage for a cookie!")
         const lines = [i18n("Hi!"), "♥", i18n("Ship it!"), i18n("All quiet here."), i18n("Pet me more!")]
         return lines[Math.floor(Math.random() * lines.length)]
     }
@@ -342,13 +369,91 @@ Item {
     function event(kind, text) {
         if (held || leaving)
             return   // (a reaction now would stop it digging away)
-        if (!playing) {
-            missed = { kind: kind, text: text, at: Date.now() }   // (acted out when it can be seen)
+        if (!playing || cookieOn) {
+            missed = { kind: kind, text: text, at: Date.now() }   // (acted out when it can be seen, or has its cookie)
             return
         }
         const action = { done: Math.random() < 0.4 ? "yay" : "finished", failed: "failed", stopped: "shrug", limit: "battery", oops: "confused", reset: "charged" }[kind]
         react(action || "alert")
         say(text)
+    }
+
+    // ------------------------------------------------------------ a cookie
+
+    function makeGame() {
+        game = new C.CookieGame(talpy, {
+            stage: () => ({ width: strip.width, ground: pet.ground, unit: pet.unit, bodyWidth: pet.bodyWidth,
+                            bodyHeight: pet.bodyHeight, minX: pet.minX, maxX: pet.maxX }),
+            px: () => pet.px,
+            moveTo: x => {
+                stride.stop()   // (it was digging somewhere else)
+                pet.travelTo = -1
+                pet.px = x
+            },
+            face: left => { view.facingLeft = left },
+            say: (what, n) => pet.say(pet.cookieWords(what, n)),
+            leaveHole: open => pet.leaveHole(open),
+            fillHole: () => { if (leftHole.shown) closeHole.restart() },
+            tally: () => strip.cookieTally(),
+            setTally: (eaten, saved) => strip.setCookieTally(eaten, saved),
+            changed: () => pet.cookieChanged(),
+            instant: () => false
+        })
+    }
+
+    // A double-click on the stage at (x, y): false if it's too close to it
+    function placeCookie(x, y) {
+        return game !== null && playing && game.place(x, y)
+    }
+
+    function cookieChanged() {
+        cookieOn = game.on
+        chasing = game.chasing
+        const c = game.cookie
+        cookie.shown = c !== null
+        if (!c)
+            return
+        cookie.r = c.r
+        cookie.cx = c.x
+        cookie.cy = c.y
+        cookie.pop = c.scale
+        cookie.angle = c.angle
+    }
+
+    // Done with its cookie: what happened meanwhile
+    onCookieOnChanged: {
+        if (cookieOn || !playing || !missed)
+            return
+        const m = missed
+        missed = null
+        if (fresh(m))
+            event(m.kind, m.text)
+    }
+
+    function cookieWords(what, n) {
+        switch (what) {
+        case "spot": return [i18n("A cookie?!"), i18n("Is that for me?"), i18n("Cookie!!")][Math.floor(Math.random() * 3)]
+        case "wake": return i18n("Did someone say cookie?")
+        case "full": return i18n("I'm stuffed… but I'll save it for later!")
+        case "gimme": return i18n("Gimme!")
+        case "cross": return i18n("Hey! No fair!")
+        case "aww": return i18n("Aww, so close!")
+        case "first": return i18n("My first cookie! Thank you! ♥")
+        case "milestone": return i18n("%1 cookies! You're the best!", n)
+        case "yum": return i18n("Mmm! Cookie number %1.", n)
+        case "burp": return i18n("…I'm stuffed.")
+        case "saved": return i18n("Saving this one for later!")
+        case "found": return i18n("Found a cookie I saved!")
+        }
+        return ""
+    }
+
+    Connections {
+        target: root
+        enabled: pet.cookieOn && pet.playing && pet.game !== null
+        function onPetFrame(now) {
+            pet.game.tick(now)
+        }
     }
 
     // ------------------------------------------------------------ timers
@@ -366,7 +471,7 @@ Item {
     Timer {
         interval: 350
         repeat: true
-        running: pet.playing && pet.lone && pet.strip.cursorX >= 0 && !pet.held && pet.mood !== "done"
+        running: pet.playing && pet.lone && pet.strip.cursorX >= 0 && !pet.held && !pet.cookieOn && pet.mood !== "done"
         onTriggered: {
             if (Math.abs(pet.strip.cursorX - pet.px) > pet.bodyWidth * 0.4)
                 view.facingLeft = pet.strip.cursorX < pet.px
@@ -381,7 +486,7 @@ Item {
     Timer {
         interval: 40000
         repeat: true
-        running: pet.playing && pet.contextFullText !== "" && (pet.mood === "working" || pet.mood === "agents") && !pet.leaving
+        running: pet.playing && pet.contextFullText !== "" && (pet.mood === "working" || pet.mood === "agents") && !pet.leaving && !pet.cookieOn
         triggeredOnStart: true
         onTriggered: {
             if (!pet.held && pet.talpy && !pet.talpy.run) {
@@ -395,7 +500,7 @@ Item {
     Timer {
         interval: 25000
         repeat: true
-        running: pet.playing && pet.isMain && root.highUsageText !== "" && pet.mood !== "done" && !pet.leaving
+        running: pet.playing && pet.isMain && root.highUsageText !== "" && pet.mood !== "done" && !pet.leaving && !pet.cookieOn
         triggeredOnStart: true
         onTriggered: {
             if (pet.held || !pet.talpy || pet.talpy.run)
@@ -466,6 +571,62 @@ Item {
         onFinished: leftHole.shown = false
     }
 
+    // The cookie you gave it (talpy/cookie.mjs), under it: painted once and
+    // moved about (grab it: it follows), its shadow on the floor
+    Rectangle {
+        readonly property real over: Math.min(1, Math.max(0, pet.ground - cookie.cy - cookie.r) / (pet.box * 0.8))
+        visible: cookie.visible
+        width: cookie.r * 2 * (1 - 0.4 * over) * cookie.pop
+        height: width * 0.24
+        radius: height / 2
+        x: cookie.cx - width / 2
+        y: pet.ground - height / 2
+        color: Qt.rgba(0.08, 0.1, 0.18, 0.2 * (1 - 0.6 * over))
+    }
+
+    Canvas {
+        id: cookie
+        property bool shown: false
+        property real r: pet.unit * 7
+        property real cx: 0
+        property real cy: 0
+        property real pop: 0
+        property real angle: 0
+        visible: shown && !pet.departed
+        width: Math.ceil(r * 2 + 4)
+        height: width
+        x: cx - width / 2
+        y: cy - height / 2
+        scale: pop
+        rotation: angle
+        renderStrategy: Canvas.Cooperative
+        onWidthChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            ctx.translate(width / 2, height / 2)
+            ctx.scale(r / 5.6, r / 5.6)
+            T.drawCookie(ctx)
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+            preventStealing: true
+            onPressed: mouse => {
+                const p = mapToItem(pet, mouse.x, mouse.y)
+                if (!pet.game.grab(p.x, p.y))
+                    mouse.accepted = false
+            }
+            onPositionChanged: mouse => {
+                const p = mapToItem(pet, mouse.x, mouse.y)
+                pet.game.drag(p.x, p.y)
+            }
+            onReleased: pet.game.drop()
+            onCanceled: pet.game.drop()
+        }
+    }
+
     TalpyView {
         id: view
         visible: !pet.departed   // (dug away: not even back up for the moment before it's removed)
@@ -487,7 +648,7 @@ Item {
         // chat's pet: smaller, so a picture every other tick (30 a second in
         // the popup, 15 on the desktop: even steps, each picture as long),
         // pictures in between poses, still at rest.
-        live: pet.landing
+        live: pet.landing || pet.chasing
         sheets: pet.lone ? 36 : 32
         frameMs: pet.lone ? root.petFrameMs : 2 * root.petFrameMs
         maxFrames: 32
