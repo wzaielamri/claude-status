@@ -16,6 +16,9 @@ PlasmaExtras.Representation {
     Layout.preferredHeight: Kirigami.Units.gridUnit * 30
 
     collapseMarginsHint: true
+    // (a tab sliding in comes from the frame's edge: it was drawn over the
+    // desktop beside the popup until it got there)
+    clip: true
 
     header: PlasmaExtras.PlasmoidHeading {
         RowLayout {
@@ -161,7 +164,7 @@ PlasmaExtras.Representation {
             const from = tabIndex > shownTab ? 1 : -1
             shownTab = tabIndex
             tabSlideIn.stop()
-            tabSlide.x = from * Kirigami.Units.gridUnit * 2.5
+            tabSlide.x = from * Kirigami.Units.gridUnit * 1.5
             tabContent.opacity = 0.35
             tabSlideIn.start()
         }
