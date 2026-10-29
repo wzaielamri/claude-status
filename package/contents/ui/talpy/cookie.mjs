@@ -43,7 +43,7 @@ const CROSS_MS = 9000;       // after it that long (and you keep moving it): cro
 const POP_MS = 300;          // a new one pops up (grows) that long, then floats down
 const HOP = 55;              // as it pops up it hops up a little (box units/s)
 const G = 350;               // how fast it falls (box units/s²): a light one,
-const AIR_S = 0.4;           // the air holding it back (it falls at most G × AIR_S)
+const AIR_S = 0.7;           // the air holding it back (it falls at most G × AIR_S)
 const BOUNCE = 0.45;         // how much of its speed it bounces back with off the floor,
 const SETTLE = 28;           // and slower than that (box units/s) it just stays down
 
