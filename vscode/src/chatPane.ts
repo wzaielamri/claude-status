@@ -343,6 +343,11 @@ class Pane implements vscode.Disposable {
       where: chatWhere(session, this.terminalHere),
       terminalApp: session?.terminalApp ?? "",
       attached: session?.kind === "bg" ? (session.attached ?? null) : null,
+      profile: session?.profile ?? "",
+      shared: session?.shared ?? null,
+      mode: session?.peek?.mode ?? "",
+      plan: session?.plan ? { title: session.plan.title } : null,
+      agents: session?.agents ?? null,
     };
     this.panel.title = chat.name || this.chatId.slice(0, 8);
     if (this.ready) this.post({ type: "chat", chat });
@@ -465,6 +470,11 @@ class Pane implements vscode.Disposable {
         const r = await backend.pane(["--reviewed", this.chatId, ...(m.on ? [] : ["--off"]), ...(this.host ? ["--host", this.host] : [])]);
         this.result("reviewed", { ok: !!r.ok, message: String(r.message ?? "") });
         this.owner.refresh(this.host);
+        break;
+      }
+      case "openPlan": {
+        const { session } = findPaneRow(this.owner.ext.dash.state(), this.host, this.chatId);
+        if (session?.plan) void this.owner.ext.actions.openPlan({ ...session.plan, profileDir: this.chat.profileDir }, this.host || undefined, false);
         break;
       }
       case "openWindow":

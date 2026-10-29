@@ -2837,6 +2837,12 @@ PlasmoidItem {
         active: root.paneChat !== null
         source: "ChatPane.qml"
         onLoaded: {
+            // (at the size it'll have beside the popup from the start: KWin only moves it there)
+            const geometry = root.paneGeometry(item)
+            if (geometry) {
+                item.width = geometry[2]
+                item.height = geometry[3]
+            }
             item.visible = true
             paneTimer.restart()
         }
@@ -2851,14 +2857,12 @@ PlasmoidItem {
 
     // (then it grows out of its chat's row: from the side the popup is on, at
     // the height of the row, else of the popup's middle)
-    function placePane() {
-        const win = paneLoader.item
+    // [x, y, width, height] of the pane beside the popup, on the side with more
+    // room, as tall as the popup; null while the popup isn't shown
+    function paneGeometry(win) {
         const item = root.fullRepresentationItem
-        if (!win || !item || !root.expanded || !item.visible || !item.Window.window) {
-            if (win)
-                win.grow(true, win.height / 2)
-            return
-        }
+        if (!win || !item || !root.expanded || !item.visible || !item.Window.window)
+            return null
         const p = item.mapToGlobal(0, 0)
         const sx = item.Screen.virtualX, sy = item.Screen.virtualY, sw = item.Screen.width, sh = item.Screen.height
         const gap = Kirigami.Units.smallSpacing
@@ -2867,14 +2871,26 @@ PlasmoidItem {
         const x = right >= width || right >= left ? p.x + item.width + gap : p.x - gap - width
         const height = Math.round(Math.min(sh, Math.max(item.height, win.minimumHeight)))
         const y = p.y - sy > sh / 2 ? p.y + item.height - height : p.y   // (bottoms lined up under a bottom panel)
-        const geometry = [Math.round(x), Math.round(Math.max(sy, Math.min(y, sy + sh - height))), width, height]
+        return [Math.round(x), Math.round(Math.max(sy, Math.min(y, sy + sh - height))), width, height]
+    }
+
+    function placePane() {
+        const win = paneLoader.item
+        const item = root.fullRepresentationItem
+        const geometry = paneGeometry(win)
+        if (!geometry) {
+            if (win)
+                win.grow(true, win.height / 2)
+            return
+        }
+        const p = item.mapToGlobal(0, 0)
         placer.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --place-window " + shellQuote(win.title)
                              + " " + geometry.join(",") + " # " + Date.now())
         const chat = root.paneChat || {}
         const spot = root.rowSpots[root.rowKeyOf(chat, chat.host)]
         const fromY = spot !== undefined && root.rowSpace ? root.rowSpace.mapToGlobal(0, spot).y + Kirigami.Units.gridUnit
                                                           : p.y + item.height / 2
-        win.grow(x > p.x, fromY - geometry[1])
+        win.grow(geometry[0] > p.x, fromY - geometry[1])
     }
 
     Exec {

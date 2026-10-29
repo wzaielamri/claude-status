@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
-import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import "markdown.mjs" as Md
 
@@ -198,7 +197,7 @@ ColumnLayout {
             font.bold: true
             onClicked: ask.answered("approve-edits", "", null)
 
-            PlasmaCore.ToolTipArea {
+            TipArea {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Approve and accept edits")
@@ -211,7 +210,7 @@ ColumnLayout {
             text: i18n("Approve")
             onClicked: ask.answered("approve", "", null)
 
-            PlasmaCore.ToolTipArea {
+            TipArea {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Approve")
@@ -243,7 +242,7 @@ ColumnLayout {
             text: i18n("Always allow")
             onClicked: ask.answered("always", "", null)
 
-            PlasmaCore.ToolTipArea {
+            TipArea {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Always allow")

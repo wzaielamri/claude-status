@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
-import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import "codehtml.mjs" as Code
 
@@ -82,7 +81,7 @@ Rectangle {
         text: Plasmoid.configuration.diffSideBySide ? i18n("One after the other") : i18n("Side by side")
         onClicked: Plasmoid.configuration.diffSideBySide = !Plasmoid.configuration.diffSideBySide
 
-        PlasmaCore.ToolTipArea {
+        TipArea {
             textFormat: Text.PlainText
             anchors.fill: parent
             mainText: parent.text

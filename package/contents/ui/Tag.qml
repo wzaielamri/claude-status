@@ -1,6 +1,5 @@
 import QtQuick
 import org.kde.plasma.components as PlasmaComponents3
-import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 
 // Small outlined label, e.g. the profile or "VS Code" next to a session name.
@@ -32,7 +31,7 @@ Rectangle {
         opacity: tag.warning ? 1 : 0.8
     }
 
-    PlasmaCore.ToolTipArea {
+    TipArea {
         textFormat: Text.PlainText
         anchors.fill: parent
         active: tag.tooltip !== ""

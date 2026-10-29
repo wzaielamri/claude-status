@@ -3,7 +3,6 @@ import QtQuick.Layouts
 import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
-import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import "hub"
 import "markdown.mjs" as Md
@@ -21,6 +20,7 @@ import "codehtml.mjs" as Code
 // Mark reviewed. One window, for the chat root.paneChat.
 Window {
     id: pane
+    objectName: "talpyDenChatPane"   // (TipArea: tooltips drawn in this window)
 
     readonly property var chat: root.paneChat || ({})
     readonly property var row: root.paneRow   // its row in the status now (null: not listed)
@@ -51,7 +51,7 @@ Window {
     width: Kirigami.Units.gridUnit * 38
     height: Kirigami.Units.gridUnit * 40
     // (never narrower than the send buttons, which don't shrink)
-    minimumWidth: Math.max(Kirigami.Units.gridUnit * 22, sendButtons.implicitWidth + Kirigami.Units.largeSpacing * 2)
+    minimumWidth: Math.max(Kirigami.Units.gridUnit * 22, widestSend.width + Kirigami.Units.largeSpacing * 2)
     minimumHeight: Kirigami.Units.gridUnit * 18
     color: Kirigami.Theme.backgroundColor
     onClosing: {
@@ -901,6 +901,17 @@ Window {
         return [added, removed]
     }
 
+    // (the send buttons at their widest, all three, never shown: the window's
+    // least width doesn't change as the chat's state does, so it doesn't resize)
+    Row {
+        id: widestSend
+        visible: false
+        spacing: Kirigami.Units.smallSpacing
+        PlasmaComponents3.Button { icon.name: "edit-copy"; text: i18n("Copy and open its tab") }
+        PlasmaComponents3.Button { icon.name: "chronometer"; text: i18n("Send when this turn ends") }
+        PlasmaComponents3.Button { icon.name: "document-send"; text: i18n("Send, go on in the background") }
+    }
+
     // ---------------------------------------------------------------- what's shown
 
     Rectangle {
@@ -1025,7 +1036,7 @@ Window {
                     text: i18n("Open its window")
                     onClicked: root.openRow(pane.row || pane.chat, pane.host)
 
-                    PlasmaCore.ToolTipArea {
+                    TipArea {
                         textFormat: Text.PlainText
                         anchors.fill: parent
                         mainText: i18n("Open its window")
@@ -1062,6 +1073,45 @@ Window {
                           : shownIn.in === "vscode" ? i18nc("where a chat runs", "VS Code terminal") : i18nc("where a chat runs", "Terminal")
                     tooltip: !shownIn ? "" : shownIn.app ? i18n("Shown in a terminal too (%1): claude attach.", shownIn.app)
                                                          : i18n("Shown in a terminal too: claude attach.")
+                }
+                // what its row in the list says of it too: shared, its permission
+                // mode, its plan, its subagents (SessionRow.qml's tags)
+                Tag {
+                    readonly property var info: pane.row ? pane.row.shared : null
+                    visible: !!info
+                    text: info && info.forkOf ? i18n("⇄ Shared copy") : i18n("⇄ Shared")
+                    tooltipTitle: info && info.forkOf ? i18n("Copy of a shared chat") : i18n("Shared chat")
+                    tooltip: !info ? "" : info.forkOf
+                             ? i18n("A copy of a chat shared between the %1 profiles: Claude forked it into a chat of its own on %2, so new messages here are only on %2.",
+                                    info.profiles.join(" + "), info.forkOn)
+                             : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one session can have it open at a time.",
+                                    info.profiles.join(" + "))
+                }
+                Tag {
+                    readonly property string mode: pane.row && pane.row.peek ? pane.row.peek.mode || "" : ""
+                    visible: root.modeText(mode) !== ""
+                    text: root.modeText(mode)
+                    warning: mode === "bypassPermissions"
+                    tooltipTitle: i18n("Permission mode: %1", root.modeText(mode))
+                    tooltip: root.modeHint(mode)
+                }
+                Tag {
+                    visible: !!pane.row && !!pane.row.plan
+                    text: i18nc("a chat's plan, click to open it", "Plan ↗")
+                    clickable: true
+                    onClicked: root.openPlan(pane.row.plan.slug, pane.profileDir, pane.host)
+                    tooltipTitle: pane.row && pane.row.plan ? pane.row.plan.title : ""
+                    tooltip: pane.host ? i18n("The plan this chat made. Click to read it: a copy, fetched from %1.", pane.host)
+                                       : i18n("The plan this chat made. Click to read it, rendered.")
+                }
+                Tag {
+                    readonly property var agents: pane.row && pane.row.agents ? pane.row.agents : null
+                    visible: agents !== null && agents.total > 0
+                    text: agents ? i18nc("subagents finished/total", "Agents %1/%2", agents.done, agents.total) : ""
+                    active: agents !== null && agents.running > 0
+                    tooltipTitle: i18n("Subagents")
+                    tooltip: !agents ? "" : i18n("%1 done, %2 running, %3 stopped", agents.done, agents.running, agents.stopped)
+                                            + (agents.failed ? i18n(", %1 failed", agents.failed) : "")
                 }
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText
@@ -1843,7 +1893,7 @@ Window {
                                                                                               : PlasmaComponents3.AbstractButton.TextBesideIcon
                             onClicked: pane.dictate()
 
-                            PlasmaCore.ToolTipArea {
+                            TipArea {
                                 textFormat: Text.PlainText
                                 anchors.fill: parent
                                 mainText: i18n("Dictate")
@@ -1863,7 +1913,7 @@ Window {
                             display: PlasmaComponents3.AbstractButton.IconOnly
                             onClicked: root.pickFiles(pane.host, "pane", pane.row ? pane.row.cwd || "" : pane.chat.cwd || "")
 
-                            PlasmaCore.ToolTipArea {
+                            TipArea {
                                 textFormat: Text.PlainText
                                 anchors.fill: parent
                                 mainText: i18n("Attach files…")
@@ -1877,7 +1927,7 @@ Window {
                             display: PlasmaComponents3.AbstractButton.IconOnly
                             onClicked: root.takeScreenshot(pane.host, "pane")
 
-                            PlasmaCore.ToolTipArea {
+                            TipArea {
                                 textFormat: Text.PlainText
                                 anchors.fill: parent
                                 mainText: i18n("Screenshot…")
@@ -1907,7 +1957,7 @@ Window {
                             text: i18n("Send when this turn ends")
                             onClicked: pane.send(pane.route === "terminal" ? "background" : "auto", true)
 
-                            PlasmaCore.ToolTipArea {
+                            TipArea {
                                 textFormat: Text.PlainText
                                 anchors.fill: parent
                                 mainText: i18n("Send when this turn ends")
@@ -1983,7 +2033,7 @@ Window {
                             text: i18n("Side by side")
                             onToggled: Plasmoid.configuration.diffSideBySide = checked
 
-                            PlasmaCore.ToolTipArea {
+                            TipArea {
                                 textFormat: Text.PlainText
                                 anchors.fill: parent
                                 mainText: i18n("Side by side")
@@ -2060,7 +2110,7 @@ Window {
                                     text: i18n("Undo this file")
                                     onClicked: pane.undoAsk = fileItem.file.path
 
-                                    PlasmaCore.ToolTipArea {
+                                    TipArea {
                                         textFormat: Text.PlainText
                                         anchors.fill: parent
                                         mainText: i18n("Undo this file")
@@ -2189,7 +2239,7 @@ Window {
                     onClicked: pane.run("reviewed", "--reviewed " + root.shellQuote(pane.chatId) + (marked ? " --off" : "")
                                         + (pane.host ? " --host " + root.shellQuote(pane.host) : "") + root.configDirArgs)
 
-                    PlasmaCore.ToolTipArea {
+                    TipArea {
                         textFormat: Text.PlainText
                         anchors.fill: parent
                         mainText: parent.marked ? i18n("Reviewed") : i18n("Mark reviewed")

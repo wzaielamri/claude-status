@@ -57,6 +57,11 @@ const chat: PaneChat = {
   where: (params.get("where") as PaneChat["where"] | null) ?? (params.get("route") === "terminal" ? "terminal" : "tmux"),
   terminalApp: params.get("where") === "terminal" || params.get("route") === "terminal" ? "Konsole" : "",
   attached: params.get("where") === "background" ? { in: "terminal", app: "Konsole" } : null,
+  profile: "work",
+  shared: params.get("shared") === "1" ? { profiles: ["work", "personal"], forkOf: null } as unknown as PaneChat["shared"] : null,
+  mode: "auto",
+  plan: { title: "Fix the week numbers" },
+  agents: { running: 1, done: 2, stopped: 0, total: 3, tree: [] },
 };
 
 const items: PaneItem[] = [

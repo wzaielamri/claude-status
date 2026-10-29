@@ -83,6 +83,12 @@ export interface PaneChat {
   where: ChatWhere;
   terminalApp: string; // the terminal it runs in, by name (Konsole, kitty…), or ""
   attached: Session["attached"]; // a background session shown in a terminal too
+  // what its row in the list says of it too: shared, its permission mode, its plan, its subagents
+  profile: string;
+  shared: Session["shared"];
+  mode: string;
+  plan: { title: string } | null;
+  agents: Session["agents"];
 }
 
 // Where a chat runs (the tag under its name, the same words as the rows'):
@@ -156,6 +162,7 @@ export type PaneMessage =
   | { type: "commit"; message: string }
   | { type: "reviewed"; on: boolean }
   | { type: "openWindow" }
+  | { type: "openPlan" } // the plan it made
   | { type: "moveToClaudeCode" } // Claude quits in its terminal, the chat reopens in a Claude Code panel (asks first)
   | { type: "copy"; text: string } // a code block of a reply, to the clipboard
   | { type: "textSize"; scale: number } // A− / A+: talpyDen.chatTextScale

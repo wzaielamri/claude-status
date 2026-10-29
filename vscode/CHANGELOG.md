@@ -66,6 +66,9 @@
   place in every account, *resets in …* at the line's end in a column kept
   for it; an account with no reset time had longer bars.
 - **Removing a chat from the list is an ×,** as in the widget (it was a −).
+- **The chat tab shows its chat's tags:** beside where it runs, what its
+  row in the list says: *⇄ Shared* or *⇄ Shared copy*, its permission mode,
+  *Plan ↗* (click: the plan) and its subagents.
 - **Inline code's ground ends with its last character:** in the chat tab
   it had room on each side that read as a space before a comma.
 - **The ticker is in the big Talpy's box:** what the working chats do right

@@ -9,7 +9,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { attachedTag, whereTag, droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer } from "../src/shared/pane";
 import { AskBox, askKey } from "./components/AskBox";
 import { Diff, Listing, ToolDetail } from "./components/CodeView";
-import type { Answers, Decision } from "../src/shared/types";
+import type { Answers, Decision, Session } from "../src/shared/types";
+import { modeHint, modeText } from "../src/shared/model";
+import { sharedTagTitle } from "./util/chat";
 import { IconButton } from "./components/IconButton";
 import { Tag } from "./components/Tag";
 import { TalpyIcon } from "./components/TalpyIcon";
@@ -506,6 +508,23 @@ function ChatApp() {
         {chat ? <Tag {...(({ tag, title }) => ({ text: tag, title }))(whereTag(chat.where, chat.terminalApp))} /> : null}
         {chat && chat.where === "background" && attachedTag(chat.attached) ? (
           <Tag {...(({ tag, title }) => ({ text: tag, title }))(attachedTag(chat.attached)!)} />
+        ) : null}
+        {/* what its row in the list says of it too: shared, its permission mode, its plan, its subagents */}
+        {chat?.shared ? (
+          <Tag text={chat.shared.forkOf ? "⇄ Shared copy" : "⇄ Shared"}
+            title={sharedTagTitle({ shared: chat.shared, profile: chat.profile } as Session)} />
+        ) : null}
+        {chat && modeText(chat.mode) ? (
+          <Tag text={modeText(chat.mode)} warning={chat.mode === "bypassPermissions"}
+            title={`Permission mode: ${modeText(chat.mode)}\n${modeHint(chat.mode)}`} />
+        ) : null}
+        {chat?.plan ? (
+          <Tag text="Plan ↗" title={`${chat.plan.title}\nThe plan this chat made. Click to read it.`} onClick={() => post({ type: "openPlan" })} />
+        ) : null}
+        {chat?.agents && chat.agents.total > 0 ? (
+          <Tag text={`Agents ${chat.agents.done}/${chat.agents.total}`} active={chat.agents.running > 0}
+            title={`Subagents\n${chat.agents.done} done, ${chat.agents.running} running, ${chat.agents.stopped} stopped` +
+              (chat.agents.failed ? `, ${chat.agents.failed} failed` : "")} />
         ) : null}
         <span class="pane-path">{(chat?.host ? chat.host + ":" : "") + (chat?.cwd ?? "")}</span>
       </div>
