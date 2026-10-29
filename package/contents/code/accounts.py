@@ -62,10 +62,15 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget
+sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget...
 # Run from its file: the widget's folder (-I leaves it off sys.path). On an SSH
 # host it comes on python3's stdin, after talpy_den.py (remote.py).
 if os.path.isfile(globals().get("__file__") or ""):
+    if sys.version_info >= (3, 8):  # ...but talpy_den.py compiled in the cache, as poll.py does
+        _cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "talpy-den"
+        if _cache.is_dir():
+            sys.pycache_prefix = str(_cache / "pycache")
+            sys.dont_write_bytecode = False
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import talpy_den as cs  # noqa: E402
 

@@ -59,7 +59,12 @@ import sys
 import time
 from pathlib import Path
 
-sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget
+sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget...
+if sys.version_info >= (3, 8):  # ...but talpy_den.py compiled in the cache, as poll.py does
+    _cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "talpy-den"
+    if _cache.is_dir():
+        sys.pycache_prefix = str(_cache / "pycache")
+        sys.dont_write_bytecode = False
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves the script dir off sys.path
 import talpy_den as cs  # noqa: E402
 

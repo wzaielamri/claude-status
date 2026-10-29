@@ -77,7 +77,12 @@ import urllib.parse
 from pathlib import Path
 from urllib.parse import urlencode
 
-sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget
+sys.dont_write_bytecode = True  # no __pycache__ inside the installed widget...
+if sys.version_info >= (3, 8):  # ...but talpy_den.py compiled in the cache, as poll.py does
+    _cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "talpy-den"
+    if _cache.is_dir():
+        sys.pycache_prefix = str(_cache / "pycache")
+        sys.dont_write_bytecode = False
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves the script dir off sys.path
 import talpy_den as cs  # noqa: E402
 import sharing  # noqa: E402
@@ -108,15 +113,19 @@ if (best) {
 # window can't place itself on Wayland, KWin can. The pane asks before it
 # shows the window, and KWin puts it there as it appears (else it would show
 # where KWin puts new windows first, then jump); one that's open moves now.
+# Its title, with * for the chat's name: that can change before it shows
+# (and KWin adds " <2>" to a title that's taken).
 # A new size takes the window a moment to draw, and KWin moves it only with
 # it: a window that's just appearing is hidden till then (at most half a
 # second), so it's only seen in place. (A window that never comes isn't
 # waited for after 5 s; the next pane's script replaces this one.)
 KWIN_PLACE_SCRIPT = """\
 const want = %s;
+const parts = want.caption.split("*"), before = parts[0], after = parts.slice(1).join("*");
 let hidden = null, timer = null;
 function fits(w) {
-    return w.normalWindow && want.pids.indexOf(w.pid) >= 0 && w.caption.indexOf(want.caption) === 0;
+    return w.normalWindow && want.pids.indexOf(w.pid) >= 0 && w.caption.indexOf(before) === 0
+           && w.caption.lastIndexOf(after) >= before.length;
 }
 function shown() {
     if (hidden) {
@@ -234,8 +243,8 @@ def raise_window(pids, caption="", require=False, prefer=""):
 
 
 def place_window(caption, x, y, width, height):
-    """Put the window whose title starts with caption, of the program that
-    runs this (plasmashell), at x, y (width × height): KWin does it (the chat
+    """Put the window whose title is caption (* in it: any text), of the
+    program that runs this (plasmashell), at x, y (width × height): KWin does it (the chat
     pane beside the popup). One that isn't there yet is put there as it
     appears: the script stays loaded, waiting for it (KWIN_PLACE_SCRIPT)."""
     want = {"pids": ancestors(os.getppid()), "caption": caption, "x": x, "y": y, "width": width, "height": height,

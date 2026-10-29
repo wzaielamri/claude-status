@@ -241,7 +241,7 @@ class PlaceWindowTests(unittest.TestCase):
                 return 3
             return ()   # (gdbus's "()")
         with Patch(dbus_call=dbus):
-            self.assertTrue(jump.place_window("Fix — Talpy Chat", 10, 20, 600, 700))
+            self.assertTrue(jump.place_window("* — Talpy Chat", 10, 20, 600, 700))
         path = calls[1][2]
         self.assertEqual(calls, [("/Scripting", "unloadScript", "talpy-den-place"),   # (the last pane's)
                                  ("/Scripting", "loadScript", path, "talpy-den-place"),
@@ -249,7 +249,7 @@ class PlaceWindowTests(unittest.TestCase):
         self.assertFalse(Path(path).exists())
         want = json.loads(scripts[0].split("\n", 1)[0][len("const want = "):-1])
         self.assertEqual({k: want[k] for k in ("caption", "x", "y", "width", "height")},
-                         {"caption": "Fix — Talpy Chat", "x": 10, "y": 20, "width": 600, "height": 700})
+                         {"caption": "* — Talpy Chat", "x": 10, "y": 20, "width": 600, "height": 700})
         self.assertLessEqual(abs(want["at"] - time.time() * 1000), 5000)
 
     def test_without_kwin_scripting(self):
@@ -260,7 +260,7 @@ class PlaceWindowTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("node"), "node isn't installed")
     def test_where_and_when_kwin_puts_it(self):
         """KWIN_PLACE_SCRIPT run by node, with a stand-in for KWin's workspace and windows."""
-        want = {"pids": [5, 1], "caption": "Fix — Talpy Chat", "x": 900, "y": 100, "width": 500, "height": 700,
+        want = {"pids": [5, 1], "caption": "* — Talpy Chat", "x": 900, "y": 100, "width": 500, "height": 700,
                 "at": 1000}
         code = """
 function Signal() {
@@ -289,14 +289,16 @@ function run(windows, now) {
 const at = w => w.asked && [w.asked.x, w.asked.y, w.asked.width, w.asked.height];
 const out = {};
 
-const other = Win("Fix — Talpy Chat", 77, [500, 700]), open = Win("Fix — Talpy Chat <2>", 5, [400, 300]);
-let ws = run([other, open]);
-out.open = [at(open), open.opacity, at(other), ws.windowAdded.count];
+const another = Win("Fix — Talpy Chat", 77, [500, 700]), open = Win("Fix — Talpy Chat <2>", 5, [400, 300]);
+let ws = run([another, open]);
+out.open = [at(open), open.opacity, at(another), ws.windowAdded.count];
 
-const elsewhere = Win("Fix — Talpy Chat", 77, [400, 300]), coming = Win("Fix — Talpy Chat", 5, [500, 728]);
+const elsewhere = Win("Fix — Talpy Chat", 77, [400, 300]), other = Win("Talpy Chat settings", 5, [400, 300]);
+const coming = Win("Renamed since — Talpy Chat", 5, [500, 728]);
 ws = run([]);
 ws.windowAdded.emit(elsewhere);
-out.notMine = [at(elsewhere), ws.windowAdded.count];
+ws.windowAdded.emit(other);
+out.notMine = [at(elsewhere), at(other), ws.windowAdded.count];
 ws.windowAdded.emit(coming);
 out.hidden = [at(coming), coming.opacity, ws.windowAdded.count, !!timers[0].started, timers[0].interval];
 coming.drawn();
@@ -327,9 +329,10 @@ process.stdout.write(JSON.stringify(out));
         target = [900, 100, 500, 700]
         # open already: moved now, as it is (a window that shows isn't hidden)
         self.assertEqual(out["open"], [target, 1, None, 0])
-        # not there yet: waited for; another program's window isn't it
-        self.assertEqual(out["notMine"], [None, 1])
-        # it appears: hidden till it's drawn at its new size, then as it was
+        # not there yet: waited for; another program's window isn't it, nor one titled otherwise
+        self.assertEqual(out["notMine"], [None, None, 1])
+        # it appears (its name changed since: * stands for any): hidden till
+        # it's drawn at its new size, then as it was
         self.assertEqual(out["hidden"], [target, 0, 0, True, 500])
         self.assertEqual(out["drawn"], [1, 0])
         self.assertEqual(out["timer"], [0.9, 0])   # (never drawn: shown after half a second anyway)

@@ -48,7 +48,8 @@ Window {
                                     : row.vscodeTerminal || row.terminalApp === "VS Code" ? "vscode" : "terminal"
 
     title: i18nc("window title: a chat's name", "%1 — Talpy Chat", chatName || chatId.slice(0, 8))
-    width: Kirigami.Units.gridUnit * 38
+    readonly property int wantedWidth: Kirigami.Units.gridUnit * 38   // (beside the popup, if there's room: main.qml)
+    width: wantedWidth
     height: Kirigami.Units.gridUnit * 40
     // (never narrower than the send buttons, which don't shrink)
     minimumWidth: Math.max(Kirigami.Units.gridUnit * 22, widestSend.width + Kirigami.Units.largeSpacing * 2)
@@ -234,6 +235,8 @@ Window {
         // comes, handle(): this one's is read now)
         loading = false
         loadAgain = false
+        chatAtEnd = true   // (a chat opens at its end)
+        chatTop = null
         const wasTab = tab
         tab = chat.tab || "chat"
         Qt.callLater(load)
@@ -296,16 +299,15 @@ Window {
         }
     }
 
-    function grow(fromLeft, fromY) {
-        growBox.origin.x = fromLeft ? 0 : surface.width
-        growBox.origin.y = Math.max(0, Math.min(surface.height, fromY))
-        growing.restart()
-    }
-    // (shown at once if the popup never says where it is)
-    Timer {
-        interval: 1500
-        running: true
-        onTriggered: if (surface.opacity === 0 && !growing.running) surface.opacity = 1
+    // Shown (main.qml: showPane, each time it opens): at the end of its
+    // conversation (laid out only now, the window was hidden), and what you
+    // type goes in the reply box at once
+    function opened() {
+        requestActivate()
+        if (conversationTab) {
+            keepEnd()
+            replyBox.forceActiveFocus()
+        }
     }
 
     function paneArgs() {
@@ -397,22 +399,26 @@ Window {
 
     // The end of the conversation in view, with its working line, when you
     // were at the end (scrolled up, it stays where you are). Rich text rows
-    // take a moment to get their height: it keeps the end in view while they do.
+    // take a moment to get their height, and the list is laid out again as
+    // the window shows: it keeps the end in view while they do, till you
+    // scroll. (Not told by the list moving up: laid out again, it moves
+    // itself, and the end was lost as the pane opened.)
     function nearEnd() {
         return list.originY + list.contentHeight - list.contentY - list.height < Kirigami.Units.gridUnit * 2
     }
     function followEnd() {
         list.contentY = Math.max(list.originY, list.originY + list.contentHeight - list.height)
-        settle.at = list.contentY
+    }
+    function scrolling() {   // (with the wheel, a drag, or its scroll bar)
+        return list.moving || scroll.PlasmaComponents3.ScrollBar.vertical.pressed
     }
     Timer {
         id: settle
         property int left: 0
-        property real at: 0   // (where it put the view: moved up from there, you scrolled, and it stops)
         interval: 80
         repeat: true
         onTriggered: {
-            if (list.moving || list.contentY < at - 1) {
+            if (pane.scrolling()) {
                 stop()
                 return
             }
@@ -425,6 +431,17 @@ Window {
         followEnd()
         settle.left = 10
         settle.restart()
+    }
+    // A row that gets its height as it's laid out, or the list's own height
+    // changed (the window fitted beside the popup as it opens): the end, or
+    // the message at the top (holdTop), is kept in the same frame
+    function keepPlace() {
+        if (scrolling())
+            return
+        if (settle.running)
+            followEnd()
+        else if (holdTop.running)
+            showTop()
     }
     onChatStateChanged: {
         if (shown)
@@ -994,17 +1011,6 @@ Window {
             }
         }
 
-        // It grows out of the chat's row in the popup (main.qml: placePane):
-        // from the popup's side, at the row's height
-        opacity: 0
-        transform: Scale { id: growBox; xScale: 1; yScale: 1 }
-        ParallelAnimation {
-            id: growing
-            NumberAnimation { target: growBox; properties: "xScale,yScale"; from: 0.88; to: 1; duration: Kirigami.Units.longDuration * 1.6; easing.type: Easing.OutCubic }
-            NumberAnimation { target: surface; property: "opacity"; from: 0; to: 1; duration: Kirigami.Units.longDuration * 1.2; easing.type: Easing.OutQuad }
-            onStopped: { growBox.xScale = 1; growBox.yScale = 1; surface.opacity = 1 }
-        }
-
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: Kirigami.Units.largeSpacing
@@ -1251,14 +1257,8 @@ Window {
                         settle.stop()
                         holdTop.stop()
                     }
-                    // (a row that gets its height as it's laid out: the end, or the
-                    // message at the top, is kept in the same frame)
-                    onContentHeightChanged: {
-                        if (settle.running && contentY >= settle.at - 1)
-                            pane.followEnd()
-                        else if (holdTop.running)
-                            pane.showTop()
-                    }
+                    onContentHeightChanged: pane.keepPlace()
+                    onHeightChanged: pane.keepPlace()
 
                     // Ctrl+wheel: the text size
                     WheelHandler {

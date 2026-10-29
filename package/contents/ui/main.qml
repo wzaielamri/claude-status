@@ -2804,6 +2804,9 @@ PlasmoidItem {
         forgetFinished(petKeyOf(s, host))
         paneChat = { chatId: s.chatId || s.sessionId, sessionId: s.sessionId || "", profileDir: s.profileDir || "",
                      host: host || "", name: s.name || "", cwd: s.cwd || "", tab: tab || "chat", at: Date.now(), key: s.key || "" }
+        if (paneLoader.item && !paneLoader.item.visible)
+            placePane()   // (closed before: shown again; the first time, once it's made)
+        paneMade = true
     }
 
     function closePane() {
@@ -2832,27 +2835,47 @@ PlasmoidItem {
         }
     }
 
+    // Its window is made the first time it opens and kept, hidden, when it's
+    // closed: it opens again without being made again
+    property bool paneMade: false
     Loader {
         id: paneLoader
-        active: root.paneChat !== null
+        active: root.paneMade
         source: "ChatPane.qml"
         onLoaded: root.placePane()
     }
 
-    // Beside the popup, on the side with more room: KWin puts it there as it
-    // appears (jump.py --place-window, asked before it's shown: else it shows
-    // where KWin puts new windows first, then jumps). Shown when KWin is ready,
-    // or after a second if it doesn't answer.
+    // It opens as any window does: whole, where it goes, with only KWin's
+    // animation. Beside the popup, on the side with more room, KWin puts it
+    // as it appears (jump.py --place-window, asked before it's shown: else it
+    // shows where KWin puts new windows first, then jumps). It's shown once
+    // KWin is ready and its conversation is read: at its end, not "Reading
+    // the chat…" first. A read that takes longer (an SSH host's) isn't
+    // waited for after 400 ms, KWin after a second.
     property string paneAsk: ""   // (the --place-window command it waits for)
-    property var paneGrow: [true, 0]   // (where it grows out of: win.grow)
+    property bool paneReading: false   // (its conversation is waited for)
+    Timer {
+        id: paneReadTimer
+        interval: 400
+        onTriggered: {
+            root.paneReading = false
+            root.showPane()
+        }
+    }
     Timer {
         id: paneTimer
         interval: 1000
-        onTriggered: root.showPane()
+        onTriggered: {
+            root.paneAsk = ""
+            root.showPane()
+        }
+    }
+    Connections {
+        target: paneLoader.item
+        function onLoadedChanged() { root.showPane() }
+        function onLoadErrorChanged() { root.showPane() }
     }
 
-    // (then it grows out of its chat's row: from the side the popup is on, at
-    // the height of the row, else of the popup's middle)
     // [x, y, width, height] of the pane beside the popup, on the side with more
     // room, as tall as the popup; null while the popup isn't shown
     function paneGeometry(win) {
@@ -2863,7 +2886,7 @@ PlasmoidItem {
         const sx = item.Screen.virtualX, sy = item.Screen.virtualY, sw = item.Screen.width, sh = item.Screen.height
         const gap = Kirigami.Units.smallSpacing
         const right = sx + sw - (p.x + item.width) - gap, left = p.x - sx - gap
-        const width = Math.round(Math.max(win.minimumWidth, Math.min(win.width, Math.max(right, left))))
+        const width = Math.round(Math.max(win.minimumWidth, Math.min(win.wantedWidth, Math.max(right, left))))
         const x = right >= width || right >= left ? p.x + item.width + gap : p.x - gap - width
         const height = Math.round(Math.min(sh, Math.max(item.height, win.minimumHeight)))
         const y = p.y - sy > sh / 2 ? p.y + item.height - height : p.y   // (bottoms lined up under a bottom panel)
@@ -2872,44 +2895,42 @@ PlasmoidItem {
 
     function placePane() {
         const win = paneLoader.item
-        const item = root.fullRepresentationItem
         const geometry = paneGeometry(win)
-        if (!geometry) {
-            paneGrow = [true, win.height / 2]
-            showPane()
-            return
+        paneReading = true
+        paneReadTimer.restart()
+        paneAsk = ""
+        if (geometry) {
+            // (at the size it'll have beside the popup from the start: KWin only moves it there)
+            win.width = geometry[2]
+            win.height = geometry[3]
+            // (its title, with * for the chat's name: that can change before it shows)
+            paneAsk = "python3 -I " + shellQuote(codeDir + "jump.py") + " --place-window "
+                      + shellQuote(i18nc("window title: a chat's name", "%1 — Talpy Chat", "*")) + " " + geometry.join(",")
+                      + " # " + Date.now()
+            placer.connectSource(paneAsk)
+            paneTimer.restart()
         }
-        // (at the size it'll have beside the popup from the start: KWin only moves it there)
-        win.width = geometry[2]
-        win.height = geometry[3]
-        const p = item.mapToGlobal(0, 0)
-        const chat = root.paneChat || {}
-        const spot = root.rowSpots[root.rowKeyOf(chat, chat.host)]
-        const fromY = spot !== undefined && root.rowSpace ? root.rowSpace.mapToGlobal(0, spot).y + Kirigami.Units.gridUnit
-                                                          : p.y + item.height / 2
-        paneGrow = [geometry[0] > p.x, fromY - geometry[1]]
-        paneAsk = "python3 -I " + shellQuote(codeDir + "jump.py") + " --place-window " + shellQuote(win.title)
-                  + " " + geometry.join(",") + " # " + Date.now()
-        placer.connectSource(paneAsk)
-        paneTimer.restart()
+        showPane()
     }
 
     function showPane() {
         const win = paneLoader.item
+        if (!win || win.visible || !paneChat || paneAsk !== "" || (paneReading && !win.loaded && win.loadError === ""))
+            return
+        paneReadTimer.stop()
         paneTimer.stop()
-        paneAsk = ""
-        if (win && !win.visible) {
-            win.visible = true
-            win.grow(paneGrow[0], paneGrow[1])
-        }
+        win.visible = true
+        win.opened()
     }
 
     Exec {
         id: placer
         onNewData: (source, data) => {
             disconnectSource(source)
-            if (source === root.paneAsk)
+            if (source === root.paneAsk) {
+                root.paneAsk = ""
                 root.showPane()
+            }
         }
     }
 
