@@ -349,6 +349,12 @@ export class Talpy {
         return this.run !== null || this.held;
     }
 
+    // Its burrow is open or opening under it (a host swinging it puts it
+    // upright then, so the burrow never swings)
+    get holeOpen() {
+        return this.v.holeTo > 0;
+    }
+
     // Grabbed: out of the burrow, flailing; nothing else moves it until land()
     // Returns how much of its hole it leaves behind (0: none, it was tunnelling
     // or down; 1: the whole hole): the host keeps drawing that where it was

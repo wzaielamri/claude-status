@@ -35,6 +35,7 @@ export class Talpy {
     facingLeft: boolean;
     travels: boolean;
     readonly busy: boolean;
+    readonly holeOpen: boolean;   // its burrow is open or opening under it
     readonly frameMs: number;   // how often a picture is worth drawing now: 40 (quick moves), 80 (slow) or 200 (at rest)
     readonly run: unknown;
     readonly now: number;

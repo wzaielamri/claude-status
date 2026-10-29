@@ -73,11 +73,22 @@ Item {
         SpringAnimation { spring: 5; damping: 0.32; epsilon: 0.2 }
     }
     readonly property real swing: held ? Math.max(-30, Math.min(30, (px - shownX) * 1.8 / unit)) : 0
-    // (on a spring: put down, it wobbles back upright on the ground, settled
-    // before talpy.land() opens its burrow, 700 ms or more after it lands)
+    // (on a spring: put down, it wobbles back upright on the ground, and stands
+    // upright once talpy.land() opens its burrow, 700 ms or more after it
+    // lands, so the burrow never swings; what's left of the wobble then is
+    // under a degree)
     property real tilt: swing
     Behavior on tilt {
         SpringAnimation { spring: 3; damping: 0.16; epsilon: 0.3 }
+    }
+    property bool upright: false
+    Connections {
+        target: root
+        enabled: pet.landing && !pet.held && !pet.upright
+        function onPetFrame(now) {
+            if (pet.talpy && pet.talpy.holeOpen)
+                pet.upright = true
+        }
     }
     property bool held: false
     property bool landing: false        // picked up, until it has landed and dug in: drawn live
@@ -267,6 +278,7 @@ Item {
 
     function pickUp() {
         held = true
+        upright = false
         landing = true
         fall.stop()   // grabbed again while falling
         stride.stop()
@@ -463,7 +475,7 @@ Item {
         transform: Rotation {
             origin.x: view.boxX + pet.box / 2
             origin.y: view.boxY + pet.box * 30 / 64   // (where you hold it)
-            angle: pet.tilt
+            angle: pet.upright ? 0 : pet.tilt
         }
         playing: pet.playing
         travels: pet.lone

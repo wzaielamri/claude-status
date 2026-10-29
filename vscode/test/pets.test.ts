@@ -501,7 +501,7 @@ test("a pet you hold trails your hand on a spring and swings, then wobbles back 
   stage.destroy();
 });
 
-test("a pet put down swinging wobbles back upright on the ground, settled before its burrow opens", () => {
+test("a pet put down swinging wobbles back upright on the ground, and its burrow never swings", () => {
   const { stage, pet, frame, angle } = framed();
   pet.pickUp();
   for (let i = 0; i < 12; i++) {
@@ -515,21 +515,28 @@ test("a pet put down swinging wobbles back upright on the ground, settled before
   let ms = 16;
   for (; pet.held; ms += 16) frame();
   assert.ok(ms <= 500, `it landed after ${ms} ms`);
-  // On the ground it swings on, as in the widget, back past upright
-  let sides = 0, last = Math.sign(angle());
-  for (ms = 0; pet.tilt.moving && ms < 2000; ms += 16) {
+  // On the ground it swings on, as in the widget, back past upright; land()'s
+  // first step (700 ms or more) keeps the burrow shut, and from when it opens
+  // the pet stands upright (only a trace of the swing was left)
+  let sides = 0, last = Math.sign(angle()), opened = -1;
+  for (ms = 0; ms < 1500; ms += 16) {
+    const before = angle();
     frame();
     const side = Math.sign(angle());
     if (side && side !== last) {
       sides++;
       last = side;
     }
-    // land()'s first step (700 ms or more) keeps the burrow shut: by then only a trace of the swing is left
-    if (ms >= 700) assert.ok(Math.abs(angle()) < 1, `still ${angle()}° as the burrow opens`);
+    if (pet.talpy.holeOpen) {
+      if (opened < 0) {
+        opened = ms;
+        assert.ok(Math.abs(before) < 1, `still ${before}° as the burrow opens`);
+      }
+      assert.equal(angle(), 0, "its burrow swings");
+    }
   }
+  assert.ok(opened >= 650, `its burrow opened ${opened} ms after it landed`);
   assert.ok(sides >= 1, "it didn't wobble back on the ground");
-  assert.ok(ms < 1100, `it swung for ${ms} ms on the ground`);
-  assert.equal(angle(), 0);
   stage.destroy();
 });
 

@@ -619,6 +619,7 @@ export class Pet {
       box = s.box,
       ground = this.ground;
     const now = s.clock.now();
+    this.talpy.tick(now); // (first: the frame its burrow starts to open, it's upright)
     this.spring(now);
     const px = Math.round(this.px * 10) / 10,
       shown = Math.round(this.shown.value * 10) / 10,
@@ -640,7 +641,6 @@ export class Pet {
       this.paintHole();
     }
 
-    this.talpy.tick(now);
     this.draw(now);
   }
 
@@ -655,8 +655,11 @@ export class Pet {
       tilt = this.tilt;
     if (!this.held || reducedMotion()) {
       shown.set(this.px);
-      if (reducedMotion()) tilt.set(0);
-      else tilt.aim(0, now); // (put down: it wobbles back upright)
+      // (put down: it wobbles back upright, and stands upright once its burrow
+      // opens, so the burrow never swings; what's left of the wobble then is
+      // under a degree)
+      if (reducedMotion() || this.talpy.holeOpen) tilt.set(0);
+      else tilt.aim(0, now);
       tilt.step(now);
     } else {
       const unit = this.stage.box / 64;
