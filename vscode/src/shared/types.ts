@@ -240,6 +240,7 @@ export interface Session {
   // processId, on the machine the session is on), if it does
   vscodeTerminal?: number | null;
   terminalApp?: string | null; // the terminal it runs in otherwise, by name (Konsole, kitty…)
+  attached?: { in: "terminal" | "tmux" | "vscode"; app: string } | null; // a background session shown in a terminal too (claude attach)
   // How it takes a message from the chat tab (talpy_den.py: reply_route);
   // older backends leave these out
   reply?: ReplyRoute;
@@ -503,6 +504,7 @@ export interface Group {
   // the account (or no host's shows), or comes from that host
   limitsHidden?: boolean;
   limitsFrom?: string;
+  usageFetchAt?: number | null; // when a fetch of its plan usage started (talpy_den.py usage_fetches)
   // With limitsHidden: the account's numbers all the same (the newest of its
   // machines'), for what weighs them (handoverTarget, limitReset)
   accountLimits?: Limits | null;

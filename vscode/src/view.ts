@@ -313,7 +313,10 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
         break;
       case "refresh":
         if (text(m.host)) void this.dash.pollHost(m.host as string);
-        else this.dash.refreshAll();
+        else {
+          this.dash.refreshAll();
+          void this.dash.fetchUsage();
+        }
         break;
       case "showRemoved":
         void this.actions.showRemoved(text(m.host) ?? null);

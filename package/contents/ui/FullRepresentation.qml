@@ -132,6 +132,7 @@ PlasmaExtras.Representation {
                 icon.name: "view-refresh"
                 onClicked: {
                     root.refresh()
+                    root.fetchUsage()   // (the plan usage too, when it's over a minute old)
                     for (const host of root.shownHosts)
                         root.pollHost(host)
                     root.loadWeek()   // (on the Recap tab)

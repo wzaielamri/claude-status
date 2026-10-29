@@ -502,11 +502,18 @@ export function tokensText(t: Tokens): string {
 }
 
 // The dim line under an account's plan usage bars: how old the numbers are, and
-// the host they're from when another machine's are newer (shareUsage)
-export function planUsageText(limits: Limits, from: string, now: number): string {
+// the host they're from when another machine's are newer (shareUsage); a
+// fetch on its way (Refresh's, or while a chat works: fetchAt) says so
+export function planUsageText(limits: Limits, from: string, now: number, fetchAt?: number | null): string {
+  if (fetchingUsage(limits, now, fetchAt)) return "Fetching the plan usage…";
   if (!Number.isFinite(limits.updatedAt)) return "";
   const on = from ? `, on ${from}` : "";
   return now - limits.updatedAt < 60000 ? `Plan usage updated just now${on}` : `Plan usage as of ${duration(now - limits.updatedAt)} ago${on}`;
+}
+
+// A fetch of an account's plan usage started in the last 70 s, its numbers not in yet
+export function fetchingUsage(limits: Limits | null | undefined, now: number, fetchAt?: number | null): boolean {
+  return !!fetchAt && now - fetchAt < 70000 && (!limits || limits.updatedAt < fetchAt);
 }
 
 export function ago(ms: number): string {

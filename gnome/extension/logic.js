@@ -285,8 +285,11 @@ export function usageClass(pct) {
     return 'working';
 }
 
-// from: the SSH host the numbers come from, when another machine's are newer (withUsage)
-export function planUsageText(limits, now, from = '') {
+// from: the SSH host the numbers come from, when another machine's are newer
+// (withUsage); a fetch on its way (Refresh's, or while a chat works: fetchAt) says so
+export function planUsageText(limits, now, from = '', fetchAt = null) {
+    if (fetchAt && now - fetchAt < 70000 && (!limits || limits.updatedAt < fetchAt))
+        return 'Fetching the plan usage…';
     if (!limits)
         return "No plan usage yet: shows after this account's next reply";
     if (from) {

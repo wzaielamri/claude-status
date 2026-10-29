@@ -540,6 +540,7 @@ def make_session(profile, home, *, sid, pid, name, cwd, kind, entrypoint, state,
         "shared": None,
         "tmux": False,  # runs in a tmux pane: it can be interrupted (Esc)
         "terminalApp": None,  # the terminal it runs in otherwise, by name (Konsole, kitty…): terminal_name
+        "attached": None,  # a background session shown in a terminal (claude attach): {"in", "app"} (attached_in)
         "peek": None,  # what it's doing, your last prompt, Claude's last reply (chat_peek)
         "changes": None,  # the files it changed: {"count", "files"} (ChatCache.changes)
         "tasks": None,  # its task list: {"done", "total", "current", "items"} (task_progress)
@@ -668,6 +669,8 @@ def live_row(entry, profile, holder, home, ctx):
     row["tmux"] = isinstance(entry.get("tmux"), str) and bool(entry["tmux"])
     if not row["tmux"] and row["entrypoint"] != "claude-vscode" and row["kind"] != "bg":
         row["terminalApp"] = terminal_name(row["pid"]) or None
+    if row["kind"] == "bg" and row["pid"]:
+        row["attached"] = attached_in(job_id, row["name"], profile)
     return finish_row(row, job, job_id, profile, ctx, alive=True)
 
 
@@ -5411,6 +5414,48 @@ def terminal_name(pid):
     return ""
 
 
+_attaching = [0.0, []]   # (when looked for, [(pid, what it attaches to)]): once a check
+
+
+def attach_clients():
+    """The `claude attach` processes on this machine: [(pid, the background
+    session it shows: its id or name)], looked for once a second at most."""
+    if time.monotonic() - _attaching[0] < 1:
+        return _attaching[1]
+    found = []
+    try:
+        names = os.listdir("/proc")
+    except OSError:
+        names = []
+    for name in names:
+        if not name.isdigit() or process_name(int(name)) != "claude":
+            continue
+        try:
+            with open(f"/proc/{name}/cmdline", "rb") as f:
+                argv = f.read().split(b"\0")
+        except OSError:
+            continue
+        if len(argv) >= 3 and argv[1] == b"attach":
+            found.append((int(name), argv[2].decode(errors="replace")))
+    _attaching[0], _attaching[1] = time.monotonic(), found
+    return found
+
+
+def attached_in(job_id, name, profile):
+    """Where a background session is shown (claude attach): {"in": "tmux",
+    "vscode" (a VS Code terminal) or "terminal", "app": the terminal's name or
+    ""}, or None: nowhere. By its id, or by its name on its own profile."""
+    for pid, what in attach_clients():
+        if what != job_id and not (name and what == name and process_config_dir(pid) == str(profile.path.resolve())):
+            continue
+        if tmux_socket(pid):
+            return {"in": "tmux", "app": ""}
+        if vscode_terminal(pid) is not None:
+            return {"in": "vscode", "app": ""}
+        return {"in": "terminal", "app": terminal_name(pid)}
+    return None
+
+
 def interrupt_chat(entry):
     """Interrupt a working or waiting chat in tmux: Ctrl+C in its pane, as if
     you pressed it there (the turn and its subagents stop; the chat stays).
@@ -5911,6 +5956,9 @@ USAGE_REFRESH_MAX_MINUTES = 60
 # as at work: its last turn's usage is fetched once after the turn
 USAGE_ACTIVE_MARGIN_MS = 5 * 60_000
 USAGE_REFRESH_LIMIT = 60  # seconds the fetch may take (then it's ended)
+# Refresh (--fetch-usage): an account's plan usage older than this is
+# fetched now, chat at work or not, at most this often
+USAGE_NOW_MS = 60_000
 USAGE_CHECK_DIR = "usage-check"  # the folder it runs in, in the cache
 USAGE_CHECK_SETTINGS = '{"disableAllHooks":true}'
 # After the fetch: the empty projects/<folder>/memory/ Claude makes for the
@@ -5954,6 +6002,41 @@ def usage_refresh_profile(members, limits, rows, now_ms, every_ms):
         if any(chat_at_work(s, now_ms, every_ms) for s in rows.get(p.real, ())):
             return p
     return None
+
+
+def usage_now_profile(members, limits, now_ms):
+    """Refresh: the profile of an account whose plan usage Claude Code should
+    fetch now, chat at work or not (its numbers are older than USAGE_NOW_MS,
+    or there are none), or None: its first profile logged in to a Claude
+    account."""
+    if limits and now_ms - limits["updatedAt"] < USAGE_NOW_MS:
+        return None
+    return next((p for p in members if p.account_id is not None
+                 and os.path.isfile(str(p.path / ".credentials.json"))), None)
+
+
+def fetch_usage_now(home, cache_root, extra_dirs=(), now=None):
+    """Refresh: have Claude Code fetch the plan usage of every account logged
+    in whose numbers are older than USAGE_NOW_MS, chat at work or not:
+    {"ok", "started": the profiles it was started for}."""
+    now_ms = int((time.time() if now is None else now) * 1000)
+    profiles = discover_profiles(home, extra_dirs)
+    logged_out = logged_out_notes(cache_root)
+    due = []
+    for _gid, members in group_profiles(profiles):
+        if all(needs_login(p, logged_out) for p in members):
+            continue
+        asked = usage_now_profile(members, plan_limits(cache_root / "statusline", members, now_ms), now_ms)
+        if asked is not None:
+            due.append(asked)
+    return {"ok": True, "started": [p.label for p in refresh_usage(home, cache_root, due, now_ms, USAGE_NOW_MS)]}
+
+
+def usage_fetches(cache_root):
+    """{profile key (its real folder): when a fetch of its plan usage started}."""
+    data = read_json(cache_root / "usage-check.json")
+    started = data.get("started") if isinstance(data, dict) else None
+    return {k: t for k, t in started.items() if number(t) is not None} if isinstance(started, dict) else {}
 
 
 def claim_usage_refresh(cache_root, key, now_ms, every_ms):
@@ -6707,6 +6790,11 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
         refresh_usage(home, cache_root, due, now_ms, refresh_ms)
     except Exception as exc:
         errors.append(f"fetching plan usage: {exc}")
+    # (an account's fetch on its way: its numbers say so until they come)
+    fetches = usage_fetches(cache_root)
+    for g in groups:
+        member = next((p for p in profiles if p.key in g.get("profileKeys", ())), None)
+        g["usageFetchAt"] = fetches.get(str(member.real)) if member is not None else None
     try:
         place_chats(groups, ctx)
     except Exception as exc:
@@ -7368,6 +7456,7 @@ def add_found_commands(result, home, extra_dirs=()):
 
 USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent N] [--plans N] [--no-tokens] [--pretty] [--remote [--local]]
                     [--usage-refresh N]
+       talpy_den.py --fetch-usage [--config-dir DIR]...
        talpy_den.py --dismiss SESSION_ID | --undismiss-all
        talpy_den.py --end SESSION_ID [--profile PROFILE] [--busy] [--config-dir DIR]...
        talpy_den.py --interrupt SESSION_ID [--profile PROFILE] [--config-dir DIR]...
@@ -7408,7 +7497,9 @@ USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent 
   --usage-cap N     stop what an account has at work once one of its plan windows reaches N%
   --usage-refresh N while one of an account's chats works, have Claude Code fetch its plan usage
                     once it's more than N minutes old, at most every N minutes (default 5, 0 = never;
-                    Claude's VS Code panel runs no status line)"""
+                    Claude's VS Code panel runs no status line)
+  --fetch-usage     (Refresh) have Claude Code fetch the plan usage of every account whose numbers
+                    are over a minute old, now, chat at work or not; prints {"ok", "started"}"""
 
 
 def main(argv=None):
@@ -7424,6 +7515,7 @@ def main(argv=None):
     vscode_account, vscode_server = None, VSCODE_SERVERS["Code"]
     keep_going, usage_cap, model, effort, mode = False, 0, None, None, None
     usage_refresh = USAGE_REFRESH_MINUTES
+    fetch_usage = False
     starred_chats, starred_plans = set(), set()
     while args:
         arg = args.pop(0)
@@ -7512,6 +7604,8 @@ def main(argv=None):
             usage_cap = min(100, int(args.pop(0)))
         elif arg == "--usage-refresh" and args and args[0].isdigit():
             usage_refresh = min(USAGE_REFRESH_MAX_MINUTES, int(args.pop(0)))
+        elif arg == "--fetch-usage":
+            fetch_usage = True
         else:
             sys.exit(USAGE)
     os.umask(0o077)  # cache files are private to the user
@@ -7522,7 +7616,12 @@ def main(argv=None):
         sys.exit(USAGE)
     if (task_action is not None or continue_id is not None) and not profile_key:
         sys.exit(USAGE)
-    if find is not None:
+    if fetch_usage:
+        try:
+            result = fetch_usage_now(home, cache_root, config_dirs)
+        except Exception as exc:
+            result = {"ok": False, "message": f"{type(exc).__name__}: {exc}"}
+    elif find is not None:
         try:
             result = find_chats(home, cache_root, config_dirs, find, find_limit)
             if remote:

@@ -56,6 +56,7 @@ const chat: PaneChat = {
   // ?where=background|closed|claude|vscode|terminal: where it runs (else tmux)
   where: (params.get("where") as PaneChat["where"] | null) ?? (params.get("route") === "terminal" ? "terminal" : "tmux"),
   terminalApp: params.get("where") === "terminal" || params.get("route") === "terminal" ? "Konsole" : "",
+  attached: params.get("where") === "background" ? { in: "terminal", app: "Konsole" } : null,
 };
 
 const items: PaneItem[] = [

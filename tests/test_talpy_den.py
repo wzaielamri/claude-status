@@ -2013,9 +2013,9 @@ class NewClaudeValuesTests(Fixture):
         self.assertIn('session status "3"', self.collect(with_tokens=False)["errors"][0])
 
 
-class UsageRefreshTests(Fixture):
-    """An account used only in VS Code's panel (no status line there): while
-    one of its chats works and its plan usage is old, Claude Code fetches it."""
+class UsageFetchFixture(Fixture):
+    """A logged-in work account whose plan usage is an hour old, and the
+    fetches started (spawned)."""
 
     CLAUDE = "/opt/claude/bin/claude"
 
@@ -2048,6 +2048,11 @@ class UsageRefreshTests(Fixture):
         self.spawned.clear()
         self.result = self.collect(with_tokens=False, usage_refresh=minutes, now=self.now if now is None else now, **kw)
         return [env.get("CLAUDE_CONFIG_DIR") for _, _, env in self.spawned]
+
+
+class UsageRefreshTests(UsageFetchFixture):
+    """An account used only in VS Code's panel (no status line there): while
+    one of its chats works and its plan usage is old, Claude Code fetches it."""
 
     def test_old_usage_fetched_while_a_chat_works(self):
         folder = self.cache / "usage-check"
@@ -2178,6 +2183,59 @@ class UsageRefreshTests(Fixture):
         self.assertTrue(cs.is_usage_check("/a/talpy-den/usage-check"))
         self.assertFalse(cs.is_usage_check("/a/usage-check"))
         self.assertFalse(cs.is_usage_check(None))
+
+
+class FetchUsageTests(UsageFetchFixture):
+    """Refresh (talpy_den.py --fetch-usage): every account's plan usage over a
+    minute old is fetched now, chat at work or not, at most once a minute."""
+
+    def fetch(self, now=None):
+        self.spawned.clear()
+        self.answer = cs.fetch_usage_now(self.home, self.cache, now=self.now if now is None else now)
+        return [env.get("CLAUDE_CONFIG_DIR") for _, _, env in self.spawned]
+
+    def test_old_usage_fetched_with_no_chat_at_work(self):
+        self.assertEqual(self.fetch(), [str(self.work)])
+        self.assertEqual(self.answer, {"ok": True, "started": ["work"]})
+        self.assertEqual(self.fetch(now=self.now + 30), [], "twice in a minute")
+        # the status says it's on its way, until its numbers are in
+        result = self.collect(with_tokens=False, usage_refresh=0, now=self.now + 5)
+        self.assertEqual(self.group(result, "work")["usageFetchAt"], int(self.now * 1000))
+
+    def test_new_usage_left_alone(self):
+        self.usage_cache(fetched_ago=30)
+        self.assertEqual(self.fetch(), [])
+
+
+class TerminalTests(unittest.TestCase):
+    """The terminal a chat runs in, by name, and where a background session is shown (claude attach)."""
+
+    def tree(self, names):
+        """pid -> its process name; each one's parent is the next pid up."""
+        return (mock.patch.object(cs, "process_name", lambda pid: names.get(pid, "")),
+                mock.patch.object(cs, "parent_pid", lambda pid: pid + 1 if pid + 1 in names else 1),
+                mock.patch.object(cs, "is_vscode_terminal_host", lambda pid: names.get(pid) == "code"))
+
+    def test_the_terminal_by_name(self):
+        for names, want in (({10: "claude", 11: "bash", 12: "konsole"}, "Konsole"),
+                            ({10: "claude", 11: "fish", 12: "gnome-terminal-"}, "GNOME Terminal"),
+                            ({10: "claude", 11: "zsh", 12: "tmux: server", 13: "kitty"}, ""),   # (in tmux)
+                            ({10: "claude", 11: "bash", 12: "code"}, ""),                       # (a VS Code terminal)
+                            ({10: "claude", 11: "sshd-session"}, "")):
+            patches = self.tree(names)
+            with patches[0], patches[1], patches[2]:
+                self.assertEqual(cs.terminal_name(10), want, names)
+
+    def test_a_background_session_shown_in_a_terminal(self):
+        profile = mock.Mock(path=Path("/home/me/.claude"))
+        with mock.patch.object(cs, "attach_clients", lambda: [(20, "0a1b2c3d"), (30, "fix parser")]), \
+                mock.patch.object(cs, "tmux_socket", lambda pid: None), \
+                mock.patch.object(cs, "vscode_terminal", lambda pid: 31 if pid == 30 else None), \
+                mock.patch.object(cs, "terminal_name", lambda pid: "Konsole"), \
+                mock.patch.object(cs, "process_config_dir", lambda pid: "/home/me/.claude"):
+            self.assertEqual(cs.attached_in("0a1b2c3d", "", profile), {"in": "terminal", "app": "Konsole"})
+            self.assertEqual(cs.attached_in("ffffffff", "fix parser", profile), {"in": "vscode", "app": ""})   # (by its name)
+            self.assertIsNone(cs.attached_in("ffffffff", "other", profile))
 
 
 class UsageRefreshCommandTests(unittest.TestCase):

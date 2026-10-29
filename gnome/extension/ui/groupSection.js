@@ -93,7 +93,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
             limits.add_child(line);
         }
     }
-    const asOf = label(L.planUsageText(group.limits, ctx.now, group.limitsFrom), 'claude-small claude-dim', {x_expand: true});
+    const asOf = label(L.planUsageText(group.limits, ctx.now, group.limitsFrom, group.usageFetchAt), 'claude-small claude-dim', {x_expand: true});
     if (!group.limits) {
         tips.add(asOf, ['No plan usage yet',
             'Plan limits come from the Claude Code status line (statusline-snippet.sh). They update whenever a session of this account gets a reply.']);

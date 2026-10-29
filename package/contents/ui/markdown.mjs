@@ -68,8 +68,10 @@ export function inline(text, s) {
             continue;
         }
         out += escape(text.slice(last, m.index));
-        if (m[1] !== undefined)
-            out += `<span style="font-family:${family(s.mono)}; font-size:${(s.pt * 0.92).toFixed(1)}pt; color:${s.code}; background-color:${s.codeBg}">&#8239;${escape(m[1])}&#8239;</span>`;
+        if (m[1] !== undefined) {   // (its margins in the text's font: a monospace space is a whole character wide)
+            const pad = `<span style="background-color:${s.codeBg}">&#8239;</span>`;
+            out += pad + `<span style="font-family:${family(s.mono)}; font-size:${(s.pt * 0.92).toFixed(1)}pt; color:${s.code}; background-color:${s.codeBg}">${escape(m[1])}</span>` + pad;
+        }
         else if (m[2] !== undefined || m[3] !== undefined)
             out += `<b>${inline(m[2] !== undefined ? m[2] : m[3], s)}</b>`;
         else if (m[4] !== undefined || m[5] !== undefined)

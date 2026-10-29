@@ -6,7 +6,7 @@
 
 import { render } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { whereTag, droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer } from "../src/shared/pane";
+import { attachedTag, whereTag, droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer } from "../src/shared/pane";
 import { AskBox, askKey } from "./components/AskBox";
 import { Diff, Listing, ToolDetail } from "./components/CodeView";
 import type { Answers, Decision } from "../src/shared/types";
@@ -504,6 +504,9 @@ function ChatApp() {
       </div>
       <div class="pane-folder">
         {chat ? <Tag {...(({ tag, title }) => ({ text: tag, title }))(whereTag(chat.where, chat.terminalApp))} /> : null}
+        {chat && chat.where === "background" && attachedTag(chat.attached) ? (
+          <Tag {...(({ tag, title }) => ({ text: tag, title }))(attachedTag(chat.attached)!)} />
+        ) : null}
         <span class="pane-path">{(chat?.host ? chat.host + ":" : "") + (chat?.cwd ?? "")}</span>
       </div>
       <div class="pane-tabs" role="tablist">

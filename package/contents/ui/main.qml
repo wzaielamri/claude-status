@@ -533,6 +533,22 @@ PlasmoidItem {
     }
 
     // ...and meanwhile, chats that need you (or finish) go to your phone with
+    // Refresh: Claude Code fetches the plan usage of every account whose
+    // numbers are over a minute old, chat at work or not (talpy_den.py
+    // --fetch-usage; the status says an account's is on its way: usageFetchAt)
+    function fetchUsage() {
+        usageFetcher.connectSource("python3 -I " + shellQuote(codeDir + "talpy_den.py") + " --fetch-usage" + configDirArgs
+                                   + " # " + Date.now())
+    }
+
+    Exec {
+        id: usageFetcher
+        onNewData: (source, data) => {
+            disconnectSource(source)
+            root.refresh()   // (its fetch on its way shows; its numbers at the checks after)
+        }
+    }
+
     // KDE Connect (phoneWhileAway; jump.py --phone)
     function toPhone(text) {
         if (!root.notifier || !Plasmoid.configuration.phoneWhileAway || !awayLongEnough())

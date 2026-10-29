@@ -354,6 +354,14 @@ export class Dashboard implements vscode.Disposable {
     for (const host of this.shownHosts()) void this.pollHost(host);
   }
 
+  // Refresh (its button, its command): the plan usage too, of every account
+  // whose numbers are over a minute old; the status says a fetch is on its way
+  async fetchUsage(): Promise<void> {
+    if (this.demo || this.disposed) return;
+    await this.backend.fetchUsage(configDirArgs());
+    void this.refresh();
+  }
+
   async pollHost(host: string): Promise<void> {
     if (this.hostBusy.has(host) || this.demo || this.disposed) return;
     const h = this.hosts.get(host);

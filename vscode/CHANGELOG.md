@@ -20,6 +20,18 @@
   camera for the two that were the text buttons *+* and *Screenshot…*;
   while dictation records or writes it down, what it's doing shows beside
   the microphone.
+- **Refresh fetches the plan usage too:** an account's numbers came only
+  with its chats' replies (and every 5 minutes while one of its chats
+  worked in the Claude Code panel), so an account with no chat at work here
+  kept numbers hours old. **Refresh** (its button, its command) now has
+  Claude Code fetch every account's plan usage that's over a minute old
+  (`claude -p /usage`: no tokens, no chat saved; at most once a minute),
+  and the line under its bars says *Fetching the plan usage…* until the
+  numbers are in.
+- **A background session shown in a terminal says so:** beside its
+  *Background* tag in the chat tab, where `claude attach` shows it:
+  *Terminal* (its tooltip names the terminal), *Tmux* or *VS Code
+  terminal*.
 - **The chat tab's Chat tab is your messages and Claude's replies, and a
   Steps tab has the rest:** **Chat** shows only what you and Claude say
   (and what needs you: a permission, a question, a plan), with what it's

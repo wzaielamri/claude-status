@@ -214,7 +214,11 @@ ColumnLayout {
             elide: Text.ElideRight
             opacity: 0.6
             font: Kirigami.Theme.smallFont
-            text: !section.group.limits ? i18n("No plan usage yet: shows after this account's next reply")
+            // (a fetch on its way, Refresh's or while a chat works: the numbers come within a minute)
+            readonly property bool fetching: !!section.group.usageFetchAt && root.now - section.group.usageFetchAt < 70000
+                                             && (!section.group.limits || section.group.limits.updatedAt < section.group.usageFetchAt)
+            text: fetching ? i18n("Fetching the plan usage…")
+                  : !section.group.limits ? i18n("No plan usage yet: shows after this account's next reply")
                   : section.group.limitsFrom
                     ? (root.now - section.group.limits.updatedAt < 60000 ? i18n("Plan usage updated just now, on %1", section.group.limitsFrom)
                        : i18n("Plan usage as of %1 ago, on %2", root.duration(root.now - section.group.limits.updatedAt), section.group.limitsFrom))
@@ -701,79 +705,98 @@ ColumnLayout {
                 TestsBadge {
                     review: root.reviewPending(recentLine.chat, section.remoteHost) ? recentLine.chat.review : null
                 }
-                PlasmaComponents3.ToolButton {
-                    // with clicks opening the pane: reopen the chat itself
-                    visible: Plasmoid.configuration.clickOpensPane && recentLine.canOpen
-                    opacity: recentHover.hovered ? 1 : 0
-                    icon.name: "window"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Reopen this chat")
-                    Layout.preferredHeight: recentName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: recentLine.open()
+                // starred: a ★ (click: unstar it)
+                StarMark {
+                    visible: !!recentLine.chat.starred
+                    tooltip: root.starHint("chats", false) + " " + root.starHint("chats", true)
+                    onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, false)
+                }
+                // its folder and how long ago, at the line's end
+                CoveredEnd {
+                    id: recentEnd
+                    covered: recentButtons.covering
+                    Layout.preferredWidth: Math.min(recentFolder.implicitWidth, Kirigami.Units.gridUnit * 12)
+                    implicitHeight: recentFolder.implicitHeight
 
-                    PlasmaCore.ToolTipArea {
+                    PlasmaComponents3.Label {
+                        id: recentFolder
+                        width: recentEnd.width
                         textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Reopen this chat")
-                        subText: recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
-                                                       : root.terminalHint(section.remoteHost, true)
+                        text: i18nc("recent chat: folder · how long ago", "%1 · %2", recentLine.chat.cwdShort || "~",
+                                    root.ago(root.now - recentLine.chat.lastActive))
+                        opacity: 0.6
+                        font: Kirigami.Theme.smallFont
+                        elide: Text.ElideLeft
+
+                        PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            active: !!recentLine.chat.cwd
+                            mainText: i18n("Folder")
+                            subText: (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd
+                        }
                     }
                 }
-                PlasmaComponents3.Label {
-                    id: recentFolder
-                    textFormat: Text.PlainText
-                    text: i18nc("recent chat: folder · how long ago", "%1 · %2", recentLine.chat.cwdShort || "~",
-                                root.ago(root.now - recentLine.chat.lastActive))
-                    opacity: 0.6
-                    font: Kirigami.Theme.smallFont
-                    elide: Text.ElideLeft
-                    Layout.maximumWidth: Kirigami.Units.gridUnit * 12
+                // on hover, over the line's end
+                HoverButtons {
+                    id: recentButtons
+                    shown: recentHover.hovered
+                    under: recentEnd
 
-                    PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        active: !!recentLine.chat.cwd
-                        mainText: i18n("Folder")
-                        subText: (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd
+                    PlasmaComponents3.ToolButton {
+                        // with clicks opening the pane: reopen the chat itself
+                        visible: Plasmoid.configuration.clickOpensPane && recentLine.canOpen
+                        icon.name: "window"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Reopen this chat")
+                        Layout.preferredHeight: recentName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: recentLine.open()
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Reopen this chat")
+                            subText: recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
+                                                           : root.terminalHint(section.remoteHost, true)
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    // star it (it stays listed under Starred) or unstar it
-                    opacity: recentLine.chat.starred || recentHover.hovered ? 1 : 0
-                    icon.name: recentLine.chat.starred ? "starred-symbolic" : "non-starred-symbolic"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: recentLine.chat.starred ? i18n("Unstar") : i18n("Star")
-                    Layout.preferredHeight: recentName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, !recentLine.chat.starred)
+                    PlasmaComponents3.ToolButton {
+                        // star it: it stays listed under Starred (a starred one has its ★)
+                        visible: !recentLine.chat.starred
+                        icon.name: "non-starred-symbolic"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Star")
+                        Layout.preferredHeight: recentName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, true)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: recentLine.chat.starred ? i18n("Starred") : i18n("Star this chat")
-                        subText: root.starHint("chats", !!recentLine.chat.starred)
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Star this chat")
+                            subText: root.starHint("chats", false)
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    id: recentShare
-                    visible: root.shareAccountsOf(section.remoteHost).length >= 2
-                    opacity: recentHover.hovered ? 1 : 0
-                    icon.name: "document-share"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Share or continue on another account…")
-                    Layout.preferredHeight: recentName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.openShareMenu(recentShare, {
-                        chatId: recentLine.chat.sessionId, name: recentLine.chat.name,
-                        profileDir: recentLine.chat.profileDir, shared: recentLine.chat.shared, host: section.remoteHost
-                    }, recentLine.rowKey)
+                    PlasmaComponents3.ToolButton {
+                        id: recentShare
+                        visible: root.shareAccountsOf(section.remoteHost).length >= 2
+                        icon.name: "document-share"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Share or continue on another account…")
+                        Layout.preferredHeight: recentName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.openShareMenu(recentShare, {
+                            chatId: recentLine.chat.sessionId, name: recentLine.chat.name,
+                            profileDir: recentLine.chat.profileDir, shared: recentLine.chat.shared, host: section.remoteHost
+                        }, recentLine.rowKey)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Continue on another account")
-                        subText: root.shareHint(section.remoteHost)
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Continue on another account")
+                            subText: root.shareHint(section.remoteHost)
+                        }
                     }
                 }
             }
@@ -888,133 +911,160 @@ ColumnLayout {
                     text: "⇄"
                     opacity: 0.6
                 }
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    text: planLine.plan.cwdShort
-                          ? i18nc("plan: folder · how long ago", "%1 · %2", planLine.plan.cwdShort, root.ago(root.now - planLine.plan.updatedAt))
-                          : root.ago(root.now - planLine.plan.updatedAt)
-                    opacity: 0.6
-                    font: Kirigami.Theme.smallFont
-                    elide: Text.ElideLeft
-                    Layout.maximumWidth: Kirigami.Units.gridUnit * 10
-
-                    PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        active: !!planLine.plan.cwd
-                        mainText: i18n("Folder")
-                        subText: (section.remoteHost ? section.remoteHost + ":" : "") + planLine.plan.cwd
-                    }
-                }
-                PlasmaComponents3.ToolButton {
-                    // star it (it stays listed under Starred) or unstar it
-                    opacity: planLine.plan.starred || planHover.hovered ? 1 : 0
-                    icon.name: planLine.plan.starred ? "starred-symbolic" : "non-starred-symbolic"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: planLine.plan.starred ? i18n("Unstar") : i18n("Star")
-                    Layout.preferredHeight: planName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, !planLine.plan.starred)
-
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: planLine.plan.starred ? i18n("Starred") : i18n("Star this plan")
-                        subText: root.starHint("plans", !!planLine.plan.starred)
-                    }
-                }
-                // the plan's Markdown file itself, to change it (an SSH host's: in VS Code, over Remote-SSH)
-                PlasmaComponents3.ToolButton {
-                    visible: !section.remoteHost || root.vscodeInstalled
-                    icon.name: "document-edit"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Edit the plan")
-                    opacity: planHover.hovered ? 1 : 0
-                    Layout.preferredHeight: planName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.editPlan(planLine.plan, section.remoteHost)
-
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Edit the plan")
-                        subText: section.remoteHost
-                                 ? i18n("Opens its Markdown file on %1 in VS Code (Remote - SSH). What you change there is the plan.", section.remoteHost)
-                                 : i18n("Opens its Markdown file in your text editor (VS Code, if the settings open plans there). What you change there is the plan.")
-                    }
-                }
-                // what you changed in it, to the chat that made it (main.qml: sendPlanFeedback)
-                // (a plan whose chat is gone keeps this button's place, greyed out, so every line's buttons and time stay in the same columns)
-                PlasmaComponents3.ToolButton {
-                    visible: !section.remoteHost
-                    enabled: !!planLine.plan.chatId
-                    icon.name: "mail-send"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Send your changes to Claude")
-                    opacity: planHover.hovered || (enabled && planLine.plan.edited) ? 1 : 0
-                    Layout.preferredHeight: planName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
+                // you changed it since Claude wrote it: send that to its chat (as in VS Code)
+                Tag {
+                    visible: !!planLine.plan.edited && !!planLine.plan.chatId && !section.remoteHost
+                    text: i18nc("send your changes to the plan to the chat", "↩ Send")
+                    active: true
+                    clickable: true
+                    tooltipTitle: i18n("Send your changes to Claude")
+                    tooltip: i18n("You changed this plan since Claude wrote it. Click to send what you changed (and notes you wrote into it) to the chat that made it: Claude revises the plan, in plan mode.")
                     onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
+                }
+                // starred: a ★ (click: unstar it)
+                StarMark {
+                    visible: !!planLine.plan.starred
+                    tooltip: root.starHint("plans", false) + " " + root.starHint("plans", true)
+                    onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, false)
+                }
+                // its folder and how long ago, at the line's end
+                CoveredEnd {
+                    id: planEnd
+                    covered: planButtons.covering
+                    Layout.preferredWidth: Math.min(planWhen.implicitWidth, Kirigami.Units.gridUnit * 10)
+                    implicitHeight: planWhen.implicitHeight
 
-                    PlasmaCore.ToolTipArea {
+                    PlasmaComponents3.Label {
+                        id: planWhen
+                        width: planEnd.width
                         textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Send your changes to Claude")
-                        subText: (planLine.plan.edited ? i18n("You changed this plan since Claude wrote it.") + " " : "")
-                                 + i18n("Sends what you changed in it (and notes you wrote into it) to the chat that made it: Claude revises the plan, in plan mode. In tmux it's typed in for you; else it goes to the clipboard and the chat comes up, to paste it there. A chat that isn't open reopens in plan mode with it.")
+                        text: planLine.plan.cwdShort
+                              ? i18nc("plan: folder · how long ago", "%1 · %2", planLine.plan.cwdShort, root.ago(root.now - planLine.plan.updatedAt))
+                              : root.ago(root.now - planLine.plan.updatedAt)
+                        opacity: 0.6
+                        font: Kirigami.Theme.smallFont
+                        elide: Text.ElideLeft
+
+                        PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            active: !!planLine.plan.cwd
+                            mainText: i18n("Folder")
+                            subText: (section.remoteHost ? section.remoteHost + ":" : "") + planLine.plan.cwd
+                        }
                     }
                 }
-                PlasmaComponents3.ToolButton {
-                    id: planGo
-                    icon.name: "media-playback-start"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Carry it out…")
-                    opacity: planHover.hovered || root.planComposer === planLine.composerKey ? 1 : 0
-                    checked: root.planComposer === planLine.composerKey
-                    Layout.preferredHeight: planName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.togglePlanComposer(planLine.composerKey)
+                // on hover (and while its new chat box is open), over the line's end
+                HoverButtons {
+                    id: planButtons
+                    shown: planHover.hovered || root.planComposer === planLine.composerKey
+                    under: planEnd
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Carry it out in a new chat")
-                        subText: i18n("A new chat starts with the plan as its first message: in a terminal, in VS Code or in the background, in the plan's folder or another one.")
+                    PlasmaComponents3.ToolButton {
+                        // star it: it stays listed under Starred (a starred one has its ★)
+                        visible: !planLine.plan.starred
+                        icon.name: "non-starred-symbolic"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Star")
+                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, true)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Star this plan")
+                            subText: root.starHint("plans", false)
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    icon.name: "go-previous"
-                    enabled: !!planLine.plan.chatId
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Continue the chat that made it")
-                    opacity: planHover.hovered ? 1 : 0
-                    Layout.preferredHeight: planName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.continuePlanChat(planLine.plan, section.group, section.remoteHost)
+                    // the plan's Markdown file itself, to change it (an SSH host's: in VS Code, over Remote-SSH)
+                    PlasmaComponents3.ToolButton {
+                        visible: !section.remoteHost || root.vscodeInstalled
+                        icon.name: "document-edit"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Edit the plan")
+                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.editPlan(planLine.plan, section.remoteHost)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Continue the chat that made it")
-                        subText: i18n("To change the plan with Claude: its chat comes up, or reopens (in a terminal or VS Code, as the switch of Recent chats says).")
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Edit the plan")
+                            subText: section.remoteHost
+                                     ? i18n("Opens its Markdown file on %1 in VS Code (Remote - SSH). What you change there is the plan.", section.remoteHost)
+                                     : i18n("Opens its Markdown file in your text editor (VS Code, if the settings open plans there). What you change there is the plan.")
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    id: planShare
-                    visible: root.shareAccountsOf(section.remoteHost).length >= 2
-                    icon.name: "document-share"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Share it with another account…")
-                    opacity: planHover.hovered ? 1 : 0
-                    Layout.preferredHeight: planName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.openPlanMenu(planShare, planLine.plan, section.remoteHost)
+                    // what you changed in it, to the chat that made it (main.qml: sendPlanFeedback)
+                    // (a plan whose chat is gone keeps this button's place, greyed out, so every line's buttons and time stay in the same columns)
+                    PlasmaComponents3.ToolButton {
+                        visible: !section.remoteHost
+                        enabled: !!planLine.plan.chatId
+                        icon.name: "mail-send"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Send your changes to Claude")
+                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Share this plan")
-                        subText: i18n("A shared plan is one file on each account: a change shows on all of them. Sharing a chat shares its plan too.")
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Send your changes to Claude")
+                            subText: (planLine.plan.edited ? i18n("You changed this plan since Claude wrote it.") + " " : "")
+                                     + i18n("Sends what you changed in it (and notes you wrote into it) to the chat that made it: Claude revises the plan, in plan mode. In tmux it's typed in for you; else it goes to the clipboard and the chat comes up, to paste it there. A chat that isn't open reopens in plan mode with it.")
+                        }
+                    }
+                    PlasmaComponents3.ToolButton {
+                        id: planGo
+                        icon.name: "media-playback-start"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Carry it out…")
+                        checked: root.planComposer === planLine.composerKey
+                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.togglePlanComposer(planLine.composerKey)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Carry it out in a new chat")
+                            subText: i18n("A new chat starts with the plan as its first message: in a terminal, in VS Code or in the background, in the plan's folder or another one.")
+                        }
+                    }
+                    PlasmaComponents3.ToolButton {
+                        icon.name: "go-previous"
+                        enabled: !!planLine.plan.chatId
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Continue the chat that made it")
+                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.continuePlanChat(planLine.plan, section.group, section.remoteHost)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Continue the chat that made it")
+                            subText: i18n("To change the plan with Claude: its chat comes up, or reopens (in a terminal or VS Code, as the switch of Recent chats says).")
+                        }
+                    }
+                    PlasmaComponents3.ToolButton {
+                        id: planShare
+                        visible: root.shareAccountsOf(section.remoteHost).length >= 2
+                        icon.name: "document-share"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Share it with another account…")
+                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredWidth: Layout.preferredHeight
+                        onClicked: root.openPlanMenu(planShare, planLine.plan, section.remoteHost)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Share this plan")
+                            subText: i18n("A shared plan is one file on each account: a change shows on all of them. Sharing a chat shares its plan too.")
+                        }
                     }
                 }
             }
@@ -1104,32 +1154,46 @@ ColumnLayout {
                     }
                 }
             }
-            PlasmaComponents3.Label {
-                textFormat: Text.PlainText
-                text: memoryLine.memory.folderShort || memoryLine.memory.type === "account"
-                      ? i18nc("memory: folder · how long ago", "%1 · %2", memoryLine.memory.folderShort || i18n("every folder"),
-                              root.ago(root.now - memoryLine.memory.updatedAt))
-                      : root.ago(root.now - memoryLine.memory.updatedAt)
-                opacity: 0.6
-                font: Kirigami.Theme.smallFont
-                elide: Text.ElideLeft
-                Layout.maximumWidth: Kirigami.Units.gridUnit * 10
-            }
-            PlasmaComponents3.ToolButton {
-                visible: !section.remoteHost
-                icon.name: "document-edit"
-                display: PlasmaComponents3.AbstractButton.IconOnly
-                text: i18n("Edit this memory")
-                opacity: memoryHover.hovered ? 1 : 0
-                Layout.preferredHeight: memoryName.implicitHeight
-                Layout.preferredWidth: Layout.preferredHeight
-                onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
+            // its folder and how long ago, at the line's end
+            CoveredEnd {
+                id: memoryEnd
+                covered: memoryButtons.covering
+                Layout.preferredWidth: Math.min(memoryWhen.implicitWidth, Kirigami.Units.gridUnit * 10)
+                implicitHeight: memoryWhen.implicitHeight
 
-                PlasmaCore.ToolTipArea {
+                PlasmaComponents3.Label {
+                    id: memoryWhen
+                    width: memoryEnd.width
                     textFormat: Text.PlainText
-                    anchors.fill: parent
-                    mainText: i18n("Edit this memory")
-                    subText: i18n("Opens its file in your text editor (VS Code, if the settings open plans there). What you change there is what Claude remembers; Claude reads it in new chats in that folder.")
+                    text: memoryLine.memory.folderShort || memoryLine.memory.type === "account"
+                          ? i18nc("memory: folder · how long ago", "%1 · %2", memoryLine.memory.folderShort || i18n("every folder"),
+                                  root.ago(root.now - memoryLine.memory.updatedAt))
+                          : root.ago(root.now - memoryLine.memory.updatedAt)
+                    opacity: 0.6
+                    font: Kirigami.Theme.smallFont
+                    elide: Text.ElideLeft
+                }
+            }
+            // on hover, over the line's end
+            HoverButtons {
+                id: memoryButtons
+                shown: memoryHover.hovered && !section.remoteHost
+                under: memoryEnd
+
+                PlasmaComponents3.ToolButton {
+                    icon.name: "document-edit"
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: i18n("Edit this memory")
+                    Layout.preferredHeight: memoryName.implicitHeight
+                    Layout.preferredWidth: Layout.preferredHeight
+                    onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
+
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: i18n("Edit this memory")
+                        subText: i18n("Opens its file in your text editor (VS Code, if the settings open plans there). What you change there is what Claude remembers; Claude reads it in new chats in that folder.")
+                    }
                 }
             }
         }

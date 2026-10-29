@@ -47,7 +47,7 @@ Window {
                                     : row.entrypoint === "claude-vscode" ? "claude" : row.tmux ? "tmux"
                                     : row.vscodeTerminal ? "vscode" : "terminal"
 
-    title: i18nc("window title: a chat's name", "%1 — Claude chat", chatName || chatId.slice(0, 8))
+    title: i18nc("window title: a chat's name", "%1 — Talpy Chat", chatName || chatId.slice(0, 8))
     width: Kirigami.Units.gridUnit * 38
     height: Kirigami.Units.gridUnit * 40
     // (never narrower than the send buttons, which don't shrink)
@@ -1053,6 +1053,15 @@ Window {
                              : pane.where === "vscode" ? i18n("It runs in a terminal of VS Code.")
                              : pane.row && pane.row.terminalApp ? i18n("It runs in a terminal (%1).", pane.row.terminalApp)
                              : i18n("It runs in a terminal.")
+                }
+                // a background session shown in a terminal too (claude attach)
+                Tag {
+                    readonly property var shownIn: pane.where === "background" && pane.row && pane.row.attached ? pane.row.attached : null
+                    visible: shownIn !== null
+                    text: !shownIn ? "" : shownIn.in === "tmux" ? "Tmux"
+                          : shownIn.in === "vscode" ? i18nc("where a chat runs", "VS Code terminal") : i18nc("where a chat runs", "Terminal")
+                    tooltip: !shownIn ? "" : shownIn.app ? i18n("Shown in a terminal too (%1): claude attach.", shownIn.app)
+                                                         : i18n("Shown in a terminal too: claude attach.")
                 }
                 PlasmaComponents3.Label {
                     textFormat: Text.PlainText

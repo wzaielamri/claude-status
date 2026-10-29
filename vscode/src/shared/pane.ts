@@ -82,6 +82,7 @@ export interface PaneChat {
   canMove: boolean; // runs in a terminal, on the account Claude Code is on: it can move to a Claude Code panel
   where: ChatWhere;
   terminalApp: string; // the terminal it runs in, by name (Konsole, kitty…), or ""
+  attached: Session["attached"]; // a background session shown in a terminal too
 }
 
 // Where a chat runs (the tag under its name, the same words as the rows'):
@@ -96,6 +97,13 @@ export function chatWhere(s: Pick<Session, "pid" | "kind" | "entrypoint" | "tmux
   if (s.entrypoint === "claude-vscode") return "claude";
   if (s.tmux) return "tmux";
   return terminalHere || s.vscodeTerminal ? "vscode" : "terminal";
+}
+
+// A background session shown in a terminal too (claude attach): its second tag
+export function attachedTag(attached: Session["attached"]): { tag: string; title: string } | null {
+  if (!attached) return null;
+  const tag = attached.in === "tmux" ? "Tmux" : attached.in === "vscode" ? "VS Code terminal" : "Terminal";
+  return { tag, title: attached.app ? `Shown in a terminal too (${attached.app}): claude attach.` : "Shown in a terminal too: claude attach." };
 }
 
 // Its tag, and what the tag says on hover (terminalApp: the terminal's name)

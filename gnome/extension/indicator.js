@@ -234,6 +234,15 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this.pollHost(host);
     }
 
+    // Refresh (its button): the plan usage too, of every account whose numbers
+    // are over a minute old (talpy_den.py --fetch-usage); the status says a
+    // fetch is on its way
+    async fetchUsage() {
+        await this._runner.run('talpy_den.py', ['--fetch-usage', ...this._configDirArgs]);
+        if (!this._destroyed)
+            this.refresh();
+    }
+
     async refresh() {
         // A still-running poll is still coming: don't stack another
         if (this._polling)
@@ -967,6 +976,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         header.add_child(this.tips.add(iconButton('view-refresh-symbolic', () => {
             this.refreshAll();
             this._loadTab();
+            this.fetchUsage();
         }), 'Refresh'));
         header.add_child(this.tips.add(iconButton('emblem-system-symbolic', () => {
             this.menu.close();

@@ -342,6 +342,7 @@ class Pane implements vscode.Disposable {
       canMove: !!session && this.owner.ext.actions.canMoveToClaudeCode(this.chat),
       where: chatWhere(session, this.terminalHere),
       terminalApp: session?.terminalApp ?? "",
+      attached: session?.kind === "bg" ? (session.attached ?? null) : null,
     };
     this.panel.title = chat.name || this.chatId.slice(0, 8);
     if (this.ready) this.post({ type: "chat", chat });
@@ -655,7 +656,7 @@ class Pane implements vscode.Disposable {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="${asset("dist", "webview-style.css")}">
-<title>Claude chat</title>
+<title>Talpy Chat</title>
 </head>
 <body class="chat-page">
 <script nonce="${nonce}">window.CLAUDE_CHAT = ${config.replace(/</g, "\\u003c")};</script>
