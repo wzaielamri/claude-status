@@ -82,8 +82,7 @@
       {
         "command": "talpyDen.newChat",
         "title": "New Chat…",
-        "category": "Talpy Den",
-        "icon": "$(add)"
+        "category": "Talpy Den"
       },
       {
         "command": "talpyDen.findChat",
@@ -162,7 +161,8 @@
       {
         "command": "talpyDen.addAccount",
         "title": "Add Claude Account…",
-        "category": "Talpy Den"
+        "category": "Talpy Den",
+        "icon": "$(person-add)"
       },
       {
         "command": "talpyDen.sendPlanFeedback",
@@ -211,7 +211,7 @@
     "menus": {
       "view/title": [
         {
-          "command": "talpyDen.newChat",
+          "command": "talpyDen.addAccount",
           "when": "view == talpyDen.view",
           "group": "navigation@1"
         },

@@ -152,7 +152,9 @@ PlasmaComponents3.ScrollView {
                         opacity: 0.8
                     }
                     PlasmaComponents3.ToolButton {
-                        icon.name: "list-add"
+                        icon.source: root.iconDir + "chat-new-symbolic.svg"   // (as an account's: at 16 px)
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("New chat here")
                         onClicked: root.newChatInProject(card.project)

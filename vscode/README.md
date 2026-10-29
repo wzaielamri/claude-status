@@ -196,10 +196,11 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   (the view's **⋯** menu) lists the Claude accounts of this computer or of
   an SSH host in the view: whom each is logged in as, which one is the
   default, which ones VS Code's Claude and plain `claude` run on. **Add
-  Account…** makes a `~/.claude-NAME` folder and opens a terminal with
-  Claude's own login; an account can log in or out, get a `claude-NAME`
-  command, become the default, or be removed (to the Trash). An account that
-  isn't logged in shows **Log in…** in the view.
+  Account…** (also the person with a plus in the view's title bar) makes a
+  `~/.claude-NAME` folder and opens a terminal with Claude's own login; an
+  account can log in or out, get a `claude-NAME` command, become the
+  default, or be removed (to the Trash). An account that isn't logged in
+  shows **Log in…** in the view.
 - **One default account**: listed first (here and in the Plasma and GNOME
   widgets) and marked **default**, its usage in the status bar, and both
   VS Code's Claude and plain `claude` run on it (see "Good to know"). Each
@@ -297,7 +298,8 @@ or through `ssh -t` for another host. A chat already running in one of this
 window's terminals is brought to the front; a chat of the Claude Code
 extension is revealed in it.
 
-**New chat** (＋) asks where: in a terminal, in one of the account's recent
+**New chat** (the speech bubble with a plus next to an account, or **Talpy
+Den: New Chat…**) asks where: in a terminal, in one of the account's recent
 folders or any other, or as a Claude Code chat tab in this window. **Start
 with a task…** first asks what Claude should do: the chat starts with it (in
 a terminal at once, in a chat tab typed in for you to send), and can also run

@@ -3,9 +3,9 @@
 #   gnome/build.sh [--gnome43] [OUT_DIR]   (default gnome/build)
 # makes OUT_DIR/talpy-den@wzaielamri.github.io/ (the extension folder) and
 # OUT_DIR/talpy-den@wzaielamri.github.io.shell-extension.zip (for
-# `gnome-extensions install`). The Python helpers, Talpy (the pet) and its
-# pictures come from the Plasma widget's package/contents, so both front ends
-# share them.
+# `gnome-extensions install`). The Python helpers, Talpy (the pet), its
+# pictures and the new-chat icon come from the Plasma widget's
+# package/contents, so both front ends share them.
 # --gnome43 converts the result for GNOME Shell 43/44 (gnome/gnome43/port43.py).
 set -euo pipefail
 gnome43=0
@@ -21,10 +21,11 @@ dest="$out/$uuid"
 zip="$out/$uuid.shell-extension.zip"
 
 rm -rf "$dest" "$zip"
-mkdir -p "$dest/code" "$dest/pets" "$dest/ui/talpy"
+mkdir -p "$dest/code" "$dest/pets" "$dest/ui/talpy" "$dest/icons"
 cp -r "$here/extension/." "$dest/"
 cp "$repo"/package/contents/code/*.py "$dest/code/"
 cp "$repo"/package/contents/pets/*.svg "$repo/package/contents/pets/README.md" "$dest/pets/"
+cp "$repo"/package/contents/icons/*-symbolic.svg "$dest/icons/"   # (the icons St colors like text)
 # Talpy, the pet, is the widget's own code (ES modules: .mjs there, .js here)
 for f in "$repo"/package/contents/ui/talpy/*.mjs; do
   sed "s/\.mjs';\$/.js';/" "$f" > "$dest/ui/talpy/$(basename "${f%.mjs}").js"

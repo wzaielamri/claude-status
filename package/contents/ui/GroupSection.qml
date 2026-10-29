@@ -67,11 +67,18 @@ ColumnLayout {
         }
         PlasmaComponents3.ToolButton {
             id: newChatButton
-            icon.name: "list-add"
+            // (a speech bubble with a plus: a + beside the account reads as
+            // "add an account"), drawn at the 16 px it's made for
+            icon.source: root.iconDir + "chat-new-symbolic.svg"
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("New chat")
             Layout.preferredHeight: heading.implicitHeight
             Layout.preferredWidth: Layout.preferredHeight
+            readonly property real iconPadding: Math.max(0, Math.floor((Layout.preferredHeight - Kirigami.Units.iconSizes.small) / 2))
+            topPadding: iconPadding
+            bottomPadding: iconPadding
+            leftPadding: iconPadding
+            rightPadding: iconPadding
             checked: root.newChatGroup === section.groupKey
             onClicked: root.toggleNewChat(section.groupKey)
 

@@ -80,7 +80,7 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
           />
         ) : null}
         <IconButton
-          icon="add"
+          icon="newChat"
           label={`New chat on ${g.title}`}
           title={
             (host

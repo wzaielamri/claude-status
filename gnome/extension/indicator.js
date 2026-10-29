@@ -41,6 +41,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._soundSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.sound'});
         this._runner = new Runner(GLib.build_filenamev([extension.path, 'code']));
         this.petsDir = GLib.build_filenamev([extension.path, 'pets']);
+        this.iconsDir = GLib.build_filenamev([extension.path, 'icons']);   // (the widget's own: build.sh)
         this._notifier = new Notifier(this.petsDir);
         this._tracker = tracker || new L.Tracker();
         this.tips = new Tooltips();

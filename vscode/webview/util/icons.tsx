@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "add" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera";
+export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "addAccount";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -20,7 +20,6 @@ const shapes: Record<IconName, JSX.Element> = {
       <path d="M12.4 1.4v3.2H9.2" />
     </>
   ),
-  add: <path d="M8 2.75v10.5M2.75 8h10.5" />,
   remove: <path d="M2.75 8h10.5" />,
   stop: <rect x="3.75" y="3.75" width="8.5" height="8.5" rx="1.5" fill="currentColor" />,
   close: <path d="M4 4l8 8M12 4l-8 8" />,
@@ -71,6 +70,19 @@ const shapes: Record<IconName, JSX.Element> = {
   move: <path d="M2.5 8h8M7.75 5.25L10.5 8l-2.75 2.75M13.25 3v10" />,
   star: <path d="M8 1.9l1.85 3.8 4.15.6-3 2.93.7 4.13L8 11.4l-3.7 1.96.7-4.13-3-2.93 4.15-.6z" />,
   chat: <path d="M2.5 3.75c0-.7.55-1.25 1.25-1.25h8.5c.7 0 1.25.55 1.25 1.25v5.5c0 .7-.55 1.25-1.25 1.25H7l-3 2.75V10.5h-.25c-.7 0-1.25-.55-1.25-1.25z" />,
+  // (a bubble with a plus: a new chat, not a new account)
+  newChat: (
+    <>
+      <path d="M2.5 3.75c0-.7.55-1.25 1.25-1.25h8.5c.7 0 1.25.55 1.25 1.25v5.5c0 .7-.55 1.25-1.25 1.25H7l-3 2.75V10.5h-.25c-.7 0-1.25-.55-1.25-1.25z" />
+      <path d="M8 4.5v4M6 6.5h4" />
+    </>
+  ),
+  addAccount: (
+    <>
+      <circle cx="6.25" cy="5" r="2.5" />
+      <path d="M1.75 13.5c0-2.5 2-4.25 4.5-4.25s4.5 1.75 4.5 4.25M12.75 2.75v4M10.75 4.75h4" />
+    </>
+  ),
   chart: <path d="M2.5 13.5h11M4.5 11V8M8 11V3.5M11.5 11V6" />,
   shield: <path d="M8 1.75l5 2v4c0 3.1-2.15 5.35-5 6.5-2.85-1.15-5-3.4-5-6.5v-4z" />,
   folder: <path d="M2 4c0-.55.45-1 1-1h3.5l1.5 1.75h5c.55 0 1 .45 1 1V12c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1z" />,

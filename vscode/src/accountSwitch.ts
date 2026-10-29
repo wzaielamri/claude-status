@@ -133,7 +133,7 @@ export class AccountSwitch implements vscode.Disposable {
           group: g,
         })),
         { label: "", kind: vscode.QuickPickItemKind.Separator },
-        { label: "$(add) Add Account…" },
+        { label: "$(person-add) Add Account…" },
       ],
       {
         title: "Default Claude account",

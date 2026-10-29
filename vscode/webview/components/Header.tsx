@@ -34,13 +34,6 @@ export function Header(props: {
   // says it's looking
   const summary = props.answered ? summaryText(counts) : props.unavailable ? "Status unavailable" : "";
 
-  function newChat() {
-    // one account: no need to ask which; else the extension asks
-    const only = groups.length === 1 ? groups[0] : null;
-    if (only?.host) post({ type: "newChat", groupId: only.id, host: only.host });
-    else post({ type: "newChat", groupId: only ? only.id : "" });
-  }
-
   return (
     <header class="header">
       <TalpyIcon state={overall} moving={visible} />
@@ -72,7 +65,12 @@ export function Header(props: {
       ) : null}
       {editorTab ? (
         <div class="header-actions">
-          <IconButton icon="add" label="New chat…" onClick={newChat} />
+          <IconButton
+            icon="addAccount"
+            label="Add account…"
+            title="Add a Claude account: a ~/.claude-NAME folder, logged in with Claude's own login. (A new chat: the bubble next to an account.)"
+            onClick={() => post({ type: "addAccount" })}
+          />
           <IconButton
             icon="search"
             label="Find a chat…"

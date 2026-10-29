@@ -129,7 +129,7 @@ export class Accounts {
     const accounts = await this.list(host);
     if (!accounts) return;
     const items: Item<() => Promise<void>>[] = [
-      { label: "$(add) Add Account…", detail: "A ~/.claude-NAME folder, logged in with Claude's own login", run: () => this.add(accounts, host) },
+      { label: "$(person-add) Add Account…", detail: "A ~/.claude-NAME folder, logged in with Claude's own login", run: () => this.add(accounts, host) },
       { label: `Accounts${host ? ` on ${host}` : " on this computer"}`, kind: vscode.QuickPickItemKind.Separator },
       ...accounts.map((a) => ({
         label: `$(${a.loggedIn ? "account" : "circle-slash"}) ${a.label}`,

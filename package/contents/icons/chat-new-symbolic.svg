@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- New chat: a speech bubble with a plus (not list-add's plain plus, which beside an account reads as "add an account"). In the theme's text color: Plasma reads the ColorScheme-Text stylesheet, GNOME recolors a -symbolic icon -->
+  <defs>
+    <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+  </defs>
+  <path class="ColorScheme-Text" style="fill:currentColor" fill-rule="evenodd" d="M1 1v11l3 3v-3h10V1zm1 1h11v9H2z"/>
+  <path class="ColorScheme-Text" style="fill:currentColor" d="M7 4h1v2h2v1H8v2H7V7H5V6h2z"/>
+</svg>

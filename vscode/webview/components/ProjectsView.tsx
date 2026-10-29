@@ -64,7 +64,7 @@ export function ProjectsView() {
               </span>
               <button type="button" class="icon-btn" title={`New chat in ${p.short}`} aria-label="New chat here"
                 onClick={() => post({ type: "newChatIn", path: p.path, profileDir: p.chats[0]?.profileDir ?? "" })}>
-                <Icon name="add" />
+                <Icon name="newChat" />
               </button>
             </div>
             {unfolded ? <ProjectDetails p={p} groups={groups} now={now} cur={answer.data?.currency} /> : null}

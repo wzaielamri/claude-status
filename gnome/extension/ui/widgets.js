@@ -38,12 +38,13 @@ export function paragraph(text, styleClass = '', props = {}) {
     return l;
 }
 
-export function iconButton(iconName, onClick, styleClass = 'claude-icon-button') {
+// icon: an icon name, or a Gio.Icon (one of the extension's own)
+export function iconButton(icon, onClick, styleClass = 'claude-icon-button') {
     const b = new St.Button({
         style_class: styleClass,
         can_focus: true,
         y_align: Clutter.ActorAlign.CENTER,
-        child: new St.Icon({icon_name: iconName, style_class: 'claude-button-icon'}),
+        child: new St.Icon({...(typeof icon === 'string' ? {icon_name: icon} : {gicon: icon}), style_class: 'claude-button-icon'}),
     });
     b.connect('clicked', () => onClick(b));
     return b;

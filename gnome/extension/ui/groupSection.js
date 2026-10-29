@@ -4,6 +4,8 @@
 // set, the account is on that SSH host and its actions run there.
 
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import * as L from '../logic.js';
@@ -30,7 +32,10 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
             + ' Change it in the settings: Accounts, Make Default.']);
         head.add_child(mark);
     }
-    const add = iconButton('list-add-symbolic', () => ctx.toggleNewChat(groupKey));
+    // (a speech bubble with a plus, the widget's: a + beside the account reads
+    // as "add an account"; St colors a -symbolic icon like text)
+    const bubble = new Gio.FileIcon({file: Gio.File.new_for_path(GLib.build_filenamev([ctx.iconsDir, 'chat-new-symbolic.svg']))});
+    const add = iconButton(bubble, () => ctx.toggleNewChat(groupKey));
     tips.add(add, [L.fmt('New chat on %1', group.title), remoteHost
         ? L.fmt("Lists this account's folders on %1: start a new Claude chat in one, in a terminal (over ssh) or in VS Code.", remoteHost)
         : "Lists this account's recent folders: start a new Claude chat in one, in a terminal or in VS Code."]);
