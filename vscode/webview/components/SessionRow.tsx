@@ -377,7 +377,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {remove ? (
             <IconButton
-              icon="remove"
+              icon="close"
               label="Remove from the list"
               title="Remove from the list. Only hides it here; nothing is deleted. It comes back if the chat runs again, or with Show Removed Chats Again."
               onClick={() => post({ type: "dismiss", chat })}

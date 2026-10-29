@@ -57,6 +57,13 @@
   (*Auto mode*, *Plan mode*…) was missing: the panel names the mode at a
   chat's first prompt only, and the row looked for it in the chat's newest
   lines.
+- **Lists line up in columns:** recent chats, plans and memories end in a
+  folder column and a time column, so their tags, folders and times line
+  up, as in the widget.
+- **Every account's usage bars are alike:** they start and end at the same
+  place in every account, *resets in …* at the line's end in a column kept
+  for it; an account with no reset time had longer bars.
+- **Removing a chat from the list is an ×,** as in the widget (it was a −).
 - **Inline code's ground ends with its last character:** in the chat tab
   it had room on each side that read as a space before a comma.
 - **The ticker is in the big Talpy's box:** what the working chats do right

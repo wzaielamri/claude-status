@@ -95,11 +95,8 @@ export function PlansList({ group }: { group: Group }) {
             ★
           </button>
         ) : null}
-        {p.cwdShort ? <Elided text={p.cwdShort} class="recent-folder small muted" title={p.cwd} /> : null}
-        <span class="small muted nowrap">
-          {p.cwdShort ? "· " : ""}
-          {ago(view.now - p.updatedAt)}
-        </span>
+        {p.cwdShort ? <Elided text={p.cwdShort} class="recent-folder small muted" title={p.cwd} /> : <span class="recent-folder" />}
+        <span class="recent-ago small muted nowrap">{ago(view.now - p.updatedAt)}</span>
         <div class="row-actions">
           {p.starred ? null : (
             <IconButton

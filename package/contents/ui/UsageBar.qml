@@ -38,7 +38,7 @@ ColumnLayout {
         PlasmaComponents3.Label {
             textFormat: Text.PlainText
             text: bar.label
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 3.5
+            Layout.preferredWidth: root.usageLabelWidth
             elide: Text.ElideRight
         }
 
@@ -96,7 +96,8 @@ ColumnLayout {
         PlasmaComponents3.Label {
             textFormat: Text.PlainText
             text: bar.detail
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 6.5
+            Layout.preferredWidth: root.usageResetWidth   // (kept with no reset to say: the bars stay alike)
+            horizontalAlignment: Text.AlignRight
             opacity: 0.7
             font: Kirigami.Theme.smallFont
             elide: Text.ElideRight
@@ -114,7 +115,7 @@ ColumnLayout {
         textFormat: Text.PlainText
         visible: bar.runsOut
         Layout.fillWidth: true
-        Layout.leftMargin: Kirigami.Units.gridUnit * 3.5 + Kirigami.Units.smallSpacing
+        Layout.leftMargin: root.usageLabelWidth + Kirigami.Units.smallSpacing
         text: bar.runsOut ? i18n("At this pace: full in %1, %2 before it resets",
                                  root.duration(bar.forecast.fullAt - root.now), root.duration(bar.resetsAt - bar.forecast.fullAt)) : ""
         color: Kirigami.Theme.neutralTextColor   // (orange, as in the VS Code extension)

@@ -105,10 +105,13 @@ export function App() {
     waiting: waiting ? chatRefOf(waiting.session, waiting.group.host) : null,
   };
   const local = state.status ? state.status.groups : [];
+  // the plan usage bars' label column: one width in every account (the widest
+  // window label shown), so their bars line up
+  const labelChars = Math.max(2, ...groups.flatMap((g) => (g.limits?.windows ?? []).map((w) => w.label.length)));
 
   return (
     <ViewContext.Provider value={state}>
-      <div class={appClass}>
+      <div class={appClass} style={{ "--usage-label-w": `${labelChars + 0.5}ch` }}>
         <div class={"top" + (scrolled ? " scrolled" : "")}>
           <Header
             overall={overall}

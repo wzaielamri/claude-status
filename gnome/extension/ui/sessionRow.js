@@ -114,7 +114,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     }
     if (s.state === 'done') {
         // Remove a finished session from the list (nothing is deleted)
-        const remove = iconButton('list-remove-symbolic',
+        const remove = iconButton('window-close-symbolic',   // (an ×, as Breeze draws Plasma's)
             () => (remoteHost ? ctx.remoteDismiss(remoteHost, s.sessionId) : ctx.dismissSession(s.sessionId)));
         tips.add(remove, ['Remove from the list',
             'Only hides it here; nothing is deleted. It comes back if the chat runs again, or with “Show removed chats again” at the bottom of this menu.']);
@@ -375,7 +375,7 @@ export function buildShareMenu(ctx, chat, rowKey) {
     } else {
         for (const g of ctx.shareAccounts) {
             menu.add_child(textButton(L.fmt('Keep only on %1…', g.title), () => ctx.askKeepOnly(rowKey, chat, g),
-                'claude-menu-item', 'list-remove-symbolic'));
+                'claude-menu-item', 'window-close-symbolic'));
         }
     }
     return menu;
@@ -386,7 +386,7 @@ export function buildKeepOnly(ctx) {
     const c = ctx.ui.shareConfirm;
     return confirmBox(L.fmt("Keep “%1” only on %2? It leaves the chat lists of %3; the conversation stays on %2. It can't be open in a session meanwhile.",
         c.name, c.account, c.others), [
-        [L.fmt('Keep only on %1', c.account), 'list-remove-symbolic', () => ctx.confirmKeepOnly()],
+        [L.fmt('Keep only on %1', c.account), 'window-close-symbolic', () => ctx.confirmKeepOnly()],
         ['Cancel', '', () => ctx.cancelKeepOnly()],
     ]);
 }

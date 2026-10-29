@@ -475,6 +475,8 @@ RowLayout {
                     property real widest: 0
                     width: stateBox.width
                     horizontalAlignment: Text.AlignRight   // (at the line's end, however wide it was)
+                    // (the hover buttons over its end: what's left of it shows, unless that's a sliver)
+                    opacity: row.buttonsShown && implicitWidth - rowButtons.covering < Kirigami.Units.gridUnit * 2 ? 0 : 1
                     textFormat: Text.PlainText
                     text: root.stateText(row.session)
                     color: row.session.state === "waiting" ? Kirigami.Theme.neutralTextColor

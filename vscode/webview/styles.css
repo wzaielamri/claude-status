@@ -564,9 +564,11 @@ button:focus-visible {
   }
 }
 
+/* label, bar, percent, when it resets: the same columns in every account
+   (App sets the label's), kept with no reset to say, so the bars line up */
 .usage {
   display: grid;
-  grid-template-columns: auto minmax(40px, 1fr) auto minmax(0, auto);
+  grid-template-columns: var(--usage-label-w, 2.5ch) minmax(40px, 1fr) 2.6em 7.6em;
   align-items: center;
   column-gap: 6px;
   row-gap: 1px;
@@ -593,6 +595,7 @@ button:focus-visible {
 
 .usage-reset {
   min-width: 0;
+  text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1435,9 +1438,18 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+/* A recent chat's, a plan's or a memory's folder and how long ago: columns
+   of one width, so the tags and names before them line up */
 .recent-folder {
-  flex: 0 1 auto;
-  max-width: calc(var(--cs-gu) * 10);
+  flex: none;
+  width: clamp(4em, 22%, calc(var(--cs-gu) * 8)); /* (a narrow sidebar keeps room for the names) */
+  text-align: right;
+}
+
+.recent-ago {
+  flex: none;
+  width: 6.4em;
+  text-align: right;
 }
 
 .recent-item > .row-actions {

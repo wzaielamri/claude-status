@@ -57,11 +57,10 @@ export function MemoriesList({ group }: { group: Group }) {
               </button>
               {m.folderShort || m.type === "account" ? (
                 <Elided text={m.folderShort || "every folder"} class="recent-folder small muted" title={m.folder} />
-              ) : null}
-              <span class="small muted nowrap">
-                {m.folderShort || m.type === "account" ? "· " : ""}
-                {ago(view.now - m.updatedAt)}
-              </span>
+              ) : (
+                <span class="recent-folder" />
+              )}
+              <span class="recent-ago small muted nowrap">{ago(view.now - m.updatedAt)}</span>
               {elsewhere ? null : (
                 <div class="row-actions">
                   <IconButton

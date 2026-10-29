@@ -181,7 +181,7 @@ export function RecentChats({ group }: { group: Group }) {
           </button>
         ) : null}
         <Elided text={c.cwdShort || "~"} class="recent-folder small muted" title={c.cwd} />
-        <span class="small muted nowrap">· {ago(view.now - c.lastActive)}</span>
+        <span class="recent-ago small muted nowrap">{ago(view.now - c.lastActive)}</span>
         <div class="row-actions">
           {paneFirst && canOpen ? (
             <IconButton icon="external" label="Reopen this chat" title={reopen} onClick={reopenIt} />

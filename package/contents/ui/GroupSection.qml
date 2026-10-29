@@ -18,8 +18,10 @@ ColumnLayout {
 
     readonly property string groupKey: (remoteHost ? remoteHost + "/" : "") + group.id
     // the folder and how long ago at the end of a recent chat's, a plan's or a
-    // memory's line: one width in all three, so what's before it lines up
-    readonly property real endWidth: Kirigami.Units.gridUnit * 12
+    // memory's line: columns of one width in all three, so what's before them
+    // lines up, and the folders and times too
+    readonly property real folderWidth: Kirigami.Units.gridUnit * 8
+    readonly property real endWidth: folderWidth + Kirigami.Units.smallSpacing + root.agoWidth
     readonly property var recent: group.recent || []
     readonly property bool recentOpen: !!root.expandedRecent[groupKey]
     readonly property var plans: group.plans || []
@@ -721,23 +723,34 @@ ColumnLayout {
                     Layout.preferredWidth: section.endWidth
                     implicitHeight: recentFolder.implicitHeight
 
-                    PlasmaComponents3.Label {
-                        id: recentFolder
+                    RowLayout {
                         width: recentEnd.width
-                        horizontalAlignment: Text.AlignRight
-                        textFormat: Text.PlainText
-                        text: i18nc("recent chat: folder · how long ago", "%1 · %2", recentLine.chat.cwdShort || "~",
-                                    root.ago(root.now - recentLine.chat.lastActive))
-                        opacity: 0.6
-                        font: Kirigami.Theme.smallFont
-                        elide: Text.ElideLeft
+                        spacing: Kirigami.Units.smallSpacing
 
-                        PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
+                        PlasmaComponents3.Label {
+                            id: recentFolder
+                            Layout.preferredWidth: section.folderWidth
+                            horizontalAlignment: Text.AlignRight
                             textFormat: Text.PlainText
-                            anchors.fill: parent
-                            active: !!recentLine.chat.cwd
-                            mainText: i18n("Folder")
-                            subText: (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd
+                            text: recentLine.chat.cwdShort || "~"
+                            opacity: 0.6
+                            font: Kirigami.Theme.smallFont
+                            elide: Text.ElideMiddle
+                            PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                active: !!recentLine.chat.cwd
+                                mainText: i18n("Folder")
+                                subText: (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd
+                            }
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.preferredWidth: root.agoWidth
+                            horizontalAlignment: Text.AlignRight
+                            textFormat: Text.PlainText
+                            text: root.ago(root.now - recentLine.chat.lastActive)
+                            opacity: 0.6
+                            font: Kirigami.Theme.smallFont
                         }
                     }
                 }
@@ -938,24 +951,34 @@ ColumnLayout {
                     Layout.preferredWidth: section.endWidth
                     implicitHeight: planWhen.implicitHeight
 
-                    PlasmaComponents3.Label {
-                        id: planWhen
+                    RowLayout {
                         width: planEnd.width
-                        horizontalAlignment: Text.AlignRight
-                        textFormat: Text.PlainText
-                        text: planLine.plan.cwdShort
-                              ? i18nc("plan: folder · how long ago", "%1 · %2", planLine.plan.cwdShort, root.ago(root.now - planLine.plan.updatedAt))
-                              : root.ago(root.now - planLine.plan.updatedAt)
-                        opacity: 0.6
-                        font: Kirigami.Theme.smallFont
-                        elide: Text.ElideLeft
+                        spacing: Kirigami.Units.smallSpacing
 
-                        PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
+                        PlasmaComponents3.Label {
+                            id: planWhen
+                            Layout.preferredWidth: section.folderWidth
+                            horizontalAlignment: Text.AlignRight
                             textFormat: Text.PlainText
-                            anchors.fill: parent
-                            active: !!planLine.plan.cwd
-                            mainText: i18n("Folder")
-                            subText: (section.remoteHost ? section.remoteHost + ":" : "") + planLine.plan.cwd
+                            text: planLine.plan.cwdShort || ""
+                            opacity: 0.6
+                            font: Kirigami.Theme.smallFont
+                            elide: Text.ElideMiddle
+                            PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                active: !!planLine.plan.cwd
+                                mainText: i18n("Folder")
+                                subText: (section.remoteHost ? section.remoteHost + ":" : "") + planLine.plan.cwd
+                            }
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.preferredWidth: root.agoWidth
+                            horizontalAlignment: Text.AlignRight
+                            textFormat: Text.PlainText
+                            text: root.ago(root.now - planLine.plan.updatedAt)
+                            opacity: 0.6
+                            font: Kirigami.Theme.smallFont
                         }
                     }
                 }
@@ -1166,18 +1189,28 @@ ColumnLayout {
                 Layout.preferredWidth: section.endWidth
                 implicitHeight: memoryWhen.implicitHeight
 
-                PlasmaComponents3.Label {
-                    id: memoryWhen
+                RowLayout {
                     width: memoryEnd.width
-                    horizontalAlignment: Text.AlignRight
-                    textFormat: Text.PlainText
-                    text: memoryLine.memory.folderShort || memoryLine.memory.type === "account"
-                          ? i18nc("memory: folder · how long ago", "%1 · %2", memoryLine.memory.folderShort || i18n("every folder"),
-                                  root.ago(root.now - memoryLine.memory.updatedAt))
-                          : root.ago(root.now - memoryLine.memory.updatedAt)
-                    opacity: 0.6
-                    font: Kirigami.Theme.smallFont
-                    elide: Text.ElideLeft
+                    spacing: Kirigami.Units.smallSpacing
+
+                    PlasmaComponents3.Label {
+                        id: memoryWhen
+                        Layout.preferredWidth: section.folderWidth
+                        horizontalAlignment: Text.AlignRight
+                        textFormat: Text.PlainText
+                        text: memoryLine.memory.folderShort || (memoryLine.memory.type === "account" ? i18n("every folder") : "")
+                        opacity: 0.6
+                        font: Kirigami.Theme.smallFont
+                        elide: Text.ElideMiddle
+                    }
+                    PlasmaComponents3.Label {
+                        Layout.preferredWidth: root.agoWidth
+                        horizontalAlignment: Text.AlignRight
+                        textFormat: Text.PlainText
+                        text: root.ago(root.now - memoryLine.memory.updatedAt)
+                        opacity: 0.6
+                        font: Kirigami.Theme.smallFont
+                    }
                 }
             }
             // on hover, over the line's end

@@ -86,6 +86,30 @@ PlasmoidItem {
         return out
     }
 
+    // The plan usage bars' columns, one width in every account (here and on
+    // SSH hosts), so their bars line up: the widest window label shown, and
+    // room for "resets in 23h 59m" at the line's end
+    FontMetrics {
+        id: usageFm
+    }
+    FontMetrics {
+        id: usageSmallFm
+        font: Kirigami.Theme.smallFont
+    }
+    readonly property real usageLabelWidth: {
+        let widest = usageFm.advanceWidth("7d")
+        const groups = (status ? status.groups : []).slice()
+        for (const host of shownHosts)
+            groups.push(...(remote[host] && remote[host].result ? remote[host].result.groups : []))
+        for (const g of groups)
+            for (const w of (g.limits ? g.limits.windows : []))
+                widest = Math.max(widest, usageFm.advanceWidth(w.label || ""))
+        return Math.ceil(widest) + Kirigami.Units.smallSpacing
+    }
+    readonly property real usageResetWidth: Math.ceil(usageSmallFm.advanceWidth(i18n("resets in %1", "23h 59m")))
+    // how long ago, at the end of a recent chat's, a plan's or a memory's line: room for "23h 59m ago"
+    readonly property real agoWidth: Math.ceil(usageSmallFm.advanceWidth(ago((23 * 60 + 59) * 60000)))
+
     // group as shown on host's section ("" here): limitsHidden when its usage
     // shows elsewhere (or no host's does), with the account's numbers all the
     // same in accountLimits (for limitReset), limitsFrom when the numbers come
