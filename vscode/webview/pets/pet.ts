@@ -103,8 +103,8 @@ export class Pet {
   private readonly holes: HTMLCanvasElement[] = [];
   // Where it's drawn: at px, but while you hold it it trails your hand on a
   // spring and swings with how fast you move it (and wobbles back after), the
-  // widget's SpringAnimations; on the ground it stands upright at once (where
-  // it digs in, its burrow doesn't swing)
+  // widget's SpringAnimations; put down, it wobbles back upright on the
+  // ground, settled before talpy.land() opens its burrow (700 ms or more)
   private readonly shown: Spring;
   private readonly tilt = new Spring(3, 0.16, 0.3);
   // The hole it was pulled out of: empty where it was while you hold it, under
@@ -623,7 +623,7 @@ export class Pet {
     const px = Math.round(this.px * 10) / 10,
       shown = Math.round(this.shown.value * 10) / 10,
       lift = Math.round(this.lift * 10) / 10,
-      swing = this.held ? Math.round(this.tilt.value * 10) / 10 : 0;
+      swing = Math.round(this.tilt.value * 10) / 10;
     this.put(this.sheets, "origin", "transformOrigin", `${s.canvasW / 2}px ${s.floorY - (box * 27) / 64}px`);
     this.put(this.sheets, "sheets", "transform",
       `translate(${shown - s.canvasW / 2}px, ${ground - lift - s.floorY}px)${swing ? ` rotate(${swing}deg)` : ""}`);
@@ -656,7 +656,7 @@ export class Pet {
     if (!this.held || reducedMotion()) {
       shown.set(this.px);
       if (reducedMotion()) tilt.set(0);
-      else tilt.aim(0, now); // (shown only while held: render())
+      else tilt.aim(0, now); // (put down: it wobbles back upright)
       tilt.step(now);
     } else {
       const unit = this.stage.box / 64;
