@@ -863,24 +863,63 @@ Window {
         reviewLoading = true
         run("review", "--review " + root.shellQuote(chatId) + paneArgs())
     }
-    // (from Chat to Steps and back the list changes: it stays at its end if it was)
-    function switchTab(to) {
-        if (conversationTab && to !== tab)
-            chatAtEnd = !loaded || nearEnd()
-        tab = to
-    }
+    // From Chat to Steps and back the list changes: it stays at its end if
+    // it was, else on the message at its top. The list shows listTab's
+    // items, set only here, after where it was is noted, and laid out again
+    // at once: no frame shows it elsewhere (Steps' tool calls came in below
+    // the view, and for a few frames it showed an older part of the chat)
+    property string listTab: "chat"
     onTabChanged: {
         if (tab === "review" && review === null)
             loadReview()
-        // (back on the Chat or Steps tab: at its end, following it, if it was when you left)
-        if (!conversationTab && chatTab)
+        if (chatTab) {   // (leaving the Chat or Steps tab)
             chatAtEnd = !loaded || nearEnd()
-        else if (conversationTab && chatAtEnd)
-            keepEnd()
-        chatTab = conversationTab
+            chatTop = chatAtEnd ? null : topMessage()
+        }
+        chatTab = tab === "chat" || tab === "steps"
+        if (chatTab) {
+            if (listTab !== tab) {
+                listTab = tab
+                list.forceLayout()
+            }
+            if (chatAtEnd || !chatTop) {   // (only tool calls below its top: the last turn's)
+                keepEnd()
+            } else {
+                showTop()
+                holdTop.restart()
+            }
+        }
     }
     property bool chatTab: true
     property bool chatAtEnd: true
+    property var chatTop: null   // [key, how far below the list's top it was]
+    // (rows shown for the first time get their height as they're laid out:
+    // the message stays where it was while they do, unless you scroll)
+    Timer {
+        id: holdTop
+        interval: 800
+    }
+
+    // The message at the top of the list (not a tool call: it's on both
+    // tabs): [its key, how far below the list's top it is]
+    function topMessage() {
+        for (let i = Math.max(0, list.indexAt(list.width / 2, list.contentY)); i < items.count; i++) {
+            const entry = list.itemAtIndex(i)
+            if (entry && entry.kind !== "tool" && entry.y + entry.height > list.contentY)
+                return [entry.key, entry.y - list.contentY]
+        }
+        return null
+    }
+    function showTop() {
+        for (let i = 0; chatTop && i < items.count; i++) {
+            const entry = items.get(i).key === chatTop[0] ? list.itemAtIndex(i) : null
+            if (entry) {
+                list.contentY = Math.max(list.originY, Math.min(entry.y - chatTop[1],
+                                                                list.originY + list.contentHeight - list.height))
+                return
+            }
+        }
+    }
 
     readonly property real editedAt: row && row.review ? row.review.editedAt || 0 : 0
     onEditedAtChanged: if (tab === "review") loadReview()
@@ -1140,7 +1179,7 @@ Window {
                         implicitHeight: tabText.implicitHeight + Kirigami.Units.largeSpacing * 1.5
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: pane.switchTab(modelData)
+                        onClicked: pane.tab = modelData
                         Accessible.role: Accessible.PageTab
                         Accessible.name: tabText.text
 
@@ -1208,7 +1247,18 @@ Window {
                     // every item made and laid out once (not as it scrolls in), so the
                     // list doesn't jump while you scroll
                     cacheBuffer: 100000
-                    onMovementStarted: settle.stop()   // (you scroll: it doesn't pull you back to the end)
+                    onMovementStarted: {   // (you scroll: it doesn't pull you back)
+                        settle.stop()
+                        holdTop.stop()
+                    }
+                    // (a row that gets its height as it's laid out: the end, or the
+                    // message at the top, is kept in the same frame)
+                    onContentHeightChanged: {
+                        if (settle.running && contentY >= settle.at - 1)
+                            pane.followEnd()
+                        else if (holdTop.running)
+                            pane.showTop()
+                    }
 
                     // Ctrl+wheel: the text size
                     WheelHandler {
@@ -1283,7 +1333,7 @@ Window {
                                 textFormat: Text.PlainText
                                 Layout.fillWidth: true
                                 // (what it's doing, unless that's the tool call just above)
-                                readonly property bool toolAbove: pane.tab === "steps" && items.count > 0 && items.get(items.count - 1).status === "open"
+                                readonly property bool toolAbove: pane.listTab === "steps" && items.count > 0 && items.get(items.count - 1).status === "open"
                                 readonly property string activity: pane.row ? root.doingText(pane.row, pane.host).replace(/[….\s]+$/, "") : ""
                                 text: (activity && !toolAbove ? activity : i18n("Working")) + "…"
                                 elide: Text.ElideRight
@@ -1314,7 +1364,7 @@ Window {
                             : kind === "you" ? Kirigami.Units.gridUnit * 1.6
                             : kind === "tool" && prev === "tool" ? Kirigami.Units.smallSpacing * 1.5
                             : Kirigami.Units.gridUnit * 0.8
-                        readonly property bool shows: kind !== "tool" || pane.tab === "steps"
+                        readonly property bool shows: kind !== "tool" || pane.listTab === "steps"
                         width: list.width
                         implicitHeight: gap + body.implicitHeight
                         height: shows ? implicitHeight : 0
