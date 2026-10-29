@@ -929,7 +929,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         const popup = column('claude-popup', {x_expand: true});
         this.menu.box.add_child(popup);
 
-        // Header: the tabs, the summary, SSH hosts, refresh
+        // Header: the tabs, the summary, SSH hosts, refresh, settings
         const header = box('claude-header', {x_expand: true});
         this._headerSpark = new TalpyIcon('claude-spark claude-spark-small');
         this._headerSpark.setMoving(false);   // (moves while the popup shows)
@@ -968,6 +968,10 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this.refreshAll();
             this._loadTab();
         }), 'Refresh'));
+        header.add_child(this.tips.add(iconButton('emblem-system-symbolic', () => {
+            this.menu.close();
+            this._extension.openPreferences();
+        }), 'Settings'));
         popup.add_child(header);
 
         // The big Talpy (pets.js) stays put while the list scrolls
@@ -993,7 +997,6 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this.menu.addAction('Open usage page on claude.ai', () => {
             Gio.AppInfo.launch_default_for_uri(USAGE_PAGE, global.create_app_launch_context(0, -1));
         }, 'web-browser-symbolic');
-        this.menu.addAction('Settings', () => this._extension.openPreferences(), 'emblem-system-symbolic');
 
         this.menu.connect('open-state-changed', (menu, open) => {
             if (open) {

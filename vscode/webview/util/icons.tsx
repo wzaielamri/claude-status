@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "addAccount";
+export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -77,10 +77,10 @@ const shapes: Record<IconName, JSX.Element> = {
       <path d="M8 4.5v4M6 6.5h4" />
     </>
   ),
-  addAccount: (
+  gear: (
     <>
-      <circle cx="6.25" cy="5" r="2.5" />
-      <path d="M1.75 13.5c0-2.5 2-4.25 4.5-4.25s4.5 1.75 4.5 4.25M12.75 2.75v4M10.75 4.75h4" />
+      <path d="M12.72 6.69l1.61.36v1.9l-1.61.36-.46 1.1.88 1.4-1.33 1.33-1.4-.88-1.1.46-.36 1.61h-1.9l-.36-1.61-1.1-.46-1.4.88-1.33-1.33.88-1.4-.46-1.1-1.61-.36v-1.9l1.61-.36.46-1.1-.88-1.4 1.33-1.33 1.4.88 1.1-.46.36-1.61h1.9l.36 1.61 1.1.46 1.4-.88 1.33 1.33-.88 1.4z" />
+      <circle cx="8" cy="8" r="2" />
     </>
   ),
   chart: <path d="M2.5 13.5h11M4.5 11V8M8 11V3.5M11.5 11V6" />,

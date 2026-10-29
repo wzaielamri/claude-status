@@ -181,6 +181,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("talpyDen.openUsagePage", () =>
       vscode.env.openExternal(vscode.Uri.parse("https://claude.ai/settings/usage")),
     ),
+    vscode.commands.registerCommand("talpyDen.openSettings", () =>
+      vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${context.extension.id}`),
+    ),
     vscode.commands.registerCommand("talpyDen.toggleDemo", () => {
       const on = dash.toggleDemo();
       void vscode.window.showInformationMessage(on ? "Talpy Den shows made-up demo chats now." : "Talpy Den shows your chats again.");

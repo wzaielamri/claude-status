@@ -117,6 +117,12 @@
         "category": "Talpy Den"
       },
       {
+        "command": "talpyDen.openSettings",
+        "title": "Open Settings",
+        "category": "Talpy Den",
+        "icon": "$(gear)"
+      },
+      {
         "command": "talpyDen.toggleDemo",
         "title": "Toggle Demo Data (for Screenshots)",
         "category": "Talpy Den"
@@ -211,54 +217,59 @@
     "menus": {
       "view/title": [
         {
-          "command": "talpyDen.addAccount",
+          "command": "talpyDen.findChat",
           "when": "view == talpyDen.view",
           "group": "navigation@1"
         },
         {
-          "command": "talpyDen.findChat",
+          "command": "talpyDen.pickHosts",
           "when": "view == talpyDen.view",
           "group": "navigation@2"
         },
         {
-          "command": "talpyDen.pickHosts",
+          "command": "talpyDen.refresh",
           "when": "view == talpyDen.view",
           "group": "navigation@3"
         },
         {
-          "command": "talpyDen.refresh",
+          "command": "talpyDen.openSettings",
           "when": "view == talpyDen.view",
           "group": "navigation@4"
         },
         {
           "command": "talpyDen.openInEditor",
           "when": "view == talpyDen.view",
-          "group": "more@1"
+          "group": "1_view@1"
         },
         {
           "command": "talpyDen.showRemoved",
           "when": "view == talpyDen.view",
-          "group": "more@2"
+          "group": "1_view@2"
         },
         {
           "command": "talpyDen.setupUsageBars",
           "when": "view == talpyDen.view",
-          "group": "more@3"
+          "group": "2_usage@1"
         },
         {
           "command": "talpyDen.openUsagePage",
           "when": "view == talpyDen.view",
-          "group": "more@4"
-        },
-        {
-          "command": "talpyDen.switchAccount",
-          "when": "view == talpyDen.view",
-          "group": "more@5"
+          "group": "2_usage@2"
         },
         {
           "command": "talpyDen.accounts",
           "when": "view == talpyDen.view",
-          "group": "more@6"
+          "group": "3_accounts@1"
+        },
+        {
+          "command": "talpyDen.addAccount",
+          "when": "view == talpyDen.view",
+          "group": "3_accounts@2"
+        },
+        {
+          "command": "talpyDen.switchAccount",
+          "when": "view == talpyDen.view",
+          "group": "3_accounts@3"
         }
       ],
       "editor/title": [

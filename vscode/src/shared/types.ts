@@ -879,7 +879,7 @@ export type WebviewMessage =
   | { type: "openAgentRun"; chat: ChatRef; agentId: string }
   | { type: "dismissDigest" }
   | { type: "newChat"; groupId: string; host?: string }
-  | { type: "addAccount" } // (on this computer: Talpy Den: Add Claude Account…)
+  | { type: "openSettings" } // (Talpy Den: Open Settings)
   | { type: "handOver"; chat: ChatRef; profile: string }
   | { type: "openPlan"; chat?: ChatRef; groupId?: string; host?: string; plan?: string; edit?: boolean } // a chat's plan, or an account's (edit: its file, to change it)
   | { type: "sendPlanFeedback"; chat?: ChatRef; groupId?: string; host?: string; plan?: string } // your changes and comments, to the chat that made it

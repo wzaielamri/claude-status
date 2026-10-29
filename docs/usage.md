@@ -5,6 +5,7 @@
 | Where | What it does |
 |---|---|
 | Panel icon | Left-click opens the popup, middle-click refreshes. Right-click: *Refresh*, *Show Removed Chats Again*, *Go to the Chat That Needs You* (when one does), *Open Usage Page on claude.ai*, the *Default Account* (with two accounts or more), and the settings. |
+| The popup's top row | The tabs, then Focus and Find a chat (on the first tab), SSH hosts, Refresh, and the gear: the settings (in the system tray, the tray's own heading has that button). |
 | The big Talpy | Click its headline (*… needs you*) to go to that chat. Click it to pet it, double-click to make it dance, drag it out of its burrow. |
 | A chat's name | Jumps to the chat: its terminal tab, its VS Code window, or a terminal attached to the background job. |
 | The line under a chat | Unfolds your last prompt, Claude's reply, the chat's tasks, and buttons that compare what it changed (all of it, or its last turn). |

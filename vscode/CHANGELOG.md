@@ -2,12 +2,19 @@
 
 ## Unreleased
 
+- **A gear for the settings, and the same buttons in the same order as the
+  widget:** the gear at the end of the view's title bar (and of the editor
+  tab's header; **Talpy Den: Open Settings** in the Command Palette) opens
+  VS Code's Settings editor at Talpy Den's settings. The buttons go as in
+  the Plasma and GNOME widgets: Focus, Find a chat, SSH hosts, Refresh,
+  Settings. **Add Claude Account…** moved to the **⋯** menu, next to
+  **Claude Accounts…** and **Default Claude Account…**; the menu is in
+  three parts now: the view, plan usage, accounts.
 - **A new chat is a speech bubble with a plus:** the **+** beside an
   account's name read as *add an account*; a bubble with a plus starts a
   new chat now, beside an account and on a project in the Projects tab.
-  The **+** at the top of the view (its title bar, and the editor tab's
-  header) is **Add Account…** now, a person with a plus; **Talpy Den: New
-  Chat…** stays in the Command Palette.
+  The **+** at the top of the view was **Add Account…**, which is in the
+  **⋯** menu now; **Talpy Den: New Chat…** stays in the Command Palette.
 - **The chat tab's reply row as in the widget:** the microphone,
   attaching files and the screenshot are icons now, a paperclip and a
   camera for the two that were the text buttons *+* and *Screenshot…*;

@@ -196,7 +196,7 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   (the view's **⋯** menu) lists the Claude accounts of this computer or of
   an SSH host in the view: whom each is logged in as, which one is the
   default, which ones VS Code's Claude and plain `claude` run on. **Add
-  Account…** (also the person with a plus in the view's title bar) makes a
+  Account…** (also in the view's **⋯** menu) makes a
   `~/.claude-NAME` folder and opens a terminal with Claude's own login; an
   account can log in or out, get a `claude-NAME` command, become the
   default, or be removed (to the Trash). An account that isn't logged in
@@ -409,6 +409,9 @@ code --install-extension talpy-den-*.vsix
 ```
 
 ## Settings
+
+The gear at the end of the view's title bar opens VS Code's Settings
+editor at these.
 
 | Setting | Default | |
 |---|---|---|

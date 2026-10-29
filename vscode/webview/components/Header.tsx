@@ -66,12 +66,6 @@ export function Header(props: {
       {editorTab ? (
         <div class="header-actions">
           <IconButton
-            icon="addAccount"
-            label="Add account…"
-            title="Add a Claude account: a ~/.claude-NAME folder, logged in with Claude's own login. (A new chat: the bubble next to an account.)"
-            onClick={() => post({ type: "addAccount" })}
-          />
-          <IconButton
             icon="search"
             label="Find a chat…"
             title="Find a chat: every chat with all the words you type in its name, its folder or your prompts, here and on the SSH hosts shown."
@@ -91,6 +85,7 @@ export function Header(props: {
             {hosts.length ? <span class="count">{hosts.length}</span> : null}
           </IconButton>
           <IconButton icon="refresh" label="Refresh" onClick={() => post({ type: "refresh" })} />
+          <IconButton icon="gear" label="Settings" title="Talpy Den's settings, in VS Code's Settings editor." onClick={() => post({ type: "openSettings" })} />
         </div>
       ) : null}
     </header>

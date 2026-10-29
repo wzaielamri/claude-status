@@ -327,8 +327,8 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
       case "setupUsageBars":
         void vscode.commands.executeCommand("talpyDen.setupUsageBars");
         break;
-      case "addAccount":
-        void vscode.commands.executeCommand("talpyDen.addAccount");
+      case "openSettings":
+        void vscode.commands.executeCommand("talpyDen.openSettings");
         break;
       case "week": {
         const asked = weekAsked(m.back, m.account, m.span);

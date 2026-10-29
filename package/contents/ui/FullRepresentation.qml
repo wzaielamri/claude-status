@@ -146,6 +146,20 @@ PlasmaExtras.Representation {
                     mainText: i18n("Refresh")
                 }
             }
+            // (in the system tray, the tray's own heading has the settings button)
+            PlasmaComponents3.ToolButton {
+                visible: !root.inTray
+                icon.source: root.iconDir + "settings-symbolic.svg"   // (a gear, as in GNOME and VS Code)
+                display: PlasmaComponents3.AbstractButton.IconOnly
+                text: i18n("Settings")
+                onClicked: Plasmoid.internalAction("configure").trigger()
+
+                PlasmaCore.ToolTipArea {
+                    textFormat: Text.PlainText
+                    anchors.fill: parent
+                    mainText: i18n("Settings")
+                }
+            }
         }
     }
 
