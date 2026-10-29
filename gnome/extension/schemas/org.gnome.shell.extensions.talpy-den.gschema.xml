@@ -70,6 +70,11 @@
       <range min="0" max="168"/>
       <summary>Keep finished background jobs listed for this many hours (0 = hide them)</summary>
     </key>
+    <key name="usage-refresh-minutes" type="i">
+      <default>5</default>
+      <range min="0" max="60"/>
+      <summary>While one of an account's chats works, have Claude Code fetch its plan usage once it's this many minutes old, at most this often (0 = never; VS Code's Claude panel runs no status line)</summary>
+    </key>
     <key name="show-usage-in-panel" type="b">
       <default>true</default>
       <summary>Show 5-hour usage next to the panel icon</summary>

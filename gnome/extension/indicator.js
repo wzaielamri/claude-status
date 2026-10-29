@@ -90,7 +90,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
                 this._settings.connect(`changed::${key}`, () => this._restartPollTimer())),
             this._settings.connect('changed::remote-poll-seconds', () => this._restartRemoteTimer()),
             this._settings.connect('changed::ssh-hosts', () => this._onHostsChanged()),
-            ...['extra-config-dirs', 'keep-done-hours', 'recent-chats', 'show-tokens'].map(key =>
+            ...['extra-config-dirs', 'keep-done-hours', 'recent-chats', 'show-tokens', 'usage-refresh-minutes'].map(key =>
                 this._settings.connect(`changed::${key}`, () => this.refreshAll())),
             ...['show-usage-in-panel', 'show-pet', 'chat-pets'].map(key =>
                 this._settings.connect(`changed::${key}`, () => this.rerender())),
@@ -172,6 +172,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             '--recent', String(Math.max(0, this._settings.get_int('recent-chats')))];
         if (!this._settings.get_boolean('show-tokens'))
             args.push('--no-tokens');
+        // (here and on hosts: an account's plan usage this old is fetched while a chat works)
+        args.push('--usage-refresh', String(Math.max(0, this._settings.get_int('usage-refresh-minutes'))));
         return args;
     }
 

@@ -100,6 +100,9 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
 
         const look = new Adw.PreferencesGroup({title: 'Panel and popup'});
         look.add(toggle('show-usage-in-panel', 'Show 5-hour usage next to the icon'));
+        look.add(spin('usage-refresh-minutes', 'Fetch plan usage older than',
+            "minutes; VS Code's Claude panel runs no status line, so while one of an account's chats works, Claude Code fetches its usage this old (as /usage does: no tokens, no chat saved), at most this often; 0 never",
+            0, 60, 1));
         look.add(toggle('show-pet', 'Show Talpy, the pet', 'in the popup and in notifications'));
         look.add(needs(spin('chat-pets', 'Chat pets per account, at most', '0 keeps only the big Talpy', 0, 8, 1),
             'show-pet'));

@@ -93,6 +93,15 @@ test("this computer's check has the usage cap, and the window that notifies look
     const args = calls[1];
     assert.deepEqual(args.slice(args.indexOf("--usage-cap"), args.indexOf("--usage-cap") + 2), ["--usage-cap", "90"]);
     assert.ok(!args.includes("--keep-going"), "another window does it");
+    // plan usage this old is fetched while a chat works (5 minutes unless set; 0: never)
+    const fetchAfter = (a: string[]) => a.slice(a.indexOf("--usage-refresh"), a.indexOf("--usage-refresh") + 2);
+    assert.deepEqual(fetchAfter(calls[0]), ["--usage-refresh", "5"]);
+    overrides.set("usageRefreshMinutes", 0);
+    await dash.refresh();
+    assert.deepEqual(fetchAfter(calls[2]), ["--usage-refresh", "0"]);
+    overrides.set("usageRefreshMinutes", 600);
+    await dash.refresh();
+    assert.deepEqual(fetchAfter(calls[3]), ["--usage-refresh", "60"], "(60 at most)");
   } finally {
     overrides.clear();
     dash.dispose();

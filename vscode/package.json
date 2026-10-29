@@ -532,6 +532,14 @@
           "markdownDescription": "A usage cap, in percent (0 = none): once one of an account's plan windows (5 hours, a week) reaches it, the account's chats at work on this computer are stopped, once in that window (in tmux and in a Claude Code tab the turn is interrupted, the chat stays open). Queued tasks wait until the window resets, and chats that keep going go on then. Chats you start or answer yourself afterwards aren't stopped again.",
           "order": 31
         },
+        "talpyDen.usageRefreshMinutes": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 60,
+          "markdownDescription": "Claude's own VS Code panel runs no status line, so its chats don't bring an account's plan usage up to date. While one of an account's chats works and its numbers are this many minutes old, Claude Code fetches them, as its `/usage` does (no tokens, no chat saved), at most this often; also on SSH hosts. 0: never.",
+          "order": 31
+        },
         "talpyDen.newChatModel": {
           "type": "string",
           "enum": [

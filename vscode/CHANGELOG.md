@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Plan usage keeps up with chats in Claude's VS Code panel:** the panel
+  runs no status line, and Claude Code updates its own copy of the usage
+  only when `/usage` runs, so an account used only there showed the same
+  numbers for a day or more. Now, while one of its chats works (or has just
+  ended a turn) and its numbers are more than 5 minutes old, Talpy Den has
+  Claude Code fetch them, at most every 5 minutes per account and on SSH
+  hosts too: `claude -p /usage`, which uses no tokens, runs no hooks and
+  saves no chat, so it never shows as a chat. `talpyDen.usageRefreshMinutes`
+  sets the minutes (`0`: never). With a terminal chat's status line keeping
+  them fresh, nothing changes.
 - **Chats stopped at the 5-hour limit with Claude Code 2.1.312:** Claude
   now calls it the *5-hour limit* (before, the *session limit*), and such
   a stop wasn't tied to the account's 5-hour window: its bar didn't show

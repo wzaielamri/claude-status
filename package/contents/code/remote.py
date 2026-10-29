@@ -2,7 +2,7 @@
 """SSH hosts for the Talpy Den widget.
 
     python3 -I remote.py --hosts                    hosts named in ~/.ssh/config
-    python3 -I remote.py --status HOST [--done-hours H] [--recent N] [--no-tokens]
+    python3 -I remote.py --status HOST [--done-hours H] [--recent N] [--no-tokens] [--usage-refresh N]
     python3 -I remote.py --open HOST COMMAND        a terminal running COMMAND on HOST
     python3 -I remote.py --run HOST COMMAND         run COMMAND on HOST (e.g. claude stop)
     python3 -I remote.py --end HOST SESSION_ID [PROFILE] [--busy]   stop a chat in a terminal or VS Code there
@@ -261,7 +261,7 @@ def explain(host, code, stderr):
     return f"{host}: {last}" if last else f"{host}: ssh failed (exit {code})"
 
 
-def status(host, done_hours=None, recent=None, tokens=True):
+def status(host, done_hours=None, recent=None, tokens=True, usage_refresh=None):
     """The widget's status of host, as talpy_den.py --remote prints it there."""
     host = check_host(host)
     args = ["--remote"]
@@ -271,6 +271,8 @@ def status(host, done_hours=None, recent=None, tokens=True):
         args += ["--recent", str(recent)]
     if not tokens:
         args.append("--no-tokens")
+    if usage_refresh is not None:  # (the host's accounts' plan usage, fetched there)
+        args += ["--usage-refresh", str(usage_refresh)]
     stars = cs.starred_of(cs.load_stars(cs.cache_dir(Path.home())), host)  # (the stars are kept here)
     for kind in cs.STAR_KINDS:
         if stars[kind]:
@@ -763,6 +765,8 @@ def main(argv=None):
                     kw["recent"] = int(rest.pop(0))
                 elif arg == "--no-tokens":
                     kw["tokens"] = False
+                elif arg == "--usage-refresh" and rest and rest[0].isdigit():
+                    kw["usage_refresh"] = int(rest.pop(0))
                 else:
                     sys.exit(USAGE)
             out = status(host, **kw)

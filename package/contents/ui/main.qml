@@ -360,6 +360,7 @@ PlasmoidItem {
             cmd += " --no-tokens"
         if (Plasmoid.configuration.usageCap > 0)
             cmd += " --usage-cap " + Math.round(Plasmoid.configuration.usageCap)
+        cmd += " --usage-refresh " + Math.max(0, Math.round(Plasmoid.configuration.usageRefreshMinutes))
         return cmd   // (hub/Hub.qml adds --instance and --interval-ms)
     }
 
@@ -387,7 +388,7 @@ PlasmoidItem {
         "notifyDoneMinSeconds", "notifySound", "soundVolume", "soundWaiting", "soundDone", "soundFailed", "recentChats",
         "sshHosts", "remotePollSeconds", "sshUsage", "keepDoneHours", "showUsageInPanel", "showPet", "chatPets", "showTokens",
         "newChatInVscode", "iconBlink", "awayDigest", "awayMinutes", "phoneWhileAway", "phoneFinished", "phoneDevice",
-        "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "recapRules", "clickOpensPane",
+        "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "usageRefreshMinutes", "recapRules", "clickOpensPane",
         "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage"]
     property real settingsSeenAt: 0     // the newest shared settings this copy has seen
     property string settingsSeen: ""    // its own settings as of the last check (to see changes)
@@ -1859,7 +1860,8 @@ PlasmoidItem {
     // once for all copies (hub/Hub.qml; a host just picked is checked at once)
     property var wantedHosts: ({})   // host -> its check's command
     readonly property string hostWish: JSON.stringify([shownHosts, Plasmoid.configuration.remotePollSeconds,
-        Plasmoid.configuration.keepDoneHours, Plasmoid.configuration.recentChats, Plasmoid.configuration.showTokens])
+        Plasmoid.configuration.keepDoneHours, Plasmoid.configuration.recentChats, Plasmoid.configuration.showTokens,
+        Plasmoid.configuration.usageRefreshMinutes])
     onHostWishChanged: wantHosts()
 
     function wantHosts() {
@@ -1966,6 +1968,7 @@ PlasmoidItem {
                   + " --recent " + Math.max(0, Plasmoid.configuration.recentChats)
         if (!Plasmoid.configuration.showTokens)
             cmd += " --no-tokens"
+        cmd += " --usage-refresh " + Math.max(0, Math.round(Plasmoid.configuration.usageRefreshMinutes))
         return cmd
     }
 

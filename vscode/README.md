@@ -379,6 +379,13 @@ It shows what it will change (and the diff, if you like), asks, and backs up
 every file it changes. **Remove the Plan Usage Status-Line Snippet** undoes
 it. The bars fill in after the next reply in each account's chats.
 
+Claude's own VS Code panel runs no status line, and Claude Code updates its
+own copy of the usage only when `/usage` runs. So while a chat of an account
+works and its numbers are more than 5 minutes old, Talpy Den asks Claude
+Code for them (`claude -p /usage`, hooks off, no chat saved; no tokens), at
+most every 5 minutes per account. `talpyDen.usageRefreshMinutes` sets those
+minutes (`0`: never).
+
 ## Install
 
 Not on the Marketplace yet. Download `talpy-den-<version>.vsix` from the
@@ -407,6 +414,7 @@ code --install-extension talpy-den-*.vsix
 | `talpyDen.includeCurrentRemote` | `true` | Also show the Remote-SSH window's host |
 | `talpyDen.remotePollSeconds` | `30` | How often hosts are checked |
 | `talpyDen.sshUsage` | `once` | Plan usage on hosts' accounts: an account on this computer and a host (or two hosts) shows it once, where it's listed first, with the newest numbers; `all`: under every copy; `none`: on no host |
+| `talpyDen.usageRefreshMinutes` | `5` | Claude's own VS Code panel runs no status line: while one of an account's chats works and its plan usage is this many minutes old, Claude Code fetches it (`claude -p /usage`: no tokens, no chat saved), at most this often; on SSH hosts too. `0`: never |
 | `talpyDen.pollInterval` | `2000` | While a chat works, ms between checks of this computer while the view is open: how often a working chat's line is brought up to date (10 s when hidden, 6 s when the window isn't focused). No effect with Live Mode on: its steps show as they happen, and a working chat is checked every 6 s |
 | `talpyDen.idlePollInterval` | `20000` | While no chat works, ms between checks: plan usage and its forecast, a usage limit resetting, a queued task coming due, a Claude that crashed. A chat that starts, ends, starts working, asks for something or finishes its turn is checked at once either way |
 | `talpyDen.extraConfigDirs` | `[]` | More Claude Code config folders |
@@ -431,6 +439,13 @@ code --install-extension talpy-den-*.vsix
 
 Nothing leaves your computer except the `ssh` connections to the hosts you
 pick. There is no telemetry, and the view loads nothing from the internet.
+Talpy Den calls no Anthropic API itself; when an account's plan usage is
+more than 5 minutes old while one of its chats works (in Claude's own VS Code
+panel, which runs no status line), it asks Claude Code for it, at most every
+5 minutes per account (`talpyDen.usageRefreshMinutes`; `0` turns it off):
+`claude -p /usage` on that account, hooks off and no chat saved, which
+fetches it from Anthropic the way `/usage` does (no tokens). Nothing about
+your chats is sent.
 
 With **Live Mode** on, a hook (`~/.local/share/talpy-den/live-hook.py`,
 named in each profile's `settings.json`) writes each chat's last steps to

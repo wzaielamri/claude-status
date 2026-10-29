@@ -294,6 +294,9 @@ class StatusTests(FakeSSH):
         self.assertEqual((host, command), ("lab", "python3 -I - --remote --recent 3 --no-tokens"))
         # nothing was written on the remote except the widget's cache
         self.assertEqual(sorted(p.name for p in (self.fake_home / ".cache").iterdir()), ["talpy-den"])
+        # how old the host's plan usage may get before Claude Code fetches it there
+        self.assertTrue(remote.status("lab", tokens=False, usage_refresh=15)["ok"])
+        self.assertEqual(self.calls()[-1][1], "python3 -I - --remote --no-tokens --usage-refresh 15")
 
     def test_login_noise_before_the_answer(self):
         self.mode("noisy")
@@ -324,8 +327,8 @@ class StatusTests(FakeSSH):
         self.assertEqual(out, {"ok": False, "host": "lab", "error": "lab didn't answer within 1 s."})
 
     def test_main_prints_json(self):
-        r = subprocess.run([sys.executable, "-I", str(CODE / "remote.py"), "--status", "lab", "--no-tokens"],
-                           capture_output=True, text=True, env=os.environ)
+        r = subprocess.run([sys.executable, "-I", str(CODE / "remote.py"), "--status", "lab", "--no-tokens",
+                            "--usage-refresh", "0"], capture_output=True, text=True, env=os.environ)
         self.assertTrue(json.loads(r.stdout)["ok"], r.stdout + r.stderr)
         r = subprocess.run([sys.executable, "-I", str(CODE / "remote.py"), "--status", "-oProxyCommand=x"],
                            capture_output=True, text=True, env=os.environ)

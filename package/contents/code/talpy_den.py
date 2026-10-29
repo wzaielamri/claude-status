@@ -22,6 +22,10 @@ Data sources (per Claude config dir, e.g. ~/.claude, ~/.claude-work):
                                   context window), written by statusline-snippet.sh
   ~/.cache/talpy-den/accounts.json
                                   profiles accounts.py logged out of
+
+When an account's plan usage is old while one of its chats works (Claude's
+VS Code panel runs no status line), it has Claude Code fetch it, the way
+/usage does (refresh_usage; ~/.cache/talpy-den/usage-check.json notes when).
 """
 
 import fcntl
@@ -230,8 +234,9 @@ class Profile:
         data = data if isinstance(data, dict) else {}
         account = data.get("oauthAccount") if isinstance(data.get("oauthAccount"), dict) else {}
         self.account_id = account.get("accountUuid")
-        # and its own cache of the plan usage (what /usage and the VS Code
-        # panel fetch): for an account whose status line hasn't run lately
+        # and its own cache of the plan usage (what /usage fetches; for the
+        # VS Code panel's chats refresh_usage has it fetched): for an account
+        # whose status line hasn't run lately
         cache = data.get("cachedUsageUtilization")
         self.usage_cache = cache if isinstance(cache, dict) and cache.get("accountUuid") in (None, self.account_id) else None
         self.display_name = clean_text(account.get("displayName"), 40) or None
@@ -626,6 +631,9 @@ def live_row(entry, profile, holder, home, ctx):
     # Pre-warmed spares, terminals parked on a background job and the daemon's
     # own processes are not sessions (`claude agents` hides them).
     if entry.get("spare") or entry.get("parkedJobId") or entry.get("kind") not in SESSION_KINDS:
+        return None
+    # nor is the widget's own fetch of the plan usage (refresh_usage)
+    if is_usage_check(entry.get("cwd"), getattr(ctx, "usage_check", None)):
         return None
     job_id = entry.get("jobId") if valid_id(entry.get("jobId")) else None
     # Background jobs keep their lifecycle (state, tempo, what they need, a
@@ -5839,6 +5847,148 @@ def usage_forecast(window, points, now_ms):
             "atReset": round(min(at_reset, 999.0), 1), "fullAt": full_at, "basis": basis}
 
 
+# ---------------------------------------------------------------- plan usage, fetched
+#
+# Claude's VS Code panel runs no status line, and Claude Code refreshes its
+# own copy of the plan usage (cachedUsageUtilization) only when /usage runs:
+# an account used only in the panel kept the numbers of its last terminal
+# chat for days. So while one of its chats works (or ended a turn lately) and
+# its newest numbers are older than the interval you set (--usage-refresh N
+# minutes, 5 unless you set it; 0: never), a check has Claude Code fetch them,
+# the way /usage does: `claude -p /usage` uses no tokens and saves no chat.
+# Its hooks are off (the live hook would note it as a chat), and it runs in a
+# folder of its own, whose session isn't listed (live_row). At most once per
+# interval per profile, whichever copy of the widget checks (usage-check.json).
+
+USAGE_REFRESH_MINUTES = 5  # the interval unless you set one
+USAGE_REFRESH_MAX_MINUTES = 60
+# A chat whose turn ended up to the interval and this much ago still counts
+# as at work: its last turn's usage is fetched once after the turn
+USAGE_ACTIVE_MARGIN_MS = 5 * 60_000
+USAGE_REFRESH_LIMIT = 60  # seconds the fetch may take (then it's ended)
+USAGE_CHECK_DIR = "usage-check"  # the folder it runs in, in the cache
+USAGE_CHECK_SETTINGS = '{"disableAllHooks":true}'
+# After the fetch: the empty projects/<folder>/memory/ Claude makes for the
+# folder it runs in goes again ($1: that projects/<folder>; then the command)
+USAGE_CHECK_SCRIPT = 'd=$1; shift; "$@"; rmdir "$d/memory" "$d" 2>/dev/null; exit 0'
+
+
+def is_usage_check(cwd, folder=None):
+    """Is cwd the folder the plan-usage fetches run in (folder: this
+    computer's; another copy's cache may be elsewhere, but its folder has
+    the same names)?"""
+    if not isinstance(cwd, str) or not cwd:
+        return False
+    cwd = os.path.normpath(cwd)
+    return cwd == (str(folder) if folder else None) or cwd.endswith("/talpy-den/" + USAGE_CHECK_DIR)
+
+
+def chat_at_work(row, now_ms, every_ms):
+    """Does a chat use the plan now: a process at work (not one whose turn
+    is over while a background shell runs), or one whose turn ended in the
+    last every_ms (the interval) + USAGE_ACTIVE_MARGIN_MS?"""
+    if row.get("pid") is None:
+        return False
+    if row["state"] == "working" and row.get("reason") != "background shell":
+        return True
+    return now_ms - (row.get("since") or 0) < every_ms + USAGE_ACTIVE_MARGIN_MS
+
+
+def usage_refresh_profile(members, limits, rows, now_ms, every_ms):
+    """The profile of an account (members) whose plan usage Claude Code
+    should fetch now, or None: when its newest numbers (limits, as
+    plan_limits gives them) are older than every_ms (the interval), or there
+    are none, the first of its profiles with a chat at work (rows: {real
+    folder: its rows}). Only a profile logged in to a Claude account counts:
+    its oauthAccount, and its login in .credentials.json (which isn't opened)."""
+    if limits and now_ms - limits["updatedAt"] < every_ms:
+        return None
+    for p in members:
+        if p.account_id is None or not os.path.isfile(str(p.path / ".credentials.json")):
+            continue
+        if any(chat_at_work(s, now_ms, every_ms) for s in rows.get(p.real, ())):
+            return p
+    return None
+
+
+def claim_usage_refresh(cache_root, key, now_ms, every_ms):
+    """Is it this check's turn to fetch the plan usage of the profile key (its
+    real folder)? Not when any copy of the widget did in the last every_ms
+    (the interval), or when another one is deciding right now; when it is,
+    it's noted."""
+    private_dir(cache_root)
+    with open(cache_root / "usage-check.lock", "a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        data = read_json(cache_root / "usage-check.json")
+        started = data.get("started") if isinstance(data, dict) else None
+        started = {k: t for k, t in (started.items() if isinstance(started, dict) else ())
+                   if number(t) is not None and now_ms - t < 86400_000}  # (a day on, forgotten)
+        last = started.get(key)
+        if last is not None and 0 <= now_ms - last < every_ms:  # (the clock set back: not)
+            return False
+        started[key] = now_ms
+        write_json_atomic(cache_root / "usage-check.json", {"started": started})
+        return True
+
+
+def usage_refresh_command(profile, home, claude, folder):
+    """(argv, env) of the command that has Claude Code fetch this profile's
+    plan usage, run in folder: `claude -p /usage`, without hooks or a saved
+    chat, ended after USAGE_REFRESH_LIMIT seconds (with timeout, if there is
+    one); the empty memory folder Claude makes for folder goes after it."""
+    import shutil
+    env = {k: v for k, v in os.environ.items() if k not in SESSION_ENV}
+    value = config_dir_value(profile, home)
+    if value is None:
+        env.pop("CLAUDE_CONFIG_DIR", None)
+    else:
+        env["CLAUDE_CONFIG_DIR"] = value
+    folder_bin = os.path.dirname(claude)
+    if folder_bin and os.path.isfile(os.path.join(folder_bin, "node")):
+        env["PATH"] = folder_bin + os.pathsep + env.get("PATH", "")
+    timeout = shutil.which("timeout")
+    limit = [timeout, "-k", "10", str(USAGE_REFRESH_LIMIT)] if timeout else []
+    projects = profile.path / "projects" / mangle(str(folder))
+    argv = ["/bin/sh", "-c", USAGE_CHECK_SCRIPT, "sh", str(projects), *limit,
+            claude, "-p", "/usage", "--no-session-persistence", "--settings", USAGE_CHECK_SETTINGS,
+            "--output-format", "json"]
+    return argv, env
+
+
+def spawn_detached(argv, cwd, env):
+    """Start argv on its own, not waited for (the check answers at once):
+    nothing of ours open in it, in a session of its own. A check is a short
+    process, so once it's gone, init takes it over and reaps it."""
+    import subprocess
+    return subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def refresh_usage(home, cache_root, due, now_ms, every_ms):
+    """Have Claude Code fetch the plan usage of the profiles due
+    (usage_refresh_profile's), each unless another check did in the last
+    every_ms: the profiles it was started for. Nothing without a claude
+    command."""
+    if not due:
+        return []
+    claude = find_claude(home)
+    if claude == "claude":  # (not found)
+        return []
+    folder = cache_root / USAGE_CHECK_DIR
+    private_dir(folder)
+    started = []
+    for p in due:
+        if not claim_usage_refresh(cache_root, str(p.real), now_ms, every_ms):
+            continue
+        argv, env = usage_refresh_command(p, home, claude, folder)
+        spawn_detached(argv, str(folder), env)
+        started.append(p)
+    return started
+
+
 # ---------------------------------------------------------------- token totals
 
 
@@ -6385,9 +6535,13 @@ class Context:
 
 
 def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_done_hours=KEEP_DONE_HOURS,
-            recent=RECENT_CHATS, plans=PLANS_LISTED, usage_cap=0, starred=None):
+            recent=RECENT_CHATS, plans=PLANS_LISTED, usage_cap=0, starred=None, usage_refresh=0):
     """starred: {"chats", "plans"} starred here (starred_of), else this
-    computer's from the cache."""
+    computer's from the cache. usage_refresh: have Claude Code fetch the plan
+    usage of an account whose numbers are older than this many minutes while
+    one of its chats works, at most that often (refresh_usage; 0: never; the
+    status check does)."""
+    refresh_ms = max(0, usage_refresh) * 60_000
     now = time.time() if now is None else now
     now_ms = int(now * 1000)
     snapshot_root = cache_root / "statusline"
@@ -6408,8 +6562,9 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
         tests=TestsCache(cache_root / "tests.json"),
         own_folders=own_folders(profiles),
         prompts={real: last_prompts(entries) for real, entries in histories.items()},
-        errors=errors, unknown={},
+        errors=errors, unknown={}, usage_check=str(cache_root / USAGE_CHECK_DIR),
     )
+    due = []  # the profiles whose plan usage Claude Code fetches now (refresh_usage)
     with ScanLock(cache_root / "tokens.lock") as lock:
         # read with the lock: the check holding it is the one that writes it
         usage = UsageHistory(cache_root / "usage.json")
@@ -6482,6 +6637,10 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
             try:
                 # a logged-out account's last status lines are no one's plan usage now
                 group["limits"] = None if group["loggedOut"] else plan_limits(snapshot_root, members, now_ms)
+                stale = (usage_refresh_profile(members, group["limits"], rows, now_ms, refresh_ms)
+                         if refresh_ms else None)
+                if stale is not None and not group["loggedOut"]:
+                    due.append(stale)
                 if group["limits"]:
                     if lock.held:
                         usage.record(group["id"], group["limits"], now_ms)
@@ -6499,6 +6658,10 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
             groups.append(group)
         usage.save()  # only this check noted anything (lock.held): others mustn't write it now
 
+    try:
+        refresh_usage(home, cache_root, due, now_ms, refresh_ms)
+    except Exception as exc:
+        errors.append(f"fetching plan usage: {exc}")
     try:
         place_chats(groups, ctx)
     except Exception as exc:
@@ -7159,6 +7322,7 @@ def add_found_commands(result, home, extra_dirs=()):
 
 
 USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent N] [--plans N] [--no-tokens] [--pretty] [--remote [--local]]
+                    [--usage-refresh N]
        talpy_den.py --dismiss SESSION_ID | --undismiss-all
        talpy_den.py --end SESSION_ID [--profile PROFILE] [--busy] [--config-dir DIR]...
        talpy_den.py --interrupt SESSION_ID [--profile PROFILE] [--config-dir DIR]...
@@ -7196,7 +7360,10 @@ USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent 
                     says whether it sends the notifications, and the shared settings; the
                     one that does looks after the chats that keep going (look_after_kept)
   --keep-going      look after the chats that keep going (the VS Code window that notifies)
-  --usage-cap N     stop what an account has at work once one of its plan windows reaches N%"""
+  --usage-cap N     stop what an account has at work once one of its plan windows reaches N%
+  --usage-refresh N while one of an account's chats works, have Claude Code fetch its plan usage
+                    once it's more than N minutes old, at most every N minutes (default 5, 0 = never;
+                    Claude's VS Code panel runs no status line)"""
 
 
 def main(argv=None):
@@ -7211,6 +7378,7 @@ def main(argv=None):
     continue_id, continue_folder = None, None
     vscode_account, vscode_server = None, VSCODE_SERVERS["Code"]
     keep_going, usage_cap, model, effort, mode = False, 0, None, None, None
+    usage_refresh = USAGE_REFRESH_MINUTES
     starred_chats, starred_plans = set(), set()
     while args:
         arg = args.pop(0)
@@ -7297,6 +7465,8 @@ def main(argv=None):
             keep_going = True
         elif arg == "--usage-cap" and args and args[0].isdigit():
             usage_cap = min(100, int(args.pop(0)))
+        elif arg == "--usage-refresh" and args and args[0].isdigit():
+            usage_refresh = min(USAGE_REFRESH_MAX_MINUTES, int(args.pop(0)))
         else:
             sys.exit(USAGE)
     os.umask(0o077)  # cache files are private to the user
@@ -7358,7 +7528,8 @@ def main(argv=None):
             result = collect(home, cache_root, config_dirs, with_tokens=with_tokens, keep_done_hours=done_hours,
                              recent=recent, plans=plans, usage_cap=usage_cap if not remote or local else 0,
                              # (on an SSH host: the host's stars, from the computer that asks)
-                             starred={"chats": starred_chats, "plans": starred_plans} if remote and not local else None)
+                             starred={"chats": starred_chats, "plans": starred_plans} if remote and not local else None,
+                             usage_refresh=usage_refresh)
             try:
                 add_vscode(result, home, config_dirs, remote and not local, cache_root)
             except Exception as exc:

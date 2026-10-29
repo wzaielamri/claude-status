@@ -49,6 +49,7 @@ KCM.SimpleKCM {
     property string cfg_newChatEffort
     property string cfg_newChatMode
     property int cfg_usageCap
+    property alias cfg_usageRefreshMinutes: usageRefreshMinutes.value
     property alias cfg_showTokens: showTokens.checked
     property alias cfg_showPet: showPet.checked
     property alias cfg_chatPets: chatPets.value
@@ -93,6 +94,7 @@ KCM.SimpleKCM {
     property string cfg_newChatEffortDefault
     property string cfg_newChatModeDefault
     property int cfg_usageCapDefault
+    property int cfg_usageRefreshMinutesDefault
     property bool cfg_showTokensDefault
     property bool cfg_showPetDefault
     property int cfg_chatPetsDefault
@@ -764,6 +766,21 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             text: i18n("Once an account's 5-hour or weekly window reaches it, the chats of that account that are at work on this computer are stopped, once in that window (in tmux and VS Code's Claude the turn is interrupted, the chat stays open). Queued tasks wait until the window resets, and chats that keep going go on then. Chats you start or answer yourself afterwards aren't stopped again.")
+        }
+
+        QQC2.SpinBox {
+            id: usageRefreshMinutes
+            Kirigami.FormData.label: i18n("Fetch plan usage older than (min):")
+            from: 0
+            to: 60
+        }
+
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+            wrapMode: Text.Wrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            text: i18n("VS Code's Claude panel runs no status line, so its chats don't bring an account's plan usage up to date. While one of the account's chats works and its numbers are this old, Claude Code fetches them, as its /usage does (no tokens, no chat saved), at most this often. 0: never.")
         }
 
         QQC2.SpinBox {

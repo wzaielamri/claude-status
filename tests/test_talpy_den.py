@@ -2011,3 +2011,201 @@ class NewClaudeValuesTests(Fixture):
     def test_a_value_that_is_no_text_is_named_too(self):
         write(self.home / ".claude-work/sessions/44.json", session("odd", status=3))
         self.assertIn('session status "3"', self.collect(with_tokens=False)["errors"][0])
+
+
+class UsageRefreshTests(Fixture):
+    """An account used only in VS Code's panel (no status line there): while
+    one of its chats works and its plan usage is old, Claude Code fetches it."""
+
+    CLAUDE = "/opt/claude/bin/claude"
+
+    def setUp(self):
+        super().setUp()
+        self.spawned = []
+        for p in (mock.patch.object(cs, "find_claude", lambda home, ask_shell=False: self.CLAUDE),
+                  mock.patch.object(cs, "spawn_detached", lambda argv, cwd, env: self.spawned.append((argv, cwd, env)))):
+            p.start()
+            self.addCleanup(p.stop)
+        self.work = self.home / ".claude-work"
+        write(self.work / ".credentials.json", "{}")  # logged in (it's never opened)
+        self.usage_cache(fetched_ago=3600)
+
+    def usage_cache(self, fetched_ago):
+        path = self.work / ".claude.json"
+        data = json.loads(path.read_text())
+        data["cachedUsageUtilization"] = {
+            "fetchedAtMs": int((self.now - fetched_ago) * 1000), "accountUuid": "acct-team",
+            "utilization": {"five_hour": {"utilization": 12, "resets_at": iso(self.now + 3600)}}}
+        write(path, data)
+
+    def only_session(self, **kw):
+        """The work profile's one chat."""
+        shutil.rmtree(self.work / "sessions", ignore_errors=True)
+        write(self.work / "sessions/1.json", session("mine", **{"entrypoint": "claude-vscode", **kw}))
+
+    def check(self, now=None, minutes=5, **kw):
+        """The profiles a status check had fetch their plan usage (CLAUDE_CONFIG_DIR)."""
+        self.spawned.clear()
+        self.result = self.collect(with_tokens=False, usage_refresh=minutes, now=self.now if now is None else now, **kw)
+        return [env.get("CLAUDE_CONFIG_DIR") for _, _, env in self.spawned]
+
+    def test_old_usage_fetched_while_a_chat_works(self):
+        folder = self.cache / "usage-check"
+        with mock.patch.dict(os.environ, {"CLAUDECODE": "1", "CLAUDE_CODE_ENTRYPOINT": "cli",
+                                          "CLAUDE_CONFIG_DIR": "/somewhere/else"}):
+            self.assertEqual(self.check(), [str(self.work)])
+        (argv, cwd, env), = self.spawned
+        timeout = shutil.which("timeout")
+        self.assertEqual(argv, [
+            "/bin/sh", "-c", cs.USAGE_CHECK_SCRIPT, "sh", str(self.work / "projects" / cs.mangle(str(folder))),
+            *([timeout, "-k", "10", "60"] if timeout else []),
+            self.CLAUDE, "-p", "/usage", "--no-session-persistence", "--settings", '{"disableAllHooks":true}',
+            "--output-format", "json"])
+        self.assertEqual(cwd, str(folder))
+        self.assertEqual(oct(folder.stat().st_mode & 0o777), "0o700")
+        self.assertNotIn("CLAUDECODE", env)  # (else it would count as part of the session the widget runs in)
+        self.assertNotIn("CLAUDE_CODE_ENTRYPOINT", env)
+        self.assertEqual(json.loads((self.cache / "usage-check.json").read_text()),
+                         {"started": {str(self.work): int(self.now * 1000)}})
+        # what it fetched counts at the next check, as Claude Code's own usage
+        self.usage_cache(fetched_ago=0)
+        os.unlink(self.cache / "usage-check.json")
+        self.assertEqual(self.check(now=self.now + 60), [])
+        self.assertEqual(self.group(self.result, "work")["limits"]["updatedAt"], int(self.now * 1000))
+
+    def test_a_plain_claude_folder_runs_without_claude_config_dir(self):
+        write(self.home / ".claude/.credentials.json", "{}")  # VS Code's chat in ~/.claude works (the fixture's)
+        with mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": "/somewhere/else"}):
+            self.assertEqual(self.check(), [None, str(self.work)])
+        argv = self.spawned[0][0]
+        self.assertEqual(argv[4], str(self.home / ".claude/projects" / cs.mangle(str(self.cache / "usage-check"))))
+
+    def test_at_most_once_in_five_minutes_whichever_copy_checks(self):
+        self.assertEqual(len(self.check()), 1)
+        self.assertEqual(self.check(now=self.now + 2), [])
+        self.assertEqual(self.check(now=self.now + 299), [])
+        self.assertEqual(len(self.check(now=self.now + 301)), 1)
+        # another copy deciding right now: this one leaves it
+        import fcntl
+        with open(self.cache / "usage-check.lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            self.assertEqual(self.check(now=self.now + 700), [])
+        self.assertEqual(len(self.check(now=self.now + 700)), 1)
+        # the clock set back: not waited for until then
+        self.assertEqual(len(self.check(now=self.now - 600)), 1)
+
+    def test_not_while_the_usage_is_fresh(self):
+        self.usage_cache(fetched_ago=120)
+        self.assertEqual(self.check(), [])
+        self.assertEqual(len(self.check(now=self.now + 200)), 1)  # 5 min old now
+        # a terminal chat's status line keeps it fresh: an old cache doesn't matter
+        self.usage_cache(fetched_ago=86400)
+        path = self.cache / "statusline/.claude-work/term.json"
+        write(path, {"rate_limits": {"five_hour": {"used_percentage": 30, "resets_at": self.now + 3600}}})
+        os.utime(path, (self.now + 590, self.now + 590))
+        self.assertEqual(self.check(now=self.now + 600), [])
+
+    def test_not_while_nothing_works(self):
+        long_ago = int((self.now - 601) * 1000)  # (the interval and 5 minutes)
+        self.only_session(status="idle", statusUpdatedAt=long_ago)
+        self.assertEqual(self.check(), [])
+        self.only_session(status="waiting", waitingFor="permission prompt", statusUpdatedAt=long_ago)
+        self.assertEqual(self.check(), [])
+        self.only_session(status="shell", statusUpdatedAt=long_ago)  # a dev server runs on
+        self.assertEqual(self.check(), [])
+        shutil.rmtree(self.work / "sessions")
+        self.assertEqual(self.check(), [])
+        self.assertFalse((self.cache / "usage-check.json").exists())
+        # a turn that ended 8 minutes ago used the plan after the numbers (once
+        # more after the turn, whenever the last fetch was)
+        self.only_session(status="idle", statusUpdatedAt=int((self.now - 480) * 1000))
+        self.assertEqual(self.check(), [str(self.work)])
+
+    def test_not_for_an_account_that_isnt_logged_in(self):
+        os.unlink(self.work / ".credentials.json")
+        self.assertEqual(self.check(), [])
+        write(self.work / ".credentials.json", "{}")
+        data = json.loads((self.work / ".claude.json").read_text())
+        del data["oauthAccount"]  # (claude auth logout)
+        write(self.work / ".claude.json", data)
+        self.assertEqual(self.check(), [])
+        self.assertTrue(self.group(self.result, "work")["loggedOut"])
+
+    def test_not_without_claude(self):
+        with mock.patch.object(cs, "find_claude", lambda home, ask_shell=False: "claude"):
+            self.assertEqual(self.check(), [])
+        self.assertFalse((self.cache / "usage-check.json").exists())
+
+    def test_the_interval_is_a_setting(self):
+        self.usage_cache(fetched_ago=600)
+        self.assertEqual(self.check(minutes=15), [])
+        self.assertEqual(self.check(minutes=0), [])  # never
+        self.assertEqual(len(self.check(minutes=9)), 1)
+        self.assertEqual(self.check(now=self.now + 9 * 60 - 1, minutes=9), [])  # (at most that often)
+        self.assertEqual(len(self.check(now=self.now + 9 * 60, minutes=9)), 1)
+
+    def test_only_for_the_status_check(self):
+        self.collect(with_tokens=False)
+        self.assertEqual(self.spawned, [])
+        self.usage_cache(fetched_ago=50 * 60)
+        xdg = Path(self.tmp.name) / "xdg"
+
+        def run(*args):
+            self.spawned.clear()
+            env = {"HOME": str(self.home), "XDG_CACHE_HOME": str(xdg)}
+            with mock.patch.dict(os.environ, env), contextlib.redirect_stdout(io.StringIO()) as out:
+                cs.main(["--no-tokens", *args])
+            self.assertTrue(json.loads(out.getvalue())["ok"])
+            return [e.get("CLAUDE_CONFIG_DIR") for _, _, e in self.spawned]
+        self.assertEqual(run("--usage-refresh", "0"), [])
+        self.assertEqual(run("--usage-refresh", "120"), [])  # (60 at most)
+        self.assertEqual(run(), [str(self.work)])  # (5 minutes unless set)
+        self.assertEqual(self.spawned[0][1], str(xdg / "talpy-den/usage-check"))
+        (xdg / "talpy-den/usage-check.json").unlink()
+        self.assertEqual(run("--usage-refresh", "49"), [str(self.work)])
+        with self.assertRaises(SystemExit):
+            run("--usage-refresh", "soon")
+
+    def test_its_own_session_isnt_a_chat(self):
+        # Claude registers it for the second it runs: busy, "interactive", in its folder
+        self.only_session(status="busy", cwd=str(self.cache / "usage-check"), entrypoint="sdk-cli")
+        write(self.work / "sessions/2.json", session("other-copy", status="busy",
+                                                     cwd="/home/x/.cache/talpy-den/usage-check/"))
+        self.assertEqual(self.check(), [])  # (nor does it count as a chat at work)
+        listed = [s["sessionId"] for g in self.result["groups"] for s in g["sessions"]]
+        self.assertEqual([i for i in listed if i in ("mine", "other-copy")], [])
+        self.assertNotIn("usage-check", json.dumps(self.result))  # (not in Recent chats, Projects, … either)
+        self.assertTrue(cs.is_usage_check("/a/talpy-den/usage-check"))
+        self.assertFalse(cs.is_usage_check("/a/usage-check"))
+        self.assertFalse(cs.is_usage_check(None))
+
+
+class UsageRefreshCommandTests(unittest.TestCase):
+    """The command itself, with a stand-in claude."""
+
+    def test_it_runs_and_leaves_no_folder_behind(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home, cache = Path(tmp) / "home", Path(tmp) / "cache"
+            write(home / ".claude-work/.profile-name", "work")
+            write(home / ".claude-work/.claude.json", {"oauthAccount": {"accountUuid": "a"}})
+            write(home / ".claude-work/projects/-keep/memory/note.md", "mine")
+            claude, out = Path(tmp) / "bin/claude", Path(tmp) / "out.txt"
+            # (Claude makes an empty memory folder for the folder it runs in)
+            write(claude, '#!/bin/sh\nprintf "%s\\n" "$PWD" "$CLAUDE_CONFIG_DIR" "$@" > "$OUT"\n'
+                          'mkdir -p "$CLAUDE_CONFIG_DIR/projects/$(pwd | sed "s/[^A-Za-z0-9]/-/g")/memory"\n')
+            claude.chmod(0o755)
+            profile = next(p for p in cs.discover_profiles(home) if p.label == "work")
+            folder = cache / "usage-check"
+            folder.mkdir(parents=True)
+            with mock.patch.dict(os.environ, {"OUT": str(out)}):
+                argv, env = cs.usage_refresh_command(profile, home, str(claude), folder)
+            proc = cs.spawn_detached(argv, str(folder), env)
+            self.assertEqual(proc.wait(timeout=30), 0)
+            self.assertEqual(out.read_text().splitlines(), [
+                str(folder), str(home / ".claude-work"), "-p", "/usage", "--no-session-persistence",
+                "--settings", '{"disableAllHooks":true}', "--output-format", "json"])
+            self.assertEqual(os.listdir(home / ".claude-work/projects"), ["-keep"])
+            # without timeout, it runs without a time limit
+            with mock.patch("shutil.which", lambda name, *a, **kw: None):
+                argv, _ = cs.usage_refresh_command(profile, home, str(claude), folder)
+            self.assertEqual(argv[5:7], [str(claude), "-p"])

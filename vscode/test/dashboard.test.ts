@@ -229,6 +229,7 @@ test("a setting checks again only what it changes: the chat tab's text size or a
     assert.deepEqual(change("keepDoneHours", 48), ["here 0", "hosts 0"]);
     assert.deepEqual(change("showTokens", false), ["here 0", "hosts 0"]);
     assert.deepEqual(change("usageCap", 80), ["here 0"]);
+    assert.deepEqual(change("usageRefreshMinutes", 15), ["here 0", "hosts 0"]);
     assert.deepEqual(change("extraConfigDirs", ["/srv/claude-team"]), ["here 0"]);
     assert.deepEqual(change("sshHosts", ["lab"]), ["hosts 0"]);
     assert.deepEqual(change("includeCurrentRemote", false), [], "(no window host here)");

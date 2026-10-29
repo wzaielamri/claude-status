@@ -59,7 +59,7 @@ Each release also has the widget as a `.plasmoid` and the GNOME extension as a `
 - [Sharing chats between accounts](docs/sharing.md)
 - [On GNOME](docs/gnome.md)
 - [Talpy Den for VS Code](vscode/)
-- [Privacy](docs/privacy.md): it reads Claude Code's files, calls no Anthropic API and sends nothing anywhere
+- [Privacy](docs/privacy.md): it reads Claude Code's files, calls no Anthropic API itself and sends nothing anywhere
 - [How it works](docs/how-it-works.md)
 - [Troubleshooting and limitations](docs/troubleshooting.md)
 - [Development](docs/development.md): tests, the layout of the code, releases
@@ -72,7 +72,7 @@ I built this widget to make my own day-to-day work with Claude Code easier. With
 
 This is an independent, personal project. It is not affiliated with, endorsed by, sponsored by or otherwise connected to Anthropic, PBC, and building it does not make me a representative of Anthropic in any way. "Claude" and "Claude Code" are trademarks of Anthropic, PBC; they appear here only to describe what the widget works with.
 
-The widget only reads files that Claude Code writes on your own computer, and changes them only when you ask it to: when you share a chat between your accounts, add, remove or pick the default account, allow or revoke a permission, undo or commit a chat's changes from its review, or turn on live mode or answering permission prompts from the widget (a hook in Claude's settings). It does not call any Anthropic API, and it sends no data anywhere: logging in and out is Claude Code's own command, and dictation runs on your computer ([Privacy](docs/privacy.md) has the details). The *Open Usage Page on claude.ai* menu entry just opens that page in your browser.
+The widget only reads files that Claude Code writes on your own computer, and changes them only when you ask it to: when you share a chat between your accounts, add, remove or pick the default account, allow or revoke a permission, undo or commit a chat's changes from its review, or turn on live mode or answering permission prompts from the widget (a hook in Claude's settings). It does not call any Anthropic API itself, and it sends no data anywhere: plan usage that's old while a chat works (in VS Code's Claude panel, which runs no status line) is fetched by Claude Code's own `/usage` (`claude -p /usage`), logging in and out is Claude Code's own command, and dictation runs on your computer ([Privacy](docs/privacy.md) has the details). The *Open Usage Page on claude.ai* menu entry just opens that page in your browser.
 
 ### AI-assisted development
 

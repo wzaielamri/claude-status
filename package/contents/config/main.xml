@@ -189,5 +189,11 @@
       <min>0</min>
       <max>100</max>
     </entry>
+    <entry name="usageRefreshMinutes" type="Int">
+      <label>While one of an account's chats works, have Claude Code fetch its plan usage once it's this many minutes old, at most this often (0: never; VS Code's Claude panel runs no status line)</label>
+      <default>5</default>
+      <min>0</min>
+      <max>60</max>
+    </entry>
   </group>
 </kcfg>

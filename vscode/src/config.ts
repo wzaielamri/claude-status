@@ -55,6 +55,7 @@ export const settings = {
   awayMinutes: () => num("awayMinutes", 5, 1, 240),
   python: () => expandHome(cfg().get<string>("pythonPath", "python3")?.trim() || "python3"),
   usageCap: () => num("usageCap", 0, 0, 100),
+  usageRefreshMinutes: () => num("usageRefreshMinutes", 5, 0, 60),
   newChatModel: () => (cfg().get<string>("newChatModel", "opus") ?? "").trim(),
   newChatEffort: () => (cfg().get<string>("newChatEffort", "xhigh") ?? "").trim(),
   newChatMode: () => (cfg().get<string>("newChatMode", "") ?? "").trim(),
@@ -104,6 +105,8 @@ export function configDirArgs(): string[] {
 export function statusArgs(): string[] {
   const args = ["--done-hours", String(settings.keepDoneHours()), "--recent", String(settings.recentChats())];
   if (!settings.showTokens()) args.push("--no-tokens");
+  // (an account's plan usage this old is fetched while one of its chats works)
+  args.push("--usage-refresh", String(settings.usageRefreshMinutes()));
   return args;
 }
 
