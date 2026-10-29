@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { ChatPanes } from "../src/chatPane";
 import { demoState } from "../src/shared/demo";
 import { chatRefOf } from "../src/shared/model";
-import { answersOf, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, withoutPicture } from "../src/shared/pane";
+import { answersOf, chatWhere, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, WHERE, withoutPicture } from "../src/shared/pane";
 import type { ViewState } from "../src/shared/types";
 import { ViewHost } from "../src/view";
 import { clipboardWrites, overrides, recorded } from "./vscode-stub";
@@ -216,6 +216,20 @@ test("the tests badge, a queued reply and how a reply goes", () => {
   assert.equal(queuedReply(status, "c1", "gpu"), null);
   assert.match(routeHint("terminal", true, "interactive", ""), /takes no text from outside/);
   assert.match(routeHint("tmux", true, "interactive", "gpu"), /tmux pane\. \(on gpu\)/);
+});
+
+test("the tag under a chat's name says where it runs, and the Terminal tab what it can show", () => {
+  const s = { pid: 7, kind: "interactive", entrypoint: "cli", tmux: false, vscodeTerminal: null };
+  assert.equal(chatWhere(undefined, false), "closed");
+  assert.equal(chatWhere({ ...s, pid: null }, false), "closed");
+  assert.equal(chatWhere({ ...s, kind: "bg" }, false), "background");
+  assert.equal(chatWhere({ ...s, entrypoint: "claude-vscode" }, false), "claude");
+  assert.equal(chatWhere({ ...s, tmux: true, vscodeTerminal: 41 }, false), "tmux");    // (tmux in a VS Code terminal: its pane can be read)
+  assert.equal(chatWhere({ ...s, vscodeTerminal: 41 }, false), "vscode");
+  assert.equal(chatWhere(s, true), "vscode");                                          // (one of this window's terminals)
+  assert.equal(chatWhere(s, false), "terminal");
+  // a screen shows for a background session and a tmux pane; the others say why not
+  for (const [where, info] of Object.entries(WHERE)) assert.equal(info.noScreen === "", where === "background" || where === "tmux", where);
 });
 
 test("every file a page loads from dist/ is packaged (.vscodeignore names each one)", async () => {

@@ -20,6 +20,26 @@
   camera for the two that were the text buttons *+* and *Screenshot…*;
   while dictation records or writes it down, what it's doing shows beside
   the microphone.
+- **The chat tab has four tabs: Chat, Steps, Terminal, Review:** **Chat**
+  shows only your messages and Claude's replies (and what needs you: a
+  permission, a question, a plan), with what it's doing on the working
+  line; **Steps** is what the Chat tab was, every tool call too.
+  **Terminal** is always there: a background session's screen as before
+  (it was the **Output** tab, shown only for those), now also a tmux
+  chat's pane with what scrolled by above it; for a chat elsewhere it
+  says why there's no screen and offers **Open its window**.
+- **A tag under a chat's name says where it runs:** *background*, *not
+  open*, *tmux*, *terminal*, *VS Code terminal* or *Claude Code tab*,
+  next to its folder in the chat tab.
+- **Pets wait for one that leaves:** when a chat left the list, the pets
+  beside it tunnelled over to their new spots at once, onto the one still
+  waving and digging away, and a chat that got a pet's place dug up where
+  another stood. They wait until it's gone now, then move up and the new
+  one comes.
+- **Talpy thinks while a chat works:** the chat tab's working line had
+  Claude's orange ✻ turning. It's Talpy now, looking up at thought dots
+  that rise one after another, and the line is in the working color, as
+  in the widget.
 - **The Projects tab starts folded, and a project's folder line fits:** the
   first three projects were open, and next to each project's numbers its
   folder and *last at work* line ran out of room in a narrow sidebar, cut

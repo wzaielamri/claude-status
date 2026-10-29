@@ -4,14 +4,15 @@ import { drawGlyph, glyphMoves } from "../../vendor/talpy/glyph.mjs";
 // Talpy peeking up out of the ground (the widget's panel icon,
 // talpy/glyph.mjs), in the state's color. It pops up when a chat needs you,
 // glances around while Claude works, smiles when it's your turn and sleeps
-// when nothing runs: a few frames a second, cheap for hours.
+// when nothing runs (thinking: a chat's working line): a few frames a second,
+// cheap for hours. Its size is the CSS's (.talpy-icon: 16 px).
 export function TalpyIcon({ state, moving }: { state: string; moving: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
     const draw = () => {
-      const px = Math.round(16 * (devicePixelRatio || 1));
+      const px = Math.round((canvas.clientWidth || 16) * (devicePixelRatio || 1));
       if (canvas.width !== px) canvas.width = canvas.height = px;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;

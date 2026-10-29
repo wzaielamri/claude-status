@@ -18,7 +18,7 @@ import { openComparison } from "./changes";
 import { cacheDir, configDirArgs } from "./config";
 import type { Dashboard } from "./dashboard";
 import { chatRefOf, doingText, liveOf, petKeyOf, recentRef, stateText } from "./shared/model";
-import { answersOf, askShownOf, PICTURE_TYPES, queuedReply, reviewPending, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage, type TermRun, type TermStyle } from "./shared/pane";
+import { answersOf, askShownOf, chatWhere, PICTURE_TYPES, queuedReply, reviewPending, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage, type TermRun, type TermStyle } from "./shared/pane";
 import type { Answers, AskShown, ChatRef, Decision, RecentChat, Session, ViewState } from "./shared/types";
 import { isDecision } from "./shared/types";
 import { localAncestors, type Terminals } from "./terminals";
@@ -341,8 +341,10 @@ class Pane implements vscode.Disposable {
       queued: queued ? { id: queued.id, prompt: queued.prompt, error: queued.error } : null,
       canMove: !!session && this.owner.ext.actions.canMoveToClaudeCode(this.chat),
       jobId: session && session.kind === "bg" && session.pid && session.jobId ? session.jobId : undefined,
+      where: chatWhere(session, this.terminalHere),
     };
     this.lastJob = chat.jobId ?? "";
+    this.tmuxSession = chat.where === "tmux" ? chat.sessionId : "";
     this.panel.title = chat.name || this.chatId.slice(0, 8);
     if (this.ready) this.post({ type: "chat", chat });
     // its turn began or ended, it asks something: the conversation now
@@ -513,8 +515,9 @@ class Pane implements vscode.Disposable {
       }
       case "logs": {
         const job = this.lastJob;
-        if (!job) break;
-        const r = await backend.pane(["--logs", job, ...(this.chat.profileDir ? ["--profile", this.chat.profileDir] : []),
+        if (!job && !this.tmuxSession) break;
+        const r = await backend.pane([...(job ? ["--logs", job] : ["--screen", this.tmuxSession]),
+          ...(this.chat.profileDir ? ["--profile", this.chat.profileDir] : []),
           ...(this.host ? ["--host", this.host] : configDirArgs())], this.host ? 60000 : 20000);
         this.post({ type: "output", lines: r.ok && Array.isArray(r.lines) ? r.lines.map(String) : [],
                     runs: r.ok && Array.isArray(r.runs) ? (r.runs as TermRun[][]) : undefined,
@@ -560,7 +563,8 @@ class Pane implements vscode.Disposable {
   // recorder meanwhile), "recording", "writing" (--stop), "model", "setup"
   private dictation: DictationState = "";
   private cancelStart = false; // cancelled (or the tab closed) while it started: stopped once it has
-  private lastJob = ""; // (the background session the Output tab reads)
+  private lastJob = ""; // (the background session the Terminal tab reads)
+  private tmuxSession = ""; // (the chat in tmux whose pane it reads instead: its session id)
   private async dictate(action: "toggle" | "cancel" | "getModel" | "setup"): Promise<void> {
     const { backend } = this.owner.ext;
     const tell = (m: Omit<Extract<PaneHostMessage, { type: "dictation" }>, "type">) => this.post({ type: "dictation", ...m });

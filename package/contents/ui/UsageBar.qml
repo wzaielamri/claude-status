@@ -117,7 +117,7 @@ ColumnLayout {
         Layout.leftMargin: Kirigami.Units.gridUnit * 3.5 + Kirigami.Units.smallSpacing
         text: bar.runsOut ? i18n("At this pace: full in %1, %2 before it resets",
                                  root.duration(bar.forecast.fullAt - root.now), root.duration(bar.resetsAt - bar.forecast.fullAt)) : ""
-        color: Kirigami.Theme.negativeTextColor
+        color: Kirigami.Theme.neutralTextColor   // (orange, as in the VS Code extension)
         font: Kirigami.Theme.smallFont
         elide: Text.ElideRight
     }

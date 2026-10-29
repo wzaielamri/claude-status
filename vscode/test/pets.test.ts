@@ -605,6 +605,30 @@ test("a pet whose spot moves hurries over to it", () => {
   stage.destroy();
 });
 
+test("the other pets wait for a pet that leaves to be gone, then move up", () => {
+  // (they tunnelled over it while it still waved and dug away; a chat that
+  // was one too many dug up where they stood)
+  const { stage, lay, show, give } = account(2);
+  lay();
+  show();
+  stage.firstShownTimer.fire();
+  give([chat("p/1"), chat("p/2"), chat("p/3")]);
+  const [one, two] = [stage.petFor("p/1"), stage.petFor("p/2")];
+  wait(one, 3000);
+  wait(two, 3000); // up out of the ground
+  const first = one.homeX;
+  give([chat("p/2"), chat("p/3")]); // p/1 left: p/3 has a pet's place now
+  assert.equal(one.leaving, true);
+  assert.notEqual(two.talpy.run?.name, "scoot", "moved over the pet that leaves");
+  assert.equal(stage.petFor("p/3"), null, "dug up while the other one left");
+  wait(one, 6000); // waved and dug away
+  assert.ok(!stage.pets.includes(one));
+  assert.equal(two.homeX, first, "p/2 stands first now");
+  assert.equal(two.talpy.run?.name, "scoot");
+  assert.ok(stage.petFor("p/3"), "p/3's pet came");
+  stage.destroy();
+});
+
 test("a pet still popping up goes to where its spot is now", () => {
   const { stage, lay, show, give } = account();
   lay(240);

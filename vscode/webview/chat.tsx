@@ -6,18 +6,19 @@
 
 import { render } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer, type TermRun, type TermStyle } from "../src/shared/pane";
+import { WHERE, droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownAsk, suggestFor, type Offers, type Suggestion, testsText, TEXT_SCALES, withoutPicture, type Conversation, type PaneChat, type PaneHostMessage, type PaneItem, type PaneMessage, type ReviewAnswer, type TermRun, type TermStyle } from "../src/shared/pane";
 import { AskBox, askKey } from "./components/AskBox";
 import { Diff, Listing, TermScreen, ToolDetail } from "./components/CodeView";
 import type { Answers, Decision } from "../src/shared/types";
 import { IconButton } from "./components/IconButton";
 import { Tag } from "./components/Tag";
+import { TalpyIcon } from "./components/TalpyIcon";
 import { Icon } from "./util/icons";
 import { Markdown } from "./util/markdown";
 
 declare global {
   interface Window {
-    CLAUDE_CHAT: { tab: "chat" | "review" | "output"; local: boolean; scale?: number; split?: boolean };
+    CLAUDE_CHAT: { tab: "chat" | "review"; local: boolean; scale?: number; split?: boolean };
   }
 }
 
@@ -26,20 +27,12 @@ const post = (m: PaneMessage) => api.postMessage(m);
 const copyCode = (code: string) => post({ type: "copy", text: code });
 const config = window.CLAUDE_CHAT;
 
+// Chat (your messages and Claude's replies), Steps (its tool calls too),
+// Terminal (its screen, where it can be read) and Review
+type Tab = "chat" | "steps" | "terminal" | "review";
+
 function plural(n: number, one: string, many = one + "s"): string {
   return `${n} ${n === 1 ? one : many}`;
-}
-
-// Claude's spinner, as in its terminal
-const SPIN = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
-
-function Spinner() {
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setN((x) => x + 1), 120);
-    return () => clearInterval(t);
-  }, []);
-  return <span class="pane-spin" aria-hidden="true">{SPIN[n % SPIN.length]}</span>;
 }
 
 // A tool call: ● Bash  npm test in green, red, or (still going) blinking,
@@ -92,8 +85,10 @@ function ChatApp() {
   const [capped, setCapped] = useState(false); // (Show earlier went as far as a tab goes)
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [tab, setTab] = useState<"chat" | "review" | "output">(config.tab);
-  // A background session's screen (the Output tab), read again every 2 s while it shows
+  const [tab, setTab] = useState<Tab>(config.tab);
+  const conversation = tab === "chat" || tab === "steps";
+  // Its screen (the Terminal tab): a background session's (claude logs) or a
+  // tmux pane's, read again every 2 s while it shows
   const [output, setOutput] = useState<{ lines: string[]; runs?: TermRun[][]; styles?: TermStyle[]; error: string } | null>(null);
   // (it stays at the end as the screen changes, unless you scrolled up)
   const term = useRef<HTMLDivElement | null>(null);
@@ -102,17 +97,17 @@ function ChatApp() {
     const el = term.current;
     if (el && termAtEnd.current) el.scrollTop = el.scrollHeight;
   }, [output, tab]);
+  const screen = chat?.jobId ? "job" : chat?.where === "tmux" ? "tmux" : "";
+  // (another screen, or none: the one before doesn't show meanwhile)
+  useEffect(() => setOutput(null), [screen, chat?.jobId]);
   useEffect(() => {
-    if (tab !== "output" || !chat?.jobId) return undefined;
+    if (tab !== "terminal" || !screen) return undefined;
     post({ type: "logs" });
     const t = setInterval(() => {
       if (document.visibilityState === "visible") post({ type: "logs" });
     }, 2000);
     return () => clearInterval(t);
-  }, [tab, chat?.jobId]);
-  useEffect(() => {
-    if (tab === "output" && chat && !chat.jobId) setTab("chat");
-  }, [tab, chat?.jobId]);
+  }, [tab, screen, chat?.jobId]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [text, setText] = useState("");
   const [askHow, setAskHow] = useState(false);
@@ -359,7 +354,7 @@ function ChatApp() {
         setReviewError(m.error);
       } else if (m.type === "result") {
         if (m.kind.startsWith("tab:")) {
-          setTab(m.kind.slice(4) as "chat" | "review");
+          setTab(m.kind.slice(4) as Tab);
           if (m.kind === "tab:review") setReviewAsked((n) => n + 1); // (compared again, also when it showed already)
           return;
         }
@@ -425,12 +420,12 @@ function ChatApp() {
     const el = list.current;
     if (el && follow.current) el.scrollTop = el.scrollHeight;
   }, [items, chat?.activity]);
-  // Back on the Chat tab (its list is made again): at its end, following it, if it was when
-  // you left, else where you were
+  // Back on the Chat or Steps tab (its list is made again), or from one to
+  // the other: at its end, following it, if it was when you left, else where you were
   const listTop = useRef(0);
   useLayoutEffect(() => {
     const el = list.current;
-    if (tab === "chat" && el) el.scrollTop = follow.current ? el.scrollHeight : listTop.current;
+    if (conversation && el) el.scrollTop = follow.current ? el.scrollHeight : listTop.current;
   }, [tab]);
 
   const send = (how: "auto" | "background" | "copy" | "enter", afterTurn: boolean) => {
@@ -455,6 +450,7 @@ function ChatApp() {
 
   // The conversation, drawn again only when it or how it shows changes: not
   // for each key typed in the reply, a dictation's second or a chat's poll
+  // (the Chat tab leaves out its tool calls)
   const asking = !!chat?.permission;
   const going = !!chat?.busy;
   const steps = useMemo(() => items.map((it, i) => {
@@ -473,7 +469,7 @@ function ChatApp() {
           <Markdown text={it.text ?? ""} onCopy={copyCode} />
         </div>
       </div>
-    ) : it.kind === "tool" ? (
+    ) : it.kind === "tool" ? (tab !== "steps" ? null :
       <ToolLine
         key={it.key}
         item={it}
@@ -490,7 +486,7 @@ function ChatApp() {
         <span>{it.text}</span>
       </div>
     );
-  }), [items, open, asking, going, split]);
+  }), [items, open, asking, going, split, tab]);
 
   return (
     <div class="pane pane-grow" style={{ "--pane-scale": String(scale) }}>
@@ -526,39 +522,47 @@ function ChatApp() {
           Open its window
         </button>
       </div>
-      <div class="pane-folder">{(chat?.host ? chat.host + ":" : "") + (chat?.cwd ?? "")}</div>
+      <div class="pane-folder">
+        {chat ? <Tag text={WHERE[chat.where].tag} title={WHERE[chat.where].title} /> : null}
+        <span class="pane-path">{(chat?.host ? chat.host + ":" : "") + (chat?.cwd ?? "")}</span>
+      </div>
       <div class="pane-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "chat"} class={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>
-          Chat
-        </button>
-        {chat?.jobId ? (
-          <button type="button" role="tab" aria-selected={tab === "output"} class={tab === "output" ? "on" : ""} onClick={() => setTab("output")}>
-            Output
+        {(["chat", "steps", "terminal"] as const).map((t) => (
+          <button key={t} type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+            {t === "chat" ? "Chat" : t === "steps" ? "Steps" : "Terminal"}
           </button>
-        ) : null}
+        ))}
         <button type="button" role="tab" aria-selected={tab === "review"} class={tab === "review" ? "on" : ""} onClick={() => setTab("review")}>
           {chat?.changes ? `Review ±${chat.changes}${chat.reviewPending ? " •" : ""}` : "Review"}
         </button>
       </div>
       {info ? <div class={info.ok ? "pane-info" : "pane-info bad"}>{info.message}</div> : null}
 
-      {tab === "output" ? (
+      {tab === "terminal" && !screen ? (
+        <div class="term-none">
+          <p>{chat ? WHERE[chat.where].noScreen : ""}</p>
+          <button type="button" class="btn secondary" onClick={() => post({ type: "openWindow" })}>
+            {chat?.where === "closed" ? "Open it again" : "Open its window"}
+          </button>
+        </div>
+      ) : tab === "terminal" ? (
         <div class="term-pane">
           <div class="term-head">
             <span class={`term-dot${output?.error ? " off" : ""}`} aria-hidden="true" />
-            <span class="term-note">{output?.error || "Its terminal right now, as Claude draws it in the background"}</span>
+            <span class="term-note">{output?.error || (screen === "job" ? "Its terminal right now, as Claude draws it in the background"
+              : "Its tmux pane right now, with what scrolled by above it")}</span>
             <button type="button" class="btn secondary small" title="To the end of its screen"
               onClick={() => { termAtEnd.current = true; if (term.current) term.current.scrollTop = term.current.scrollHeight; }}>
               ⤓
             </button>
           </div>
-          <div class="term-card" ref={term} title="Its terminal as Claude draws it now (claude logs)"
+          <div class="term-card" ref={term} title={screen === "job" ? "Its terminal as Claude draws it now (claude logs)" : "Its tmux pane now (tmux capture-pane)"}
             onScroll={(e) => { const el = e.currentTarget; termAtEnd.current = el.scrollTop >= el.scrollHeight - el.clientHeight - 24; }}>
             {output && !output.error ? <TermScreen lines={output.lines} runs={output.runs} styles={output.styles} />
               : <div class="term-wait">{output?.error ? "" : "Reading its screen…"}</div>}
           </div>
         </div>
-      ) : tab === "chat" ? (
+      ) : conversation ? (
         <>
           <div
             class="pane-list"
@@ -586,9 +590,9 @@ function ChatApp() {
             {chat?.state === "working" ? (
               <div class="pane-item pane-working">
                 <span class="pane-gutter">
-                  <Spinner />
+                  <TalpyIcon state="thinking" moving={true} />
                 </span>
-                <span>{activity && !(last?.kind === "tool" && last.status === "open") ? activity : "Working"}…</span>
+                <span>{activity && !(tab === "steps" && last?.kind === "tool" && last.status === "open") ? activity : "Working"}…</span>
               </div>
             ) : null}
           </div>

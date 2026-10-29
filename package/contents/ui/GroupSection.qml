@@ -231,14 +231,26 @@ ColumnLayout {
         }
     }
 
-    // Token totals (from local transcripts); click for the last days
+    // Token totals (from local transcripts); click for the last days (the
+    // arrow before them, as in the VS Code extension)
     RowLayout {
         visible: section.hasTokens
         Layout.fillWidth: true
         Layout.leftMargin: Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
+        spacing: Kirigami.Units.smallSpacing / 2
 
+        Kirigami.Icon {
+            visible: section.hasStats
+            source: section.statsOpen ? "arrow-down" : "arrow-right"
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+            Layout.preferredHeight: Layout.preferredWidth
+            opacity: 0.6
+
+            TapHandler {
+                onTapped: root.toggleStats(section.groupKey)
+            }
+        }
         PlasmaComponents3.Label {
             id: tokenLabel
             textFormat: Text.PlainText
@@ -279,17 +291,6 @@ ColumnLayout {
                     cursorShape: section.hasStats ? Qt.PointingHandCursor : Qt.ArrowCursor
                     onClicked: root.toggleStats(section.groupKey)
                 }
-            }
-        }
-        Kirigami.Icon {
-            visible: section.hasStats
-            source: section.statsOpen ? "arrow-up" : "arrow-down"
-            Layout.preferredWidth: Kirigami.Units.iconSizes.small
-            Layout.preferredHeight: Layout.preferredWidth
-            opacity: 0.5
-
-            TapHandler {
-                onTapped: root.toggleStats(section.groupKey)
             }
         }
     }

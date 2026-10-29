@@ -350,20 +350,25 @@ export class Stage implements PetStage, Animator {
     }
     const shown = this.chats.slice(0, this.maxPets);
     const byKey = new Map(shown.map((c) => [c.key, c]));
-    // Spots: in the order of the chats in the list, left to right (the
-    // colors tie pets to rows)
-    const keys = [...shown].sort((a, b) => a.order - b.order).map((c) => c.key);
-    const spacing = this.spacingFor(keys.length);
-    this.tagWidth = Math.max(this.gu * 3.5, spacing - SMALL * 2);
-    keys.forEach((k, i) => this.slots.set(k, this.margin + (i + 0.5) * spacing));
-    for (const k of [...this.slots.keys()]) if (!byKey.has(k) && !this.petFor(k)) this.slots.delete(k);
     for (const p of [...this.pets]) p.setChat(byKey.get(p.key) ?? null);
-    for (const c of shown) {
-      if (this.petFor(c.key)) continue;
-      const here = new Set(this.pets.filter((p) => !p.leaving).map((p) => p.colorIndex));
-      this.pets.push(new Pet(this, c.key, c, freeColor(c.key, here), this.slotX(c.key)));
+    // While a pet digs away the others stay where they are and a new chat's
+    // pet waits: none tunnels over it or digs up where it still stands
+    // (removePet comes back here once it's gone)
+    if (!this.pets.some((p) => p.leaving)) {
+      // Spots: in the order of the chats in the list, left to right (the
+      // colors tie pets to rows)
+      const keys = [...shown].sort((a, b) => a.order - b.order).map((c) => c.key);
+      const spacing = this.spacingFor(keys.length);
+      this.tagWidth = Math.max(this.gu * 3.5, spacing - SMALL * 2);
+      keys.forEach((k, i) => this.slots.set(k, this.margin + (i + 0.5) * spacing));
+      for (const k of [...this.slots.keys()]) if (!byKey.has(k)) this.slots.delete(k);
+      for (const c of shown) {
+        if (this.petFor(c.key)) continue;
+        const here = new Set(this.pets.map((p) => p.colorIndex));
+        this.pets.push(new Pet(this, c.key, c, freeColor(c.key, here), this.slotX(c.key)));
+      }
+      for (const p of this.pets) p.setHome(this.slotX(p.key));
     }
-    for (const p of this.pets) p.setHome(this.slotX(p.key));
     this.publishColors();
     this.countPets();
     // More chats than pets: say how many
@@ -390,6 +395,8 @@ export class Stage implements PetStage, Animator {
     pet.destroy();
     this.publishColors();
     this.countPets();
+    // (the last one gone: the others move up, a new chat's pet comes)
+    if (!this.pets.some((p) => p.leaving)) this.sync();
   }
 
   // (the UI keeps an account's stage open while a pet is on it)

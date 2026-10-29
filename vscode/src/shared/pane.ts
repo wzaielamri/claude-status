@@ -79,8 +79,39 @@ export interface PaneChat {
   review: Review | null;
   queued: { id: string; prompt: string; error: string } | null; // a reply waiting for its turn to end
   canMove: boolean; // runs in a terminal, on the account Claude Code is on: it can move to a Claude Code tab
-  jobId?: string; // a running background session: its screen is in the Output tab (pane.py --logs)
+  jobId?: string; // a running background session: its screen is in the Terminal tab (pane.py --logs)
+  where: ChatWhere;
 }
+
+// Where a chat runs (the tag under its name; what the Terminal tab can show):
+// a background session, closed (no process: a reply goes on in the
+// background), a Claude Code tab, tmux, a terminal of VS Code (this window's
+// or another's) or another terminal
+export type ChatWhere = "background" | "closed" | "claude" | "tmux" | "vscode" | "terminal";
+
+export function chatWhere(s: Pick<Session, "pid" | "kind" | "entrypoint" | "tmux" | "vscodeTerminal"> | undefined, terminalHere: boolean): ChatWhere {
+  if (!s || !s.pid) return "closed";
+  if (s.kind === "bg") return "background";
+  if (s.entrypoint === "claude-vscode") return "claude";
+  if (s.tmux) return "tmux";
+  return terminalHere || s.vscodeTerminal ? "vscode" : "terminal";
+}
+
+// Its tag, what the tag says on hover, and (where the Terminal tab shows no
+// screen) why
+export const WHERE: Record<ChatWhere, { tag: string; title: string; noScreen: string }> = {
+  background: { tag: "background", noScreen: "",
+                title: "A background session: Claude's background service runs it, with no terminal of its own. The Terminal tab shows its screen." },
+  closed: { tag: "not open", title: "No terminal or tab has it open: a reply goes on with it in the background.",
+            noScreen: "No terminal or tab has this chat open, so it shows no screen now. A reply goes on with it in the background." },
+  claude: { tag: "Claude Code tab", title: "It runs in a Claude Code tab (the Claude Code extension).",
+            noScreen: "It runs in a Claude Code tab, which has no terminal: what it does is in the Steps tab." },
+  tmux: { tag: "tmux", title: "It runs in a tmux pane: the Terminal tab shows its screen.", noScreen: "" },
+  vscode: { tag: "VS Code terminal", title: "It runs in a terminal of VS Code.",
+            noScreen: "It runs in a terminal of VS Code, whose screen an extension can't read: what it does is in the Steps tab." },
+  terminal: { tag: "terminal", title: "It runs in a terminal outside VS Code.",
+              noScreen: "It runs in a terminal whose screen can't be read from here (a chat in tmux shows it here): what it does is in the Steps tab." },
+};
 
 // A background session's screen in color (pane.py screen_view): each row's
 // runs of [text, index in styles]; a style's fg / bg ("#rrggbb", null: the
@@ -104,7 +135,7 @@ export type PaneHostMessage =
   // text written down, or why not); offerModel: whisper is there but no speech model (engine: which
   // one), offerSetup: nothing writes it down yet (setupMb: what setting up downloads); the tab asks
   // before either
-  | { type: "output"; lines: string[]; runs?: TermRun[][]; styles?: TermStyle[]; error: string } // a background session's screen (pane.py --logs)
+  | { type: "output"; lines: string[]; runs?: TermRun[][]; styles?: TermStyle[]; error: string } // its screen (pane.py --logs or --screen)
   | { type: "dictation"; state: "" | "starting" | "recording" | "writing" | "model" | "setup"; text?: string; message?: string; offerModel?: boolean;
       engine?: string; offerSetup?: boolean; setupMb?: number };
 
@@ -130,7 +161,7 @@ export type PaneMessage =
   | { type: "attach"; id: string; path: string } // a file dropped from VS Code's Explorer: a picture saved as one, a file named
   | { type: "screenshot"; id: string } // a region of the screen you pick, as a picture
   | { type: "complete" } // what the reply box offers (answered with "offers")
-  | { type: "logs" } // a background session's screen now (answered with "output")
+  | { type: "logs" } // its screen now: a background session's or a tmux pane's (answered with "output")
   | { type: "dictate"; action: "toggle" | "cancel" | "getModel" | "setup" }; // the microphone (answered with "dictation")
 
 // What the reply box offers as you type (pane.py --complete): / at the start

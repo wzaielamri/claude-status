@@ -57,6 +57,8 @@ its permission prompt and its review.
         past prompts in its folder (newest first) for ↑
   --logs JOB [--profile P]
         a background session's screen now (claude logs), as lines of text
+  --screen CHAT [--profile P]
+        a chat's tmux pane now, with the end of its scrollback above it
   --oldest allow|deny [--osd]
         answer the oldest prompt a chat waits on (one the hook relayed; a plan:
         approve it, or keep planning), for a keyboard shortcut; --osd: say on
@@ -815,8 +817,9 @@ def screen_cells(stream, width=200, height=60):
                 grid[row][col + 1] = ("", style)   # (the second half of a wide character)
         col += 2 if two else 1
 
-    for m in ESCAPE.finditer(text):
-        for ch in text[pos:m.start()]:
+    def chars(chunk):   # (text between escapes)
+        nonlocal row, col
+        for ch in chunk:
             if ch == "\r":
                 col = 0
             elif ch == "\n":
@@ -825,6 +828,9 @@ def screen_cells(stream, width=200, height=60):
                 col = max(0, col - 1)
             elif ch >= " ":
                 put(ch)
+
+    for m in ESCAPE.finditer(text):
+        chars(text[pos:m.start()])
         pos = m.end()
         args, op = m.group(1), m.group(2)
         if m.group(4) == "7":
@@ -864,9 +870,7 @@ def screen_cells(stream, width=200, height=60):
                     whole[r] = True
                 if mode == 0:
                     grid[row][col:] = [erased] * (width - col)
-    for ch in text[pos:]:
-        if ch >= " " and col < width:
-            put(ch)
+    chars(text[pos:])
     return grid, whole
 
 
@@ -940,6 +944,25 @@ def job_screen(home, extra_dirs, job_id, profile_key=None):
     if r.returncode != 0:
         return {"ok": False, "message": (r.stderr or r.stdout).decode(errors="replace").strip()[:300] or "claude logs failed"}
     return dict(screen_view(r.stdout.decode("utf-8", "replace")), ok=True)
+
+
+SCREEN_HISTORY = 300  # lines of a tmux pane's scrollback shown above its screen
+
+
+def chat_screen(home, extra_dirs, chat_id, profile_key=None):
+    """A chat's tmux pane now, in its colors, with the last SCREEN_HISTORY
+    lines of its scrollback above it: {"ok"} and screen_view's."""
+    entry = cs.find_chat_entry(home, extra_dirs, chat_id, profile_key)
+    if entry is None:
+        return {"ok": False, "message": "That chat isn't running any more"}
+    base, target = tmux_base(entry)
+    if base is None:
+        return {"ok": False, "message": "It doesn't run in tmux: its screen can't be read from here"}
+    ok, out = tmux_run(base, ["capture-pane", "-p", "-e", "-S", f"-{SCREEN_HISTORY}", "-t", target])
+    if not ok:
+        return {"ok": False, "message": out}
+    # (a row for each line: the grid doesn't scroll, and a line is never wider than its pane)
+    return dict(screen_view(out, width=1000, height=out.count("\n") + 2), ok=True)
 
 
 # ---------------------------------------------------------------- keyboard answers
@@ -1865,7 +1888,7 @@ def main(argv=None):
     session, text, stamp, limit, files, config_dirs, answers = None, None, None, PANE_ITEMS, [], [], None
     after, off, remote, pretty, source, expect, text_file = False, False, False, False, None, None, None
     actions = ("--conversation", "--send", "--answer", "--keys", "--review", "--undo", "--commit", "--reviewed",
-               "--relay", "--live", "--oldest", "--shortcuts", "--complete", "--logs")
+               "--relay", "--live", "--oldest", "--shortcuts", "--complete", "--logs", "--screen")
     osd = False
     while args:
         arg = args.pop(0)
@@ -1972,6 +1995,8 @@ def main(argv=None):
             result = {"ok": ok, "message": said, **({"changed": True} if not ok and said in (NOT_ASKING, ASKS_ELSE) else {})}
         elif action == "--logs":
             result = job_screen(home, config_dirs, target, profile)
+        elif action == "--screen":
+            result = chat_screen(home, config_dirs, target, profile)
         elif action == "--complete":
             result = completions(home, config_dirs, target, profile)
         elif action == "--oldest":

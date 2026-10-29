@@ -35,12 +35,23 @@ Window {
     readonly property var permission: row && row.permission && chatState === "waiting" ? row.permission : null
     readonly property var queued: root.queuedMessage(chatId, host)
     readonly property bool reviewPending: row ? root.reviewPending(row, host) : false
+    // Chat (your messages and Claude's replies), Steps (its tool calls too),
+    // Terminal (its screen, where it can be read) and Review
     property string tab: "chat"
+    readonly property bool conversationTab: tab === "chat" || tab === "steps"
+    // Where it runs (the tag under its name; what the Terminal tab can show):
+    // "background" (a background session), "closed" (no process: a reply goes
+    // on in the background), "claude" (VS Code's Claude panel), "tmux",
+    // "vscode" (a terminal of VS Code) or "terminal" (another terminal)
+    readonly property string where: !row || !row.pid ? "closed" : row.kind === "bg" ? "background"
+                                    : row.entrypoint === "claude-vscode" ? "claude" : row.tmux ? "tmux"
+                                    : row.vscodeTerminal ? "vscode" : "terminal"
 
     title: i18nc("window title: a chat's name", "%1 — Claude chat", chatName || chatId.slice(0, 8))
     width: Kirigami.Units.gridUnit * 38
     height: Kirigami.Units.gridUnit * 40
-    minimumWidth: Kirigami.Units.gridUnit * 22
+    // (never narrower than the send buttons, which don't shrink)
+    minimumWidth: Math.max(Kirigami.Units.gridUnit * 22, sendButtons.implicitWidth + Kirigami.Units.largeSpacing * 2)
     minimumHeight: Kirigami.Units.gridUnit * 18
     color: Kirigami.Theme.backgroundColor
     onClosing: {
@@ -865,24 +876,32 @@ Window {
         reviewLoading = true
         run("review", "--review " + root.shellQuote(chatId) + paneArgs())
     }
+    // (from Chat to Steps and back the list changes: it stays at its end if it was)
+    function switchTab(to) {
+        if (conversationTab && to !== tab)
+            chatAtEnd = !loaded || nearEnd()
+        tab = to
+    }
     onTabChanged: {
         if (tab === "review" && review === null)
             loadReview()
-        if (tab === "output")
+        if (tab === "terminal")
             loadOutput()
-        // (back on the Chat tab: at its end, following it, if it was when you left)
-        if (tab !== "chat" && chatTab)
+        // (back on the Chat or Steps tab: at its end, following it, if it was when you left)
+        if (!conversationTab && chatTab)
             chatAtEnd = !loaded || nearEnd()
-        else if (tab === "chat" && !chatTab && chatAtEnd)
+        else if (conversationTab && chatAtEnd)
             keepEnd()
-        chatTab = tab === "chat"
+        chatTab = conversationTab
     }
     property bool chatTab: true
     property bool chatAtEnd: true
 
-    // A background session's screen (the Output tab): its terminal as Claude
-    // draws it, in its colors on a terminal's dark ground (a light theme too)
+    // Its screen (the Terminal tab): a background session's as Claude draws
+    // it (claude logs), a tmux pane's as it shows, in its colors on a
+    // terminal's dark ground (a light theme too)
     readonly property string jobId: row && row.kind === "bg" && row.jobId && row.pid ? row.jobId : ""
+    readonly property bool screenShown: jobId !== "" || where === "tmux"
     property string outputText: ""
     property string outputHtml: ""
     property string outputError: ""
@@ -899,14 +918,23 @@ Window {
     function loadOutput() {
         if (jobId)
             run("logs", "--logs " + root.shellQuote(jobId) + paneArgs())
+        else if (where === "tmux" && sessionId)
+            run("logs", "--screen " + root.shellQuote(sessionId) + paneArgs())
     }
     Timer {
         interval: 2000
         repeat: true
-        running: pane.tab === "output" && pane.visible && pane.visibility !== Window.Minimized && pane.jobId !== ""
+        running: pane.tab === "terminal" && pane.shown && pane.screenShown
         onTriggered: pane.loadOutput()
     }
-    onJobIdChanged: if (!jobId && tab === "output") tab = "chat"
+    // (another screen, or none: the one before doesn't show meanwhile)
+    onScreenShownChanged: {
+        outputText = ""
+        outputHtml = ""
+        outputError = ""
+        if (screenShown && tab === "terminal")
+            loadOutput()
+    }
     readonly property real editedAt: row && row.review ? row.review.editedAt || 0 : 0
     onEditedAtChanged: if (tab === "review") loadReview()
 
@@ -940,7 +968,7 @@ Window {
             id: dropArea
             anchors.fill: parent
             z: 10
-            enabled: pane.tab === "chat"
+            enabled: pane.conversationTab
             keys: ["text/uri-list"]
             onDropped: drop => {
                 const paths = (drop.urls || []).map(u => String(u)).filter(u => u.startsWith("file://"))
@@ -1058,26 +1086,45 @@ Window {
                     }
                 }
             }
-            PlasmaComponents3.Label {
-                textFormat: Text.PlainText
+            // where it runs, and its folder
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: Math.round(fm.height * 0.5) + Kirigami.Units.smallSpacing
-                text: (pane.host ? pane.host + ":" : "") + (pane.row ? pane.row.cwdShort || pane.row.cwd || "" : pane.chat.cwd || "")
-                font.family: pane.monoFamily
-                font.pointSize: pane.pt * 0.85
-                color: pane.mutedColor
-                elide: Text.ElideMiddle
+                spacing: Kirigami.Units.smallSpacing
+
+                Tag {
+                    text: pane.where === "background" ? i18nc("where a chat runs", "background")
+                          : pane.where === "closed" ? i18nc("where a chat runs", "not open")
+                          : pane.where === "claude" ? i18nc("where a chat runs: the Claude Code extension's panel", "Claude panel")
+                          : pane.where === "tmux" ? "tmux"
+                          : pane.where === "vscode" ? i18nc("where a chat runs", "VS Code terminal")
+                          : i18nc("where a chat runs", "terminal")
+                    tooltip: pane.where === "background" ? i18n("A background session: Claude's background service runs it, with no terminal of its own. The Terminal tab shows its screen.")
+                             : pane.where === "closed" ? i18n("No terminal or tab has it open: a reply goes on with it in the background.")
+                             : pane.where === "claude" ? i18n("It runs in VS Code's Claude panel (the Claude Code extension).")
+                             : pane.where === "tmux" ? i18n("It runs in a tmux pane: the Terminal tab shows its screen.")
+                             : pane.where === "vscode" ? i18n("It runs in a terminal of VS Code.")
+                             : i18n("It runs in a terminal (Konsole or another).")
+                }
+                PlasmaComponents3.Label {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: (pane.host ? pane.host + ":" : "") + (pane.row ? pane.row.cwdShort || pane.row.cwd || "" : pane.chat.cwd || "")
+                    font.family: pane.monoFamily
+                    font.pointSize: pane.pt * 0.85
+                    color: pane.mutedColor
+                    elide: Text.ElideMiddle
+                }
             }
 
-            // Chat | Review, underlined in Claude's color
+            // Chat | Steps | Terminal | Review, underlined in Claude's color
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.smallSpacing
                 spacing: 0
 
                 Repeater {
-                    // (made again only when the Output tab comes or goes: not on each status check)
-                    model: pane.jobId !== "" ? ["chat", "output", "review"] : ["chat", "review"]
+                    model: ["chat", "steps", "terminal", "review"]
                     delegate: MouseArea {
                         id: tabButton
                         required property string modelData
@@ -1086,7 +1133,7 @@ Window {
                         implicitHeight: tabText.implicitHeight + Kirigami.Units.largeSpacing * 1.5
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: pane.tab = modelData
+                        onClicked: pane.switchTab(modelData)
                         Accessible.role: Accessible.PageTab
                         Accessible.name: tabText.text
 
@@ -1094,8 +1141,9 @@ Window {
                             id: tabText
                             anchors.centerIn: parent
                             textFormat: Text.PlainText
-                            text: tabButton.modelData === "chat" ? i18n("Chat")
-                                  : tabButton.modelData === "output" ? i18n("Output")
+                            text: tabButton.modelData === "chat" ? i18nc("tab: your messages and Claude's replies", "Chat")
+                                  : tabButton.modelData === "steps" ? i18nc("tab: the chat with every tool call", "Steps")
+                                  : tabButton.modelData === "terminal" ? i18nc("tab: the chat's terminal screen", "Terminal")
                                   : pane.row && pane.row.changes
                                   ? (pane.reviewPending ? i18nc("tab: the files a chat changed, not reviewed yet", "Review ±%1 •", pane.row.changes.count)
                                                         : i18nc("tab: the files a chat changed", "Review ±%1", pane.row.changes.count))
@@ -1135,10 +1183,11 @@ Window {
                 color: pane.infoBad ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.positiveTextColor
             }
 
-            // ---------------------------------------------------------------- Chat
+            // ---------------------------------------------------------------- Chat and Steps
+            // (one list: on the Chat tab its tool calls take no room)
             PlasmaComponents3.ScrollView {
                 id: scroll
-                visible: pane.tab === "chat"
+                visible: pane.conversationTab
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
@@ -1203,7 +1252,8 @@ Window {
                         }
                     }
 
-                    // While it works: ✻ what it's doing, in Claude's color
+                    // While it works: Talpy thinking (talpy/glyph.mjs) and what
+                    // it's doing, in the working color
                     footer: Item {
                         width: list.width
                         implicitHeight: pane.chatState === "working" ? workingLine.implicitHeight + Kirigami.Units.gridUnit : 0
@@ -1216,33 +1266,22 @@ Window {
                             anchors.bottom: parent.bottom
                             spacing: 0
 
-                            PlasmaComponents3.Label {
-                                id: spinner
-                                property int step: 0
-                                readonly property var glyphs: ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"]
+                            TalpyIcon {
                                 Layout.preferredWidth: pane.gutter
-                                textFormat: Text.PlainText
-                                text: glyphs[step % glyphs.length]
-                                color: pane.claudeColor
-                                font.pointSize: pane.pt
-                                font.weight: Font.Bold
-
-                                Timer {
-                                    interval: 120
-                                    repeat: true
-                                    running: workingLine.visible && pane.visible && pane.tab === "chat"
-                                    onTriggered: spinner.step += 1
-                                }
+                                Layout.preferredHeight: Math.round(fm.height * 1.2)
+                                mode: "thinking"
+                                color: root.stateColor("working")
+                                moving: workingLine.visible && pane.shown && pane.conversationTab
                             }
                             PlasmaComponents3.Label {
                                 textFormat: Text.PlainText
                                 Layout.fillWidth: true
                                 // (what it's doing, unless that's the tool call just above)
-                                readonly property bool toolAbove: items.count > 0 && items.get(items.count - 1).status === "open"
+                                readonly property bool toolAbove: pane.tab === "steps" && items.count > 0 && items.get(items.count - 1).status === "open"
                                 readonly property string activity: pane.row ? root.doingText(pane.row, pane.host).replace(/[….\s]+$/, "") : ""
                                 text: (activity && !toolAbove ? activity : i18n("Working")) + "…"
                                 elide: Text.ElideRight
-                                color: pane.claudeColor
+                                color: root.stateColor("working")
                                 font.pointSize: pane.pt
                             }
                         }
@@ -1269,9 +1308,11 @@ Window {
                             : kind === "you" ? Kirigami.Units.gridUnit * 1.6
                             : kind === "tool" && prev === "tool" ? Kirigami.Units.smallSpacing * 1.5
                             : Kirigami.Units.gridUnit * 0.8
+                        readonly property bool shows: kind !== "tool" || pane.tab === "steps"
                         width: list.width
                         implicitHeight: gap + body.implicitHeight
-                        height: implicitHeight
+                        height: shows ? implicitHeight : 0
+                        visible: shows
 
                         Loader {
                             id: body
@@ -1533,7 +1574,7 @@ Window {
             // What it asks while it waits: Allow once / Always allow / Deny, or its questions
             // (at most half the pane, scrolling, so the conversation stays in sight)
             Rectangle {
-                visible: pane.tab === "chat" && pane.permission !== null
+                visible: pane.conversationTab && pane.permission !== null
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(askColumn.implicitHeight + Kirigami.Units.largeSpacing * 2, pane.height / 2)
                 radius: Kirigami.Units.cornerRadius
@@ -1565,7 +1606,7 @@ Window {
 
             // Your reply
             ColumnLayout {
-                visible: pane.tab === "chat"
+                visible: pane.conversationTab
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
 
@@ -1819,105 +1860,123 @@ Window {
                     font.pointSize: pane.pt * 0.85
                     color: pane.mutedColor
                 }
-                RowLayout {
+                // Your tools, and the send buttons beside them or, when both
+                // don't fit (a button keeps its width), under them
+                GridLayout {
                     Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
+                    Layout.minimumWidth: 0   // (its width is the pane's, never what it asks for)
+                    columns: replyTools.implicitWidth + columnSpacing + sendButtons.implicitWidth <= width ? 2 : 1
+                    columnSpacing: Kirigami.Units.smallSpacing
+                    rowSpacing: Kirigami.Units.smallSpacing
 
-                    PlasmaComponents3.ToolButton {
-                        icon.name: pane.dictating === "recording" ? "media-playback-stop" : "audio-input-microphone"
-                        icon.color: pane.dictating === "recording" ? Kirigami.Theme.negativeTextColor : "transparent"
-                        enabled: pane.dictating === "" || pane.dictating === "recording"
-                        text: pane.dictating === "recording" ? i18n("Stop: write it down") + " · " + root.duration(Math.max(1000, pane.recordedMs))
-                              : pane.dictating === "writing" ? i18n("Writing it down…")
-                              : pane.dictating === "model" ? i18n("Downloading the speech model…")
-                              : pane.dictating === "setup" ? i18n("Setting up dictation (a few minutes)…")
-                              : pane.dictating === "starting" ? i18n("Starting the microphone…") : i18n("Dictate")
-                        display: pane.dictating === "" || pane.dictating === "starting" ? PlasmaComponents3.AbstractButton.IconOnly
-                                                                                          : PlasmaComponents3.AbstractButton.TextBesideIcon
-                        onClicked: pane.dictate()
-
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            anchors.fill: parent
-                            mainText: i18n("Dictate")
-                            subText: i18n("Say your reply: click again to stop, and it's written down where you're typing. On this computer only (whisper): what you say doesn't leave it. The speech model: in the settings.")
-                        }
-                    }
-                    PlasmaComponents3.ToolButton {
-                        visible: pane.dictating === "recording"
-                        icon.name: "dialog-cancel"
-                        display: PlasmaComponents3.AbstractButton.IconOnly
-                        text: i18n("Stop, don't write it down")
-                        onClicked: pane.cancelDictation()
-                    }
-                    PlasmaComponents3.ToolButton {
-                        icon.name: "mail-attachment"
-                        text: i18n("Attach files…")
-                        display: PlasmaComponents3.AbstractButton.IconOnly
-                        onClicked: root.pickFiles(pane.host, "pane", pane.row ? pane.row.cwd || "" : pane.chat.cwd || "")
-
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            anchors.fill: parent
-                            mainText: i18n("Attach files…")
-                            subText: pane.host ? i18n("Pick pictures for your reply (copied to %1 once you say so).", pane.host)
-                                               : i18n("Pick files for your reply: a picture goes in as one, another file is named for Claude to read. You can drop them on the pane too.")
-                        }
-                    }
-                    PlasmaComponents3.ToolButton {
-                        icon.name: "camera-photo"
-                        text: i18n("Screenshot…")
-                        display: PlasmaComponents3.AbstractButton.IconOnly
-                        onClicked: root.takeScreenshot(pane.host, "pane")
-
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            anchors.fill: parent
-                            mainText: i18n("Screenshot…")
-                            subText: i18n("Pick a region of the screen: its picture goes in your reply. Files and pictures can be dropped on the pane too.")
-                        }
-                    }
-                    Item {
+                    RowLayout {
+                        id: replyTools
                         Layout.fillWidth: true
-                    }
-                    PlasmaComponents3.Button {
-                        visible: pane.route === "terminal" || pane.askHow
-                        enabled: replyBox.text.trim() !== "" && !pane.sending
-                        icon.name: "edit-copy"
-                        text: i18n("Copy and open its tab")
-                        onClicked: pane.send("copy", false)
-                    }
-                    PlasmaComponents3.Button {
-                        visible: pane.busy
-                        enabled: replyBox.text.trim() !== "" && !pane.sending
-                        icon.name: "chronometer"
-                        text: i18n("Send when this turn ends")
-                        onClicked: pane.send(pane.route === "terminal" ? "background" : "auto", true)
+                        spacing: Kirigami.Units.smallSpacing
 
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            anchors.fill: parent
-                            mainText: i18n("Send when this turn ends")
-                            subText: i18n("The widget keeps it and sends it once Claude's turn is over (also with the popup closed).")
+                        PlasmaComponents3.ToolButton {
+                            icon.name: pane.dictating === "recording" ? "media-playback-stop" : "audio-input-microphone"
+                            icon.color: pane.dictating === "recording" ? Kirigami.Theme.negativeTextColor : "transparent"
+                            enabled: pane.dictating === "" || pane.dictating === "recording"
+                            text: pane.dictating === "recording" ? i18n("Stop: write it down") + " · " + root.duration(Math.max(1000, pane.recordedMs))
+                                  : pane.dictating === "writing" ? i18n("Writing it down…")
+                                  : pane.dictating === "model" ? i18n("Downloading the speech model…")
+                                  : pane.dictating === "setup" ? i18n("Setting up dictation (a few minutes)…")
+                                  : pane.dictating === "starting" ? i18n("Starting the microphone…") : i18n("Dictate")
+                            display: pane.dictating === "" || pane.dictating === "starting" ? PlasmaComponents3.AbstractButton.IconOnly
+                                                                                              : PlasmaComponents3.AbstractButton.TextBesideIcon
+                            onClicked: pane.dictate()
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: i18n("Dictate")
+                                subText: i18n("Say your reply: click again to stop, and it's written down where you're typing. On this computer only (whisper): what you say doesn't leave it. The speech model: in the settings.")
+                            }
+                        }
+                        PlasmaComponents3.ToolButton {
+                            visible: pane.dictating === "recording"
+                            icon.name: "dialog-cancel"
+                            display: PlasmaComponents3.AbstractButton.IconOnly
+                            text: i18n("Stop, don't write it down")
+                            onClicked: pane.cancelDictation()
+                        }
+                        PlasmaComponents3.ToolButton {
+                            icon.name: "mail-attachment"
+                            text: i18n("Attach files…")
+                            display: PlasmaComponents3.AbstractButton.IconOnly
+                            onClicked: root.pickFiles(pane.host, "pane", pane.row ? pane.row.cwd || "" : pane.chat.cwd || "")
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: i18n("Attach files…")
+                                subText: pane.host ? i18n("Pick pictures for your reply (copied to %1 once you say so).", pane.host)
+                                                   : i18n("Pick files for your reply: a picture goes in as one, another file is named for Claude to read. You can drop them on the pane too.")
+                            }
+                        }
+                        PlasmaComponents3.ToolButton {
+                            icon.name: "camera-photo"
+                            text: i18n("Screenshot…")
+                            display: PlasmaComponents3.AbstractButton.IconOnly
+                            onClicked: root.takeScreenshot(pane.host, "pane")
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: i18n("Screenshot…")
+                                subText: i18n("Pick a region of the screen: its picture goes in your reply. Files and pictures can be dropped on the pane too.")
+                            }
+                        }
+                        Item {
+                            Layout.fillWidth: true
                         }
                     }
-                    PlasmaComponents3.Button {
-                        enabled: replyBox.text.trim() !== "" && !pane.sending && !(pane.route === "terminal" && pane.busy)
-                                 && !(pane.permission && pane.route === "tmux")
-                        icon.name: "document-send"
-                        text: pane.sending ? i18n("Sending…") : pane.route === "terminal" || pane.askHow ? i18n("Send, go on in the background") : i18n("Send")
-                        onClicked: pane.send(pane.route === "terminal" || pane.askHow ? "background" : "auto", false)
+                    RowLayout {
+                        id: sendButtons
+                        Layout.alignment: Qt.AlignRight
+                        spacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Button {
+                            visible: pane.route === "terminal" || pane.askHow
+                            enabled: replyBox.text.trim() !== "" && !pane.sending
+                            icon.name: "edit-copy"
+                            text: i18n("Copy and open its tab")
+                            onClicked: pane.send("copy", false)
+                        }
+                        PlasmaComponents3.Button {
+                            visible: pane.busy
+                            enabled: replyBox.text.trim() !== "" && !pane.sending
+                            icon.name: "chronometer"
+                            text: i18n("Send when this turn ends")
+                            onClicked: pane.send(pane.route === "terminal" ? "background" : "auto", true)
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: i18n("Send when this turn ends")
+                                subText: i18n("The widget keeps it and sends it once Claude's turn is over (also with the popup closed).")
+                            }
+                        }
+                        PlasmaComponents3.Button {
+                            enabled: replyBox.text.trim() !== "" && !pane.sending && !(pane.route === "terminal" && pane.busy)
+                                     && !(pane.permission && pane.route === "tmux")
+                            icon.name: "document-send"
+                            text: pane.sending ? i18n("Sending…") : pane.route === "terminal" || pane.askHow ? i18n("Send, go on in the background") : i18n("Send")
+                            onClicked: pane.send(pane.route === "terminal" || pane.askHow ? "background" : "auto", false)
+                        }
                     }
                 }
             }
 
-            // ---------------------------------------------------------------- Output
-            // A background session's screen now (pane.py --logs: claude logs),
-            // its tool calls, diffs and spinner as its terminal shows them, in
-            // their colors, read again every 2 s while shown; it stays at the
-            // end as it changes, unless you scrolled up
+            // ---------------------------------------------------------------- Terminal
+            // Its screen now: a background session's (pane.py --logs: claude
+            // logs) or a tmux pane's (pane.py --screen), its tool calls, diffs
+            // and spinner as its terminal shows them, in their colors, read
+            // again every 2 s while shown; it stays at the end as it changes,
+            // unless you scrolled up
             ColumnLayout {
-                visible: pane.tab === "output"
+                visible: pane.tab === "terminal" && pane.screenShown
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: Kirigami.Units.smallSpacing
@@ -1935,7 +1994,8 @@ Window {
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
-                        text: pane.outputError || i18n("Its terminal right now, as Claude draws it in the background")
+                        text: pane.outputError || (pane.jobId ? i18n("Its terminal right now, as Claude draws it in the background")
+                                                              : i18n("Its tmux pane right now, with what scrolled by above it"))
                         color: pane.outputError ? Kirigami.Theme.neutralTextColor : pane.mutedColor
                         font: Kirigami.Theme.smallFont
                         elide: Text.ElideRight
@@ -1978,6 +2038,41 @@ Window {
                         text: pane.outputError ? "" : i18n("Reading its screen…")
                         color: "#9a9a9a"
                     }
+                }
+            }
+
+            // Elsewhere: why it shows no screen, and its window
+            ColumnLayout {
+                visible: pane.tab === "terminal" && !pane.screenShown
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Kirigami.Units.largeSpacing
+
+                Item {
+                    Layout.fillHeight: true
+                }
+                PlasmaComponents3.Label {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Kirigami.Units.gridUnit * 2
+                    Layout.rightMargin: Kirigami.Units.gridUnit * 2
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: pane.where === "closed" ? i18n("No terminal or tab has this chat open, so it shows no screen now. A reply goes on with it in the background.")
+                          : pane.where === "claude" ? i18n("It runs in VS Code's Claude panel, which has no terminal: what it does is in the Steps tab.")
+                          : pane.where === "vscode" ? i18n("It runs in a terminal of VS Code, whose screen can't be read from here: what it does is in the Steps tab.")
+                          : i18n("It runs in a terminal whose screen can't be read from here (a chat in tmux shows it here): what it does is in the Steps tab.")
+                    color: pane.mutedColor
+                    font.pointSize: pane.pt
+                }
+                PlasmaComponents3.Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    icon.name: "window"
+                    text: pane.where === "closed" ? i18n("Open it in a terminal") : i18n("Open its window")
+                    onClicked: root.openRow(pane.row || pane.chat, pane.host)
+                }
+                Item {
+                    Layout.fillHeight: true
                 }
             }
 

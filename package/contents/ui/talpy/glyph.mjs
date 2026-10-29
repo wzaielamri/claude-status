@@ -2,6 +2,8 @@
 // (the state's), its eyes cut out so the panel shows through. A 24 × 24 box.
 //   waiting: pops up, wide-eyed    working: glances around, lamp bobbing
 //   idle: smiles (your turn)       none: asleep, sunk low, lamp drooping
+//   thinking (a chat's working line): a little to the left, looking up at
+//     three thought dots that rise one after another, lamp swaying, a blink
 //
 // Plain ES2017 (see paths.mjs).
 
@@ -20,12 +22,12 @@ function kf(p, frames) {
 
 // Whether the icon moves in this state (the host can stop its clock otherwise)
 export function glyphMoves(state) {
-    return state === 'waiting' || state === 'working';
+    return state === 'waiting' || state === 'working' || state === 'thinking';
 }
 
 export function drawGlyph(ctx, state, color, now) {
     now = now || 0;
-    let dig = 0, lamp = 0, lookX = 0;
+    let dig = 0, lamp = 0, lookX = 0, lookY = 0, shift = 0, blink = false;
     if (state === 'none') {
         dig = 2.4;
         lamp = 50;
@@ -37,12 +39,19 @@ export function drawGlyph(ctx, state, color, now) {
     } else if (state === 'waiting') {
         dig = kf((now % 1100) / 1100, [[0, 0], [0.2, -2.4], [0.4, -0.4], [0.5, -1.2], [0.6, 0], [1, 0]]);
         lamp = -20;
+    } else if (state === 'thinking') {
+        shift = -2;
+        lookX = 0.6;
+        lookY = -0.5;
+        lamp = kf((now % 2600) / 2600, [[0, -6], [0.5, 8], [1, -6]]);
+        blink = now % 3900 < 140;
     }
     ctx.save();
     ctx.fillStyle = color;
     ctx.strokeStyle = color;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.translate(shift, 0);
     // everything above the edge
     ctx.save();
     ctx.beginPath();
@@ -66,10 +75,10 @@ export function drawGlyph(ctx, state, color, now) {
     ctx.fill();
     // eyes: holes through the body
     ctx.globalCompositeOperation = 'destination-out';
-    if (state === 'none' || state === 'idle') {
+    if (state === 'none' || state === 'idle' || blink) {
         ctx.lineWidth = 1;
         ctx.beginPath();
-        tracePath(ctx, state === 'none' ? 'M8 15.4q1.5 1.3 3 0M13 15.4q1.5 1.3 3 0' : 'M8 16q1.5-1.8 3 0M13 16q1.5-1.8 3 0');
+        tracePath(ctx, state === 'idle' ? 'M8 16q1.5-1.8 3 0M13 16q1.5-1.8 3 0' : 'M8 15.4q1.5 1.3 3 0M13 15.4q1.5 1.3 3 0');
         ctx.stroke();
     } else {
         const wide = state === 'waiting';
@@ -79,8 +88,8 @@ export function drawGlyph(ctx, state, color, now) {
         ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
         ctx.beginPath();
-        traceEllipse(ctx, 10 + lookX, 14.4, wide ? 0.6 : 0.5, wide ? 0.6 : 0.5);
-        traceEllipse(ctx, 15 + lookX, 14.4, wide ? 0.6 : 0.5, wide ? 0.6 : 0.5);
+        traceEllipse(ctx, 10 + lookX, 14.4 + lookY, wide ? 0.6 : 0.5, wide ? 0.6 : 0.5);
+        traceEllipse(ctx, 15 + lookX, 14.4 + lookY, wide ? 0.6 : 0.5, wide ? 0.6 : 0.5);
         ctx.fill();
     }
     ctx.restore();
@@ -91,5 +100,16 @@ export function drawGlyph(ctx, state, color, now) {
     ctx.moveTo(2, 19.9);
     ctx.lineTo(22, 19.9);
     ctx.stroke();
+    // its thought dots, toward the top right, each fading in after the one before
+    if (state === 'thinking') {
+        ctx.translate(-shift, 0);
+        [[18.2, 10.4, 0.9, 0], [20.3, 7, 1.25, 350], [22.3, 3.3, 1.6, 700]].forEach(d => {
+            const p = ((now - d[3]) % 2600 + 2600) % 2600 / 2600;
+            ctx.globalAlpha = p < 0.08 ? 0 : p < 0.22 ? (p - 0.08) / 0.14 : p < 0.78 ? 1 : p < 0.92 ? 1 - (p - 0.78) / 0.14 : 0;
+            ctx.beginPath();
+            traceEllipse(ctx, d[0], d[1], d[2], d[2]);
+            ctx.fill();
+        });
+    }
     ctx.restore();
 }

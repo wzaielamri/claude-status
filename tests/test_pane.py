@@ -154,6 +154,27 @@ class ScreenTests(PaneFixture):
         self.assertEqual(pane.job_screen(self.home, [], "../x")["message"], "Not a background session: ../x")
         self.assertEqual(pane.job_screen(self.home, [], "ffffffff")["message"], "That background session isn't there any more")
 
+    def test_a_tmux_chat_shows_its_pane_with_the_end_of_its_scrollback(self):
+        e = "\x1b"
+        captured = "older output\n" * 299 + f"{e}[38;2;215;119;87m● Done{e}[39m\n> \n\n\n"
+        with mock.patch.object(pane.cs, "find_chat_entry", return_value={"tmux": "main:1.%3", "pid": 7}), \
+                mock.patch.object(pane, "tmux_base", return_value=(["tmux"], "%3")), \
+                mock.patch.object(pane, "tmux_run", return_value=(True, captured)) as run:
+            got = pane.chat_screen(self.home, [], SID)
+        self.assertEqual(run.call_args.args[1], ["capture-pane", "-p", "-e", "-S", "-300", "-t", "%3"])
+        self.assertTrue(got["ok"])
+        self.assertEqual(len(got["lines"]), 301)             # (every line: the grid doesn't scroll)
+        self.assertEqual(got["lines"][-2:], ["● Done", ">"])
+        self.assertEqual(got["styles"][got["runs"][-2][0][1]]["fg"], "#d77757")
+
+    def test_a_chat_outside_tmux_has_no_screen_here(self):
+        with mock.patch.object(pane.cs, "find_chat_entry", return_value=None):
+            self.assertEqual(pane.chat_screen(self.home, [], SID), {"ok": False, "message": "That chat isn't running any more"})
+        with mock.patch.object(pane.cs, "find_chat_entry", return_value={"pid": 7}), \
+                mock.patch.object(pane, "tmux_base", return_value=(None, None)):
+            self.assertEqual(pane.chat_screen(self.home, [], SID)["message"],
+                             "It doesn't run in tmux: its screen can't be read from here")
+
 
 class ConversationTests(PaneFixture):
     def test_items(self):

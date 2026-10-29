@@ -211,6 +211,10 @@ code {
   --ov: var(--cs-disabled);
 }
 
+.ov-thinking {
+  --ov: var(--cs-working);
+}
+
 .hero {
   padding: 0 var(--cs-pad);
 }
@@ -2557,7 +2561,7 @@ body.chat-page {
 }
 
 /* The chat tab, drawn the way Claude's terminal draws a chat: its orange for
-   Claude's dots, headings and the working line, your accent for you, inline
+   Claude's dots and headings, your accent for you, inline
    code in the blue its terminal uses */
 .pane {
   --pane-claude: #d97757;
@@ -2668,11 +2672,23 @@ body.vscode-high-contrast-light .pane {
   cursor: default;
 }
 
+/* Where it runs (a tag), and its folder */
 .pane-folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: -6px;
   padding-left: calc(8px + 8px);
-  overflow: hidden;
   color: var(--cs-muted);
+}
+
+.pane-folder .tag {
+  font-size: 0.75em;
+}
+
+.pane-path {
+  min-width: 0;
+  overflow: hidden;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 0.82em;
   text-overflow: ellipsis;
@@ -2917,14 +2933,15 @@ body.vscode-high-contrast-light .pane {
   border-color: var(--cs-failed);
 }
 
-/* While it works: ✻ what it's doing, in Claude's color */
+/* While it works: Talpy thinking and what it's doing, in the working color */
 .pane-working {
   margin-top: 0.8em;
-  color: var(--pane-claude);
+  color: var(--cs-working);
 }
 
-.pane-spin {
-  font-weight: 700;
+.pane-working .talpy-icon {
+  width: 1.25em;
+  height: 1.25em;
 }
 
 /* Claude's Markdown */
@@ -3528,6 +3545,24 @@ body.vscode-high-contrast-light .pane {
 
 .term-wait {
   color: #9a9a9a;
+}
+
+/* The Terminal tab of a chat whose screen can't be read: why, and its window */
+.term-none {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 2em;
+  color: var(--cs-muted);
+  text-align: center;
+}
+
+.term-none p {
+  max-width: 36em;
+  margin: 0;
 }
 
 /* The Day view, chat by chat (WeekView.tsx Lanes) */

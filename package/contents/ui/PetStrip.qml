@@ -37,7 +37,8 @@ Item {
     readonly property real tagHeight: gu * 1.05
     readonly property real margin: bodyWidth * 0.8
     // Pets stand in a row from the left, spaced so their tags fit
-    readonly property real slotSpacing: spacingFor(shownChats.length)
+    property int placed: 0   // pets the spots were made for (sync): their tags fit there
+    readonly property real slotSpacing: spacingFor(placed)
     readonly property real tagWidth: Math.max(gu * 3.5, slotSpacing - Kirigami.Units.smallSpacing * 2)
     // (the name tag goes under the burrow's mound)
     readonly property real chatGround: height - tagHeight - boxSize * 6 / 64 - Kirigami.Units.smallSpacing
@@ -207,6 +208,14 @@ Item {
             if (p.label !== label)
                 petModel.setProperty(i, "label", label)
         }
+        // While a pet digs away the others stay where they are and a new
+        // chat's pet waits: none tunnels over it or digs up where it still
+        // stands (removePet comes back here once it's gone)
+        for (let i = 0; i < petModel.count; i++)
+            if (petModel.get(i).leaving) {
+                publishColors()
+                return
+            }
         for (const c of shownChats)
             if (indexOfPet(c.key) < 0)
                 petModel.append({ petKey: c.key, colorIndex: freeColor(c.key), leaving: false,
@@ -215,14 +224,11 @@ Item {
         // colors tie pets to rows)
         const keys = shownChats.slice().sort((a, b) => a.order - b.order).map(c => c.key)
         const spacing = spacingFor(keys.length)
+        placed = keys.length
         const spots = {}
         for (let i = 0; i < petModel.count; i++) {
             const k = petModel.get(i).petKey
-            const at = keys.indexOf(k)
-            if (at >= 0)
-                spots[k] = margin + (at + 0.5) * spacing
-            else if (k in slots)
-                spots[k] = slots[k]
+            spots[k] = margin + (keys.indexOf(k) + 0.5) * spacing
         }
         if (JSON.stringify(spots) !== JSON.stringify(slots))
             slots = spots
@@ -234,6 +240,9 @@ Item {
         if (i >= 0 && petModel.get(i).leaving)
             petModel.remove(i)
         publishColors()
+        // (the last one gone: the others move up, a new chat's pet comes)
+        syncedAs = ""
+        sync()
     }
 
     // The list shows a bar in each pet's color next to its chat
@@ -405,12 +414,6 @@ Item {
                 font: Kirigami.Theme.smallFont
                 opacity: 0.7
             }
-        }
-
-        // What the working chats do right now, one at a time
-        Ticker {
-            Layout.fillWidth: true
-            items: strip.hero ? root.tickerItems : []
         }
     }
 
