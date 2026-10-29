@@ -149,214 +149,230 @@ PlasmaExtras.Representation {
         }
     }
 
-    contentItem: ColumnLayout {
-        id: tabContent
-        spacing: Kirigami.Units.smallSpacing
-        // A tab fades in where it is (one that slid in from the side was drawn
-        // past the popup's frame, over the desktop, on its way: the sections
-        // reach into the frame's edge, so clipping cut their words instead)
-        property int tabIndex: ["chats", "week", "perms", "projects"].indexOf(root.popupTab)
-        onTabIndexChanged: {
-            if (!root.animateRows)
-                return
-            tabFadeIn.stop()
-            tabContent.opacity = 0.35
-            tabFadeIn.start()
-        }
-        NumberAnimation {
-            id: tabFadeIn
-            target: tabContent; property: "opacity"; to: 1; duration: Kirigami.Units.longDuration; easing.type: Easing.OutQuad
-            onStopped: tabContent.opacity = 1
-        }
+    // What's past its edges isn't drawn: Representation gives the content
+    // negative padding out to the frame's inner edge (collapseMarginsHint), so
+    // this is where the popup ends; a tab sliding in comes from there (it was
+    // drawn over the desktop beside the popup on its way, and clipping the
+    // popup itself cut the sections, which reach out to the frame)
+    contentItem: Item {
+        clip: true
+        implicitWidth: tabContent.implicitWidth
+        implicitHeight: tabContent.implicitHeight
 
-        // The big Talpy: the whole dashboard at a glance (stays put while the list scrolls)
-        PetStrip {
-            id: hero
-            hero: true
-            visible: Plasmoid.configuration.showPet && root.popupTab === "chats"
-            Layout.fillWidth: true
-            Layout.preferredHeight: implicitHeight
-            Layout.topMargin: Kirigami.Units.smallSpacing
-            Layout.leftMargin: Kirigami.Units.smallSpacing
-            Layout.rightMargin: Kirigami.Units.smallSpacing
-        }
+        ColumnLayout {
+            id: tabContent
+            anchors.fill: parent
+            spacing: Kirigami.Units.smallSpacing
+            // A tab slides in from the side it's on (Chats | Recap | Permissions | Projects), as in VS Code
+            transform: Translate { id: tabSlide }
+            property int tabIndex: ["chats", "week", "perms", "projects"].indexOf(root.popupTab)
+            onTabIndexChanged: {
+                if (!root.animateRows)
+                    return
+                const from = tabIndex > shownTab ? 1 : -1
+                shownTab = tabIndex
+                tabSlideIn.stop()
+                tabSlide.x = from * Kirigami.Units.gridUnit * 1.5
+                tabContent.opacity = 0.35
+                tabSlideIn.start()
+            }
+            property int shownTab: tabIndex
+            ParallelAnimation {
+                id: tabSlideIn
+                NumberAnimation { target: tabSlide; property: "x"; to: 0; duration: Kirigami.Units.longDuration; easing.type: Easing.OutQuint }
+                NumberAnimation { target: tabContent; property: "opacity"; to: 1; duration: Kirigami.Units.longDuration; easing.type: Easing.OutQuint }
+                onStopped: { tabSlide.x = 0; tabContent.opacity = 1 }
+            }
 
-        // Find a chat (the magnifier above): its words, then what matched
-        PlasmaExtras.SearchField {
-            id: searchField
-            visible: root.searchOpen && root.popupTab === "chats"
-            Layout.fillWidth: true
-            Layout.leftMargin: Kirigami.Units.smallSpacing
-            Layout.rightMargin: Kirigami.Units.smallSpacing
-            placeholderText: i18n("Find a chat: words in its name, folder or your prompts")
-            onTextChanged: root.searchQuery = text
-            onVisibleChanged: {
-                if (visible) {
-                    text = root.searchQuery
-                    forceActiveFocus()
+            // The big Talpy: the whole dashboard at a glance (stays put while the list scrolls)
+            PetStrip {
+                id: hero
+                hero: true
+                visible: Plasmoid.configuration.showPet && root.popupTab === "chats"
+                Layout.fillWidth: true
+                Layout.preferredHeight: implicitHeight
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+            }
+
+            // Find a chat (the magnifier above): its words, then what matched
+            PlasmaExtras.SearchField {
+                id: searchField
+                visible: root.searchOpen && root.popupTab === "chats"
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                placeholderText: i18n("Find a chat: words in its name, folder or your prompts")
+                onTextChanged: root.searchQuery = text
+                onVisibleChanged: {
+                    if (visible) {
+                        text = root.searchQuery
+                        forceActiveFocus()
+                    }
+                }
+                Keys.onEscapePressed: root.toggleSearch()
+
+                Connections {   // (cleared when the search closes)
+                    target: root
+                    function onSearchQueryChanged() {
+                        if (searchField.text !== root.searchQuery)
+                            searchField.text = root.searchQuery
+                    }
                 }
             }
-            Keys.onEscapePressed: root.toggleSearch()
 
-            Connections {   // (cleared when the search closes)
-                target: root
-                function onSearchQueryChanged() {
-                    if (searchField.text !== root.searchQuery)
-                        searchField.text = root.searchQuery
-                }
+            // (made only while their tab is open)
+            Loader {
+                active: root.popupTab === "week"
+                visible: active
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                source: "WeekView.qml"
             }
-        }
+            Loader {
+                active: root.popupTab === "projects"
+                visible: active
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                source: "ProjectsView.qml"
+            }
+            Loader {
+                active: root.popupTab === "perms"
+                visible: active
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                source: "PermsView.qml"
+            }
 
-        // (made only while their tab is open)
-        Loader {
-            active: root.popupTab === "week"
-            visible: active
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            source: "WeekView.qml"
-        }
-        Loader {
-            active: root.popupTab === "projects"
-            visible: active
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            source: "ProjectsView.qml"
-        }
-        Loader {
-            active: root.popupTab === "perms"
-            visible: active
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            source: "PermsView.qml"
-        }
+            PlasmaComponents3.ScrollView {
+                id: scroll
+                visible: root.popupTab === "chats"
+                // Fixed implicit size: deriving it from the content would loop
+                // through the popup's width.
+                implicitWidth: Kirigami.Units.gridUnit * 28
+                implicitHeight: Kirigami.Units.gridUnit * 26
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: availableWidth
+                contentHeight: content.implicitHeight
+                PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
-        PlasmaComponents3.ScrollView {
-            id: scroll
-            visible: root.popupTab === "chats"
-            // Fixed implicit size: deriving it from the content would loop
-            // through the popup's width.
-            implicitWidth: Kirigami.Units.gridUnit * 28
-            implicitHeight: Kirigami.Units.gridUnit * 26
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            contentWidth: availableWidth
-            contentHeight: content.implicitHeight
-            PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
+                ColumnLayout {
+                    id: content
+                    width: scroll.availableWidth
+                    spacing: Kirigami.Units.largeSpacing
+                    Component.onCompleted: root.rowSpace = content
 
-            ColumnLayout {
-                id: content
-                width: scroll.availableWidth
-                spacing: Kirigami.Units.largeSpacing
-                Component.onCompleted: root.rowSpace = content
+                    PlasmaComponents3.Label {
+                        textFormat: Text.PlainText
+                        Layout.fillWidth: true
+                        Layout.margins: Kirigami.Units.smallSpacing
+                        visible: root.actionError !== ""
+                        text: root.actionError
+                        color: Kirigami.Theme.negativeTextColor
+                        wrapMode: Text.Wrap
+                    }
 
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    Layout.margins: Kirigami.Units.smallSpacing
-                    visible: root.actionError !== ""
-                    text: root.actionError
-                    color: Kirigami.Theme.negativeTextColor
-                    wrapMode: Text.Wrap
-                }
+                    PlasmaComponents3.Label {
+                        textFormat: Text.PlainText
+                        Layout.fillWidth: true
+                        Layout.margins: Kirigami.Units.smallSpacing
+                        visible: root.actionInfo !== ""
+                        text: root.actionInfo
+                        color: Kirigami.Theme.positiveTextColor
+                        wrapMode: Text.Wrap
+                    }
 
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    Layout.margins: Kirigami.Units.smallSpacing
-                    visible: root.actionInfo !== ""
-                    text: root.actionInfo
-                    color: Kirigami.Theme.positiveTextColor
-                    wrapMode: Text.Wrap
-                }
+                    // What happened while you were away (main.qml: sendDigest), until you've seen it
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        Layout.margins: Kirigami.Units.smallSpacing
+                        visible: root.awayDigest !== null
+                        type: Kirigami.MessageType.Information
+                        icon.name: "user-away"
+                        text: root.awayDigest ? "<b>" + root.escapeHtml(root.awayDigest.title) + "</b><br>"
+                                                + root.awayDigest.lines.map(root.escapeHtml).join("<br>") : ""
+                        actions: [
+                            Kirigami.Action {
+                                text: i18n("Dismiss")
+                                icon.name: "dialog-close"
+                                onTriggered: root.awayDigest = null
+                            }
+                        ]
+                    }
 
-                // What happened while you were away (main.qml: sendDigest), until you've seen it
-                Kirigami.InlineMessage {
-                    Layout.fillWidth: true
-                    Layout.margins: Kirigami.Units.smallSpacing
-                    visible: root.awayDigest !== null
-                    type: Kirigami.MessageType.Information
-                    icon.name: "user-away"
-                    text: root.awayDigest ? "<b>" + root.escapeHtml(root.awayDigest.title) + "</b><br>"
-                                            + root.awayDigest.lines.map(root.escapeHtml).join("<br>") : ""
-                    actions: [
-                        Kirigami.Action {
-                            text: i18n("Dismiss")
-                            icon.name: "dialog-close"
-                            onTriggered: root.awayDigest = null
+                    SearchResults {
+                        visible: root.searchOpen && root.searchQuery.trim().length >= 2
+                        Layout.fillWidth: true
+                    }
+
+                    PlasmaComponents3.Label {
+                        textFormat: Text.PlainText
+                        Layout.fillWidth: true
+                        Layout.margins: Kirigami.Units.smallSpacing
+                        visible: root.errorText !== ""
+                        text: root.errorText
+                        color: Kirigami.Theme.negativeTextColor
+                        wrapMode: Text.Wrap
+                    }
+
+                    // Only what needs you and what works (the header's filter button)
+                    FocusView {
+                        visible: root.focusView && !(root.searchOpen && root.searchQuery.trim().length >= 2)
+                        Layout.fillWidth: true
+                    }
+
+                    // Indexed by position so rows survive each poll (a new array every
+                    // 2 s would rebuild them and drop their state).
+                    Repeater {
+                        model: root.groups.length
+                        delegate: GroupSection {
+                            required property int index
+                            visible: !root.focusView   // (kept, with their pets and what's open, while the focus view shows)
+                            Layout.fillWidth: true
+                            group: root.groups[index] || root.emptyGroup
+                            accounts: root.groups.length
+                            last: index === root.groups.length - 1
                         }
-                    ]
-                }
-
-                SearchResults {
-                    visible: root.searchOpen && root.searchQuery.trim().length >= 2
-                    Layout.fillWidth: true
-                }
-
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    Layout.margins: Kirigami.Units.smallSpacing
-                    visible: root.errorText !== ""
-                    text: root.errorText
-                    color: Kirigami.Theme.negativeTextColor
-                    wrapMode: Text.Wrap
-                }
-
-                // Only what needs you and what works (the header's filter button)
-                FocusView {
-                    visible: root.focusView && !(root.searchOpen && root.searchQuery.trim().length >= 2)
-                    Layout.fillWidth: true
-                }
-
-                // Indexed by position so rows survive each poll (a new array every
-                // 2 s would rebuild them and drop their state).
-                Repeater {
-                    model: root.groups.length
-                    delegate: GroupSection {
-                        required property int index
-                        visible: !root.focusView   // (kept, with their pets and what's open, while the focus view shows)
-                        Layout.fillWidth: true
-                        group: root.groups[index] || root.emptyGroup
-                        accounts: root.groups.length
-                        last: index === root.groups.length - 1
                     }
-                }
 
-                // No account here, but SSH hosts shown: one quiet line where this
-                // computer's accounts go (a computer that only watches its hosts is fine)
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    Layout.margins: Kirigami.Units.smallSpacing
-                    visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length > 0 && !root.focusView
-                    text: i18n("No Claude Code config on this computer")
-                    opacity: 0.6
-                    elide: Text.ElideRight
-                }
-
-                // SSH hosts you picked, after this computer's accounts
-                Repeater {
-                    model: root.shownHosts.length
-                    delegate: HostSection {
-                        required property int index
-                        visible: !root.focusView
+                    // No account here, but SSH hosts shown: one quiet line where this
+                    // computer's accounts go (a computer that only watches its hosts is fine)
+                    PlasmaComponents3.Label {
+                        textFormat: Text.PlainText
                         Layout.fillWidth: true
-                        host: root.shownHosts[index] || ""
+                        Layout.margins: Kirigami.Units.smallSpacing
+                        visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length > 0 && !root.focusView
+                        text: i18n("No Claude Code config on this computer")
+                        opacity: 0.6
+                        elide: Text.ElideRight
                     }
-                }
 
-                PlasmaExtras.PlaceholderMessage {
-                    Layout.fillWidth: true
-                    Layout.margins: Kirigami.Units.gridUnit
-                    visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length === 0
-                    iconName: "dialog-information"
-                    text: i18n("No Claude Code config found")
-                    explanation: i18n("Looked for ~/.claude and ~/.claude-*. Add other dirs in the widget settings.")
-                }
+                    // SSH hosts you picked, after this computer's accounts
+                    Repeater {
+                        model: root.shownHosts.length
+                        delegate: HostSection {
+                            required property int index
+                            visible: !root.focusView
+                            Layout.fillWidth: true
+                            host: root.shownHosts[index] || ""
+                        }
+                    }
 
-                // (some room under the last line, scrolled to the end too)
-                Item {
-                    implicitHeight: Kirigami.Units.smallSpacing
+                    PlasmaExtras.PlaceholderMessage {
+                        Layout.fillWidth: true
+                        Layout.margins: Kirigami.Units.gridUnit
+                        visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length === 0
+                        iconName: "dialog-information"
+                        text: i18n("No Claude Code config found")
+                        explanation: i18n("Looked for ~/.claude and ~/.claude-*. Add other dirs in the widget settings.")
+                    }
+
+                    // (some room under the last line, scrolled to the end too)
+                    Item {
+                        implicitHeight: Kirigami.Units.smallSpacing
+                    }
                 }
             }
         }
