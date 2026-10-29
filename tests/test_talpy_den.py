@@ -2207,6 +2207,30 @@ class FetchUsageTests(UsageFetchFixture):
         self.assertEqual(self.fetch(), [])
 
 
+class ModeTests(unittest.TestCase):
+    """A chat's permission mode: VS Code's Claude Code panel names it at the
+    first prompt only (one that begins with a note of the file open there)."""
+
+    def test_named_once_then_kept(self):
+        first = {"type": "user", "permissionMode": "auto", "origin": {"kind": "human"},
+                 "message": {"role": "user", "content": [{"type": "text", "text": "<ide_opened_file>The user opened a.tex</ide_opened_file>"},
+                                                         {"type": "text", "text": "tidy the abstract"}]}}
+        later = {"type": "user", "message": {"role": "user", "content": "and the intro"}}
+        self.assertEqual(cs.names_mode(first), "auto")
+        self.assertIsNone(cs.names_mode(later))
+        self.assertIsNone(cs.names_mode({**first, "isSidechain": True}))
+        self.assertEqual(cs.names_mode({"type": "permission-mode", "permissionMode": "plan"}), "plan")
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "chat.jsonl"
+            path.write_text("".join(json.dumps(e) + "\n" for e in (first, later, later)))
+            self.assertEqual(cs.scan_mode(path, path.stat().st_size), "auto")
+            cache = cs.ChatCache(Path(d) / "chats.json")
+            self.assertEqual(cache.edits(path)["mode"], "auto")
+            with open(path, "a") as f:   # (changed later on: the newest one)
+                f.write(json.dumps({"type": "permission-mode", "permissionMode": "plan"}) + "\n")
+            self.assertEqual(cs.ChatCache(Path(d) / "chats.json").edits(path)["mode"], "plan")
+
+
 class TerminalTests(unittest.TestCase):
     """The terminal a chat runs in, by name, and where a background session is shown (claude attach)."""
 

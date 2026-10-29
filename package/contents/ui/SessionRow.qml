@@ -474,6 +474,7 @@ RowLayout {
                     // turning "Idle · 0m", or the next minute, doesn't move its tags)
                     property real widest: 0
                     width: stateBox.width
+                    horizontalAlignment: Text.AlignRight   // (at the line's end, however wide it was)
                     textFormat: Text.PlainText
                     text: root.stateText(row.session)
                     color: row.session.state === "waiting" ? Kirigami.Theme.neutralTextColor

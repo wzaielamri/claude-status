@@ -383,12 +383,18 @@ def claude_pids():
 
 def attach_clients(job_id, name, config_dir):
     """The `claude attach` processes showing this background job, in any
-    terminal: by its id, or by its name on this profile."""
+    terminal: by its id, or by its name on this profile. (Once attached, one
+    runs on as `claude agents`, the job it shows picked in its environment.)"""
     pids = []
     for pid in claude_pids():
         argv = proc_cmdline(pid)
-        if len(argv) >= 3 and argv[1] == "attach" and (
-                argv[2] == job_id or (name and argv[2] == name and proc_config_dir(pid) == config_dir)):
+        if len(argv) >= 3 and argv[1] == "attach":
+            what = argv[2]
+        elif len(argv) >= 2 and argv[1] == "agents":
+            what = cs.process_environ_value(pid, "CLAUDE_AGENTS_SELECT")
+        else:
+            continue
+        if what == job_id or (name and what == name and proc_config_dir(pid) == config_dir):
             pids.append(pid)
     return pids
 

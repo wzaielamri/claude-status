@@ -17,6 +17,9 @@ ColumnLayout {
     property int accounts: 1          // how many accounts its machine has (the default one is marked)
 
     readonly property string groupKey: (remoteHost ? remoteHost + "/" : "") + group.id
+    // the folder and how long ago at the end of a recent chat's, a plan's or a
+    // memory's line: one width in all three, so what's before it lines up
+    readonly property real endWidth: Kirigami.Units.gridUnit * 12
     readonly property var recent: group.recent || []
     readonly property bool recentOpen: !!root.expandedRecent[groupKey]
     readonly property var plans: group.plans || []
@@ -715,12 +718,13 @@ ColumnLayout {
                 CoveredEnd {
                     id: recentEnd
                     covered: recentButtons.covering
-                    Layout.preferredWidth: Math.min(recentFolder.implicitWidth, Kirigami.Units.gridUnit * 12)
+                    Layout.preferredWidth: section.endWidth
                     implicitHeight: recentFolder.implicitHeight
 
                     PlasmaComponents3.Label {
                         id: recentFolder
                         width: recentEnd.width
+                        horizontalAlignment: Text.AlignRight
                         textFormat: Text.PlainText
                         text: i18nc("recent chat: folder · how long ago", "%1 · %2", recentLine.chat.cwdShort || "~",
                                     root.ago(root.now - recentLine.chat.lastActive))
@@ -931,12 +935,13 @@ ColumnLayout {
                 CoveredEnd {
                     id: planEnd
                     covered: planButtons.covering
-                    Layout.preferredWidth: Math.min(planWhen.implicitWidth, Kirigami.Units.gridUnit * 10)
+                    Layout.preferredWidth: section.endWidth
                     implicitHeight: planWhen.implicitHeight
 
                     PlasmaComponents3.Label {
                         id: planWhen
                         width: planEnd.width
+                        horizontalAlignment: Text.AlignRight
                         textFormat: Text.PlainText
                         text: planLine.plan.cwdShort
                               ? i18nc("plan: folder · how long ago", "%1 · %2", planLine.plan.cwdShort, root.ago(root.now - planLine.plan.updatedAt))
@@ -1158,12 +1163,13 @@ ColumnLayout {
             CoveredEnd {
                 id: memoryEnd
                 covered: memoryButtons.covering
-                Layout.preferredWidth: Math.min(memoryWhen.implicitWidth, Kirigami.Units.gridUnit * 10)
+                Layout.preferredWidth: section.endWidth
                 implicitHeight: memoryWhen.implicitHeight
 
                 PlasmaComponents3.Label {
                     id: memoryWhen
                     width: memoryEnd.width
+                    horizontalAlignment: Text.AlignRight
                     textFormat: Text.PlainText
                     text: memoryLine.memory.folderShort || memoryLine.memory.type === "account"
                           ? i18nc("memory: folder · how long ago", "%1 · %2", memoryLine.memory.folderShort || i18n("every folder"),

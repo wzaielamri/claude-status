@@ -3006,7 +3006,7 @@ body.vscode-high-contrast-light .pane {
 }
 
 .md code {
-  padding: 0 0.35em;
+  padding: 0 1px; /* (its ground ends with its last character, as in the widget: no margin that reads as a space) */
   border-radius: 4px;
   background: var(--pane-code-bg, var(--vscode-textCodeBlock-background));
   color: var(--pane-code, inherit);

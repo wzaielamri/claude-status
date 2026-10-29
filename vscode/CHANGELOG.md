@@ -53,6 +53,12 @@
 - **A chat that hasn't started yet says so:** its tab said *That chat's
   transcript isn't there any more*, in red; it says *This chat hasn't
   started yet, or it isn't there any more* now, as a note.
+- **A chat in the Claude Code panel shows its permission mode:** its tag
+  (*Auto mode*, *Plan mode*…) was missing: the panel names the mode at a
+  chat's first prompt only, and the row looked for it in the chat's newest
+  lines.
+- **Inline code's ground ends with its last character:** in the chat tab
+  it had room on each side that read as a space before a comma.
 - **The ticker is in the big Talpy's box:** what the working chats do right
   now is the box's last line, under the counts, as in the widget; it was a
   line under the box.

@@ -754,6 +754,11 @@ def finish_row(row, job, job_id, profile, ctx, alive):
     if chats is not None:
         path = transcript_path(profile, row["chatId"])
         row["peek"] = chats.peek(path)
+        if row["peek"] and not row["peek"].get("mode") and path is not None:
+            # (its newest entries name none: a chat in the Claude Code panel names it at its first prompt only)
+            mode = chats.edits(path).get("mode")
+            if mode:
+                row["peek"] = dict(row["peek"], mode=mode)
         peek = row["peek"] or {}
         row["plan"] = plan_of(profile, peek.get("slug"))
         if row["name"].startswith(CONTINUE_PROMPT[:30]) and path is not None and getattr(ctx, "links", None) is not None:
@@ -1625,13 +1630,19 @@ def peek_from(entries):
     return peek, prompt is not None or (bool(parts) and bool(last_prompt))
 
 
+def names_mode(e):
+    """The permission mode an entry names: a mode change, or an entry of
+    yours (a prompt, also one VS Code's panel begins with a note of the file
+    open there), or None."""
+    if e.get("type") not in ("permission-mode", "user") or e.get("isSidechain") or e.get("isMeta"):
+        return None
+    mode = e.get("permissionMode")
+    return mode if isinstance(mode, str) and mode else None
+
+
 def mode_of(entries):
     """The chat's permission mode (newest first entries), e.g. "plan", or None."""
-    for e in entries:
-        if e["type"] == "permission-mode" or human_prompt(e) is not None:
-            if isinstance(e.get("permissionMode"), str) and e["permissionMode"]:
-                return e["permissionMode"]
-    return None
+    return next((m for m in map(names_mode, entries) if m), None)
 
 
 def recap_of(entries):
@@ -1701,8 +1712,9 @@ def new_edits():
         as of that prompt; turn: {path: backup name} of files first backed up
         since then;
     sessions: session ids whose file-history folders hold its backups;
-    stats: what the chat did (fold_stats)."""
-    return {"files": {}, "snap": None, "snapFiles": {}, "turn": {}, "sessions": [], "stats": new_stats()}
+    stats: what the chat did (fold_stats);
+    mode: its permission mode, the newest one named (fold_mode)."""
+    return {"files": {}, "snap": None, "snapFiles": {}, "turn": {}, "sessions": [], "stats": new_stats(), "mode": None}
 
 
 def new_stats():
@@ -1840,6 +1852,36 @@ def fold_edits(rec, e):
                     rec["files"].setdefault(os.path.normpath(path), [False, 0])
 
 
+def fold_mode(rec, e):
+    """The permission mode an entry names (names_mode; a chat in VS Code's
+    Claude Code panel names it at its first prompt only)."""
+    mode = names_mode(e)
+    if mode:
+        rec["mode"] = mode
+
+
+def scan_mode(path, end):
+    """The newest permission mode the transcript names up to byte offset end, or None."""
+    rec = {"mode": None}
+    try:
+        with open(path, "rb") as f:
+            read = 0
+            for line in f:
+                read += len(line)
+                if read > end:
+                    break
+                if b'"permissionMode"' in line:
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(e, dict):
+                        fold_mode(rec, e)
+    except OSError:
+        pass
+    return rec["mode"]
+
+
 def scan_edits(path, rec, start=0, sessions=None):
     """Fold the transcript's lines from byte offset start into rec; returns
     the offset read up to (a half-written last line is left for next time).
@@ -1857,9 +1899,10 @@ def scan_edits(path, rec, start=0, sessions=None):
                         sessions.add(m.group(1).decode())
                 edits = b'"file-history-' in line or EDIT_LINE.search(line)
                 talk = ASSISTANT_LINE.search(line) or (USER_LINE.search(line) and b'"tool_result"' not in line)
+                mode = b'"permissionMode"' in line
                 if not talk and not rec["stats"].get("started", True) and USER_LINE.search(line):
                     rec["stats"]["started"] = True  # a fork's first entry: tool results, then its directive
-                if edits or talk:
+                if edits or talk or mode:
                     try:
                         e = json.loads(line)
                     except ValueError:
@@ -1867,7 +1910,10 @@ def scan_edits(path, rec, start=0, sessions=None):
                     if isinstance(e, dict):
                         if edits:
                             fold_edits(rec, e)
-                        fold_stats(rec["stats"], e)
+                        if edits or talk:
+                            fold_stats(rec["stats"], e)
+                        if mode:
+                            fold_mode(rec, e)
                 offset += len(line)
     except OSError:
         pass
@@ -2064,6 +2110,10 @@ class ChatCache:
                 size = counted
         else:
             size, rec = 0, new_edits()
+        if "mode" not in rec:   # (kept by an older copy of this script: its mode from what was read, once)
+            rec = json.loads(json.dumps(rec))
+            rec["mode"] = scan_mode(path, size)
+            self.changed = True
         if size < st.st_size:
             rec = json.loads(json.dumps(rec))  # a copy: the old one may be kept as is
             size = scan_edits(path, rec, size)
@@ -5419,7 +5469,9 @@ _attaching = [0.0, []]   # (when looked for, [(pid, what it attaches to)]): once
 
 def attach_clients():
     """The `claude attach` processes on this machine: [(pid, the background
-    session it shows: its id or name)], looked for once a second at most."""
+    session it shows: its id or name)], looked for once a second at most.
+    Once attached, one runs on as `claude agents`, the session it shows
+    picked in its environment (CLAUDE_AGENTS_SELECT)."""
     if time.monotonic() - _attaching[0] < 1:
         return _attaching[1]
     found = []
@@ -5437,8 +5489,23 @@ def attach_clients():
             continue
         if len(argv) >= 3 and argv[1] == b"attach":
             found.append((int(name), argv[2].decode(errors="replace")))
+        elif len(argv) >= 2 and argv[1] == b"agents":
+            picked = process_environ_value(int(name), "CLAUDE_AGENTS_SELECT")
+            if picked:
+                found.append((int(name), picked))
     _attaching[0], _attaching[1] = time.monotonic(), found
     return found
+
+
+def process_environ_value(pid, key):
+    """One variable of a process's environment (as it started), or ""."""
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as f:
+            data = f.read()
+    except OSError:
+        return ""
+    prefix = key.encode() + b"="
+    return next((e[len(prefix):].decode(errors="replace") for e in data.split(b"\0") if e.startswith(prefix)), "")
 
 
 def attached_in(job_id, name, profile):
