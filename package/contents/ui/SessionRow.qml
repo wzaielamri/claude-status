@@ -43,13 +43,17 @@ RowLayout {
     readonly property string rowKey: root.rowKeyOf(session, remoteHost)
 
     // Motion: the row is the same delegate whichever chat it shows, so when a
-    // chat moves in the list (or what's above it grows) it slides from where
+    // chat moves in the list (or a row above it grows) it slides from where
     // it was drawn last (root.rowSpots) to where it is; a chat new to the list
     // fades in. Placed once a layout has settled (Qt.callLater).
     // (a new row isn't where it goes until the layout has placed it: its first
     // move, or a moment after it's made, at the top)
     transform: Translate { id: slide }
     property bool laidOut: false
+    // Where its list starts, if it's in one (an account's): it's placed in
+    // the list then, as the VS Code extension does, so a panel unfolding
+    // above the list moves the list whole and the row doesn't slide over it
+    property Item listTop: null
     onRowKeyChanged: {
         stateLabel.widest = stateLabel.implicitWidth
         Qt.callLater(row.placed)
@@ -70,7 +74,7 @@ RowLayout {
     function placed() {
         if (!root.rowSpace || row.session.key === "" || !row.visible || !row.laidOut)
             return
-        const y = row.mapToItem(root.rowSpace, 0, 0).y
+        const y = listTop ? row.y - listTop.y : row.mapToItem(root.rowSpace, 0, 0).y
         const was = root.rowSpots[row.rowKey]
         root.rowSpots[row.rowKey] = y
         if (!root.animateRows)

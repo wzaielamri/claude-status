@@ -305,11 +305,20 @@ ColumnLayout {
     }
 
     // Sessions
+    // (where their list starts: a row slides when it moves in the list, not
+    // when what's above the list grows, its Tokens panel say: SessionRow.placed)
+    Item {
+        id: sessionsTop
+        Layout.fillWidth: true
+        Layout.preferredHeight: 0
+        Layout.bottomMargin: -section.spacing
+    }
     Repeater {
         model: section.group.sessions.length
         delegate: SessionRow {
             required property int index
             Layout.fillWidth: true
+            listTop: sessionsTop
             session: section.group.sessions[index] || root.emptySession
             showProfile: section.multiProfile
             remoteHost: section.remoteHost
