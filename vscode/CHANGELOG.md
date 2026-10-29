@@ -29,9 +29,10 @@
   and the line under its bars says *Fetching the plan usage…* until the
   numbers are in.
 - **A background session shown in a terminal says so:** beside its
-  *Background* tag in the chat tab, where `claude attach` shows it:
-  *Terminal* (its tooltip names the terminal), *Tmux* or *VS Code
-  terminal*.
+  *Background* tag, in the list and in the chat tab, where `claude attach`
+  shows it: *Terminal* (its tooltip names the terminal), *Tmux* or *VS Code
+  terminal*. Claude Code doesn't say which session an agent view switched
+  to, so it's the one the view was opened for.
 - **The chat tab's Chat tab is your messages and Claude's replies, and a
   Steps tab has the rest:** **Chat** shows only what you and Claude say
   (and what needs you: a permission, a question, a plan), with what it's

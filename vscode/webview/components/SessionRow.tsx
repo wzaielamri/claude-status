@@ -27,7 +27,7 @@ import {
   tasksTitle,
   usageLevel,
 } from "../../src/shared/model";
-import { reviewPending, shownAsk, testsText } from "../../src/shared/pane";
+import { attachedTag, reviewPending, shownAsk, testsText } from "../../src/shared/pane";
 import type { Group, Session } from "../../src/shared/types";
 import { post } from "../env";
 import { pets } from "../pets";
@@ -142,6 +142,9 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
                   : "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."
               }
             />
+          ) : null}
+          {isBackground(s) && attachedTag(s.attached) ? (
+            <Tag text={attachedTag(s.attached)!.tag} title={attachedTag(s.attached)!.title} />
           ) : null}
           {s.shared ? <Tag text={s.shared.forkOf ? "⇄ Shared copy" : "⇄ Shared"} title={sharedTagTitle(s)} /> : null}
           {agents ? (

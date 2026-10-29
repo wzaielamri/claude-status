@@ -347,6 +347,15 @@ RowLayout {
                                  ? i18n("Runs in VS Code's Claude Code panel. Click the name to open the conversation there.")
                                  : i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
                     }
+                    // a background session shown in a terminal too (claude attach)
+                    Tag {
+                        readonly property var shownIn: row.session.kind === "bg" && row.session.attached ? row.session.attached : null
+                        visible: shownIn !== null
+                        text: !shownIn ? "" : shownIn.in === "tmux" ? "Tmux"
+                              : shownIn.in === "vscode" ? i18nc("where a chat runs", "VS Code terminal") : i18nc("where a chat runs", "Terminal")
+                        tooltip: !shownIn ? "" : shownIn.app ? i18n("Shown in a terminal too (%1): claude attach.", shownIn.app)
+                                                             : i18n("Shown in a terminal too: claude attach.")
+                    }
                     Tag {
                         // Chat shared across profiles (hard-linked transcript)
                         readonly property var info: row.session.shared

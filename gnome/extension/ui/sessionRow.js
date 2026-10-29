@@ -61,6 +61,12 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
             ? "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."
             : "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."));
     }
+    // a background session shown in a terminal too (claude attach)
+    if (s.kind === 'bg' && s.attached) {
+        const where = s.attached.in === 'tmux' ? 'Tmux' : s.attached.in === 'vscode' ? 'VS Code terminal' : 'Terminal';
+        tags.push(tips.add(tag(where), s.attached.app ? L.fmt('Shown in a terminal too (%1): claude attach.', s.attached.app)
+            : 'Shown in a terminal too: claude attach.'));
+    }
     if (s.shared)
         tags.push(tips.add(tag(s.shared.forkOf ? '⇄ Shared copy' : '⇄ Shared'), () => sharedTooltip(s)));
     if (agents) {
