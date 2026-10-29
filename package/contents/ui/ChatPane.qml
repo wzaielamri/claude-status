@@ -1851,7 +1851,7 @@ Window {
                         onClicked: pane.cancelDictation()
                     }
                     PlasmaComponents3.ToolButton {
-                        icon.name: "list-add"
+                        icon.name: "mail-attachment"
                         text: i18n("Attach files…")
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         onClicked: root.pickFiles(pane.host, "pane", pane.row ? pane.row.cwd || "" : pane.chat.cwd || "")
@@ -1865,7 +1865,7 @@ Window {
                         }
                     }
                     PlasmaComponents3.ToolButton {
-                        icon.name: "spectacle"
+                        icon.name: "camera-photo"
                         text: i18n("Screenshot…")
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         onClicked: root.takeScreenshot(pane.host, "pane")

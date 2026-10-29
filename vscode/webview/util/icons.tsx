@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "add" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder";
+export type IconName = "refresh" | "add" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -74,6 +74,19 @@ const shapes: Record<IconName, JSX.Element> = {
   chart: <path d="M2.5 13.5h11M4.5 11V8M8 11V3.5M11.5 11V6" />,
   shield: <path d="M8 1.75l5 2v4c0 3.1-2.15 5.35-5 6.5-2.85-1.15-5-3.4-5-6.5v-4z" />,
   folder: <path d="M2 4c0-.55.45-1 1-1h3.5l1.5 1.75h5c.55 0 1 .45 1 1V12c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1z" />,
+  mic: (
+    <>
+      <rect x="6" y="1.75" width="4" height="7.5" rx="2" />
+      <path d="M3.75 7.5a4.25 4.25 0 0 0 8.5 0M8 11.75v2.5M5.75 14.25h4.5" />
+    </>
+  ),
+  attach: <path d="M11.25 5v5.75a3.25 3.25 0 0 1-6.5 0V4.5a2.25 2.25 0 0 1 4.5 0v5.75a1.125 1.125 0 0 1-2.25 0V6" transform="rotate(45 8 8.1)" />,
+  camera: (
+    <>
+      <path d="M1.75 5.5c0-.7.55-1.25 1.25-1.25h2l1.25-1.75h3.5l1.25 1.75h2c.7 0 1.25.55 1.25 1.25v6.25c0 .7-.55 1.25-1.25 1.25H3c-.7 0-1.25-.55-1.25-1.25z" />
+      <circle cx="8" cy="8.5" r="2.5" />
+    </>
+  ),
   external: (
     <>
       <path d="M9.5 2.5h4v4M13.5 2.5L8 8" />

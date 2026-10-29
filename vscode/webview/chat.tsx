@@ -10,7 +10,9 @@ import { droppedPaths, fileMention, picturesIn, PICTURE_TYPES, routeHint, shownA
 import { AskBox, askKey } from "./components/AskBox";
 import { Diff, Listing, TermScreen, ToolDetail } from "./components/CodeView";
 import type { Answers, Decision } from "../src/shared/types";
+import { IconButton } from "./components/IconButton";
 import { Tag } from "./components/Tag";
+import { Icon } from "./util/icons";
 import { Markdown } from "./util/markdown";
 
 declare global {
@@ -258,6 +260,10 @@ function ChatApp() {
     pendingAt(id);
     post({ type: "screenshot", id });
   };
+  const micText = dictating === "recording" ? `Stop: write it down · ${Math.max(1, Math.round((Date.now() - recordedAt) / 1000))}s`
+    : dictating === "starting" ? "Starting the microphone…"
+    : dictating === "writing" ? "Writing it down…" : dictating === "model" ? "Downloading the speech model…"
+    : dictating === "setup" ? "Setting up dictation (a few minutes)…" : "Dictate";
   const savePicture = (p: { id: string; mime: string; data: string; url: string; at: number }) => {
     pending.current[p.id] = { at: p.at, url: p.url };
     setSaving((n) => n + 1);
@@ -700,30 +706,26 @@ function ChatApp() {
           ) : null}
           <div class="pane-hint">{chat ? routeHint(chat.route, chat.state !== "done" || !!chat.busy, "", chat.host) : ""}</div>
           <div class="pane-buttons">
-            <button type="button" class={"btn secondary pane-mic" + (dictating === "recording" ? " on" : "")}
+            {/* (icons, as in the widget; what dictation is doing shows beside the microphone) */}
+            <button type="button" class={"icon-btn pane-mic" + (dictating === "recording" ? " on" : "")}
               disabled={dictating === "starting" || dictating === "writing" || dictating === "model" || dictating === "setup"}
               title="Dictate: say your reply, click again to stop, and it's written down where you're typing. On this computer only (whisper): what you say doesn't leave it. The speech model: Talpy Den: Dictation Models."
+              aria-label={micText}
               onClick={() => {
                 if (dictating === "") setDictating("starting"); // (until it records, or says why not: no second recorder)
                 post({ type: "dictate", action: "toggle" });
               }}>
-              {dictating === "recording" ? `■ Stop: write it down · ${Math.max(1, Math.round((Date.now() - recordedAt) / 1000))}s`
-                : dictating === "starting" ? "Starting the microphone…"
-                : dictating === "writing" ? "Writing it down…" : dictating === "model" ? "Downloading the speech model…"
-                : dictating === "setup" ? "Setting up dictation (a few minutes)…" : "Dictate"}
+              <Icon name={dictating === "recording" ? "stop" : "mic"} />
+              {dictating === "" || dictating === "starting" ? null : <span>{micText}</span>}
             </button>
             {dictating === "recording" ? (
-              <button type="button" class="btn secondary" title="Stop, don't write it down" onClick={() => post({ type: "dictate", action: "cancel" })}>×</button>
+              <IconButton icon="close" label="Stop, don't write it down" onClick={() => post({ type: "dictate", action: "cancel" })} />
             ) : null}
-            <button type="button" class="btn secondary pane-attach"
+            <IconButton icon="attach" class="pane-attach" label="Attach files…"
               title={chat?.host ? `Attach pictures (copied to ${chat.host})` : "Attach files: a picture goes in as one, another file is named for Claude to read. You can drop them on the tab too (hold Shift from the Explorer)."}
-              onClick={() => post({ type: "pickFiles" })}>
-              +
-            </button>
-            <button type="button" class="btn secondary pane-shot" title="Screenshot: pick a region of the screen, its picture goes in your reply"
-              onClick={screenshot}>
-              Screenshot…
-            </button>
+              onClick={() => post({ type: "pickFiles" })} />
+            <IconButton icon="camera" class="pane-shot" label="Screenshot…" title="Screenshot: pick a region of the screen, its picture goes in your reply"
+              onClick={screenshot} />
             {terminal ? (
               <button type="button" class="btn secondary" disabled={!text.trim() || sending} onClick={() => send("copy", false)}>
                 Copy and open its terminal

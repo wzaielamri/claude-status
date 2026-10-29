@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The chat tab's reply row as in the widget:** the microphone,
+  attaching files and the screenshot are icons now, a paperclip and a
+  camera for the two that were the text buttons *+* and *Screenshot…*;
+  while dictation records or writes it down, what it's doing shows beside
+  the microphone.
 - **A pet you hold swings as in the widget, and lands upright:** one you
   held and swung kept swinging like a pendulum for seconds, its springs
   only roughly the widget's; they're stepped as Qt steps the widget's now

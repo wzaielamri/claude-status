@@ -3192,6 +3192,7 @@ body.vscode-high-contrast-light .pane {
 .pane-buttons {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 6px;
 }
@@ -3423,7 +3424,11 @@ body.vscode-high-contrast-light .pane {
 
 .pane-mic.on {
   color: var(--vscode-errorForeground, #f85149);
-  border-color: var(--vscode-errorForeground, #f85149);
+  background: color-mix(in srgb, var(--vscode-errorForeground, #f85149) 15%, transparent);
+}
+
+.pane-mic span {
+  padding-right: 3px;
 }
 
 /* What the reply box offers as you type (chat.tsx): / commands, @ files */
