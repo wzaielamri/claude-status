@@ -20,7 +20,7 @@ import { Films } from "../../vendor/talpy/films.mjs";
 import { BOX, LILAC, Talpy, calmColors, drawHole, drawHoleSide } from "../../vendor/talpy/talpy.mjs";
 import type { StageChat } from "./api";
 import { PALETTE, textOn } from "./colors";
-import { Timer, Tween, ease, reducedMotion } from "./motion";
+import { Spring, Timer, Tween, ease, reducedMotion } from "./motion";
 import type { Stage } from "./stage";
 
 // Kirigami's small and large spacing at gridUnit 16
@@ -102,12 +102,11 @@ export class Pet {
   private readonly canvases: HTMLCanvasElement[] = [];
   private readonly holes: HTMLCanvasElement[] = [];
   // Where it's drawn: at px, but while you hold it it trails your hand on a
-  // spring and swings with how fast you move it (and wobbles back after)
-  private shownX: number;
-  private shownV = 0;
-  private swing = 0;
-  private swingV = 0;
-  private lastStep = 0;
+  // spring and swings with how fast you move it (and wobbles back after), the
+  // widget's SpringAnimations; on the ground it stands upright at once (where
+  // it digs in, its burrow doesn't swing)
+  private readonly shown: Spring;
+  private readonly tilt = new Spring(3, 0.16, 0.3);
   // The hole it was pulled out of: empty where it was while you hold it, under
   // the pet (the hole doesn't come along), filled in once the pet has landed
   private readonly leftHole: HTMLCanvasElement;
@@ -140,7 +139,7 @@ export class Pet {
     this.colorIndex = colorIndex;
     this.homeX = homeX;
     this.px = homeX;
-    this.shownX = homeX;
+    this.shown = new Spring(5, 0.32, 0.2, homeX);
     if (chat) this.takeChat(chat);
 
     const clock = stage.clock;
@@ -622,9 +621,9 @@ export class Pet {
     const now = s.clock.now();
     this.spring(now);
     const px = Math.round(this.px * 10) / 10,
-      shown = Math.round(this.shownX * 10) / 10,
+      shown = Math.round(this.shown.value * 10) / 10,
       lift = Math.round(this.lift * 10) / 10,
-      swing = Math.round(this.swing * 10) / 10;
+      swing = this.held ? Math.round(this.tilt.value * 10) / 10 : 0;
     this.put(this.sheets, "origin", "transformOrigin", `${s.canvasW / 2}px ${s.floorY - (box * 27) / 64}px`);
     this.put(this.sheets, "sheets", "transform",
       `translate(${shown - s.canvasW / 2}px, ${ground - lift - s.floorY}px)${swing ? ` rotate(${swing}deg)` : ""}`);
@@ -645,31 +644,30 @@ export class Pet {
     this.draw(now);
   }
 
-  // A damped spring for where it's drawn and how it swings while you hold it
-  // (a QML SpringAnimation in the widget); at rest it's simply where it is
+  // Where it's drawn and how it swings while you hold it, the widget's
+  // Behaviors with a SpringAnimation, in Qt's order: a new place from your
+  // hand comes between frames, so the swing takes its step first, then where
+  // it's drawn; while that spring alone moves it on (your hand holds still),
+  // the swing's target changes in each frame and it waits until that has
+  // settled. Not held, it's simply where it is.
   private spring(now: number): void {
-    const dt = Math.min(0.05, Math.max(0, (now - (this.lastStep || now)) / 1000));
-    this.lastStep = now;
-    const unit = this.stage.box / 64;
-    const moving = this.held || Math.abs(this.shownV) > 0.5 || Math.abs(this.px - this.shownX) > 0.2
-      || Math.abs(this.swing) > 0.2 || Math.abs(this.swingV) > 0.5;
-    if (!moving || reducedMotion()) {
-      this.shownX = this.px;
-      this.shownV = this.swing = this.swingV = 0;
-      return;
-    }
-    // (stiffness and damping per second, about the widget's spring 5 / damping 0.32 and 3 / 0.16)
-    if (this.held) {
-      this.shownV += (140 * (this.px - this.shownX) - 8.3 * this.shownV) * dt;
-      this.shownX += this.shownV * dt;
+    const shown = this.shown,
+      tilt = this.tilt;
+    if (!this.held || reducedMotion()) {
+      shown.set(this.px);
+      if (reducedMotion()) tilt.set(0);
+      else tilt.aim(0, now); // (shown only while held: render())
+      tilt.step(now);
     } else {
-      this.shownX = this.px;
-      this.shownV = 0;
+      const unit = this.stage.box / 64;
+      const swing = () => Math.max(-30, Math.min(30, ((this.px - shown.value) * 1.8) / unit));
+      const moved = shown.aim(this.px, now - 16); // (since the last frame: a step in this one)
+      if (moved) tilt.aim(swing(), now - 16);
+      if (moved || !shown.moving) tilt.step(now);
+      shown.step(now);
+      if (tilt.aim(swing(), now)) tilt.wait(now);
     }
-    const target = this.held ? Math.max(-30, Math.min(30, ((this.px - this.shownX) * 1.8) / unit)) : 0;
-    this.swingV += (90 * (target - this.swing) - 3 * this.swingV) * dt;
-    this.swing += this.swingV * dt;
-    this.stage.invalidate();
+    if (shown.moving || tilt.moving) this.stage.invalidate();
   }
 
   // As a film (vendor/talpy/films.mjs): a picture of a move drawn once and

@@ -73,6 +73,12 @@ Item {
         SpringAnimation { spring: 5; damping: 0.32; epsilon: 0.2 }
     }
     readonly property real swing: held ? Math.max(-30, Math.min(30, (px - shownX) * 1.8 / unit)) : 0
+    // (on a spring, shown only while you hold it: on the ground it stands
+    // upright at once, so where it digs in its burrow doesn't swing)
+    property real tilt: swing
+    Behavior on tilt {
+        SpringAnimation { spring: 3; damping: 0.16; epsilon: 0.3 }
+    }
     property bool held: false
     property bool landing: false        // picked up, until it has landed and dug in: drawn live
     property bool arriving: false
@@ -457,10 +463,7 @@ Item {
         transform: Rotation {
             origin.x: view.boxX + pet.box / 2
             origin.y: view.boxY + pet.box * 30 / 64   // (where you hold it)
-            angle: pet.swing
-            Behavior on angle {
-                SpringAnimation { spring: 3; damping: 0.16; epsilon: 0.3 }
-            }
+            angle: pet.held ? pet.tilt : 0
         }
         playing: pet.playing
         travels: pet.lone

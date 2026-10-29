@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **A pet you hold swings as in the widget, and lands upright:** one you
+  held and swung kept swinging like a pendulum for seconds, its springs
+  only roughly the widget's; they're stepped as Qt steps the widget's now
+  (16 ms at a time, in the same order), so it swings and settles as in
+  Plasma. Put down still swinging, it swung on as it dug in, its burrow
+  with it: it stands upright once it lands now.
 - **Plan usage keeps up with chats in Claude's VS Code panel:** the panel
   runs no status line, and Claude Code updates its own copy of the usage
   only when `/usage` runs, so an account used only there showed the same

@@ -173,3 +173,62 @@ export class Tween {
     this.done?.();
   }
 }
+
+// A QML SpringAnimation (mass 1) in a Behavior, stepped as Qt steps it
+// (qquickspringanimation.cpp): whole 16 ms steps, each one
+// velocity += spring × distance − damping × velocity, then value += velocity
+// × 16 ms, the time left over kept for the next; at rest once the distance
+// and the speed (per second) are both under epsilon, and then exactly there.
+// A new target keeps where it is and how fast it goes.
+export class Spring {
+  value: number;
+  private to: number;
+  private velocity = 0;
+  private last = -1; // clock time its steps have reached; -1 at rest
+
+  constructor(
+    private readonly spring: number,
+    private readonly damping: number,
+    private readonly epsilon: number,
+    value = 0,
+  ) {
+    this.value = this.to = value;
+  }
+
+  get moving(): boolean {
+    return this.last >= 0;
+  }
+
+  // True if that's a new target
+  aim(to: number, now: number): boolean {
+    if (to === this.to) return false;
+    this.to = to;
+    if (this.last < 0) this.last = now;
+    return true;
+  }
+
+  // Its 16 ms start over from now (Qt restarts a SpringAnimation whose target
+  // changes as it draws a frame: then it takes no step in that frame)
+  wait(now: number): void {
+    if (this.last >= 0) this.last = now;
+  }
+
+  // There at once, at rest (the Behavior switched off)
+  set(value: number): void {
+    this.value = this.to = value;
+    this.velocity = 0;
+    this.last = -1;
+  }
+
+  step(now: number): void {
+    if (this.last < 0) return;
+    const count = Math.floor((now - this.last) / 16);
+    if (count < 1) return; // (Qt's "capped at 62fps")
+    this.last += count * 16;
+    for (let i = 0; i < count; i++) {
+      this.velocity += this.spring * (this.to - this.value) - this.damping * this.velocity;
+      this.value += (this.velocity * 16) / 1000;
+    }
+    if (Math.abs(this.velocity) < this.epsilon && Math.abs(this.to - this.value) < this.epsilon) this.set(this.to);
+  }
+}

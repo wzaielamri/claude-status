@@ -21,7 +21,7 @@ function bundle(): string {
     bundled = buildSync({
       stdin: {
         contents: 'export { Stage, setDarkAll } from "./webview/pets/stage";\nexport { petFields, stageCallbacks } from "./webview/util/petStage";\n' +
-          'export { ACTIONS, MOODS } from "./vendor/talpy/actions.mjs";\n',
+          'export { ACTIONS, MOODS } from "./vendor/talpy/actions.mjs";\nexport { Spring } from "./webview/pets/motion";\n',
         resolveDir: repo,
         loader: "ts",
       },
@@ -152,7 +152,7 @@ function load() {
   return {
     Stage: exports.Stage as Any, petFields: exports.petFields as Any, ACTIONS: exports.ACTIONS as Any,
     MOODS: exports.MOODS as Any, stageCallbacks: exports.stageCallbacks as Any, resize, intersect, frames, posted,
-    setDarkAll: exports.setDarkAll as Any, css,
+    setDarkAll: exports.setDarkAll as Any, css, Spring: exports.Spring as Any,
   };
 }
 
@@ -410,7 +410,37 @@ test("while you hold a pet nothing moves it", () => {
   stage.destroy();
 });
 
-test("a pet you hold trails your hand on a spring and swings, then wobbles back", () => {
+test("a spring steps as Qt's SpringAnimation does, as the widget's swing (values from Qt 6.11)", () => {
+  const { Spring } = load();
+  const swing = new Spring(3, 0.16, 0.3);
+  swing.aim(30, 1000);
+  swing.step(1015);
+  assert.equal(swing.value, 0, "a step before 16 ms");
+  const seen: number[] = [];
+  for (let t = 1016; swing.moving; t += 16) {
+    swing.step(t);
+    seen.push(swing.value);
+  }
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  assert.ok(near(seen[0], 1.44) && near(seen[1], 4.02048) && near(seen[3], 11.38649628672), String(seen.slice(0, 4)));
+  assert.ok(near(Math.max(...seen), 38.27449633860427), "its overshoot");
+  assert.ok(near(seen[57], 29.83079908030854));
+  assert.equal(seen.length, 59, "at rest after 944 ms");
+  assert.equal(swing.value, 30, "exactly there");
+  // (the time left over is kept for the next step; a new target keeps its speed)
+  const shown = new Spring(5, 0.32, 0.2);
+  shown.aim(10, 0);
+  shown.step(40);
+  const twice = shown.value;
+  shown.step(48);
+  assert.ok(shown.value > twice, "the 8 ms left over and 8 more make a step");
+  shown.aim(-10, 50);
+  shown.step(64);
+  assert.ok(shown.value > twice, "a new target stopped it");
+});
+
+// A chat's pet on a stage in view, up out of the ground, and a frame every 16 ms
+function framed() {
   const s = account();
   s.give([chat("p/1")]);
   s.lay();
@@ -420,23 +450,78 @@ test("a pet you hold trails your hand on a spring and swings, then wobbles back"
   const clock = s.stage.clock as Any;
   const frame = () => {
     clock.base += 16;
+    pet.faller.step(clock.base);
     pet.render();
   };
+  const angle = () => Number(/rotate\((-?[\d.]+)deg\)/.exec(String(pet.sheets.style.transform))?.[1] ?? 0);
   frame();
+  return { ...s, pet, frame, angle };
+}
+
+// The widget's pet in Qt 6.11, pulled right 4 units a frame for 37 frames, then
+// held still: drawn 0.32 and swung 0.35° after the first frame, 1.15 and 1.28°
+// after the second; swung to 37.7°, waited at 28.2° until it was drawn where
+// the hand is, back to −7.7°, then 2.1°, and at rest 1.49 s after the hand stopped
+test("a pet you hold trails your hand on a spring and swings, then wobbles back as in the widget", () => {
+  const { stage, pet, frame, angle } = framed();
+  const unit = stage.box / 64;
   pet.pickUp();
   const from = pet.px;
-  pet.px = from + s.stage.gu * 8; // a quick pull to the right
-  frame();
-  assert.ok(pet.shownX < pet.px && pet.shownX >= from, "it's drawn where your hand is at once");
-  assert.ok(pet.swing > 0, "it doesn't swing");
-  for (let i = 0; i < 120; i++) frame();
-  assert.ok(Math.abs(pet.shownX - pet.px) < 1, "it never catches up");
+  let most = 0;
+  for (let i = 1; i <= 37; i++) {
+    pet.px = from + 4 * unit * i;
+    frame();
+    if (i <= 2) {
+      assert.ok(Math.abs((pet.shown.value - from) / unit - [0.32, 1.15][i - 1]) < 0.01, `drawn at ${(pet.shown.value - from) / unit}`);
+      assert.equal(angle(), [0.3, 1.3][i - 1]); // (to 0.1°)
+    }
+    most = Math.max(most, angle());
+  }
+  let back = 0,
+    wait = 0,
+    ms = 0;
+  for (; ms < 3000 && (pet.shown.moving || pet.tilt.moving); ms += 16) {
+    const was = angle();
+    frame();
+    if (angle() === was && pet.shown.moving) wait = was;
+    most = Math.max(most, angle());
+    back = Math.min(back, angle());
+  }
+  assert.equal(pet.shown.value, pet.px, "it never catches up");
+  assert.equal(angle(), 0, "it keeps swinging");
+  assert.ok(most > 37 && most < 38.3, `it swung to ${most}°`);
+  assert.ok(wait > 27 && wait < 29, `it waited at ${wait}°`);
+  assert.ok(back > -8.3 && back < -7, `it swung back to ${back}°`);
+  assert.ok(ms > 1300 && ms < 1650, `at rest ${ms} ms after the hand stopped`);
   pet.drop();
-  pet.faller.step(1e15);
-  for (let i = 0; i < 200; i++) frame();
-  assert.equal(pet.swing, 0, "it keeps swinging");
-  assert.equal(pet.shownX, pet.px);
-  s.stage.destroy();
+  for (let i = 0; i < 20; i++) frame();
+  assert.equal(pet.held, false);
+  assert.equal(angle(), 0);
+  assert.equal(pet.shown.value, pet.px);
+  stage.destroy();
+});
+
+test("a pet put down swinging stands upright once it has landed: its burrow doesn't swing", () => {
+  const { stage, pet, frame, angle } = framed();
+  pet.pickUp();
+  for (let i = 0; i < 12; i++) {
+    pet.px += stage.gu * 2; // a fast pull to the right
+    frame();
+  }
+  assert.ok(angle() > 20, `it swings ${angle()}°`);
+  pet.drop(); // let go at once: it falls, still swinging
+  frame();
+  assert.ok(angle() !== 0, "it stopped swinging as it fell");
+  let ms = 16;
+  for (; pet.held; ms += 16) frame();
+  assert.ok(ms <= 500, `it landed after ${ms} ms`);
+  assert.equal(angle(), 0, "upright as it lands");
+  assert.ok(pet.tilt.moving, "(its spring hasn't settled yet)");
+  for (let i = 0; i < 100; i++) {
+    frame();
+    assert.equal(angle(), 0, "it swings on the ground");
+  }
+  stage.destroy();
 });
 
 test("the open hole is drawn once and copied into each picture", () => {
