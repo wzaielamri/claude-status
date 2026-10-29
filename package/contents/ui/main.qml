@@ -2836,23 +2836,19 @@ PlasmoidItem {
         id: paneLoader
         active: root.paneChat !== null
         source: "ChatPane.qml"
-        onLoaded: {
-            // (at the size it'll have beside the popup from the start: KWin only moves it there)
-            const geometry = root.paneGeometry(item)
-            if (geometry) {
-                item.width = geometry[2]
-                item.height = geometry[3]
-            }
-            item.visible = true
-            paneTimer.restart()
-        }
+        onLoaded: root.placePane()
     }
 
-    // Beside the popup, on the side with more room (KWin moves it: jump.py --place-window)
+    // Beside the popup, on the side with more room: KWin puts it there as it
+    // appears (jump.py --place-window, asked before it's shown: else it shows
+    // where KWin puts new windows first, then jumps). Shown when KWin is ready,
+    // or after a second if it doesn't answer.
+    property string paneAsk: ""   // (the --place-window command it waits for)
+    property var paneGrow: [true, 0]   // (where it grows out of: win.grow)
     Timer {
         id: paneTimer
-        interval: 300
-        onTriggered: root.placePane()
+        interval: 1000
+        onTriggered: root.showPane()
     }
 
     // (then it grows out of its chat's row: from the side the popup is on, at
@@ -2879,23 +2875,42 @@ PlasmoidItem {
         const item = root.fullRepresentationItem
         const geometry = paneGeometry(win)
         if (!geometry) {
-            if (win)
-                win.grow(true, win.height / 2)
+            paneGrow = [true, win.height / 2]
+            showPane()
             return
         }
+        // (at the size it'll have beside the popup from the start: KWin only moves it there)
+        win.width = geometry[2]
+        win.height = geometry[3]
         const p = item.mapToGlobal(0, 0)
-        placer.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --place-window " + shellQuote(win.title)
-                             + " " + geometry.join(",") + " # " + Date.now())
         const chat = root.paneChat || {}
         const spot = root.rowSpots[root.rowKeyOf(chat, chat.host)]
         const fromY = spot !== undefined && root.rowSpace ? root.rowSpace.mapToGlobal(0, spot).y + Kirigami.Units.gridUnit
                                                           : p.y + item.height / 2
-        win.grow(geometry[0] > p.x, fromY - geometry[1])
+        paneGrow = [geometry[0] > p.x, fromY - geometry[1]]
+        paneAsk = "python3 -I " + shellQuote(codeDir + "jump.py") + " --place-window " + shellQuote(win.title)
+                  + " " + geometry.join(",") + " # " + Date.now()
+        placer.connectSource(paneAsk)
+        paneTimer.restart()
+    }
+
+    function showPane() {
+        const win = paneLoader.item
+        paneTimer.stop()
+        paneAsk = ""
+        if (win && !win.visible) {
+            win.visible = true
+            win.grow(paneGrow[0], paneGrow[1])
+        }
     }
 
     Exec {
         id: placer
-        onNewData: (source, data) => disconnectSource(source)
+        onNewData: (source, data) => {
+            disconnectSource(source)
+            if (source === root.paneAsk)
+                root.showPane()
+        }
     }
 
     // Finished, changed files, and not marked reviewed since (pane.py

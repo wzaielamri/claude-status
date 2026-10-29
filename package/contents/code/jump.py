@@ -105,16 +105,55 @@ if (best) {
 """
 
 # The chat pane's window (ChatPane.qml), put beside the widget's popup: a
-# window can't place itself on Wayland, KWin can
+# window can't place itself on Wayland, KWin can. The pane asks before it
+# shows the window, and KWin puts it there as it appears (else it would show
+# where KWin puts new windows first, then jump); one that's open moves now.
+# A new size takes the window a moment to draw, and KWin moves it only with
+# it: a window that's just appearing is hidden till then (at most half a
+# second), so it's only seen in place. (A window that never comes isn't
+# waited for after 5 s; the next pane's script replaces this one.)
 KWIN_PLACE_SCRIPT = """\
 const want = %s;
-for (const w of workspace.windowList()) {
-    if (w.normalWindow && want.pids.indexOf(w.pid) >= 0 && w.caption.indexOf(want.caption) === 0) {
-        w.frameGeometry = {x: want.x, y: want.y, width: want.width, height: want.height};
-        break;
+let hidden = null, timer = null;
+function fits(w) {
+    return w.normalWindow && want.pids.indexOf(w.pid) >= 0 && w.caption.indexOf(want.caption) === 0;
+}
+function shown() {
+    if (hidden) {
+        hidden.window.frameGeometryChanged.disconnect(shown);
+        hidden.window.opacity = hidden.opacity;
+        hidden = null;
     }
 }
+function place(w, appearing) {
+    const to = {x: want.x, y: want.y, width: want.width, height: want.height};
+    const now = w.frameGeometry;
+    if (appearing && (now.width !== to.width || now.height !== to.height) && typeof QTimer === "function") {
+        hidden = {window: w, opacity: w.opacity};
+        w.opacity = 0;
+        w.frameGeometryChanged.connect(shown);
+        timer = new QTimer();
+        timer.singleShot = true;
+        timer.interval = 500;
+        timer.timeout.connect(shown);
+        timer.start();
+    }
+    w.frameGeometry = to;
+}
+function added(w) {
+    if (fits(w)) {
+        workspace.windowAdded.disconnect(added);
+        if (Date.now() - want.at < 5000)
+            place(w, true);
+    }
+}
+const open = workspace.windowList().filter(fits);
+if (open.length)
+    place(open[0], false);
+else
+    workspace.windowAdded.connect(added);
 """
+KWIN_PLACE_NAME = "talpy-den-place"
 
 
 # ---------------------------------------------------------------- helpers
@@ -197,9 +236,22 @@ def raise_window(pids, caption="", require=False, prefer=""):
 def place_window(caption, x, y, width, height):
     """Put the window whose title starts with caption, of the program that
     runs this (plasmashell), at x, y (width × height): KWin does it (the chat
-    pane beside the popup)."""
-    want = {"pids": ancestors(os.getppid()), "caption": caption, "x": x, "y": y, "width": width, "height": height}
-    return raise_window_kwin(want, KWIN_PLACE_SCRIPT)
+    pane beside the popup). One that isn't there yet is put there as it
+    appears: the script stays loaded, waiting for it (KWIN_PLACE_SCRIPT)."""
+    want = {"pids": ancestors(os.getppid()), "caption": caption, "x": x, "y": y, "width": width, "height": height,
+            "at": int(time.time() * 1000)}
+    fd, path = tempfile.mkstemp(prefix="talpy-den-", suffix=".js")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(KWIN_PLACE_SCRIPT % json.dumps(want))
+        dbus_call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", KWIN_PLACE_NAME)
+        script_id = dbus_call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", path, KWIN_PLACE_NAME)
+        if not isinstance(script_id, int) or script_id < 0:
+            return False
+        # (KWin answers once the script has run: the window can be shown then)
+        return dbus_call("org.kde.KWin", f"/Scripting/Script{script_id}", "org.kde.kwin.Script.run") is not None
+    finally:
+        os.unlink(path)
 
 
 def raise_window_kwin(want, script=KWIN_SCRIPT):

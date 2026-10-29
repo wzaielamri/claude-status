@@ -228,6 +228,115 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(jump.raise_hint(), "is KWin scripting available?")
 
 
+class PlaceWindowTests(unittest.TestCase):
+    """The chat pane's window beside the popup: KWin puts it there as it appears."""
+
+    def test_the_script_stays_loaded_for_the_window_to_come(self):
+        calls, scripts = [], []
+
+        def dbus(dest, path, method, *args):
+            calls.append((path, method.rsplit(".", 1)[1]) + args)
+            if method.endswith(".loadScript"):
+                scripts.append(Path(args[0]).read_text())
+                return 3
+            return ()   # (gdbus's "()")
+        with Patch(dbus_call=dbus):
+            self.assertTrue(jump.place_window("Fix — Talpy Chat", 10, 20, 600, 700))
+        path = calls[1][2]
+        self.assertEqual(calls, [("/Scripting", "unloadScript", "talpy-den-place"),   # (the last pane's)
+                                 ("/Scripting", "loadScript", path, "talpy-den-place"),
+                                 ("/Scripting/Script3", "run")])
+        self.assertFalse(Path(path).exists())
+        want = json.loads(scripts[0].split("\n", 1)[0][len("const want = "):-1])
+        self.assertEqual({k: want[k] for k in ("caption", "x", "y", "width", "height")},
+                         {"caption": "Fix — Talpy Chat", "x": 10, "y": 20, "width": 600, "height": 700})
+        self.assertLessEqual(abs(want["at"] - time.time() * 1000), 5000)
+
+    def test_without_kwin_scripting(self):
+        for loaded in (None, -1):
+            with Patch(dbus_call=lambda dest, path, method, *args: loaded if method.endswith(".loadScript") else ()):
+                self.assertFalse(jump.place_window("Fix — Talpy Chat", 0, 0, 1, 1))
+
+    @unittest.skipUnless(shutil.which("node"), "node isn't installed")
+    def test_where_and_when_kwin_puts_it(self):
+        """KWIN_PLACE_SCRIPT run by node, with a stand-in for KWin's workspace and windows."""
+        want = {"pids": [5, 1], "caption": "Fix — Talpy Chat", "x": 900, "y": 100, "width": 500, "height": 700,
+                "at": 1000}
+        code = """
+function Signal() {
+    const fns = [];
+    return {connect: f => fns.push(f), disconnect: f => { if (fns.indexOf(f) >= 0) fns.splice(fns.indexOf(f), 1); },
+            emit: w => fns.slice().forEach(f => f(w)), get count() { return fns.length; }};
+}
+// A window KWin moves only once it's drawn at its new size (drawn())
+function Win(caption, pid, size, opacity) {
+    let g = {x: 1, y: 2, width: size[0], height: size[1]};
+    const w = {caption: caption, pid: pid, normalWindow: true, opacity: opacity === undefined ? 1 : opacity,
+               frameGeometryChanged: Signal(), asked: null};
+    Object.defineProperty(w, "frameGeometry", {get: () => g, set: v => { w.asked = v; }});
+    w.drawn = () => { g = w.asked; w.frameGeometryChanged.emit(); };
+    return w;
+}
+let timers = [];
+function QTimer() { this.timeout = Signal(); timers.push(this); }
+QTimer.prototype.start = function () { this.started = true; };
+function run(windows, now) {
+    const workspace = {windowList: () => windows, windowAdded: Signal()};
+    timers = [];
+    new Function("workspace", "QTimer", "Date", SCRIPT)(workspace, QTimer, {now: () => now || 2000});
+    return workspace;
+}
+const at = w => w.asked && [w.asked.x, w.asked.y, w.asked.width, w.asked.height];
+const out = {};
+
+const other = Win("Fix — Talpy Chat", 77, [500, 700]), open = Win("Fix — Talpy Chat <2>", 5, [400, 300]);
+let ws = run([other, open]);
+out.open = [at(open), open.opacity, at(other), ws.windowAdded.count];
+
+const elsewhere = Win("Fix — Talpy Chat", 77, [400, 300]), coming = Win("Fix — Talpy Chat", 5, [500, 728]);
+ws = run([]);
+ws.windowAdded.emit(elsewhere);
+out.notMine = [at(elsewhere), ws.windowAdded.count];
+ws.windowAdded.emit(coming);
+out.hidden = [at(coming), coming.opacity, ws.windowAdded.count, !!timers[0].started, timers[0].interval];
+coming.drawn();
+out.drawn = [coming.opacity, coming.frameGeometryChanged.count];
+
+const slow = Win("Fix — Talpy Chat", 5, [500, 728], 0.9);
+ws = run([]);
+ws.windowAdded.emit(slow);
+timers[0].timeout.emit();
+out.timer = [slow.opacity, slow.frameGeometryChanged.count];
+
+const sized = Win("Fix — Talpy Chat", 1, [500, 700]);
+ws = run([]);
+ws.windowAdded.emit(sized);
+out.sized = [at(sized), sized.opacity, timers.length];
+
+const late = Win("Fix — Talpy Chat", 5, [500, 728]);
+ws = run([], 6000);
+ws.windowAdded.emit(late);
+out.late = [at(late), late.opacity, ws.windowAdded.count];
+process.stdout.write(JSON.stringify(out));
+"""
+        script = jump.KWIN_PLACE_SCRIPT % json.dumps(want)
+        node = subprocess.run(["node", "-e", f"const SCRIPT = {json.dumps(script)};\n" + code],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(node.returncode, 0, node.stderr)
+        out = json.loads(node.stdout)
+        target = [900, 100, 500, 700]
+        # open already: moved now, as it is (a window that shows isn't hidden)
+        self.assertEqual(out["open"], [target, 1, None, 0])
+        # not there yet: waited for; another program's window isn't it
+        self.assertEqual(out["notMine"], [None, 1])
+        # it appears: hidden till it's drawn at its new size, then as it was
+        self.assertEqual(out["hidden"], [target, 0, 0, True, 500])
+        self.assertEqual(out["drawn"], [1, 0])
+        self.assertEqual(out["timer"], [0.9, 0])   # (never drawn: shown after half a second anyway)
+        self.assertEqual(out["sized"], [target, 1, 0])   # (its size already: only moved)
+        self.assertEqual(out["late"], [None, 1, 0])   # (5 s on, the window isn't the one asked about)
+
+
 class SmallJumpTests(unittest.TestCase):
     def test_remote_folder_address(self):
         self.assertEqual(jump.remote_folder_uri("lab", "/home/u/C# tools?"), "vscode-remote://ssh-remote+lab/home/u/C%23%20tools%3F")
