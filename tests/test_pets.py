@@ -713,21 +713,138 @@ console.log(JSON.stringify(out));""")
                 self.assertNotRegex(path.read_text(errors="ignore"), r"(?i)clawd", str(path.relative_to(repo)))
 
 
+class TugTests(unittest.TestCase):
+    """Pulled at in its burrow, Talpy hangs on to the rim for a moment."""
+
+    def test_pulled_at_in_its_burrow_it_hangs_on_then_comes_out(self):
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({ brain: false });
+let now = 1000;
+t.tick(now);
+const run = (ms, until) => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); t.draw(ctx); if (until && until()) break; } };
+run(600);
+let out = null;
+const began = t.tug(ok => { out = [ok, now]; });
+const at = now;
+run(300);
+const hanging = { tugging: t.tugging, busy: t.busy, depth: t.st.depth, arms: t.st.arms, body: t.st.body };
+let reacted = null;
+t.react('wave', ok => { reacted = ok; });
+run(2000, () => out !== null);
+const open = t.setHeld(true);
+console.log(JSON.stringify({ began, hanging, reacted, ok: out[0], ms: out[1] - at, tugging: t.tugging, held: t.held, open }));""")
+        self.assertTrue(r["began"])
+        self.assertEqual(r["hanging"], {"tugging": True, "busy": True, "depth": "high", "arms": "rim", "body": "tug"})
+        self.assertFalse(r["reacted"])   # (nothing else moves it meanwhile)
+        self.assertTrue(r["ok"])
+        self.assertGreaterEqual(r["ms"], 1000)
+        self.assertLess(r["ms"], 1100)
+        self.assertEqual((r["tugging"], r["held"]), (False, True))
+        self.assertGreater(r["open"], 0.9)   # (its burrow stays where it was)
+
+    def test_hanging_on_it_leans_towards_your_hand(self):
+        # Pulled up and to the right it leans right (more as it stretches),
+        # to the left left; straight up not at all; once out, no lean
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({ brain: false });
+let now = 1000;
+t.tick(now);
+const run = ms => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); t.draw(ctx); } };
+run(600);
+const lean = [];
+t.tug(() => {});
+t.tugToward(40, -20);
+run(500);
+lean.push(t.tugLean);
+t.tugToward(-40, -20);
+run(400);
+lean.push(t.tugLean);
+t.tugToward(0, -30);
+run(90);
+t.setHeld(true);
+run(800);
+lean.push(t.tugLean);
+console.log(JSON.stringify(lean.map(v => Math.round(v))));""")
+        self.assertGreater(r[0], 25)
+        self.assertLess(r[1], -25)
+        self.assertEqual(r[2], 0)
+
+    def test_let_go_of_early_it_drops_back_in(self):
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({ brain: false });
+let now = 1000;
+t.tick(now);
+const run = ms => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); t.draw(ctx); } };
+run(600);
+let tug = null, back = null;
+t.tug(ok => { tug = ok; });
+run(400);
+t.letGo(ok => { back = ok; });
+run(1200);
+console.log(JSON.stringify({ tug, back, tugging: t.tugging, held: t.held, depth: t.st.depth, hole: t.v.hole }));""")
+        self.assertEqual(r, {"tug": False, "back": True, "tugging": False, "held": False, "depth": "half", "hole": 1})
+
+    def test_out_of_its_burrow_it_is_taken_at_once(self):
+        # Held, out on the floor after a cookie, jumping clear of it, or
+        # tunnelling: no rim to hang on to
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({ brain: false });
+let now = 1000;
+t.tick(now);
+const run = ms => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); } };
+run(600);
+const out = [];
+t.setHeld(true);
+out.push(t.tug());
+t.land(0, () => { t.chase(); out.push(t.chased, t.tug()); }, true);
+run(1500);
+t.eat('choc', false);
+run(12000);
+t.react('flip');
+run(500);
+out.push(t.st.depth, t.tug());
+run(3000);
+t.react('dig');
+run(1200);
+out.push(t.st.tunnel, t.tug());
+console.log(JSON.stringify(out));""")
+        self.assertEqual(r, [False, "stand", False, "out", False, "1", False])
+
+    def test_both_hosts_pull_and_let_go_through_it(self):
+        # A drag that starts pulls (tug: false, it's taken at once); let go of
+        # while it hangs on, it drops back in (letGo); drawn live meanwhile
+        pet = (ROOT / "ui/Pet.qml").read_text()
+        ts = (ROOT.parent.parent / "vscode/webview/pets/pet.ts").read_text()
+        self.assertIn("pet.pull()", pet)
+        self.assertIn("this.pull();", ts)
+        self.assertIn("pet.tugToward(p)", pet)   # (it leans towards your hand as you move it)
+        self.assertIn("this.tugToward(p);", ts)
+        for text in (pet, ts):
+            self.assertRegex(text, r"talpy\.tug\(")
+            self.assertRegex(text, r"talpy\.letGo\(")
+            self.assertRegex(text, r"tugging\)\s*(\{\s*)?\n?\s*(pet\.|this\.)?letGo\(\)")
+        self.assertIn("live: pet.landing || pet.chasing || pet.tugging", pet)
+        self.assertIn("!this.tugging", ts[ts.index("f.on ="):])
+
+
 # Talpy on a stage with a cookie game (talpy/cookie.mjs), as a host has it:
 # run(ms, until) ticks both (and draws Talpy) every 16 ms; states: what the
 # game and Talpy did, in turn ("chase:run": chasing, running)
 COOKIE_STAGE = NULL_CANVAS + """
-import { CookieGame, cookieCount, cookieNews } from %s;
+import { CookieGame } from %s;
+import { COOKIE, FLAVOURS, THANKS_NAMES } from %s;
+import { drawCookie } from %s;
 const gu = 16, box = gu * 5.6, unit = box / 64, bw = box * 38 / 64, bh = box * 31 / 64, W = 400, H = gu * 6;
-const said = [], holes = [], states = [];
-let px = W * 0.76, tally = { eaten: 0, saved: 0 }, now = 1000;
+const said = [], holes = [], states = [], flavours = [];
+let px = W * 0.76, eaten = 0, now = 1000;   // (eaten: as it says yum)
 const t = new Talpy({ travels: true });
 t.onTravel = () => {};
 const host = {
     stage: () => ({ width: W, ground: H - gu * 0.55, unit, bodyWidth: bw, bodyHeight: bh, minX: box * 27 / 64 + 4, maxX: W - box * 27 / 64 - 4 }),
-    px: () => px, moveTo: x => { px = x; }, face: left => { t.facingLeft = left; }, say: what => said.push(what),
+    px: () => px, moveTo: x => { px = x; }, face: left => { t.facingLeft = left; },
+    say: (what, flavour) => { said.push(what); flavours.push(flavour); if (what === 'yum') eaten += 1; },
     leaveHole: open => holes.push('leave ' + Math.round(open * 100) / 100), fillHole: () => holes.push(t.holeOpen ? 'fill' : 'fill early'),
-    tally: () => tally, setTally: (eaten, saved) => { tally = { eaten, saved }; }, changed: () => {}, instant: () => false };
+    changed: () => {}, instant: () => false };
 const game = new CookieGame(t, host);
 const run = (ms, until) => {
     for (const end = now + ms; now < end;) {
@@ -745,7 +862,7 @@ const run = (ms, until) => {
 };
 t.tick(now);
 run(500);
-""" % json.dumps(str(TALPY / "cookie.mjs"))
+""" % (json.dumps(str(TALPY / "cookie.mjs")), json.dumps(str(TALPY / "actions.mjs")), json.dumps(str(TALPY / "talpy.mjs")))
 
 
 class CookieTests(unittest.TestCase):
@@ -757,16 +874,18 @@ class CookieTests(unittest.TestCase):
         # burrow right there, and the old one is filled once it does
         r = run_node(COOKIE_STAGE + """
 const placed = game.place(40, 70);
+const flavour = game.cookie.flavour;
 run(20000, () => !game.on);
-console.log(JSON.stringify({ placed, states, said, holes, tally, on: game.on, chasing: t.chasing, px: Math.round(px),
+console.log(JSON.stringify({ placed, states, said, flavours, flavour, holes, eaten, on: game.on, chasing: t.chasing, px: Math.round(px),
                              depth: t.st.depth, hole: t.v.hole }));""")
         self.assertTrue(r["placed"])
         self.assertEqual(r["states"][:4], ["", "spot", "chase:out", "chase:stand"])
         self.assertIn("chase:run", r["states"])
         self.assertEqual(r["states"][-2:], ["eat", ""])
-        self.assertEqual(r["said"], ["spot", "first"])
+        self.assertEqual(r["said"], ["spot", "yum"])
+        self.assertEqual(r["flavours"], [r["flavour"]] * 2)   # (its words are for that one)
         self.assertEqual(r["holes"], ["leave 1", "fill"])
-        self.assertEqual(r["tally"], {"eaten": 1, "saved": 0})
+        self.assertEqual(r["eaten"], 1)
         self.assertFalse(r["on"] or r["chasing"])
         self.assertLess(r["px"], 80)
         self.assertEqual((r["depth"], r["hole"]), ("half", 1))
@@ -796,38 +915,138 @@ console.log(JSON.stringify({ tries, said, before, state: game.state, cookie: gam
         self.assertTrue(r["before"].startswith("leap"), r["before"])
         self.assertIsNone(r["cookie"])
 
-    def test_stuffed_it_saves_the_next_one_and_digs_it_up_later(self):
+    def test_it_takes_one_standing_from_right_behind_it(self):
+        # (the cookie is drawn over it: it shows whole as it gets there, and
+        # turns into the one in its hands where it is)
         r = run_node(COOKIE_STAGE + """
-for (let i = 0; i < 6; i++) {
-    game.place(px > W / 2 ? 40 : W - 40, 70);
-    run(20000, () => !game.on);
-    run(300);
-}
-const stuffed = [game.stuffed, JSON.stringify(tally)];
-game.ate = [];   // (hungry again)
-Math.random = () => 0;
-const found = game.surprise();
-run(15000, () => !game.on);
-console.log(JSON.stringify({ stuffed, found, tally, said }));""")
-        self.assertEqual(r["stuffed"], [True, '{"eaten":5,"saved":1}'])
-        self.assertTrue(r["found"])
-        self.assertEqual(r["tally"], {"eaten": 6, "saved": 0})
-        self.assertEqual([w for w in r["said"] if w not in ("spot",)], ["first", "yum", "yum", "yum", "burp", "full", "saved", "found"])
+game.place(60, H - 20);
+let x = null;
+run(20000, () => { if (game.cookie) x = game.cookie.x; return game.state === 'eat'; });
+console.log(JSON.stringify({ off: Math.abs(x - px) / bw }));""")
+        self.assertLess(r["off"], 0.12)
+
+    def test_one_left_alone_falls_and_it_has_it(self):
+        # Popped up high, out of its reach, and never touched: it falls to
+        # the floor and Talpy has it; the game ends
+        r = run_node(COOKIE_STAGE + """
+game.place(40, 0);
+run(20000, () => !game.on);
+console.log(JSON.stringify({ on: game.on, eaten, said }));""")
+        self.assertEqual((r["on"], r["eaten"]), (False, 1))
+        self.assertNotIn("gimme", r["said"])
+
+    def test_a_cookie_is_light_it_pops_hops_floats_down_and_bounces(self):
+        # (Talpy stays put: just the cookie) It grows as it pops up (also
+        # long after the last one: the game's clock stood still meanwhile),
+        # hops up a little, floats down (the air holds it back), lands with
+        # a squash and a rock, bounces less each time, and settles round
+        r = run_node(COOKIE_STAGE + """
+t.chase = () => 0;
+t.seeCookie = () => {};
+run(5000);
+const floor = H - gu * 0.55 - 7 * unit, start = now;
+game.place(40, 45);
+const path = [];
+let grew = [], landed = [], last = -1e9, minSy = 1;
+run(3000, () => {
+    const c = game.cookie;
+    if (now - start <= 320) grew.push(c.scale);
+    path.push([now - start, (floor - c.y) / unit]);
+    if (c.landAt !== last) { landed.push(now - start); last = c.landAt; }
+    minSy = Math.min(minSy, c.sy);
+    return false;
+});
+const c = game.cookie;
+console.log(JSON.stringify({ grew: [grew[0], Math.max(...grew), grew[grew.length - 1]], start: path[0][1],
+                             top: Math.max(...path.map(p => p[1])), landed, minSy, end: [c.sx, c.sy, c.angle, c.vy].map(v => Math.round(v * 100) / 100),
+                             bounced: path.some(p => p[0] > landed[0] && p[1] > 1) }));""")
+        self.assertLess(r["grew"][0], 0.2)
+        self.assertGreater(r["grew"][1], 1)   # (a little over on the way)
+        self.assertGreater(r["top"], r["start"] + 1)   # (the hop)
+        self.assertGreater(r["landed"][0], 650)   # (floating: not dropped like a stone)
+        self.assertLess(r["landed"][-1], 1600)
+        self.assertGreaterEqual(len(r["landed"]), 2)
+        self.assertTrue(r["bounced"])
+        self.assertLess(r["minSy"], 0.92)
+        self.assertEqual(r["end"], [1, 1, 0, 0])
+
+    def test_let_go_of_on_the_move_it_flies_on_and_stops_where_it_can_be_had(self):
+        r = run_node(COOKIE_STAGE + """
+game.place(200, 30);
+run(400);
+game.grab(game.cookie.x, game.cookie.y);
+for (let i = 0; i < 8; i++) { now += 16; game.drag(game.cookie.x + 12, game.cookie.y); t.tick(now); game.tick(now); }
+const from = game.cookie.x;
+game.drop();
+run(300);
+const flying = game.cookie ? game.cookie.x - from : null;
+const stage = host.stage();
+run(20000, () => !game.on);
+const thrown = [];
+game.place(200, 60);
+run(400);
+game.grab(game.cookie.x, game.cookie.y);
+for (let i = 0; i < 6; i++) { now += 16; game.drag(game.cookie.x, game.cookie.y - 6); t.tick(now); game.tick(now); }
+const y0 = game.cookie.y;
+game.drop();
+run(120);
+console.log(JSON.stringify({ flying, eaten, up: y0 - game.cookie.y }));""")
+        self.assertGreater(r["flying"], 10)   # (on the way you moved it)
+        self.assertGreater(r["up"], 3)        # (thrown up: up it goes first)
+        self.assertGreaterEqual(r["eaten"], 1)
+
+    def test_a_cookie_on_the_floor_can_be_picked_up_again(self):
+        r = run_node(COOKIE_STAGE + """
+game.place(40, 0);
+run(2500, () => game.cookie.vy === 0 && game.cookie.y === H - gu * 0.55 - 7 * unit);
+const c = game.cookie, onFloor = Math.round(c.y) === Math.round(H - gu * 0.55 - 7 * unit);
+const took = game.grab(c.x, c.y);
+game.drag(c.x, 10);
+run(600);
+const held = [game.cookie.held, Math.round(game.cookie.y)];
+game.drop();
+run(20000, () => !game.on);
+console.log(JSON.stringify({ onFloor, took, held, eaten }));""")
+        self.assertTrue(r["onFloor"] and r["took"])
+        self.assertEqual(r["held"], [True, 10])   # (in your hand it doesn't fall)
+        self.assertEqual(r["eaten"], 1)
 
     def test_picked_up_while_after_it_it_goes_after_it_again_once_down(self):
+        # Put down with a cookie out it doesn't dig in first: it's straight
+        # after it (talpy.land with stayOut, as both hosts call it)
         r = run_node(COOKIE_STAGE + """
 game.place(40, 70);
 run(5000, () => t.chased === 'run');
 t.setHeld(true);
 game.picked();
 const held = [game.state, game.on, t.chasing];
-t.land(0, () => game.landed());
+t.land(0, () => game.landed(), true);
+const from = states.length;
 run(20000, () => !game.on);
-console.log(JSON.stringify({ held, holes, tally }));""")
+console.log(JSON.stringify({ held, holes, eaten, after: states.slice(from) }));""")
         self.assertEqual(r["held"], ["held", True, False])
-        # (its first burrow is the host's to fill as it lands; then it leaves the one it dug there)
-        self.assertEqual(r["holes"], ["leave 1", "leave 1", "fill"])
-        self.assertEqual(r["tally"]["eaten"], 1)
+        # (its first burrow is the host's to fill as it lands; it dug none since)
+        self.assertEqual(r["holes"], ["leave 1"])
+        self.assertNotIn("spot", r["after"])
+        self.assertNotIn("chase:out", r["after"])
+        self.assertEqual(r["eaten"], 1)
+
+    def test_let_go_of_as_it_hung_on_it_sees_it_again(self):
+        # Pulled at while it looked at it: it stops; let go before it came
+        # out, it drops back in, sees it again and goes after it
+        r = run_node(COOKIE_STAGE + """
+game.place(40, 70);
+run(200);
+const tugged = t.tug(() => {});
+game.picked();
+run(400);
+let back = null;
+t.letGo(ok => { back = ok; if (ok) game.landed(); });
+run(20000, () => !game.on);
+console.log(JSON.stringify({ tugged, back, eaten, states }));""")
+        self.assertTrue(r["tugged"] and r["back"])
+        self.assertEqual(r["eaten"], 1)
+        self.assertEqual(r["states"].count("spot"), 2)
 
     def test_nothing_else_moves_it_while_it_runs_after_it(self):
         r = run_node(COOKIE_STAGE + """
@@ -840,12 +1059,34 @@ const after = [t.chased, t.st.walk, t.run === null, t.busy];
 console.log(JSON.stringify({ reacted, after }));""")
         self.assertEqual(r, {"reacted": False, "after": ["run", "1", True, True]})
 
-    def test_each_cookie_has_its_news_and_the_count_fits_its_corner(self):
+    def test_every_flavour_and_every_thanks_runs_to_its_end_and_draws(self):
+        # Each flavour tasted its way, with each thanks (or none), drawn as
+        # it goes; ends dug in. Mostly chocolate chip, the rest now and then
         r = run_node(COOKIE_STAGE + """
-console.log(JSON.stringify([[1, 2, 10, 11, 25, 100, 2000, 2500].map(n => cookieNews(n, false)), cookieNews(7, true),
-                            [7, 999, 1000, 1234, 12345, 999999].map(cookieCount)]));""")
-        self.assertEqual(r, [["first", "", "milestone", "", "milestone", "milestone", "milestone", ""], "full",
-                             ["7", "999", "1k", "1.2k", "12k", "999k"]])
+const ends = [];
+for (const flavour of Object.keys(FLAVOURS)) {
+    drawCookie(ctx, flavour);
+    for (const thanks of THANKS_NAMES.concat([''])) {
+        let ok = null;
+        t.play({ steps: COOKIE.eat(flavour, false, thanks) }, done => { ok = done; }, false);
+        const props = new Set();
+        run(15000, () => { props.add(t.st.prop + ':' + t.st.treat); return ok !== null; });
+        ends.push([flavour, thanks, ok, t.st.depth, [...props].includes('cookie:' + flavour)]);
+    }
+}
+const picked = {};
+for (let i = 0; i < 2000; i++) {
+    game.place(40, 70);
+    picked[game.cookie.flavour] = (picked[game.cookie.flavour] || 0) + 1;
+    game.cookie = null; game.on = false; game.state = '';
+}
+console.log(JSON.stringify({ ends, picked }));""")
+        self.assertGreaterEqual(len({e[0] for e in r["ends"]}), 8)
+        for flavour, thanks, ok, depth, held in r["ends"]:
+            self.assertEqual((ok, depth, held), (True, "half", True), (flavour, thanks))
+        self.assertEqual(set(r["picked"]), {e[0] for e in r["ends"]})
+        self.assertGreater(r["picked"]["choc"], 2000 / 4)
+        self.assertLess(r["picked"]["choc"], 2000 / 2)
 
     def test_the_headline_the_ticker_and_the_pet_keep_their_clicks(self):
         # A double-click anywhere else on the hero's stage is a cookie: in
@@ -864,15 +1105,32 @@ console.log(JSON.stringify([[1, 2, 10, 11, 25, 100, 2000, 2500].map(n => cookieN
         for skipped in (".cs-hero-headline.cs-clickable", ".cs-hero-ticker", ".cs-pet-grab", ".cs-cookie"):
             self.assertIn(skipped, click)
 
+    def test_the_cookie_is_drawn_over_talpy_and_pressed_first(self):
+        # As Talpy gets there it's behind the cookie, which shows whole; and
+        # a cookie over it is picked up, not Talpy
+        pet = (ROOT / "ui/Pet.qml").read_text()
+        self.assertGreater(pet.index("    Canvas {\n        id: cookie"), pet.index("    MouseArea {\n        id: grab"))
+        self.assertLess(pet.index("    Rectangle {\n        readonly property real over"), pet.index("    TalpyView {"))
+        ts = (ROOT.parent.parent / "vscode/webview/pets/pet.ts").read_text()
+        append = ts[ts.index("stage.petLayer.append("):]
+        append = append[:append.index(";")]
+        self.assertLess(append.index("this.cookieShadow"), append.index("this.sheets"))
+        self.assertGreater(append.index("this.cookie]"), append.index("this.grab"))
+
     def test_both_hosts_tell_the_game_when_you_pick_it_up_and_it_lands(self):
+        # (also as you pull at it, and as it drops back in, let go of; put
+        # down with a cookie out, it stays out: land's stayOut)
         pet = (ROOT / "ui/Pet.qml").read_text()
         ts = (ROOT.parent.parent / "vscode/webview/pets/pet.ts").read_text()
-        for text, pick, land, end in ((pet, "function pickUp()", "const feel = talpy.land(", "\n    }\n"),
-                                      (ts, "private pickUp()", "const feel = this.talpy.land(", "\n  }\n")):
-            picked = text[text.index(pick):]
-            self.assertRegex(picked[:picked.index(end)], r"game\??\.picked\(\)")
+        for text, fn, land, end in ((pet, "function ", "const feel = talpy.land(", "\n    }\n"),
+                                    (ts, "private ", "const feel = this.talpy.land(", "\n  }\n")):
+            for name, call in (("pickUp()", "picked"), ("pull()", "picked"), ("letGo()", "landed")):
+                body = text[text.index(fn + name):]
+                self.assertRegex(body[:body.index(end)], r"game\??\.%s\(\)" % call, name)
             landed = text[text.index(land):]
-            self.assertRegex(landed[:landed.index("})")], r"game\??\.landed\(\)")
+            landed = landed[:landed.index("if (feel")]
+            self.assertRegex(landed, r"game\??\.landed\(\)")
+            self.assertRegex(landed, r"game(\?\.| !== null && game\.)cookie")
 
     def test_the_game_runs_only_with_a_cookie(self):
         # (an add-on: nothing more each frame unless a cookie is out or eaten)
@@ -1338,7 +1596,7 @@ class PetLifeTests(unittest.TestCase):
         # "then it waves and digs away" (PetStrip.qml): leaving plays Talpy's
         # leave, which waves before it digs in, and only then is the pet gone
         pet = (ROOT / "ui/Pet.qml").read_text()
-        self.assertRegex(pet, r"onLeavingChanged: \{\n\s+if \(leaving && !held\)\n\s+goAway\(\)")
+        self.assertRegex(pet, r"onLeavingChanged: \{\n\s+if \(leaving && !held && !tugging\)\n\s+goAway\(\)")
         self.assertRegex(pet, r'react\("leave", ok => \{\n\s+if \(ok && pet\.leaving\) \{\n\s+pet\.departed = true\n\s+Qt\.callLater\(pet\.gone\)')
         actions = (TALPY / "actions.mjs").read_text()
         leave = actions[actions.index("    leave: {"):]

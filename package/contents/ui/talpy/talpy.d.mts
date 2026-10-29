@@ -18,8 +18,8 @@ export function calmColors(tint: string): TalpyColors;
 export function drawHole(ctx: unknown, hole: number): void;   // an empty hole in the 64 × 64 box (hole: 0 to 1.1, as it opens or closes)
 // the open hole's back or front, turned left or not, in the 64 × 64 box (for Talpy.holeImage)
 export function drawHoleSide(ctx: unknown, part: "back" | "front", left: boolean): void;
-// a cookie (the one it eats), 5.6 box units round, centred at the context's origin (cookie.mjs)
-export function drawCookie(ctx: unknown): void;
+// a cookie (the one it eats) of a flavour (cookie.mjs: Cookie.flavour), 5.6 box units round, centred at the context's origin
+export function drawCookie(ctx: unknown, flavour?: string): void;
 
 // A film's picture of it (Talpy.still), see films.mjs
 export interface Still {
@@ -38,10 +38,12 @@ export class Talpy {
     travels: boolean;
     readonly busy: boolean;
     readonly holeOpen: boolean;   // its burrow is open or opening under it
+    readonly onFloor: boolean;    // out of its burrow on the floor, as drawn now
     readonly frameMs: number;   // how often a picture is worth drawing now: 40 (quick moves), 80 (slow) or 200 (at rest)
     readonly run: unknown;
     readonly mood: string;
     readonly held: boolean;
+    readonly tugging: boolean;   // you pull at it, it hangs on to its burrow (tug)
     readonly chasing: boolean;   // after a cookie (cookie.mjs): on its feet, the host moves it
     readonly now: number;
     readonly settled: boolean;   // what's eased between poses is where it's going
@@ -52,16 +54,20 @@ export class Talpy {
     setTheme(theme: TalpyTheme): void;
     setMood(mood: string): void;
     react(name: string, done?: ((ok: boolean) => void) | null): void;
+    // you pull at it: in its burrow it hangs on for a moment, then done(true) (take it: setHeld);
+    // false: it isn't in its burrow, take it at once
+    tug(done?: ((ok: boolean) => void) | null): boolean;
+    tugToward(dx: number, dy: number): void;   // where your hand is from its middle (box units, right +, down +): it leans that way
+    letGo(done?: ((ok: boolean) => void) | null): void;   // you let go before it came out: back in it drops
     setHeld(held: boolean): number;   // how much of its hole it leaves behind (0 to 1): draw that where it was, drawHole
-    land(height: number, done?: ((ok: boolean) => void) | null): "sick" | "dizzy" | "fine";   // height in box units
+    // height in box units; stayOut: it doesn't dig in (a cookie is out: it goes after it)
+    land(height: number, done?: ((ok: boolean) => void) | null, stayOut?: boolean): "sick" | "dizzy" | "fine";
     pose(step?: Record<string, unknown>): void;
     // a cookie (cookie.mjs drives these)
     seeCookie(look: [number, number], done?: ((ok: boolean) => void) | null): void;
     chase(): number;   // how much of its hole it leaves behind, as setHeld
     chaseAs(pose: "out" | "run" | "stand" | "beg" | "leap" | "reach" | "pout", look?: [number, number]): void;
-    eat(news: string, caught: boolean, done?: ((ok: boolean) => void) | null): void;
-    stash(done?: ((ok: boolean) => void) | null): void;
-    digUp(done?: ((ok: boolean) => void) | null): void;
+    eat(flavour: string, caught: boolean, done?: ((ok: boolean) => void) | null): void;
     tick(now: number): void;
     draw(ctx: unknown, withoutParticles?: boolean): void;
     drawParticles(ctx: unknown, now: number): void;

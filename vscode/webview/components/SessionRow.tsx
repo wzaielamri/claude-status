@@ -89,6 +89,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
   const move = canMoveToClaudeCode(s, codeHere);
   const reopenInCode = s.kind === "chat" && reopensInClaudeCode(view.settings.reopenIn, cliInstalled(machineStatus(view, host)), codeHere);
   const mode = modeText(s.peek?.mode);
+  const ultracode = s.peek?.ultracode === true;
   // A usage limit stopped it: it can go on on another account with room left
   const handover = handoverTarget(s, shareAccounts(machineStatus(view, host)));
   // or by itself once the limit resets (queued; again: cancelled)
@@ -217,9 +218,12 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
 
         <div class="session-line small">
           <Elided text={s.cwdShort || s.cwd || "~"} class="folder muted" title={s.cwd || s.cwdShort} />
-          {s.model ? (
-            <span class="muted nowrap" title={s.effort ? `${s.model}\nEffort: ${s.effort} (how hard it thinks; /effort changes it)` : s.model}>
-              {s.effort ? `${s.model} · ${s.effort}` : s.model}
+          {s.model || ultracode ? (
+            // the model, how hard it thinks (Claude's /effort) and whether ultracode is on
+            <span class="muted nowrap" title={[s.model ?? "", s.effort ? `Effort: ${s.effort} (how hard it thinks; /effort changes it)` : "",
+              ultracode ? "Ultracode: Claude runs workflows of agents for every substantial task (/ultracode off turns it off)" : ""]
+              .filter((t) => t).join("\n")}>
+              {[s.model ?? "", s.effort ?? "", ultracode ? "ultracode" : ""].filter((t) => t).join(" · ")}
             </span>
           ) : null}
           {s.context != null ? (

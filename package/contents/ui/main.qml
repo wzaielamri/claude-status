@@ -413,7 +413,7 @@ PlasmoidItem {
         "sshHosts", "remotePollSeconds", "sshUsage", "keepDoneHours", "showUsageInPanel", "showPet", "chatPets", "showTokens",
         "newChatInVscode", "iconBlink", "awayDigest", "awayMinutes", "phoneWhileAway", "phoneFinished", "phoneDevice",
         "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "usageRefreshMinutes", "recapRules", "clickOpensPane",
-        "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage", "cookiesEaten", "cookiesSaved"]
+        "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage"]
     property real settingsSeenAt: 0     // the newest shared settings this copy has seen
     property string settingsSeen: ""    // its own settings as of the last check (to see changes)
 
@@ -2749,15 +2749,17 @@ PlasmoidItem {
         sharer.connectSource(cmd)
     }
 
-    // A chat's permission mode (talpy_den.py: mode_of), "" for the default
+    // A chat's permission mode (talpy_den.py: mode_of), "" when it isn't known;
+    // the default is Claude's manual mode
     function modeText(mode) {
         switch (mode) {
+        case "default": return i18n("Manual mode")
         case "plan": return i18n("Plan mode")
         case "acceptEdits": return i18n("Accept edits")
         case "auto": return i18n("Auto mode")
         case "bypassPermissions": return i18n("Bypass permissions")
         case "dontAsk": return i18n("Don't ask")
-        case "default": case "": case null: case undefined: return ""
+        case "": case null: case undefined: return ""
         default: return mode
         }
     }
@@ -2769,6 +2771,7 @@ PlasmoidItem {
         case "auto": return i18n("Auto mode: Claude goes ahead with what it judges safe, and asks you about the rest.")
         case "bypassPermissions": return i18n("Claude runs everything without asking.")
         case "dontAsk": return i18n("What isn't allowed already is refused, without asking you.")
+        case "default": return i18n("Manual mode: Claude asks you before it edits a file or runs a command you haven't allowed. Shift+Tab in the chat changes it.")
         default: return i18n("Shift+Tab in the chat changes it.")
         }
     }

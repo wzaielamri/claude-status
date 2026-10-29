@@ -7,7 +7,7 @@
 
 import type { PetsModule } from "./api";
 import { onColorsChanged, petColor } from "./colors";
-import { Stage, allStages, setCookiesAll, setDarkAll } from "./stage";
+import { Stage, allStages, setDarkAll } from "./stage";
 
 export const pets: PetsModule = {
   createHeroStage: (el, cb) => new Stage(el, true, "hero", cb),
@@ -18,5 +18,4 @@ export const pets: PetsModule = {
   petColor,
   onColorsChanged,
   setDark: setDarkAll,
-  setCookies: setCookiesAll,
 };

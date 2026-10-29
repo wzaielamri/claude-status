@@ -53,8 +53,6 @@ KCM.SimpleKCM {
     property alias cfg_showTokens: showTokens.checked
     property alias cfg_showPet: showPet.checked
     property alias cfg_chatPets: chatPets.value
-    property int cfg_cookiesEaten       // these two counted as the big Talpy eats the cookies you give it
-    property int cfg_cookiesSaved
     property alias cfg_recentChats: recentChats.value
     property alias cfg_remotePollSeconds: remotePollSeconds.value
     property string cfg_sshHosts
@@ -100,8 +98,6 @@ KCM.SimpleKCM {
     property bool cfg_showTokensDefault
     property bool cfg_showPetDefault
     property int cfg_chatPetsDefault
-    property int cfg_cookiesEatenDefault
-    property int cfg_cookiesSavedDefault
     property int cfg_recentChatsDefault
     property int cfg_remotePollSecondsDefault
     property string cfg_sshHostsDefault

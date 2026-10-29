@@ -6,16 +6,18 @@
 //   const t = new Talpy({ colors, words: s => i18n(s), travels: true });
 //   t.setMood('working');          // idle working agents needs done failed limit error loading
 //   t.react('pet');                // an action now (see actions.mjs)
+//   t.tug(ok => ...);              // you pull at it: it holds on to its burrow, then comes out
 //   t.onTravel = ms => { ... };    // it dug in: move it to its new spot within ms
 //   every frame: t.tick(Date.now()); then draw(ctx) in a 64 × 64 box, floor at y = 57
 //
-// While you hold it (setHeld) nothing else moves it; land() drops it, and it
+// Pulled at in its burrow (tug), it hangs on to the rim for a moment first;
+// while you hold it (setHeld) nothing else moves it; land() drops it, and it
 // digs back in where it landed.
 //
 // Plain ES2017 (see paths.mjs).
 
 import * as art from './art.mjs';
-import { ACTIONS, COOKIE, MOODS, dirt, random } from './actions.mjs';
+import { ACTIONS, COOKIE, MOODS, TUG, TUG_MS, dirt, random } from './actions.mjs';
 
 export const BOX = 64;
 export const FLOOR = 57;     // where the stage's floor is, in the box
@@ -24,12 +26,12 @@ export const LILAC = art.LILAC;
 export const calmColors = art.calmColors;
 
 const KEYS = ['eyes', 'mouth', 'arms', 'plume', 'body', 'prop', 'tail', 'blush', 'think', 'orbit', 'walk', 'held', 'sip',
-              'fail', 'depth', 'tunnel', 'hole', 'lamp', 'gum', 'bite'];
+              'fail', 'depth', 'tunnel', 'hole', 'lamp', 'gum', 'bite', 'treat'];
 const DEPTH = { out: -0.5, high: 6, half: 10, low: 13, peek: 19, hidden: 42, gone: 74 };
 const ARMS = { rest: [16, -16], up: [150, -150], hold: [16, 35], sip: [16, 62], both: [-50, 50], chin: [16, 60], scratch: [16, -165],
                ear: [16, 153], scope: [16, -164], sign: [16, -150], balloon: [150, -16], cover: [-101, 101], juggle: [-20, 20],
                type: [-38, 38], held: [60, -60], wave: [16, -145], waveboth: [145, -145], dance: [90, -90], flail: [70, -70], throw: [16, -140],
-               selfie: [16, -152] };
+               selfie: [16, -152], rim: [44, -44], horn: [16, 75] };
 const BLINKING = { open: 1, wide: 1, sad: 1, tired: 1, wink: 1 };
 // How often a picture is worth drawing (frameMs): quick moves want 25 a
 // second, slow ones 12; at rest (breathing, the lamp's glow) 5 show it all.
@@ -37,7 +39,7 @@ const BLINKING = { open: 1, wide: 1, sad: 1, tired: 1, wink: 1 };
 // (40 ms) to count as a quick move (a twentieth of it: a slow one). Sleepy
 // z's float up slowly enough for 5, and a sleepy slump too.
 const EASED = { depth: 0.3, hole: 0.02, armL: 1.5, armR: 1.5, armLy: 0.1, armRy: 0.1, plume: 3, lx: 0.08, ly: 0.08, sip: 0.05 };
-const QUICK_BODY = { hop: 1, jump: 1, bounce: 1, wiggle: 1, shake: 1, spin: 1, jolt: 1, shiver: 1, tumble: 1, land: 1, bob: 1 };
+const QUICK_BODY = { hop: 1, jump: 1, bounce: 1, wiggle: 1, shake: 1, spin: 1, jolt: 1, shiver: 1, tumble: 1, land: 1, bob: 1, tug: 1 };
 const RESTING_BODY = { slump: 1 };   // (as slow as breathing)
 const QUICK_PROPS = { phone: 1, juggle: 1 };
 const SLOW_PROPS = { gum: 1, magnifier: 1 };
@@ -103,6 +105,22 @@ function bodyMove(name, ms, it) {
         p = Math.min(1, ms / 1300);
         m.sx = kf(p, [[0, 1], [0.35, 0.92], [0.8, 0.92], [1, 1]]);
         m.sy = kf(p, [[0, 1], [0.35, 1.13], [0.8, 1.13], [1, 1]]);
+        m.torso = true;
+        return m;
+    case 'bow':          // a little bow, hands together: down, a beat, up
+        p = Math.min(1, ms / 1200);
+        m.sx = kf(p, [[0, 1], [0.3, 1.05], [0.7, 1.05], [1, 1]]);
+        m.sy = kf(p, [[0, 1], [0.3, 0.86], [0.7, 0.86], [1, 1]]);
+        m.tr = kf(p, [[0, 0], [0.3, 6], [0.7, 6], [1, 0]]);
+        m.ty = kf(p, [[0, 0], [0.3, 2.6], [0.7, 2.6], [1, 0]]);
+        m.torso = true;
+        return m;
+    case 'tug':          // pulled at, hanging on: drawn out of its burrow, trembling
+        p = sine(Math.min(1, ms / TUG_MS));
+        m.wy = -3.5 * p;
+        m.wx = lerp(-0.6, 0.6, alt(ms, 60)) * p;
+        m.sx = 1 - 0.1 * p;
+        m.sy = 1 + 0.2 * p;
         m.torso = true;
         return m;
     case 'inhale':
@@ -231,7 +249,7 @@ const BIG_DEPTH = 8;   // (from low to high is no big move, from half to peeking
 // lamp) has no pictures either: a film draws it live (ms it takes, × it).
 const SETTLE_MS = 280;
 const TWEENED = ['depth', 'armL', 'armR', 'armLy', 'armRy', 'plume', 'lx', 'ly', 'sip'];
-const ONE_SHOT = { body: { stretch: 1300, inhale: 450, trip: 1500 }, arms: { throw: 550 }, plume: { flick: 400, twirl: 800 } };
+const ONE_SHOT = { body: { stretch: 1300, inhale: 450, trip: 1500, bow: 1200, tug: TUG_MS }, arms: { throw: 550 }, plume: { flick: 400, twirl: 800 } };
 
 // ---------------------------------------------------------------- the hole
 
@@ -266,12 +284,13 @@ export function drawHoleSide(ctx, part, left) {
     ctx.restore();
 }
 
-// A cookie (the one it eats), 5.6 units round, centred at the context's
-// origin: a host draws the one it goes after with this (cookie.mjs)
-export function drawCookie(ctx) {
+// A cookie (the one it eats) of that flavour (actions.mjs FLAVOURS), 5.6
+// units round, centred at the context's origin: a host draws the one it goes
+// after with this (cookie.mjs)
+export function drawCookie(ctx, flavour) {
     ctx.save();
     ctx.translate(-32, -47.4);
-    art.propFront(ctx, 'cookie', 0, 0, { bite: 0 });
+    art.propFront(ctx, 'cookie', 0, 0, { bite: 0, treat: flavour || '' });
     ctx.restore();
 }
 
@@ -301,6 +320,9 @@ export class Talpy {
         this.brainOn = opts.brain !== false;
         this.held = false;
         this.heldAt = 0;
+        this.tugging = false;     // you pull at it, it hangs on to its burrow (tug)
+        this.tugAim = 0;          // and leans towards your hand (degrees, + to the right: tugToward),
+        this.tugLean = 0;         // eased there
         this.chasing = false;     // after a cookie (chase): on its feet, the host moves it
         this.chased = '';         // how (chaseAs)
         this.frameMs = 40;        // see tick()
@@ -350,7 +372,7 @@ export class Talpy {
 
     // An action now: a reaction to you or to an event (done(true) when it ran to the end)
     react(name, done) {
-        if (this.held || this.chasing || !ACTIONS[name]) {
+        if (this.held || this.tugging || this.chasing || !ACTIONS[name]) {
             if (done)
                 done(false);
             return;
@@ -359,13 +381,52 @@ export class Talpy {
     }
 
     get busy() {
-        return this.run !== null || this.held || this.chasing;
+        return this.run !== null || this.held || this.tugging || this.chasing;
     }
 
     // Its burrow is open or opening under it (a host swinging it puts it
     // upright then, so the burrow never swings)
     get holeOpen() {
         return this.v.holeTo > 0;
+    }
+
+    // Out of its burrow on the floor, as it's drawn now (what a pose that
+    // just ended goes back to hasn't moved it yet)
+    get onFloor() {
+        return !this.held && this.st.tunnel !== '1' && this.v.depth <= 0 && this.v.hole <= 0.02;
+    }
+
+    // You pull at it (a drag on it): in its burrow it hangs on to the rim,
+    // stretched and trembling, for TUG_MS, then done(true): it lets go and
+    // the host takes it (setHeld); done(false): you let go first (letGo) or
+    // took it anyway. False if it isn't in its burrow (out on the floor,
+    // tunnelling, held): the host takes it at once
+    tug(done) {
+        if (this.held || this.chasing || this.tugging || this.st.tunnel === '1' || this.v.holeTo <= 0 || this.st.depth === 'out')
+            return false;
+        this.tugging = true;
+        this.play({ steps: TUG.hold }, ok => {
+            this.tugging = false;
+            if (done)
+                done(ok);
+        }, false);
+        return true;
+    }
+
+    // Where your hand is as you pull, from its middle (box units: right +,
+    // down +): it leans that way as it hangs on, more as it stretches
+    tugToward(dx, dy) {
+        this.tugAim = Math.max(-40, Math.min(40, Math.atan2(dx, Math.max(6, -dy)) * 180 / Math.PI));
+    }
+
+    // You let go before it came out: it drops back in, phew
+    letGo(done) {
+        if (!this.tugging) {
+            if (done)
+                done(false);
+            return;
+        }
+        this.play({ steps: TUG.back }, done, false);
     }
 
     // Grabbed: out of the burrow, flailing; nothing else moves it until land()
@@ -378,6 +439,7 @@ export class Talpy {
         const left = this.st.tunnel === '1' ? 0 : clamp01(this.v.hole);
         this.cancel();
         this.chasing = false;
+        this.tugging = false;
         this.held = true;
         this.heldAt = this.now;
         this.apply({ depth: 'out', hole: 0, held: 1, arms: 'flail', eyes: 'wide', mouth: 'o', body: '', fx: dirt(8, 16) });
@@ -389,21 +451,21 @@ export class Talpy {
         return left > 0.02 ? left : 0;
     }
 
-    // Dropped from `height` box units: lands, maybe dizzy, then digs in right there
-    // Returns how it feels, for the words the host has it say: 'sick' (from
-    // high up), 'dizzy' or 'fine'
-    land(height, done) {
+    // Dropped from `height` box units: lands, maybe dizzy, then digs in right
+    // there (stayOut: not yet, a cookie is out and it's off after it, see
+    // cookie.mjs). Returns how it feels, for the words the host has it say:
+    // 'sick' (from high up), 'dizzy' or 'fine'
+    land(height, done, stayOut) {
         this.held = false;
         const feel = height > 28 ? 'sick' : height > 16 ? 'dizzy' : 'fine';
         const first = feel === 'sick' ? { eyes: 'spiral', mouth: 'wavy', plume: 'droop', orbit: 1, t: 1800 }
                     : feel === 'dizzy' ? { eyes: 'spiral', mouth: 'o', orbit: 1, t: 1200 }
                     : { eyes: 'happy', mouth: 'smile', t: 700 };
-        this.play({ steps: () => [
-            Object.assign({ depth: 'out', hole: 0, body: 'land' }, first),
+        this.play({ steps: () => [Object.assign({ depth: 'out', hole: 0, body: 'land' }, first)].concat(stayOut ? [] : [
             { depth: 'out', hole: 1, eyes: feel === 'sick' ? 'tired' : 'open', mouth: feel === 'sick' ? 'wavy' : 'flat', look: [-1.5, 0.5],
               t: 500 },   // the hole opens under it first
             { body: 'spin', eyes: 'squint', fx: dirt(10), t: 700 },
-            { eyes: 'happy', t: 500 }] }, done, false);
+            { eyes: 'happy', t: 500 }]) }, done, false);
         return feel;
     }
 
@@ -433,16 +495,17 @@ export class Talpy {
         this.play({ steps: COOKIE.spot(look, this.mood === 'done') }, done, false);
     }
 
-    // Off after it: out of its burrow at a jump, then on its feet. No action
-    // or mood moves it until it has it (eat, stash) or you pick it up.
-    // Returns how much of its hole it leaves behind, as setHeld
+    // Off after it: out of its burrow at a jump (or, out already, on its
+    // feet at once). No action or mood moves it until it has it (eat) or you
+    // pick it up. Returns how much of its hole it leaves behind, as setHeld
     chase() {
         const left = this.st.tunnel === '1' || this.held ? 0 : clamp01(this.v.hole);
+        const out = this.onFloor;
         this.cancel();
         this.held = false;
         this.chasing = true;
-        this.chased = 'out';
-        this.apply(COOKIE.chase.out());
+        this.chased = out ? 'stand' : 'out';
+        this.apply(COOKIE.chase[this.chased]());
         const v = this.v;
         v.hole = v.holeFrom = v.holeTo = 0;
         return left > 0.02 ? left : 0;
@@ -461,27 +524,11 @@ export class Talpy {
             this.st.look = look;
     }
 
-    // It has it: eats it (news: '', 'first', 'milestone', 'full'; caught:
-    // out of the air) and digs in where it is
-    eat(news, caught, done) {
+    // It has it: eats it (flavour: see FLAVOURS in actions.mjs; caught: out
+    // of the air), says thanks its way now and then, and digs in where it is
+    eat(flavour, caught, done) {
         this.chasing = false;
-        this.play({ steps: COOKIE.eat(news, caught) }, done, false);
-    }
-
-    // Stuffed: it takes it down a new burrow, for later
-    stash(done) {
-        this.chasing = false;
-        this.play({ steps: COOKIE.stash() }, done, false);
-    }
-
-    // One it saved: dug up and eaten
-    digUp(done) {
-        if (this.held || this.chasing) {
-            if (done)
-                done(false);
-            return;
-        }
-        this.play({ steps: COOKIE.digUp() }, done, false);
+        this.play({ steps: COOKIE.eat(flavour, caught) }, done, false);
     }
 
     // ------------------------------------------------------------ steps
@@ -615,6 +662,7 @@ export class Talpy {
         const plumeTarget = st.tunnel === '1' ? plumeAngle('wild', now, 1) : plumeAngle(st.plume, now - (this.since.plume || 0), Number(st.it));
         v.plume = st.plume === 'twirl' || st.plume === 'wild' || st.tunnel === '1' ? plumeTarget : v.plume + (plumeTarget - v.plume) * k(70);
         v.sip += ((st.sip === '1' ? 1 : 0) - v.sip) * k(90);
+        this.tugLean += ((st.body === 'tug' ? this.tugAim : 0) - this.tugLean) * k(110);
         // glances and blinks of its own
         if (now >= this.nextGlance) {
             this.glance = st.prop || Math.random() < 0.4 ? [0, 0] : [random.rnd(-1.6, 1.6), random.rnd(-1, 0.8)];
@@ -880,6 +928,8 @@ export class Talpy {
         const now = this.now, st = this.st, v = this.v, pal = this.colors;
         const ms = key => now - (this.since[key] || 0);
         const move = bodyMove(st.body, ms('body'), Number(st.it)) || {};
+        if (st.body === 'tug')   // (leaning towards your hand, about its burrow: tugToward)
+            move.wr = (move.wr || 0) + this.tugLean * (0.4 + 0.6 * sine(Math.min(1, ms('body') / TUG_MS))) * (this.facingLeft ? -1 : 1);
         ctx.save();
         if (this.facingLeft) {
             ctx.translate(BOX, 0);
@@ -989,7 +1039,8 @@ export class Talpy {
         art.propBack(ctx, st.prop, now, this.theme.fx, v.sip, art.FACE_Y);
         this.drawArm(ctx, 14.5, v.armL, v.armLy || 0, pal, st.prop === 'balloon' ? 'balloon' : '', now);
         this.drawArm(ctx, 49.5, v.armR, v.armRy || 0, pal, st.prop === 'sign' ? 'sign' : st.arms === 'selfie' ? 'selfie' : '', now);
-        art.propFront(ctx, st.prop, now, ms('prop'), { fail: st.fail === '1', gum: Number(st.gum) || 2000, bite: Number(st.bite) || 0, skin: pal.skin });
+        art.propFront(ctx, st.prop, now, ms('prop'), { fail: st.fail === '1', gum: Number(st.gum) || 2000, bite: Number(st.bite) || 0, skin: pal.skin,
+                                                       treat: st.treat });
         if (st.think === '1')
             art.think(ctx, now, this.theme.fx);
         ctx.restore();

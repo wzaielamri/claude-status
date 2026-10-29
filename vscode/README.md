@@ -187,9 +187,11 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
   Talpy lives in a burrow: it digs over to another spot instead of walking,
   a new chat's pet digs up out of the ground, and one whose chat leaves the
   list waves and digs away. Click a pet to go to its chat (its terminal or
-  Claude Code panel), drag one out of its burrow, double-click the big one.
-  Double-click the big one's stage a little away from it for a cookie: it
-  runs after it as you drag the cookie around, and eats it.
+  Claude Code panel), drag one out of its burrow (it hangs on to the rim
+  for a second first), double-click the big one. Double-click the big one's
+  stage a little away from it for a cookie, now and then of another
+  flavour: it runs after it as you drag the cookie around (let go and it
+  floats down; pick it up again any time), and eats it.
 - **Shared chats**: with two or more Claude accounts on this computer (or
   on an SSH host), a finished chat's share button continues it on another
   account (say, when one hits its limit), shares it with all of them, or

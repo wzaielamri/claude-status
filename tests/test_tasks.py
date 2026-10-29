@@ -84,6 +84,17 @@ class PeekTests(Fixture):
         # a slug that can't be a file name is no slug
         self.assertIsNone(self.peek(prompt("hi", t, slug="../x"), reply("Hi.", t + 1))["slug"])
 
+    def test_ultracode_as_claude_last_noted_it(self):
+        # Claude Code 2.1.312 notes ultracode with your next prompt after it
+        # changes: an ultra_effort_enter attachment (on), ultra_effort_exit (off)
+        t = self.now - 600
+        on = {"type": "attachment", "attachment": {"type": "ultra_effort_enter", "reminderType": "full"}}
+        off = {"type": "attachment", "attachment": {"type": "ultra_effort_exit"}}
+        other = {"type": "attachment", "attachment": {"type": "date_change", "text": "ultra_effort_enter"}}
+        self.assertFalse(self.peek(prompt("hi", t), reply("Hello.", t + 5))["ultracode"])
+        self.assertTrue(self.peek(prompt("hi", t), on, reply("Hello.", t + 5), other)["ultracode"])
+        self.assertFalse(self.peek(on, prompt("hi", t), reply("Hello.", t + 5), off, prompt("and now?", t + 9))["ultracode"])
+
     def test_what_stopped_it(self):
         t = self.now - 600
         p = self.peek(prompt("go on", t), limit_error("You've hit your session limit · resets 7:10pm (Europe/Berlin)", t + 2))

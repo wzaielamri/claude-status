@@ -11,6 +11,7 @@ export const ease = {
   outQuad: (t: number) => 1 - (1 - t) * (1 - t),
   inOutQuad: (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2),
   inOutSine: (t: number) => -(Math.cos(Math.PI * t) - 1) / 2,
+  outBack: (t: number) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2, // (Qt's Easing.OutBack)
 };
 
 // The same curves for CSS and the Web Animations API

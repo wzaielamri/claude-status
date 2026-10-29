@@ -690,19 +690,22 @@ RowLayout {
                 }
             }
             PlasmaComponents3.Label {
+                readonly property bool ultracode: !!row.peek && row.peek.ultracode === true
                 textFormat: Text.PlainText
-                visible: !!row.session.model
-                // the model, and how hard it thinks (Claude's /effort)
-                text: (row.session.model || "") + (row.session.effort ? " · " + row.session.effort : "")
+                visible: !!row.session.model || ultracode
+                // the model, how hard it thinks (Claude's /effort) and whether ultracode is on
+                text: [row.session.model || "", row.session.effort || "", ultracode ? i18n("ultracode") : ""].filter(t => t).join(" · ")
                 opacity: 0.7
                 font: Kirigami.Theme.smallFont
 
                 PlasmaCore.ToolTipArea {
                     textFormat: Text.PlainText
                     anchors.fill: parent
-                    active: !!row.session.effort
+                    active: !!row.session.effort || parent.ultracode
                     mainText: row.session.model || ""
-                    subText: i18n("Effort: %1 (how hard it thinks; /effort changes it)", row.session.effort || "")
+                    subText: [row.session.effort ? i18n("Effort: %1 (how hard it thinks; /effort changes it)", row.session.effort) : "",
+                              parent.ultracode ? i18n("Ultracode: Claude runs workflows of agents for every substantial task (/ultracode off turns it off)") : ""]
+                             .filter(t => t).join("\n")
                 }
             }
             // Context window fill

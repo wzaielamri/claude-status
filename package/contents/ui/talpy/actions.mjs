@@ -242,11 +242,15 @@ export const ACTIONS = {
               fx: [['text', 50, 22, { text: w('mmm…'), size: 5.5, dy: -6 }], ['heart', 52, 30, { dy: -10, delay: 0.5 }]], t: 1400 },
             { eyes: 'happy', mouth: 'smile', blush: 1, look: [1.4, 0.4], t: 1000 }];
     } },
-    snack: { keep: { prop: 'cookie', arms: 'both', depth: 'out' }, steps: w => [
-        { eyes: 'wide', mouth: 'o', look: [0, 1.4], t: 700 },
-        ...repeat(3, i => [{ eyes: 'closed', mouth: 'open', bite: i + 1, fx: crumbs(), t: 380 },
-            { eyes: 'happy', mouth: 'small', bite: i + 1, t: rnd(380, 560) }]),
-        { prop: '', arms: 'rest', eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }]], t: 1000 }] },
+    // (a cookie of its own, of any flavour: FLAVOURS below)
+    snack: { steps: w => {
+        const k = { prop: 'cookie', arms: 'both', depth: 'out', treat: pickFlavour() };
+        return [
+            Object.assign({ eyes: 'wide', mouth: 'o', look: [0, 1.4], t: 700 }, k),
+            ...repeat(3, i => [Object.assign({ eyes: 'closed', mouth: 'open', bite: i + 1, fx: crumbs(), t: 380 }, k),
+                Object.assign({ eyes: 'happy', mouth: 'small', bite: i + 1, t: rnd(380, 560) }, k)]),
+            { depth: 'out', eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }]], t: 1000 }];
+    } },
     selfie: { steps: w => [
         { depth: 'high', arms: 'selfie', eyes: 'open', mouth: 'smile', look: [1.2, -1.4], t: 700 },
         { arms: 'selfie', eyes: 'wink', mouth: 'grin', blush: 1, fx: [['text', 46, 4, { text: w('cheese!'), size: 6, dy: -4 }]], t: 800 },
@@ -303,14 +307,69 @@ export const ACTIONS = {
 };
 
 // A cookie you give it (cookie.mjs): it sees it, goes after it out of its
-// burrow on its feet (the host moves it: chase poses), then eats it, or
-// stuffed saves it for later, and digs in where it is. Not picked by any
-// mood: only the cookie's game plays these.
+// burrow on its feet (the host moves it: chase poses), eats it, says thanks
+// its way now and then, and digs in where it is. Not picked by any mood:
+// only the cookie's game plays these.
+//
+// Flavours, and how often each comes up (cookie.mjs picks one as a cookie
+// pops up; art.mjs draws them): mostly chocolate chip, now and then another
+export const FLAVOURS = { choc: 4, double: 1, sprinkles: 1, ginger: 1, mint: 1, jam: 1, oat: 1, white: 1 };
+export function pickFlavour() {
+    const names = Object.keys(FLAVOURS);
+    let r = Math.random() * names.reduce((sum, n) => sum + FLAVOURS[n], 0);
+    for (const n of names) {
+        r -= FLAVOURS[n];
+        if (r < 0)
+            return n;
+    }
+    return names[0];
+}
 const hearts = n => repeat(n, i => [['heart', rnd(16, 48), rnd(16, 28), { dy: rnd(-16, -10), dx: rnd(-6, 6), delay: i * 0.2 }]]);
-const bites = keep => repeat(3, i => [
-    Object.assign({ prop: 'cookie', arms: 'both', bite: i + 1, eyes: 'closed', mouth: 'open', fx: crumbs(), t: 360 }, keep),
-    Object.assign({ prop: 'cookie', arms: 'both', bite: i + 1, eyes: 'happy', mouth: 'small', t: rnd(340, 480) }, keep)]);
+const bites = (keep, flavour) => repeat(3, i => [
+    Object.assign({ prop: 'cookie', treat: flavour, arms: 'both', bite: i + 1, eyes: 'closed', mouth: 'open', fx: crumbs(), t: 360 }, keep),
+    Object.assign({ prop: 'cookie', treat: flavour, arms: 'both', bite: i + 1, eyes: 'happy', mouth: 'small', t: rnd(340, 480) }, keep)]);
 const OUT = { depth: 'out', hole: 0 };
+const out = steps => steps.map(s => Object.assign({}, s, OUT));
+// How each one tastes, once it's eaten
+const TASTE = {
+    choc: w => [{ eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }], ...hearts(3)], t: 1000 }],
+    double: () => [{ eyes: 'heart', mouth: 'open', blush: 1, body: 'wiggle', plume: 'bob', fx: hearts(5), t: 1300 }],
+    sprinkles: () => [{ arms: 'dance', body: 'sway', eyes: 'happy', mouth: 'open', plume: 'bob', fx: notes(), t: 1600 }],
+    ginger: w => [
+        { eyes: 'squint', mouth: 'o', body: 'inhale', plume: 'up', t: 450 },
+        { eyes: 'closed', mouth: 'open', body: 'jolt', plume: 'wild',
+          fx: [['cloud', 18, 40, { dx: -12, dy: -4, s0: 0.4, s1: 1.4, dur: 1.2 }], ['text', 14, 26, { text: w('achoo!'), size: 6.5, dx: -4, dy: -8, dur: 1.4 }]],
+          t: 520 },
+        { eyes: 'happy', mouth: 'smile', blush: 1, t: 600 }],
+    mint: () => [{ arms: 'both', body: 'shiver', eyes: 'squint', mouth: 'grin', plume: 'up',
+        fx: repeat(6, () => [['snow', rnd(8, 56), rnd(-6, 8), { dx: rnd(-4, 4), dy: rnd(46, 58), dur: rnd(1.4, 2), delay: rnd(0, 0.6), s0: 1, s1: 1, ease: 'linear' }]]),
+        t: 1400 }],
+    jam: w => [{ eyes: 'closed', mouth: 'kiss', blush: 1, look: [0.8, -1.2], body: 'inhale',
+        fx: [['text', 50, 22, { text: w('mmm…'), size: 5.5, dy: -6 }], ['heart', 46, 30, { dy: -10, delay: 0.4 }]], t: 1300 }],
+    oat: () => [
+        { eyes: 'squint', mouth: 'wavy', look: [0, 1.6], fx: [['text', 48, 22, { text: '?', size: 8, dy: -6 }]], t: 900 },
+        { eyes: 'happy', mouth: 'smile', blush: 1, t: 700 }],
+    white: () => [{ eyes: 'closed', mouth: 'kiss', blush: 1, look: [0.6, -0.6], fx: bubbles(), t: 1600 }]
+};
+// Thanks now and then, its own way, picked at random (never for how many
+// it had: it doesn't count them)
+const THANKS = {
+    bow: () => [{ body: 'bow', arms: 'both', eyes: 'closed', mouth: 'smile', blush: 1, look: [0, 1.4], t: 1200 }, { eyes: 'happy', t: 300 }],
+    fanfare: w => [
+        { prop: 'trumpet', arms: 'horn', eyes: 'closed', mouth: 'small', blush: 1, body: 'inhale', t: 450 },
+        { prop: 'trumpet', arms: 'horn', eyes: 'happy', mouth: 'small', blush: 1, plume: 'wild',
+          fx: [['note', 52, 30, { dx: 8, dy: -12, dur: 1.2 }], ['note', 54, 34, { dx: 10, dy: -8, dur: 1.2, delay: 0.3 }],
+               ['note', 50, 28, { dx: 6, dy: -16, dur: 1.2, delay: 0.6 }], ['text', 32, 6, { text: w('ta-da!'), size: 7, dy: -6, delay: 0.3 }]],
+          t: 1300 }],
+    confetti: w => [{ body: 'hop', it: 2, arms: 'up', eyes: 'star', mouth: 'grin', plume: 'wild',
+        fx: [...confetti(12), ['text', 32, 4, { text: w('yay!'), size: 7, dy: -6 }]], t: 1100 }],
+    twirl: () => [{ plume: 'twirl', it: 2, arms: 'up', eyes: 'wide', mouth: 'o', fx: sparkles(3), t: 1600 }, { eyes: 'happy', mouth: 'grin', t: 300 }],
+    kiss: () => [
+        { arms: 'chin', eyes: 'closed', mouth: 'kiss', t: 550 },
+        { arms: 'wave', eyes: 'happy', mouth: 'kiss', blush: 1, fx: [['heart', 42, 40, { path: 'plane', dur: 1.9, scale: 0.9 }]], t: 1300 }],
+    hops: () => [{ body: 'hop', it: 3, arms: 'up', eyes: 'happy', mouth: 'open', plume: 'bob', fx: sparkles(3), t: 1650 }]
+};
+const THANKS_OFTEN = 0.6;
 // (its hole opens under it, it spins round and digs in: the end of a fall too)
 const digIn = () => [
     { depth: 'out', hole: 1, eyes: 'happy', mouth: 'smile', t: 500 },
@@ -336,33 +395,34 @@ export const COOKIE = {
         reach: () => Object.assign({ body: 'jump', arms: 'up', eyes: 'squint', mouth: 'open', plume: 'wild', tail: 'up' }, OUT),
         pout: () => Object.assign({ body: 'shake', eyes: 'squint', mouth: 'frown', plume: 'wild', tail: 'droop' }, OUT)
     },
-    // Got it (caught: out of the air): eats it, and is happy, over the moon
-    // for a milestone ('first', 'milestone') or full ('full': it burps)
-    eat: (news, caught) => w => [
-        Object.assign({ prop: 'cookie', arms: 'both', eyes: 'star', mouth: 'o', look: [0, 1.4],
-                        fx: [...sparkles(2), ...(caught ? [['text', 32, 4, { text: w('got it!'), size: 6, dy: -6 }]] : [])], t: 650 }, OUT),
-        ...bites(OUT),
-        ...(news === 'full'
-            ? [Object.assign({ eyes: 'closed', mouth: 'o', body: 'inhale', fx: [['text', 48, 22, { text: w('*burp*'), size: 5.5, dy: -6 }]], t: 700 }, OUT),
-               Object.assign({ eyes: 'tired', mouth: 'smile', blush: 1, t: 900 }, OUT)]
-            : [Object.assign({ eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }], ...hearts(3)], t: 1000 }, OUT)]),
-        ...(news === 'first' || news === 'milestone'
-            ? [Object.assign({ body: 'hop', it: 2, arms: 'up', eyes: 'star', mouth: 'grin', plume: 'wild', fx: confetti(10), t: 1100 }, OUT)] : []),
-        ...digIn()],
-    // Stuffed: it takes it down its new burrow for later
-    stash: () => w => [
-        Object.assign({ prop: 'cookie', arms: 'both', eyes: 'happy', mouth: 'smile', look: [0, 1.4], t: 600 }, OUT),
-        { depth: 'out', hole: 1, prop: 'cookie', arms: 'both', eyes: 'wink', mouth: 'smile', t: 500 },
-        { depth: 'half', hole: 1, eyes: 'closed', mouth: 'small', fx: dirt(8), t: 600 },
-        { depth: 'high', hole: 1, eyes: 'happy', mouth: 'grin', blush: 1,
-          fx: [['text', 46, 20, { text: w('for later!'), size: 5.5, dy: -6 }], ['sparkle', 40, 30, { dy: -6 }]], t: 1000 }],
-    // One it saved, dug up again (some time later) and eaten
-    digUp: () => w => [
-        { depth: 'hidden', eyes: 'closed', fx: dirt(8), t: 700 },
-        { depth: 'high', prop: 'cookie', arms: 'both', eyes: 'star', mouth: 'open',
-          fx: [...dirt(6), ['text', 46, 18, { text: w('found it!'), size: 5.5, dy: -6 }]], t: 900 },
-        ...bites({ depth: 'high' }),
-        { depth: 'high', eyes: 'happy', mouth: 'grin', blush: 1, fx: [['text', 50, 22, { text: w('yum!'), size: 6, dy: -6 }], ...hearts(2)], t: 1000 }]
+    // Got it (caught: out of the air): eats it, tastes it (TASTE), says
+    // thanks now and then (THANKS), and digs in. thanks: which, '' none,
+    // undefined: at random
+    eat: (flavour, caught, thanks) => w => {
+        const taste = TASTE[flavour] || TASTE.choc;
+        if (thanks === undefined)
+            thanks = chance(THANKS_OFTEN) ? pick(Object.keys(THANKS)) : '';
+        return [
+            Object.assign({ prop: 'cookie', treat: flavour, arms: 'both', eyes: 'star', mouth: 'o', look: [0, 1.4],
+                            fx: [...sparkles(2), ...(caught ? [['text', 32, 4, { text: w('got it!'), size: 6, dy: -6 }]] : [])], t: 650 }, OUT),
+            ...bites(OUT, flavour),
+            ...out(taste(w)),
+            ...out(THANKS[thanks] ? THANKS[thanks](w) : []),
+            ...digIn()];
+    }
+};
+export const THANKS_NAMES = Object.keys(THANKS);
+
+// Pulled at in its burrow (Talpy.tug): it hangs on to the rim, stretched
+// and trembling, for TUG_MS until it lets go (the host has it then), or you
+// let go first and it drops back in
+export const TUG_MS = 1000;
+export const TUG = {
+    hold: () => [{ depth: 'high', body: 'tug', arms: 'rim', eyes: 'squint', mouth: 'wavy', plume: 'wild',
+                   fx: [...dirt(4, 10), ['drop', 47, 26, { dy: 6, s0: 1, delay: 0.45 }]], t: TUG_MS }],
+    back: () => [
+        { depth: 'low', body: 'jolt', eyes: 'closed', mouth: 'wavy', plume: 'droop', fx: dirt(4, 8), t: 450 },
+        { depth: 'half', eyes: 'happy', mouth: 'smile', t: 500 }]
 };
 
 // Moods: how it looks between actions (base) and what it picks (pool)

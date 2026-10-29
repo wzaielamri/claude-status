@@ -111,14 +111,6 @@
       <label>Show Talpy, the pet, in the popup and in notifications</label>
       <default>true</default>
     </entry>
-    <entry name="cookiesEaten" type="Int">
-      <label>Cookies the big Talpy has eaten (double-click its stage for one)</label>
-      <default>0</default>
-    </entry>
-    <entry name="cookiesSaved" type="Int">
-      <label>Cookies the big Talpy saved for later, stuffed</label>
-      <default>0</default>
-    </entry>
     <entry name="chatPets" type="Int">
       <label>Pets for each account's chats in the list, at most (0 = only the big Talpy)</label>
       <default>5</default>

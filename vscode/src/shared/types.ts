@@ -41,6 +41,7 @@ export interface Peek {
   // writes one when you come back to a chat after a while). Older backends leave it out.
   recap?: { text: string; at: number | null } | null;
   mode?: string | null; // its permission mode: default, plan, auto, acceptEdits, bypassPermissions, dontAsk
+  ultracode?: boolean; // ultracode is on (/effort's ultracode; older backends leave it out)
   slug?: string | null; // its plan's name, <config>/plans/<slug>.md
   stopped?: Stop | null; // (as read; the row's own `stopped` says when the limit resets)
 }
@@ -545,14 +546,6 @@ export interface Counts {
 
 export type Overall = "waiting" | "working" | "idle" | "none";
 
-// The cookies you gave the big Talpy (double-click its stage): how many it
-// ate, and how many it saved for later, stuffed. Kept in the extension's
-// global state, the same in every window and view
-export interface Cookies {
-  eaten: number;
-  saved: number;
-}
-
 // One SSH host as the extension sees it
 export interface HostState {
   name: string;
@@ -921,8 +914,7 @@ export type WebviewMessage =
   | { type: "perms" } // the Permissions tab wants what it shows
   | { type: "projects" } // the Projects tab wants its projects (week.py --projects)
   | { type: "newChatIn"; path: string; profileDir: string } // + of a project: a new chat there, on the account of its newest chat
-  | { type: "copy"; text: string } // a tip's command, to the clipboard
-  | { type: "cookies"; cookies: Cookies }; // the big Talpy ate or saved one: the new tally
+  | { type: "copy"; text: string }; // a tip's command, to the clipboard
 
 // extension -> webview
 export type HostMessage =
@@ -935,5 +927,4 @@ export type HostMessage =
   | { type: "weekRule"; id: string; host: string; ok: boolean; message: string }
   | { type: "weekRevoke"; id: string; host: string; ok: boolean; message: string }
   | { type: "perms"; data: PermsData | null; error: string }
-  | { type: "projects"; data: ProjectsData | null; error: string }
-  | { type: "cookies"; cookies: Cookies }; // the big Talpy's cookie tally (as the page is ready, and when it changed)
+  | { type: "projects"; data: ProjectsData | null; error: string };

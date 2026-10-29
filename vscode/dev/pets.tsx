@@ -5,7 +5,7 @@
 // Query: ?theme=light|dark, ?mood=done (the hero's mood), ?pets=N (pets
 // per account), ?phase=N (the demo's story), ?still (no scheduled events),
 // ?cookie=X,Y (a double-click there on the hero's stage after a second: a
-// cookie), ?eaten=N (cookies it ate so far).
+// cookie).
 
 import "../webview/styles.css";
 import { pets } from "../webview/pets";
@@ -73,8 +73,7 @@ function box(className: string, parent: HTMLElement = app): HTMLDivElement {
   return el;
 }
 
-const hero = pets.createHeroStage(box("dev-hero"), { ...callbacks, saveCookies: (c) => console.log("cookies", c) });
-if (query.has("eaten")) pets.setCookies({ eaten: Number(query.get("eaten")), saved: 0 });
+const hero = pets.createHeroStage(box("dev-hero"), callbacks);
 const cookieAt = query.get("cookie");
 if (cookieAt) {
   setTimeout(() => {

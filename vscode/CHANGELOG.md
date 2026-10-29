@@ -2,17 +2,31 @@
 
 ## Unreleased
 
-- **A cookie for Talpy:** double-click the big Talpy's stage a little away
-  from it and a cookie pops up there. It spots it, jumps out of its burrow
-  (which stays where it was) and runs to it; drag the cookie around and it
-  follows, hold it up out of reach and it begs and keeps jumping for it,
-  lower it a little and it snatches it out of your hand. It eats it and
-  digs a new burrow right there. The corner of its stage counts the cookies
-  it ate (the same in every window), with confetti for the first and for
-  10, 25, 50, 100…; five in ten minutes and it's stuffed: the next one it
-  takes down its burrow for later, and digs it up another time. Clicking it
-  still pets it, and the headline and the line under it still open your
-  chats.
+- **A cookie for Talpy, and a tug of war for its burrow:** double-click the
+  big Talpy's stage a little away from it and a cookie pops up there, mostly
+  chocolate chip, now and then double chocolate, sprinkles, ginger, mint,
+  jam, oatmeal raisin or white chocolate. It spots it (and names it), jumps
+  out of its burrow (which stays where it was) and runs to it. A cookie is
+  light: it hops a little as it pops up and floats down to the floor, lands
+  with a soft squash and a bounce or two, flies on the way you threw it if
+  you let go on the move, and you can pick it up again whenever you like; hold it up out of reach and it begs and keeps jumping for it,
+  lower it a little and it snatches it out of your hand. The cookie is
+  drawn in front of it, so it steps right behind it and takes it where it
+  is. Each flavour tastes its own way, and now and then it says thanks its
+  way too (a bow, a fanfare on a little horn, confetti, a twirl, a blown
+  kiss or a few hops), never as a prize: nothing is counted or kept. Then
+  it digs a new burrow right there. Drag a Talpy out of its burrow and it
+  hangs on to the rim for a second, stretching, trembling and leaning
+  towards your hand, before it pops out into it; let go before that and it drops back in. Put
+  down while a cookie is out, it goes straight after it. Clicking it still
+  pets it, and the headline and the line under it still open your chats.
+- **Manual mode has its tag, and ultracode shows beside the effort:** a
+  chat in Claude's default permission mode says *Manual mode* beside its
+  name, as Claude calls it, like *Plan mode*, *Auto mode* and *Accept edits*
+  (it had no tag). A chat with ultracode on (Claude's `/effort` ultracode,
+  or `/ultracode on`) says so after its model and effort, e.g. *Opus 5.5 ·
+  xhigh · ultracode*, from the next prompt on, as Claude notes it in the
+  chat.
 - **A gear for the settings, and the same buttons in the same order as the
   widget:** the gear at the end of the view's title bar (and of the editor
   tab's header; **Talpy Den: Open Settings** in the Command Palette) opens

@@ -44,9 +44,6 @@ window.addEventListener("message", (event: MessageEvent) => {
     case "projects":
       projectsAnswer.set(msg);
       break;
-    case "cookies":
-      pets.setCookies(msg.cookies);
-      break;
   }
 });
 

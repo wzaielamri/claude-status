@@ -849,9 +849,12 @@ export function overlapText(overlaps: Overlap[]): string {
 
 // ---------------------------------------------------------------- permission mode
 
-// A chat's permission mode as its tag says it ("" for the default)
+// A chat's permission mode as its tag says it ("" when it isn't known; the
+// default is Claude's manual mode)
 export function modeText(mode: string | null | undefined): string {
   switch (mode) {
+    case "default":
+      return "Manual mode";
     case "plan":
       return "Plan mode";
     case "acceptEdits":
@@ -862,7 +865,6 @@ export function modeText(mode: string | null | undefined): string {
       return "Bypass permissions";
     case "dontAsk":
       return "Don't ask";
-    case "default":
     case "":
     case null:
     case undefined:
@@ -884,6 +886,8 @@ export function modeHint(mode: string | null | undefined): string {
       return "Claude runs everything without asking.";
     case "dontAsk":
       return "What isn't allowed already is refused, without asking you.";
+    case "default":
+      return "Manual mode: Claude asks you before it edits a file or runs a command you haven't allowed. Shift+Tab in the chat changes it.";
     default:
       return "Shift+Tab in the chat changes it.";
   }

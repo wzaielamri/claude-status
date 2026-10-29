@@ -415,6 +415,57 @@ export function propBack(ctx, name, t, fx, sip, faceY) {
     }
 }
 
+// A cookie of a flavour (actions.mjs FLAVOURS), 5.6 units round at (32,
+// 47.4): its dough and edge, and what's in it or on it
+const COOKIES = {
+    choc: { dough: '#d9a066', edge: '#a8733e', bits: '#5b3a22' },
+    double: { dough: '#7b4a2d', edge: '#4f2d19', bits: '#f3e6cf' },
+    mint: { dough: '#aedcc0', edge: '#6fae8c', bits: '#4a2f1f' },
+    white: { dough: '#e3bd84', edge: '#b38d55', bits: '#fffaf0' },
+    oat: { dough: '#d3ab73', edge: '#9c763f', bits: '#4b2a3d' },
+    sprinkles: { dough: '#f0d39a', edge: '#c9a165' },
+    ginger: { dough: '#c47a3c', edge: '#8c5022' },
+    jam: { dough: '#e6b56a', edge: '#b07f3a' }
+};
+const CHIPS = [[29.6, 46.2], [33.6, 45.6], [31.4, 49.4], [34.8, 48.6]];
+const SPRINKLES = [[30.2, 45.4, 30, '#3daee9'], [33.6, 44.9, -40, '#f2c94c'], [35.2, 47.6, 70, '#27ae60'], [32.2, 49.8, -10, '#8e9af5'],
+                   [29.2, 48.4, 55, '#ff6b6b'], [32.8, 47.3, 10, '#ffffff']];
+function cookie(ctx, treat) {
+    const k = COOKIES[treat] || COOKIES.choc;
+    circle(ctx, 32, 47.4, 5.6, k.dough);
+    ctx.beginPath();
+    traceEllipse(ctx, 32, 47.4, 5.6, 5.6);
+    stroke(ctx, k.edge, 0.7);
+    if (treat === 'sprinkles') {
+        circle(ctx, 32, 47.4, 4.2, '#ffb6d2');
+        for (const p of SPRINKLES) {
+            ctx.save();
+            about(ctx, p[0], p[1], p[2]);
+            rrect(ctx, p[0] - 0.85, p[1] - 0.3, 1.7, 0.6, 0.3, p[3]);
+            ctx.restore();
+        }
+    } else if (treat === 'ginger') {
+        line(ctx, 'M28.4 46.6l2 .7 1.5-1.7M33.2 50l1.7-1.3 1.5.5M31 50.8l.7-1.5M34 44.6l-.6 1.6', '#ecc796', 0.6);
+        for (const d of [[34.4, 46.6], [29.8, 49], [32.4, 47.8], [30.6, 44.6]])
+            circle(ctx, d[0], d[1], 0.38, '#fbeedb');
+    } else if (treat === 'jam') {
+        circle(ctx, 32, 47.4, 2.6, '#9c7038', 0.35);
+        circle(ctx, 32, 47.6, 2.3, '#d43a55');
+        circle(ctx, 31.2, 46.8, 0.7, '#ff9aae');
+    } else if (treat === 'oat') {
+        for (const f of [[30.4, 45.2], [34.6, 46.8], [31, 50.2], [33.8, 49.8], [28.8, 47.8], [32.2, 47.4]])
+            ellipse(ctx, f[0], f[1], 0.8, 0.42, '#f0dcb0');
+        for (const c of CHIPS.slice(0, 3))
+            ellipse(ctx, c[0], c[1], 0.95, 0.7, k.bits);
+    } else {
+        for (const c of CHIPS) {
+            if (treat === 'white')
+                circle(ctx, c[0], c[1], 1, '#c9a874');
+            circle(ctx, c[0], c[1], treat === 'white' ? 0.82 : 0.75, k.bits);
+        }
+    }
+}
+
 // Props held in front (the hands are behind them)
 export function propFront(ctx, name, t, since, opts) {
     opts = opts || {};
@@ -454,15 +505,21 @@ export function propFront(ctx, name, t, since, opts) {
         path(ctx, HEART, '#e05a7a');
         ctx.restore();
     } else if (name === 'cookie') {
+        cookie(ctx, opts.treat);
         // bitten (opts.bite times) where the skin behind it shows, a little shaded
-        circle(ctx, 32, 47.4, 5.6, '#d9a066');
-        ctx.beginPath();
-        traceEllipse(ctx, 32, 47.4, 5.6, 5.6);
-        stroke(ctx, '#a8733e', 0.7);
-        for (const c of [[29.6, 46.2], [33.6, 45.6], [31.4, 49.4], [34.8, 48.6]])
-            circle(ctx, c[0], c[1], 0.75, '#5b3a22');
         const behind = mix(opts.skin || LILAC.skin, '#1a1028', 0.14);
         [[36.4, 43.6], [33, 41.9], [29.2, 42.6]].slice(0, Math.min(3, opts.bite || 0)).forEach(b => circle(ctx, b[0], b[1], 2.1, behind));
+    } else if (name === 'trumpet') {
+        // a little horn at its mouth, its bell up to the right
+        line(ctx, 'M33.6 44.2L44.6 40.4', '#e9b949', 1.9);
+        rrect(ctx, 37.1, 40.3, 1.3, 2.8, 0.5, '#c99a33');
+        rrect(ctx, 39.7, 39.4, 1.3, 2.8, 0.5, '#c99a33');
+        ellipse(ctx, 33.4, 44.3, 1.4, 1.2, '#b9862a');
+        path(ctx, 'M43.8 39.4L50.2 34Q54.4 36.2 54 41L44.6 41.8Z', '#f2c94c');
+        ctx.save();
+        about(ctx, 52.1, 37.5, -27);
+        ellipse(ctx, 52.1, 37.5, 1.2, 3.5, '#c98f22');
+        ctx.restore();
     } else if (name === 'gum') {
         const grow = Math.min(1, since / Math.max(1, opts.gum || 2000));
         ctx.save();

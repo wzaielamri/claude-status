@@ -68,8 +68,7 @@ Item {
             "cheese!": i18nc("Talpy takes a selfie", "cheese!"), "yum!": i18nc("Talpy eats a cookie", "yum!"),
             "wheee!": i18nc("Talpy slides or swings", "wheee!"), "yay!": i18nc("Talpy cheers", "yay!"),
             "mmm…": i18nc("Talpy smells a flower", "mmm…"), "a star!": i18nc("Talpy sees a shooting star", "a star!"),
-            "sniff sniff": i18nc("Talpy smells a cookie in its sleep", "sniff sniff"), "*burp*": i18nc("Talpy ate too many cookies", "*burp*"),
-            "for later!": i18nc("Talpy saves a cookie", "for later!"), "found it!": i18nc("Talpy digs up a cookie it saved", "found it!")
+            "sniff sniff": i18nc("Talpy smells a cookie in its sleep", "sniff sniff")
         }
         talpy = new T.Talpy({ colors: colors(), theme: theme(), travels: travels, words: s => words[s] || s })
         talpy.facingLeft = facingLeft

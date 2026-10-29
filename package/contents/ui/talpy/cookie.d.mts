@@ -2,10 +2,6 @@
 
 import type { Talpy } from "./talpy.mjs";
 
-export const MILESTONES: number[];
-export function cookieNews(n: number, full: boolean): "first" | "milestone" | "full" | "";
-export function cookieCount(n: number): string;   // 999, then 1.2k, 12k
-
 export interface CookieStage {
     width: number;
     ground: number;      // the floor, from the stage's top
@@ -16,18 +12,16 @@ export interface CookieStage {
     maxX: number;
 }
 
-export type CookieWords = "spot" | "wake" | "full" | "gimme" | "cross" | "aww" | "first" | "milestone" | "yum" | "burp" | "saved" | "found";
+export type CookieWords = "spot" | "wake" | "gimme" | "cross" | "aww" | "yum";
 
 export interface CookieHost {
     stage(): CookieStage;
     px(): number;
     moveTo(x: number): void;
     face(left: boolean): void;
-    say(what: CookieWords, n: number): void;
+    say(what: CookieWords, flavour: string): void;
     leaveHole(open: number): void;
     fillHole(): void;
-    tally(): { eaten: number; saved: number };
-    setTally(eaten: number, saved: number): void;
     changed(): void;
     instant(): boolean;
 }
@@ -37,8 +31,11 @@ export interface Cookie {
     y: number;
     r: number;        // its radius, px
     scale: number;    // popping up: 0 to 1 (a little over on the way)
-    angle: number;    // degrees, as it swings
+    angle: number;    // degrees, as it swings (and rocks as it lands)
+    sx: number;       // squashed as it lands (1: round): draw it scaled so, its bottom where it is
+    sy: number;
     held: boolean;    // in your hand
+    flavour: string;  // choc double sprinkles ginger mint jam oat white (actions.mjs FLAVOURS)
 }
 
 export class CookieGame {
@@ -46,13 +43,11 @@ export class CookieGame {
     readonly cookie: Cookie | null;
     readonly on: boolean;        // something goes on: tick it
     readonly chasing: boolean;   // Talpy is on its feet after it: draw it live
-    readonly stuffed: boolean;
     place(x: number, y: number): boolean;
     grab(x: number, y: number): boolean;
     drag(x: number, y: number): void;
     drop(): void;
     picked(): void;
     landed(): void;
-    surprise(): boolean;
     tick(now: number): void;
 }

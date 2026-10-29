@@ -102,7 +102,7 @@ test("continuing a stopped chat on another account with room left", () => {
 test("permission modes as their tags say them", () => {
   assert.equal(modeText("plan"), "Plan mode");
   assert.equal(modeText("bypassPermissions"), "Bypass permissions");
-  assert.equal(modeText("default"), "");
+  assert.equal(modeText("default"), "Manual mode");
   assert.equal(modeText(undefined), "");
   assert.equal(modeText("somethingNew"), "somethingNew");
 });

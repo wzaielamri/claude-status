@@ -1446,6 +1446,9 @@ def agent_run(home, extra_dirs, chat_id, agent_id, profile_key=None):
 #     after it.
 #   - the permission mode (default, plan, auto, acceptEdits, …): the newest
 #     `permission-mode` record, or the one your last prompt carries.
+#   - whether ultracode is on (2.1.312: /effort's ultracode, /ultracode on):
+#     the newest `attachment` record of type ultra_effort_enter (on) or
+#     ultra_effort_exit (off), which Claude adds with your next prompt.
 #   - the chat's slug: its plan, if it made one, is <cfg>/plans/<slug>.md.
 #   - what stopped it: a reply that is an API error saying a usage limit was
 #     hit ("You've hit your session limit · resets 7:10pm (Europe/Berlin)",
@@ -1467,7 +1470,8 @@ PEEK_REPLY_CHARS = 1500
 PEEK_PROMPT_CHARS = 300
 PEEK_LINE = re.compile(rb'"type":\s*"(?:user|assistant|last-prompt)"')
 PEEK_MORE_LINE = re.compile(rb'"type":\s*"(?:user|assistant|last-prompt|system|permission-mode)"')
-PEEK_ADDED = ("recap", "mode", "slug", "stopped")  # a cached peek without them (an older copy's) is read again
+ULTRA_LINE = re.compile(rb'"type":\s*"ultra_effort_(?:enter|exit)"')  # (of all attachments, only these are read)
+PEEK_ADDED = ("recap", "mode", "slug", "stopped", "ultracode")  # a cached peek without them (an older copy's) is read again
 RECAP_NOTE = re.compile(r"\s*\(disable recaps in /config\)\s*$")
 # Claude's names for the plan windows in "You've hit your … limit" (its
 # rate-limit types: five_hour is the session limit, the 5-hour limit since
@@ -1522,7 +1526,8 @@ def blocks_of(e):
 
 def tail_entries(path, size, nbytes, more=False):
     """Conversation entries (and last-prompt records) from the last nbytes
-    of a transcript, newest first; more: system and permission-mode records too."""
+    of a transcript, newest first; more: system and permission-mode records
+    too, and ultracode's attachments."""
     try:
         with open(path, "rb") as f:
             f.seek(max(0, size - nbytes))
@@ -1532,10 +1537,10 @@ def tail_entries(path, size, nbytes, more=False):
     if size > nbytes:
         lines = lines[1:]  # probably cut in the middle
     pattern = PEEK_MORE_LINE if more else PEEK_LINE
-    kinds = ("user", "assistant", "last-prompt") + (("system", "permission-mode") if more else ())
+    kinds = ("user", "assistant", "last-prompt") + (("system", "permission-mode", "attachment") if more else ())
     entries = []
     for line in reversed(lines):
-        if not pattern.search(line):
+        if not pattern.search(line) and not (more and ULTRA_LINE.search(line)):
             continue
         try:
             e = json.loads(line)
@@ -1624,6 +1629,7 @@ def peek_from(entries):
         "at": to_ms(convo[0].get("timestamp")) if convo else None,
         "recap": recap_of(entries),
         "mode": mode_of(entries),
+        "ultracode": ultracode_of(entries),
         "slug": next((e["slug"] for e in entries if isinstance(e.get("slug"), str) and PLAN_SLUG.match(e["slug"])), None),
         "stopped": stopped_by(turn) if turn is not None else None,
     }
@@ -1643,6 +1649,16 @@ def names_mode(e):
 def mode_of(entries):
     """The chat's permission mode (newest first entries), e.g. "plan", or None."""
     return next((m for m in map(names_mode, entries) if m), None)
+
+
+def ultracode_of(entries):
+    """Whether ultracode is on in the chat (newest first entries), as Claude
+    noted it with your last prompt since it changed."""
+    for e in entries:
+        kind = e.get("attachment").get("type") if e["type"] == "attachment" and isinstance(e.get("attachment"), dict) else None
+        if kind in ("ultra_effort_enter", "ultra_effort_exit"):
+            return kind == "ultra_effort_enter"
+    return False
 
 
 def recap_of(entries):
@@ -1688,7 +1704,7 @@ def stopped_by(e):
 
 
 def chat_peek(path):
-    """{"activity", "prompt", "reply", "replyLine", "at", "recap", "mode",
+    """{"activity", "prompt", "reply", "replyLine", "at", "recap", "mode", "ultracode",
     "slug", "stopped"} of a chat, read from the end of its transcript (more
     of it while that isn't enough)."""
     try:

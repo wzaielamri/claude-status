@@ -15,9 +15,6 @@ export const stageCallbacks: StageCallbacks = {
   open(chat: ChatRef) {
     post({ type: "openWindow", chat });
   },
-  saveCookies(cookies) {
-    post({ type: "cookies", cookies });
-  },
 };
 
 export function useViewVisible(): boolean {

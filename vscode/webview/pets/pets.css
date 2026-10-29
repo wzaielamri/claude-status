@@ -253,8 +253,8 @@
   touch-action: none;
 }
 
-/* The cookie you gave the hero (grab it: it follows), its shadow on the
-   floor, and how many it ate, in the corner */
+/* The cookie you gave the hero (grab it: it follows; over the hero, so it
+   shows whole as the hero gets there), its shadow on the floor */
 .cs-cookie,
 .cs-cookie-shadow {
   position: absolute;
@@ -279,21 +279,8 @@
 }
 
 .cs-cookie[hidden],
-.cs-cookie-shadow[hidden],
-.cs-cookie-jar[hidden] {
+.cs-cookie-shadow[hidden] {
   display: none;
-}
-
-.cs-cookie-jar {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: var(--cs-small-font);
-  opacity: 0.75;
 }
 
 /* Speech bubble above whoever speaks */

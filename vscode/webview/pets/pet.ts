@@ -6,9 +6,11 @@
 // The hero (key "") mirrors all your sessions and has a life of its own: it
 // digs over to wherever your mouse is, has hobbies, naps and reacts to you.
 // Click to pet it (many quick clicks tickle), double-click to make it dance,
-// drag it out of its burrow and drop it. Double-click its stage a little away
-// from it and there's a cookie (vendor/talpy/cookie.mjs): it sees it, runs
-// after it as you drag it about, and eats it.
+// drag it out of its burrow (it hangs on to the rim for a moment, then pops
+// out into your hand) and drop it. Double-click its stage a little away from
+// it and there's a cookie (vendor/talpy/cookie.mjs), now and then of another
+// flavour: it sees it, runs after it as you drag it about (let go and it
+// falls: pick it up again), and eats it.
 //
 // A chat's pet stands for one chat in the list: it acts that chat out (works,
 // calls you, rests while it's idle, sleeps once it's done, looks sad if it
@@ -66,21 +68,25 @@ export function chatRef(c: StageChat): ChatRef {
   };
 }
 
-// What the hero says about its cookie (n: how many it ate)
-function cookieWords(what: CookieWords, n: number): string {
+// What the hero says about its cookie (flavour: the cookie's, see FLAVOURS in
+// vendor/talpy/actions.mjs)
+const SPOT: Record<string, string> = {
+  double: "Double chocolate?!", sprinkles: "Sprinkles!!", ginger: "Ooh, ginger!", mint: "Mint?!", jam: "Is that jam?!",
+  oat: "Oatmeal… raisin?", white: "White chocolate?!",
+};
+const YUM: Record<string, string> = {
+  double: "So chocolatey! ♥", sprinkles: "Sprinkles! ♪", ginger: "Spicy!", mint: "So fresh!", jam: "Mmm, jam!",
+  oat: "…raisins. Still yum!", white: "Fancy!",
+};
+function cookieWords(what: CookieWords, flavour: string): string {
+  const any = (list: string[]) => list[Math.floor(Math.random() * list.length)];
   switch (what) {
-    case "spot": return ["A cookie?!", "Is that for me?", "Cookie!!"][Math.floor(Math.random() * 3)];
+    case "spot": return SPOT[flavour] ?? any(["A cookie?!", "Is that for me?", "Cookie!!"]);
     case "wake": return "Did someone say cookie?";
-    case "full": return "I'm stuffed… but I'll save it for later!";
     case "gimme": return "Gimme!";
     case "cross": return "Hey! No fair!";
     case "aww": return "Aww, so close!";
-    case "first": return "My first cookie! Thank you! ♥";
-    case "milestone": return `${n} cookies! You're the best!`;
-    case "yum": return `Mmm! Cookie number ${n}.`;
-    case "burp": return "…I'm stuffed.";
-    case "saved": return "Saving this one for later!";
-    case "found": return "Found a cookie I saved!";
+    case "yum": return YUM[flavour] ?? any(["Yum!", "Mmm, cookie!", "Thank you!"]);
   }
   return "";
 }
@@ -106,6 +112,9 @@ export class Pet {
   px: number;
   lift = 0;
   held = false;
+  private tugging = false; // you pull at it in its burrow: it hangs on (talpy.tug), then pops out
+  private pop = 1; // popping out into your hand: 0 in its burrow, 1 where you hold it
+  private lastAt = { x: 0, y: 0 }; // where your hand is (pull, popOut)
   private arriving = false;
   private travelTo = -1; // where the next dig takes it (-1: it picks)
   private quickClicks = 0;
@@ -145,11 +154,13 @@ export class Pet {
   private readonly cookie: HTMLCanvasElement | null = null;
   private readonly cookieShadow: HTMLDivElement | null = null;
   private cookieOn = false;
+  private hadCookie = false; // you gave it one since the view opened (its hint stops)
   private readonly grab: HTMLDivElement;
   private readonly drawn: Record<string, string> = {};
 
   private readonly stride: Tween;
   private readonly faller: Tween;
+  private readonly popper: Tween;
   private readonly lookTimer: Timer;
   private readonly tickleTimer: Timer;
   private readonly contextTimer: Timer;
@@ -184,6 +195,7 @@ export class Pet {
 
     this.stride = new Tween(stage, (v) => (this.px = v));
     this.faller = new Tween(stage, (v) => (this.lift = v));
+    this.popper = new Tween(stage, (v) => (this.pop = v));
     this.fill = new Tween(stage, (v) => (this.leftOpen = v));
     // The hero turns towards the mouse while it hovers the stage
     this.lookTimer = new Timer(clock, 350, () => {
@@ -246,9 +258,10 @@ export class Pet {
       this.tag.style.color = textOn(PALETTE[colorIndex]);
       this.tag.addEventListener("click", () => this.clicked());
     }
-    // (the hole and the cookie first: under the pet)
-    stage.petLayer.append(this.leftHole, ...(this.cookie ? [this.cookieShadow!, this.cookie] : []), this.sheets,
-      ...(this.tag ? [this.tag] : []), this.grab);
+    // (the hole and the cookie's shadow first: under the pet; the cookie last:
+    // over it, so it shows whole as the pet gets there, and pressed first)
+    stage.petLayer.append(this.leftHole, ...(this.cookieShadow ? [this.cookieShadow] : []), this.sheets,
+      ...(this.tag ? [this.tag] : []), this.grab, ...(this.cookie ? [this.cookie] : []));
     this.listen();
     this.describe();
 
@@ -342,7 +355,7 @@ export class Pet {
     const leaving = !c;
     if (leaving !== this.leaving) {
       this.leaving = leaving;
-      if (leaving && !this.held) this.goAway();
+      if (leaving && !this.held && !this.tugging) this.goAway();
       else if (!leaving) this.arrive(); // its chat came back: it pops up again
     }
     this.changed();
@@ -361,7 +374,7 @@ export class Pet {
   setHome(x: number): void {
     if (x !== this.homeX) {
       this.homeX = x;
-      if (this.held || this.leaving) {
+      if (this.held || this.tugging || this.leaving) {
         // stays: in your hand (put down, it digs back), or on its way out
       } else if (!this.stage.shownOnce() || this.arriving) {
         this.px = x; // not seen yet, or still underground: it's just there
@@ -387,7 +400,6 @@ export class Pet {
     }
     const mood = this.mood;
     if (!this.lone || this.cookieOn || mood === "done" || mood === "loading" || offFor < 1500) return;
-    if (this.game?.surprise()) return; // (it digs up a cookie it saved)
     const holiday = holidayGreeting();
     if (holiday) {
       this.talpy.react("celebrate");
@@ -439,7 +451,7 @@ export class Pet {
   // Digs over to x (it dives in, tunnels across, pops up there); quick: its
   // spot moved (a new chat makes room), so it hurries
   private digTo(x: number, quick = false): void {
-    if (this.held || this.leaving || this.arriving) return;
+    if (this.held || this.tugging || this.leaving || this.arriving) return;
     this.travelTo = this.clampX(x);
     if (Math.abs(this.travelTo - this.px) < this.stage.bodyWidth * 0.3) {
       this.travelTo = -1;
@@ -532,6 +544,58 @@ export class Pet {
     this.say("♪ ♫");
   }
 
+  // You start to drag it: in its burrow it hangs on to the rim for a moment
+  // (talpy.tug), stretching, then pops out into your hand; let go before that
+  // and it drops back in. Out of its burrow (or with less motion) it's yours
+  // at once.
+  private pull(): void {
+    if (!reducedMotion() && this.talpy.tug((ok) => { if (ok && this.tugging) this.popOut(); })) {
+      this.tugging = true;
+      this.tugToward(this.lastAt);
+      this.stride.stop();
+      this.game?.picked(); // (it stops seeing to its cookie meanwhile)
+      this.say("Hnngh!");
+      this.changed();
+      return;
+    }
+    this.pickUp();
+    this.holdAt(this.lastAt);
+  }
+
+  // (it leans towards your hand, p, as it hangs on)
+  private tugToward(p: { x: number; y: number }): void {
+    const unit = this.stage.box / 64;
+    this.talpy.tugToward((p.x - this.px) / unit, (p.y - (this.ground - this.stage.bodyHeight * 0.6)) / unit);
+  }
+
+  private popOut(): void {
+    this.tugging = false;
+    this.pickUp();
+    this.holdAt(this.lastAt);
+    this.popper.run(0, 1, 220, ease.outBack); // (from its burrow up to your hand)
+  }
+
+  // Let go of while it hung on: back down it drops, phew
+  private letGo(): void {
+    this.tugging = false;
+    this.talpy.letGo((ok) => {
+      if (!ok || this.destroyed) return;
+      if (this.leaving) this.goAway(); // its chat left meanwhile: now it goes
+      else this.game?.landed();
+    });
+    this.say("Phew!");
+    this.changed();
+  }
+
+  // Where you hold it: under your hand (p, stage coordinates)
+  private holdAt(p: { x: number; y: number }): void {
+    const ground = this.ground,
+      bh = this.stage.bodyHeight;
+    this.px = this.clampX(p.x);
+    this.lift = Math.max(0, Math.min(ground - bh, ground - p.y - bh / 2));
+    this.changed();
+  }
+
   private pickUp(): void {
     this.held = true; // first: nothing else moves it while you hold it
     this.landing = true;
@@ -554,6 +618,11 @@ export class Pet {
   }
 
   private drop(): void {
+    if (this.popper.active) {
+      this.popper.stop(); // (it falls from where it's drawn)
+      this.lift *= this.pop;
+      this.pop = 1;
+    }
     const from = this.lift;
     this.faller.run(from, 0, Math.max(160, Math.sqrt(from / this.stage.gu) * 230), ease.inQuad, () => this.landed(from));
     this.changed();
@@ -564,13 +633,14 @@ export class Pet {
     this.held = false;
     // (the one it left is filled in; it digs a new one where it is)
     if (!this.leftHole.hidden) this.fill.run(this.leftOpen, 0, 350, ease.linear, () => (this.leftHole.hidden = true));
+    // (a cookie out: it stays out of its burrow and goes after it)
     const feel = this.talpy.land(fromHeight / (this.stage.box / 64), () => {
       this.landing = false;
       if (this.destroyed) return;
       this.game?.landed();
       if (this.leaving) this.goAway(); // its chat left while you held it: now it goes
       else if (!this.lone && Math.abs(this.px - this.homeX) > this.stage.bodyWidth * 0.5) this.digTo(this.homeX);
-    });
+    }, !!this.game?.cookie);
     // (in the words for how it looks)
     if (feel === "sick") this.say("Ugh… I don't feel so good.");
     else if (feel === "dizzy") this.say("Ouch… the room is spinning.");
@@ -583,14 +653,14 @@ export class Pet {
     if (mood === "needs" && waiting) return `${waiting} needs you!`;
     if (mood === "agents") return "Juggling subagents!";
     if (mood === "working") return "Busy coding… thanks!";
-    if (this.lone && this.stage.cookies().eaten === 0 && Math.random() < 0.35) return "Psst… double-click my stage for a cookie!";
+    if (this.lone && !this.hadCookie && Math.random() < 0.25) return "Psst… double-click my stage for a cookie!";
     const lines = ["Hi!", "♥", "Ship it!", "All quiet here.", "Pet me more!"];
     return lines[Math.floor(Math.random() * lines.length)];
   }
 
   // Something happened to its chat (or, for the hero, to an account)
   event(kind: string, text: string): void {
-    if (this.held || this.leaving) return; // (a reaction now would stop it digging away)
+    if (this.held || this.tugging || this.leaving) return; // (a reaction now would stop it digging away)
     if (!this.stage.live || this.cookieOn) {
       this.missed = { kind, text, at: Date.now() }; // (acted out when it shows, or has its cookie)
       return;
@@ -615,13 +685,11 @@ export class Pet {
         this.px = x;
       },
       face: (left) => (this.talpy.facingLeft = left),
-      say: (what, n) => this.say(cookieWords(what, n)),
+      say: (what, flavour) => this.say(cookieWords(what, flavour)),
       leaveHole: (open) => this.leaveHole(open),
       fillHole: () => {
         if (!this.leftHole.hidden) this.fill.run(this.leftOpen, 0, 350, ease.linear, () => (this.leftHole.hidden = true));
       },
-      tally: () => s.cookies(),
-      setTally: (eaten, saved) => s.saveCookies({ eaten, saved }),
       changed: () => this.cookieChanged(),
       instant: () => reducedMotion(), // (no running about: it just has it)
     });
@@ -629,7 +697,9 @@ export class Pet {
 
   // A double-click on the stage at (x, y): false if it's too close to it
   placeCookie(x: number, y: number): boolean {
-    return !!this.game && this.stage.live && this.game.place(x, y);
+    if (!this.game || !this.stage.live || !this.game.place(x, y)) return false;
+    this.hadCookie = true;
+    return true;
   }
 
   private cookieChanged(): void {
@@ -659,19 +729,23 @@ export class Pet {
     if (el.hidden) el.hidden = shadow.hidden = false;
     const k = devicePixelRatio || 1,
       size = Math.ceil(c.r * 2 + 4);
-    if (this.drawn.cookieSize !== `${size}@${k}`) {
-      this.drawn.cookieSize = `${size}@${k}`;
+    if (this.drawn.cookieSize !== `${size}@${k},${c.flavour}`) {
+      this.drawn.cookieSize = `${size}@${k},${c.flavour}`;
       el.width = el.height = Math.round(size * k);
       el.style.width = el.style.height = `${size}px`;
       const ctx = el.getContext("2d");
       if (ctx) {
         ctx.setTransform((k * c.r) / 5.6, 0, 0, (k * c.r) / 5.6, (k * size) / 2, (k * size) / 2);
-        drawCookie(ctx);
+        drawCookie(ctx, c.flavour);
       }
     }
-    const r1 = (v: number) => Math.round(v * 10) / 10;
+    const r1 = (v: number) => Math.round(v * 10) / 10,
+      r2 = (v: number) => Math.round(v * 100) / 100,
+      bottom = r1(c.r * c.scale);
+    // (squashed as it lands about its bottom, on the floor: Pet.qml's Scale after its scale and rotation)
+    const squash = c.sx !== 1 || c.sy !== 1 ? ` translate(0, ${bottom}px) scale(${r2(c.sx)}, ${r2(c.sy)}) translate(0, ${-bottom}px)` : "";
     this.put(el, "cookie", "transform",
-      `translate(${r1(c.x - size / 2)}px, ${r1(c.y - size / 2)}px) rotate(${r1(c.angle)}deg) scale(${Math.round(c.scale * 100) / 100})`);
+      `translate(${r1(c.x - size / 2)}px, ${r1(c.y - size / 2)}px)${squash} rotate(${r1(c.angle)}deg) scale(${r2(c.scale)})`);
     el.classList.toggle("cs-held", c.held);
     // its shadow on the floor, smaller and lighter the higher it is
     const over = Math.min(1, Math.max(0, this.ground - c.y - c.r) / (this.stage.box * 0.8)),
@@ -696,25 +770,27 @@ export class Pet {
     });
     g.addEventListener("pointermove", (e) => {
       if (!this.pressedAt) return;
-      const p = this.stage.local(e);
+      const p = (this.lastAt = this.stage.local(e));
       if (!this.dragging && Math.hypot(p.x - this.pressedAt.x, p.y - this.pressedAt.y) > this.stage.gu * 0.5) {
         this.dragging = true;
-        this.pickUp();
-      }
-      if (this.dragging) {
-        const ground = this.ground,
-          bh = this.stage.bodyHeight;
-        this.px = this.clampX(p.x);
-        this.lift = Math.max(0, Math.min(ground - bh, ground - p.y - bh / 2));
-        this.changed();
+        this.pull();
+      } else if (this.dragging && this.held) {
+        this.holdAt(p);
+      } else if (this.dragging && this.tugging) {
+        this.tugToward(p);
       }
     });
+    // (put down, or let go of while it hung on)
+    const release = (): void => {
+      this.dragging = false;
+      if (this.tugging) this.letGo();
+      else if (this.held) this.drop();
+    };
     g.addEventListener("pointerup", () => {
       if (!this.pressedAt) return;
       this.pressedAt = null;
       if (this.dragging) {
-        this.dragging = false;
-        this.drop();
+        release();
         return;
       }
       // Like Qt: a click, then a double-click instead of the second click
@@ -727,10 +803,7 @@ export class Pet {
     const cancel = (): void => {
       if (!this.pressedAt) return;
       this.pressedAt = null;
-      if (this.dragging) {
-        this.dragging = false;
-        this.drop();
-      }
+      if (this.dragging) release();
     };
     g.addEventListener("pointercancel", cancel);
     g.addEventListener("lostpointercapture", cancel);
@@ -776,7 +849,7 @@ export class Pet {
     this.spring(now);
     const px = Math.round(this.px * 10) / 10,
       shown = Math.round(this.shown.value * 10) / 10,
-      lift = Math.round(this.lift * 10) / 10,
+      lift = Math.round(this.lift * this.pop * 10) / 10,
       swing = Math.round(this.tilt.value * 10) / 10;
     this.put(this.sheets, "origin", "transformOrigin", `${s.canvasW / 2}px ${s.floorY - (box * 27) / 64}px`);
     this.put(this.sheets, "sheets", "transform",
@@ -788,7 +861,7 @@ export class Pet {
     const gw = s.bodyWidth + LARGE,
       gh = s.bodyHeight + LARGE;
     this.put(this.grab, "grab", "transform", `translate(${px - gw / 2}px, ${ground - lift - gh}px)`);
-    this.put(this.grab, "cursor", "cursor", this.held ? "grabbing" : this.lone ? "grab" : "pointer");
+    this.put(this.grab, "cursor", "cursor", this.held || this.tugging ? "grabbing" : this.lone ? "grab" : "pointer");
     if (!this.leftHole.hidden) {
       this.put(this.leftHole, "hole", "transform", `translate(${Math.round(this.leftAt * 10) / 10 - s.canvasW / 2}px, ${ground - s.floorY}px)`);
       this.paintHole();
@@ -832,7 +905,7 @@ export class Pet {
   // live while you hold it, until it has landed.
   private draw(now: number): void {
     const f = this.film;
-    f.on = !this.landing && !this.game?.chasing && !reducedMotion();
+    f.on = !this.landing && !this.tugging && !this.game?.chasing && !reducedMotion();
     let changed = f.tick(now);
     if (this.paintSheets()) changed = true; // (drawn at once: shown at once)
     if (changed) this.compose();
@@ -953,7 +1026,7 @@ export class Pet {
 
   destroy(): void {
     this.destroyed = true;
-    for (const t of [this.stride, this.faller, this.fill]) t.stop();
+    for (const t of [this.stride, this.faller, this.popper, this.fill]) t.stop();
     for (const t of [this.lookTimer, this.tickleTimer, this.contextTimer, this.usageTimer]) t.stop();
     for (const el of [this.leftHole, this.cookieShadow, this.cookie, this.sheets, this.tag, this.grab]) el?.remove();
   }
