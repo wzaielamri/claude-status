@@ -249,14 +249,14 @@ uninstall_gnome() {
 
 # The chat pane's icon (Plasma). The pane is a window of plasmashell, so the
 # taskbar would show Plasma's icon for it; a KWin window rule gives windows
-# titled "… — Claude chat" a desktop file of their own (hidden from menus)
+# titled "… — Talpy Chat" a desktop file of their own (hidden from menus)
 # with Talpy as its icon. It shows in System Settings → Window Rules.
 pane_app="org.wzaielamri.talpyden.chat"
 pane_desktop="${XDG_DATA_HOME:-$HOME/.local/share}/applications/$pane_app.desktop"
 pane_rule="talpy-den-chat-pane"
 pane_rule_keys=(
   "Description=Talpy Den: Talpy as the chat pane's icon"
-  "title=— Claude chat" "titlematch=2"         # 2: the title has it
+  "title=— Talpy Chat" "titlematch=2"         # 2: the title has it (ChatPane.qml's title)
   "wmclass=plasmashell" "wmclassmatch=2"       # (org.kde.plasmashell on Wayland)
   "types=1"                                    # normal windows
   "desktopfile=$pane_app" "desktopfilerule=2"  # 2: force
@@ -280,7 +280,7 @@ install_pane_icon() {
   cat > "$pane_desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Claude chat
+Name=Talpy Chat
 Comment=The chat pane of the Talpy Den widget
 Icon=$HOME/.local/share/plasma/plasmoids/$id/contents/pets/window.svg
 Exec=true

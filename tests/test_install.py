@@ -136,7 +136,9 @@ class InstallTests(unittest.TestCase):
         text = rules.read_text()
         self.assertIn("count=2\nrules=mine,talpy-den-chat-pane\n", text)
         self.assertIn("[talpy-den-chat-pane]\n", text)
-        self.assertIn("title=— Claude chat\n", text)
+        self.assertIn("title=— Talpy Chat\n", text)
+        # (the rule matches the pane's title: the two can't drift apart)
+        self.assertIn('"%1 — Talpy Chat"', (ROOT / "package/contents/ui/ChatPane.qml").read_text())
         self.assertIn("desktopfile=org.wzaielamri.talpyden.chat\ndesktopfilerule=2\n", text)
         self.assertIn("[mine]\nDescription=my rule\n", text)
         desktop = self.home / ".local/share/applications/org.wzaielamri.talpyden.chat.desktop"

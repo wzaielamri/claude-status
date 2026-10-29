@@ -276,194 +276,208 @@ RowLayout {
             // The name, then its tags: beside it while the whole name and all
             // of them fit there, else under it (on more lines if need be), so
             // the tags never cut the name short (as in the VS Code extension)
-            Flow {
-                id: nameLine
+            // (the hover buttons reaching past its state: its name and tags are
+            // cut where they begin, in place, nothing drawn over them)
+            Item {
+                id: nameBox
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignTop
-                readonly property bool tagsBeside: nameLabel.implicitWidth + Kirigami.Units.smallSpacing + tagLine.extent.width <= width
+                implicitHeight: nameLine.implicitHeight
 
-                PlasmaComponents3.Label {
-                    id: nameLabel
-                    textFormat: Text.PlainText
-                    text: row.session.name
-                    font.bold: true
-                    font.underline: nameMouse.containsMouse
-                    elide: Text.ElideRight
-                    width: Math.min(implicitWidth, nameLine.width)
+                Item {
+                    width: Math.max(0, nameBox.width - rowButtons.beyond)
+                    height: nameBox.height
+                    clip: true
 
-                    // Click the name to jump to the session
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        width: nameLabel.contentWidth
-                        height: parent.height
-                        mainText: Plasmoid.configuration.clickOpensPane
-                                  ? i18n("Open this chat beside the popup: its conversation, a box to reply, and what it changed")
-                                  : row.openHint
+                    Flow {
+                        id: nameLine
+                        width: nameBox.width
+                        readonly property bool tagsBeside: nameLabel.implicitWidth + Kirigami.Units.smallSpacing + tagLine.extent.width <= width
 
-                        MouseArea {
-                            id: nameMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.clickChat(row.session, row.remoteHost)
-                        }
-                    }
-                }
-                Flow {
-                    id: tagLine
-                    // its shown tags in one line (a pixel spare, so they don't wrap
-                    // on a rounding), and their height
-                    readonly property var extent: {
-                        let w = -spacing, h = 0
-                        for (const t of children)
-                            if (t.visible) {
-                                w += t.implicitWidth + spacing
-                                h = Math.max(h, t.implicitHeight)
+                        PlasmaComponents3.Label {
+                            id: nameLabel
+                            textFormat: Text.PlainText
+                            text: row.session.name
+                            font.bold: true
+                            font.underline: nameMouse.containsMouse
+                            elide: Text.ElideRight
+                            width: Math.min(implicitWidth, nameLine.width)
+
+                            // Click the name to jump to the session
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                width: nameLabel.contentWidth
+                                height: parent.height
+                                mainText: Plasmoid.configuration.clickOpensPane
+                                          ? i18n("Open this chat beside the popup: its conversation, a box to reply, and what it changed")
+                                          : row.openHint
+
+                                MouseArea {
+                                    id: nameMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.clickChat(row.session, row.remoteHost)
+                                }
                             }
-                        return { width: w > 0 ? Math.ceil(w) + 1 : 0, height: h }
-                    }
-                    // (no tags: no width, so the name's line leaves it out)
-                    width: !nameLine.tagsBeside ? nameLine.width : extent.width > 0 ? leftPadding + extent.width : 0
-                    leftPadding: nameLine.tagsBeside ? Kirigami.Units.smallSpacing : 0
-                    topPadding: nameLine.tagsBeside ? Math.max(0, Math.round((nameLabel.implicitHeight - extent.height) / 2))
-                                                    : Math.round(Kirigami.Units.smallSpacing / 2)
-                    spacing: Kirigami.Units.smallSpacing
+                        }
+                        Flow {
+                            id: tagLine
+                            // its shown tags in one line (a pixel spare, so they don't wrap
+                            // on a rounding), and their height
+                            readonly property var extent: {
+                                let w = -spacing, h = 0
+                                for (const t of children)
+                                    if (t.visible) {
+                                        w += t.implicitWidth + spacing
+                                        h = Math.max(h, t.implicitHeight)
+                                    }
+                                return { width: w > 0 ? Math.ceil(w) + 1 : 0, height: h }
+                            }
+                            // (no tags: no width, so the name's line leaves it out)
+                            width: !nameLine.tagsBeside ? nameLine.width : extent.width > 0 ? leftPadding + extent.width : 0
+                            leftPadding: nameLine.tagsBeside ? Kirigami.Units.smallSpacing : 0
+                            topPadding: nameLine.tagsBeside ? Math.max(0, Math.round((nameLabel.implicitHeight - extent.height) / 2))
+                                                            : Math.round(Kirigami.Units.smallSpacing / 2)
+                            spacing: Kirigami.Units.smallSpacing
 
-                    // starred: a ★ (click: unstar it)
-                    StarMark {
-                        visible: !!row.session.starred
-                        tooltip: i18n("Once it isn't listed here any more, it stays under Recent chats → Starred. Click to unstar it.")
-                        onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, false)
-                    }
-                    Tag {
-                        visible: row.showProfile
-                        text: row.session.profile
-                        tooltip: i18n("The Claude profile (config folder) this session runs in")
-                    }
-                    Tag {
-                        visible: row.tag !== ""
-                        text: row.tag
-                        tooltip: row.session.entrypoint === "claude-vscode"
-                                 ? i18n("Runs in VS Code's Claude Code panel. Click the name to open the conversation there.")
-                                 : i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
-                    }
-                    // a background session shown in a terminal too (claude attach)
-                    Tag {
-                        readonly property var shownIn: row.session.kind === "bg" && row.session.attached ? row.session.attached : null
-                        visible: shownIn !== null
-                        text: !shownIn ? "" : shownIn.in === "tmux" ? "Tmux"
-                              : shownIn.in === "vscode" ? i18nc("where a chat runs", "VS Code terminal") : i18nc("where a chat runs", "Terminal")
-                        tooltip: !shownIn ? "" : shownIn.app ? i18n("Shown in a terminal too (%1): claude attach.", shownIn.app)
-                                                             : i18n("Shown in a terminal too: claude attach.")
-                    }
-                    Tag {
-                        // Chat shared across profiles (hard-linked transcript)
-                        readonly property var info: row.session.shared
-                        visible: !!info
-                        text: info && info.forkOf ? i18n("⇄ Shared copy") : i18n("⇄ Shared")
-                        tooltipTitle: info && info.forkOf ? i18n("Copy of a shared chat") : i18n("Shared chat")
-                        tooltip: !info ? ""
-                                 : info.forkOf
-                                   ? i18n("A copy of a chat shared between the %1 profiles: Claude forked it into a chat of its own on %2, so new messages here are only on %2.",
-                                          info.profiles.join(" + "), info.forkOn)
-                                     + (info.movedHere ? "\n" + i18n("The shared chat continued here, so it isn't listed itself.") : "")
-                                     + (info.stoppedCopies ? "\n" + i18n("Its background session on %1 was stopped; %1 shows a link to this copy.", info.stoppedCopies.join(", ")) : "")
-                                   : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one session can have it open at a time.",
-                                          info.profiles.join(" + "))
-                                     + (row.session.kind === "chat" ? "\n" + i18n("Listed here because it was used on %1 last.", row.session.profile) : "")
-                                     + (info.openIn ? "\n" + i18n("Open in %1 right now.", info.openIn) : "")
-                                     + (info.stoppedCopies ? "\n" + i18n("Its background session on %1 was stopped; %1 shows a link to this chat.", info.stoppedCopies.join(", ")) : "")
-                    }
-                    Tag {
-                        visible: row.agents !== null
-                        text: row.agents ? i18nc("subagents finished/total", "Agents %1/%2", row.agents.done, row.agents.total) : ""
-                        active: row.agents !== null && row.agents.running > 0
-                        clickable: true
-                        onClicked: root.toggleAgents(row.rowKey)
-                        tooltipTitle: i18n("Subagents")
-                        tooltip: !row.agents ? ""
-                                 : i18n("%1 done, %2 running, %3 stopped", row.agents.done, row.agents.running, row.agents.stopped)
-                                   + (row.agents.failed ? i18n(", %1 failed", row.agents.failed) : "") + ". "
-                                   + i18n("Click to %1 what each one is doing.", row.showAgents ? i18n("hide") : i18n("show"))
-                    }
-                    Tag {
-                        // plan mode, auto mode, …: how freely it may act
-                        visible: row.modeText !== ""
-                        text: row.modeText
-                        warning: !!row.peek && row.peek.mode === "bypassPermissions"
-                        tooltipTitle: i18n("Permission mode: %1", row.modeText)
-                        tooltip: root.modeHint(row.peek ? row.peek.mode : "")
-                    }
-                    Tag {
-                        // the plan it made (talpy_den.py: plan_of)
-                        visible: !!row.session.plan
-                        text: i18nc("a chat's plan, click to open it", "Plan ↗")
-                        clickable: true
-                        onClicked: root.openPlan(row.session.plan.slug, row.session.profileDir, row.remoteHost)
-                        tooltipTitle: row.session.plan ? row.session.plan.title : ""
-                        tooltip: row.remoteHost ? i18n("The plan this chat made. Click to read it: a copy, fetched from %1.", row.remoteHost)
-                                                : i18n("The plan this chat made. Click to read it, rendered.")
-                    }
-                    Tag {
-                        // its file itself, to change it (an SSH host's: in VS Code, over Remote-SSH)
-                        visible: !!row.session.plan && (!row.remoteHost || root.vscodeInstalled)
-                        text: "✎"
-                        clickable: true
-                        onClicked: root.editPlan({ slug: row.session.plan.slug, path: row.session.plan.path,
-                                                   profileDir: row.session.profileDir }, row.remoteHost)
-                        tooltipTitle: i18n("Edit the plan")
-                        tooltip: (row.remoteHost
-                                  ? i18n("Opens its Markdown file on %1 in VS Code (Remote - SSH). What you change there is the plan.", row.remoteHost)
-                                  : i18n("Opens its Markdown file in your text editor (VS Code, if the settings open plans there). What you change there is the plan."))
-                                 + (row.remoteHost ? "" : " " + i18n("Then send your changes to this chat (↩ send to Claude): Claude revises the plan."))
-                    }
-                    Tag {
-                        // you changed its plan since the chat last did anything (talpy_den.py: plan_edited)
-                        visible: !!row.session.plan && !!row.session.plan.edited && !row.remoteHost && !!row.session.chatId
-                        text: i18nc("send your changes to the plan to the chat", "↩ Send to Claude")
-                        active: true
-                        clickable: true
-                        onClicked: root.sendPlanFeedback(row.session.plan.slug, row.session.profileDir, row.session.chatId)
-                        tooltipTitle: i18n("Send your changes to Claude")
-                        tooltip: i18n("You changed this plan since Claude wrote it. Click to send what you changed (and notes you wrote into it) to this chat: Claude revises the plan, in plan mode.")
-                                 + "\n\n" + i18n("In tmux it's typed in for you. Else it goes to the clipboard and the chat comes up: paste it there (if Claude asks whether to go ahead with the plan, choose to keep planning first). A chat that isn't open reopens in plan mode with it.")
-                    }
-                    Tag {
-                        // another chat with a process changed some of the same files (talpy_den.py: note_overlaps)
-                        visible: !!row.session.overlaps && row.session.overlaps.length > 0
-                        text: i18nc("two chats changed the same files", "⚠ Same files")
-                        warning: true
-                        clickable: true
-                        onClicked: row.openOverlap()
-                        tooltipTitle: i18n("Another chat changes the same files")
-                        tooltip: row.session.overlaps ? root.overlapText(row.session.overlaps) + "\n\n"
-                                 + i18n("Two chats changing the same files can overwrite each other's work. Click to go to the other chat.") : ""
-                    }
-                    Tag {
-                        visible: row.changes !== null
-                        text: row.changes ? i18nc("number of files a chat changed", "±%1", row.changes.count) : ""
-                        clickable: row.canCompare
-                        onClicked: root.showChanges(row.session.chatId, row.session.profileDir, false)
-                        tooltipTitle: row.changes ? i18np("%1 file changed", "%1 files changed", row.changes.count) : ""
-                        tooltip: !row.changes ? ""
-                                 : row.changes.files.join("\n")
-                                   + (row.changes.count > row.changes.files.length ? "\n" + i18n("…and %1 more", row.changes.count - row.changes.files.length) : "")
-                                   + "\n\n" + (row.remoteHost ? i18n("The files are on %1.", row.remoteHost)
-                                              : !root.vscodeInstalled ? i18n("Install VS Code to compare them side by side.")
-                                              : i18n("Click to compare them in VS Code: what they were before the chat, and now."))
-                    }
-                    Tag {
-                        // it changed files and is done: to review until you mark it reviewed (ChatPane.qml)
-                        visible: root.reviewPending(row.session, row.remoteHost)
-                        text: i18nc("a finished chat's changes, not reviewed yet", "To review")
-                        active: true
-                        clickable: true
-                        onClicked: root.openPane(row.session, row.remoteHost, "review")
-                        tooltipTitle: i18n("Not reviewed yet")
-                        tooltip: i18n("It changed files and its turn is over. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed.")
-                    }
-                    TestsBadge {
-                        review: root.reviewPending(row.session, row.remoteHost) ? row.session.review : null
+                            // starred: a ★ (click: unstar it)
+                            StarMark {
+                                visible: !!row.session.starred
+                                tooltip: i18n("Once it isn't listed here any more, it stays under Recent chats → Starred. Click to unstar it.")
+                                onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, false)
+                            }
+                            Tag {
+                                visible: row.showProfile
+                                text: row.session.profile
+                                tooltip: i18n("The Claude profile (config folder) this session runs in")
+                            }
+                            Tag {
+                                visible: row.tag !== ""
+                                text: row.tag
+                                tooltip: row.session.entrypoint === "claude-vscode"
+                                         ? i18n("Runs in VS Code's Claude Code panel. Click the name to open the conversation there.")
+                                         : i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
+                            }
+                            // a background session shown in a terminal too (claude attach)
+                            Tag {
+                                readonly property var shownIn: row.session.kind === "bg" && row.session.attached ? row.session.attached : null
+                                visible: shownIn !== null
+                                text: !shownIn ? "" : shownIn.in === "tmux" ? "Tmux"
+                                      : shownIn.in === "vscode" ? i18nc("where a chat runs", "VS Code terminal") : i18nc("where a chat runs", "Terminal")
+                                tooltip: !shownIn ? "" : shownIn.app ? i18n("Shown in a terminal too (%1): claude attach.", shownIn.app)
+                                                                     : i18n("Shown in a terminal too: claude attach.")
+                            }
+                            Tag {
+                                // Chat shared across profiles (hard-linked transcript)
+                                readonly property var info: row.session.shared
+                                visible: !!info
+                                text: info && info.forkOf ? i18n("⇄ Shared copy") : i18n("⇄ Shared")
+                                tooltipTitle: info && info.forkOf ? i18n("Copy of a shared chat") : i18n("Shared chat")
+                                tooltip: !info ? ""
+                                         : info.forkOf
+                                           ? i18n("A copy of a chat shared between the %1 profiles: Claude forked it into a chat of its own on %2, so new messages here are only on %2.",
+                                                  info.profiles.join(" + "), info.forkOn)
+                                             + (info.movedHere ? "\n" + i18n("The shared chat continued here, so it isn't listed itself.") : "")
+                                             + (info.stoppedCopies ? "\n" + i18n("Its background session on %1 was stopped; %1 shows a link to this copy.", info.stoppedCopies.join(", ")) : "")
+                                           : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one session can have it open at a time.",
+                                                  info.profiles.join(" + "))
+                                             + (row.session.kind === "chat" ? "\n" + i18n("Listed here because it was used on %1 last.", row.session.profile) : "")
+                                             + (info.openIn ? "\n" + i18n("Open in %1 right now.", info.openIn) : "")
+                                             + (info.stoppedCopies ? "\n" + i18n("Its background session on %1 was stopped; %1 shows a link to this chat.", info.stoppedCopies.join(", ")) : "")
+                            }
+                            Tag {
+                                visible: row.agents !== null
+                                text: row.agents ? i18nc("subagents finished/total", "Agents %1/%2", row.agents.done, row.agents.total) : ""
+                                active: row.agents !== null && row.agents.running > 0
+                                clickable: true
+                                onClicked: root.toggleAgents(row.rowKey)
+                                tooltipTitle: i18n("Subagents")
+                                tooltip: !row.agents ? ""
+                                         : i18n("%1 done, %2 running, %3 stopped", row.agents.done, row.agents.running, row.agents.stopped)
+                                           + (row.agents.failed ? i18n(", %1 failed", row.agents.failed) : "") + ". "
+                                           + i18n("Click to %1 what each one is doing.", row.showAgents ? i18n("hide") : i18n("show"))
+                            }
+                            Tag {
+                                // plan mode, auto mode, …: how freely it may act
+                                visible: row.modeText !== ""
+                                text: row.modeText
+                                warning: !!row.peek && row.peek.mode === "bypassPermissions"
+                                tooltipTitle: i18n("Permission mode: %1", row.modeText)
+                                tooltip: root.modeHint(row.peek ? row.peek.mode : "")
+                            }
+                            Tag {
+                                // the plan it made (talpy_den.py: plan_of)
+                                visible: !!row.session.plan
+                                text: i18nc("a chat's plan, click to open it", "Plan ↗")
+                                clickable: true
+                                onClicked: root.openPlan(row.session.plan.slug, row.session.profileDir, row.remoteHost)
+                                tooltipTitle: row.session.plan ? row.session.plan.title : ""
+                                tooltip: row.remoteHost ? i18n("The plan this chat made. Click to read it: a copy, fetched from %1.", row.remoteHost)
+                                                        : i18n("The plan this chat made. Click to read it, rendered.")
+                            }
+                            Tag {
+                                // its file itself, to change it (an SSH host's: in VS Code, over Remote-SSH)
+                                visible: !!row.session.plan && (!row.remoteHost || root.vscodeInstalled)
+                                text: "✎"
+                                clickable: true
+                                onClicked: root.editPlan({ slug: row.session.plan.slug, path: row.session.plan.path,
+                                                           profileDir: row.session.profileDir }, row.remoteHost)
+                                tooltipTitle: i18n("Edit the plan")
+                                tooltip: (row.remoteHost
+                                          ? i18n("Opens its Markdown file on %1 in VS Code (Remote - SSH). What you change there is the plan.", row.remoteHost)
+                                          : i18n("Opens its Markdown file in your text editor (VS Code, if the settings open plans there). What you change there is the plan."))
+                                         + (row.remoteHost ? "" : " " + i18n("Then send your changes to this chat (↩ send to Claude): Claude revises the plan."))
+                            }
+                            Tag {
+                                // you changed its plan since the chat last did anything (talpy_den.py: plan_edited)
+                                visible: !!row.session.plan && !!row.session.plan.edited && !row.remoteHost && !!row.session.chatId
+                                text: i18nc("send your changes to the plan to the chat", "↩ Send to Claude")
+                                active: true
+                                clickable: true
+                                onClicked: root.sendPlanFeedback(row.session.plan.slug, row.session.profileDir, row.session.chatId)
+                                tooltipTitle: i18n("Send your changes to Claude")
+                                tooltip: i18n("You changed this plan since Claude wrote it. Click to send what you changed (and notes you wrote into it) to this chat: Claude revises the plan, in plan mode.")
+                                         + "\n\n" + i18n("In tmux it's typed in for you. Else it goes to the clipboard and the chat comes up: paste it there (if Claude asks whether to go ahead with the plan, choose to keep planning first). A chat that isn't open reopens in plan mode with it.")
+                            }
+                            Tag {
+                                // another chat with a process changed some of the same files (talpy_den.py: note_overlaps)
+                                visible: !!row.session.overlaps && row.session.overlaps.length > 0
+                                text: i18nc("two chats changed the same files", "⚠ Same files")
+                                warning: true
+                                clickable: true
+                                onClicked: row.openOverlap()
+                                tooltipTitle: i18n("Another chat changes the same files")
+                                tooltip: row.session.overlaps ? root.overlapText(row.session.overlaps) + "\n\n"
+                                         + i18n("Two chats changing the same files can overwrite each other's work. Click to go to the other chat.") : ""
+                            }
+                            Tag {
+                                visible: row.changes !== null
+                                text: row.changes ? i18nc("number of files a chat changed", "±%1", row.changes.count) : ""
+                                clickable: row.canCompare
+                                onClicked: root.showChanges(row.session.chatId, row.session.profileDir, false)
+                                tooltipTitle: row.changes ? i18np("%1 file changed", "%1 files changed", row.changes.count) : ""
+                                tooltip: !row.changes ? ""
+                                         : row.changes.files.join("\n")
+                                           + (row.changes.count > row.changes.files.length ? "\n" + i18n("…and %1 more", row.changes.count - row.changes.files.length) : "")
+                                           + "\n\n" + (row.remoteHost ? i18n("The files are on %1.", row.remoteHost)
+                                                      : !root.vscodeInstalled ? i18n("Install VS Code to compare them side by side.")
+                                                      : i18n("Click to compare them in VS Code: what they were before the chat, and now."))
+                            }
+                            Tag {
+                                // it changed files and is done: to review until you mark it reviewed (ChatPane.qml)
+                                visible: root.reviewPending(row.session, row.remoteHost)
+                                text: i18nc("a finished chat's changes, not reviewed yet", "To review")
+                                active: true
+                                clickable: true
+                                onClicked: root.openPane(row.session, row.remoteHost, "review")
+                                tooltipTitle: i18n("Not reviewed yet")
+                                tooltip: i18n("It changed files and its turn is over. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed.")
+                            }
+                            TestsBadge {
+                                review: root.reviewPending(row.session, row.remoteHost) ? row.session.review : null
+                            }
+                        }
                     }
                 }
             }
@@ -508,6 +522,7 @@ RowLayout {
             // VS Code extension
             HoverButtons {
                 id: rowButtons
+                lineHeight: nameLabel.implicitHeight
                 shown: row.buttonsShown
                 under: stateBox
 
@@ -516,7 +531,9 @@ RowLayout {
                     icon.name: Plasmoid.configuration.clickOpensPane ? "window" : "dialog-messages"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
-                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     Layout.alignment: Qt.AlignTop
                     onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
@@ -536,7 +553,9 @@ RowLayout {
                     icon.name: "non-starred-symbolic"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Star")
-                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, true)
@@ -554,7 +573,9 @@ RowLayout {
                     icon.name: "media-playlist-repeat"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Keep going after usage limits")
-                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.keepGoing(row.session, true)
@@ -572,7 +593,9 @@ RowLayout {
                     icon.name: "document-share"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Share or continue on another account…")
-                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.openShareMenu(shareButton, {
@@ -590,10 +613,12 @@ RowLayout {
                 PlasmaComponents3.ToolButton {
                     // Remove a finished session from the list (nothing is deleted)
                     visible: row.session.state === "done"
-                    icon.name: "list-remove"
+                    icon.name: "window-close"   // (an × in the text's color, as in VS Code and GNOME)
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Remove from list")
-                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     Layout.alignment: Qt.AlignTop
                     onClicked: row.remoteHost ? root.remoteDismiss(row.remoteHost, row.session.sessionId)
@@ -611,7 +636,9 @@ RowLayout {
                     icon.name: "media-playback-stop"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
-                    Layout.preferredHeight: nameLabel.implicitHeight
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     Layout.alignment: Qt.AlignTop
                     onClicked: {

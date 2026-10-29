@@ -2296,7 +2296,7 @@ PlasmoidItem {
             items.push(shareItem.createObject(shareMenu, { separator: true }))
             for (const g of accounts)
                 items.push(shareItem.createObject(shareMenu, {
-                    text: i18n("Keep only on %1…", g.title), icon: "list-remove", kind: "keeponly",
+                    text: i18n("Keep only on %1…", g.title), icon: "window-close", kind: "keeponly",
                     chatId: chat.chatId, chatName: chat.name, rowKey: rowKey, account: g, host: host
                 }))
         }
@@ -3646,7 +3646,7 @@ PlasmoidItem {
         if (plan.shared) {
             items.push(planItem.createObject(planMenu, { separator: true }))
             for (const g of accounts)
-                items.push(planItem.createObject(planMenu, { text: i18n("Keep only on %1", g.title), icon: "list-remove",
+                items.push(planItem.createObject(planMenu, { text: i18n("Keep only on %1", g.title), icon: "window-close",
                                                             kind: "keeponly", slug: plan.slug, from: plan.profileDir,
                                                             to: g.shareProfile, host: host }))
         }

@@ -11,7 +11,7 @@ Kirigami.InlineMessage {
     actions: [
         Kirigami.Action {
             text: i18n("Keep only on %1", root.shareConfirm.account)
-            icon.name: "list-remove"
+            icon.name: "window-close"
             onTriggered: root.confirmKeepOnly()
         },
         Kirigami.Action {

@@ -757,6 +757,7 @@ ColumnLayout {
                 // on hover, over the line's end
                 HoverButtons {
                     id: recentButtons
+                    lineHeight: recentName.implicitHeight
                     shown: recentHover.hovered
                     under: recentEnd
 
@@ -766,7 +767,9 @@ ColumnLayout {
                         icon.name: "window"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Reopen this chat")
-                        Layout.preferredHeight: recentName.implicitHeight
+                        Layout.preferredHeight: recentButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: recentLine.open()
 
@@ -784,7 +787,9 @@ ColumnLayout {
                         icon.name: "non-starred-symbolic"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Star")
-                        Layout.preferredHeight: recentName.implicitHeight
+                        Layout.preferredHeight: recentButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, true)
 
@@ -801,7 +806,9 @@ ColumnLayout {
                         icon.name: "document-share"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Share or continue on another account…")
-                        Layout.preferredHeight: recentName.implicitHeight
+                        Layout.preferredHeight: recentButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.openShareMenu(recentShare, {
                             chatId: recentLine.chat.sessionId, name: recentLine.chat.name,
@@ -985,6 +992,7 @@ ColumnLayout {
                 // on hover (and while its new chat box is open), over the line's end
                 HoverButtons {
                     id: planButtons
+                    lineHeight: planName.implicitHeight
                     shown: planHover.hovered || root.planComposer === planLine.composerKey
                     under: planEnd
 
@@ -994,7 +1002,9 @@ ColumnLayout {
                         icon.name: "non-starred-symbolic"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Star")
-                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, true)
 
@@ -1011,7 +1021,9 @@ ColumnLayout {
                         icon.name: "document-edit"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Edit the plan")
-                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.editPlan(planLine.plan, section.remoteHost)
 
@@ -1032,7 +1044,9 @@ ColumnLayout {
                         icon.name: "mail-send"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Send your changes to Claude")
-                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
 
@@ -1050,7 +1064,9 @@ ColumnLayout {
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Carry it out…")
                         checked: root.planComposer === planLine.composerKey
-                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.togglePlanComposer(planLine.composerKey)
 
@@ -1066,7 +1082,9 @@ ColumnLayout {
                         enabled: !!planLine.plan.chatId
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Continue the chat that made it")
-                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.continuePlanChat(planLine.plan, section.group, section.remoteHost)
 
@@ -1083,7 +1101,9 @@ ColumnLayout {
                         icon.name: "document-share"
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Share it with another account…")
-                        Layout.preferredHeight: planName.implicitHeight
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: icon.width
                         Layout.preferredWidth: Layout.preferredHeight
                         onClicked: root.openPlanMenu(planShare, planLine.plan, section.remoteHost)
 
@@ -1216,6 +1236,7 @@ ColumnLayout {
             // on hover, over the line's end
             HoverButtons {
                 id: memoryButtons
+                lineHeight: memoryName.implicitHeight
                 shown: memoryHover.hovered && !section.remoteHost
                 under: memoryEnd
 
@@ -1223,7 +1244,9 @@ ColumnLayout {
                     icon.name: "document-edit"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Edit this memory")
-                    Layout.preferredHeight: memoryName.implicitHeight
+                    Layout.preferredHeight: memoryButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: icon.width
                     Layout.preferredWidth: Layout.preferredHeight
                     onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
 
