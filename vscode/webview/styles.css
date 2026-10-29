@@ -3639,7 +3639,7 @@ body.vscode-high-contrast-light .pane {
 .project-head {
   display: flex;
   gap: 6px;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .project-name {
@@ -3658,6 +3658,11 @@ body.vscode-high-contrast-light .pane {
 
 .project-name .chevron {
   flex: none;
+  /* on the name's line (not the middle of the three lines), turning in place */
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  height: 1.4em;
   transition: transform 0.15s;
 }
 
@@ -3666,11 +3671,15 @@ body.vscode-high-contrast-light .pane {
 }
 
 .project-numbers {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  text-align: right;
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.project-title strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .project-title {
@@ -3683,10 +3692,6 @@ body.vscode-high-contrast-light .pane {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.project-name .chevron {
-  margin-top: 2px;
 }
 
 .project-details {

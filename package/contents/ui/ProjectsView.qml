@@ -16,7 +16,7 @@ PlasmaComponents3.ScrollView {
 
     readonly property var projects: root.projectsData ? root.projectsData.projects || [] : []
     readonly property real gu: Kirigami.Units.gridUnit
-    property var open: ({})        // project path -> unfolded (the first three are)
+    property var open: ({})        // project path -> unfolded (all folded at first)
     contentWidth: availableWidth
     PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
@@ -46,7 +46,7 @@ PlasmaComponents3.ScrollView {
         return { sessions: sessions, plans: plans, memories: memories, recap: recents.length ? recents[0].recap.text : "" }
     }
     function isOpen(project, index) {
-        return project.path in open ? open[project.path] : index < 3
+        return project.path in open ? open[project.path] : false
     }
     // (as the Recap shows money: its currency, symbol and rounding)
     readonly property var currency: root.projectsData && root.projectsData.currency ? root.projectsData.currency : ({ code: "USD", rate: 1 })
@@ -124,11 +124,15 @@ PlasmaComponents3.ScrollView {
                         source: card.unfolded ? "go-down" : "go-next"
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: Layout.preferredWidth
+                        // (on the name's line)
+                        Layout.alignment: Qt.AlignTop
+                        Layout.topMargin: Math.max(0, (projectName.implicitHeight - Layout.preferredHeight) / 2)
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 0
                         Kirigami.Heading {
+                            id: projectName
                             level: 4
                             textFormat: Text.PlainText
                             Layout.fillWidth: true
@@ -143,15 +147,17 @@ PlasmaComponents3.ScrollView {
                             opacity: 0.65
                             elide: Text.ElideMiddle
                         }
-                    }
-                    PlasmaComponents3.Label {
-                        textFormat: Text.PlainText
-                        text: i18n("7 days: %1", view.hours(card.project.weekMs)) + "\n" + i18n("all: %1 · %2", view.hours(card.project.workedMs), view.money(card.project.cost))
-                        font: Kirigami.Theme.smallFont
-                        horizontalAlignment: Text.AlignRight
-                        opacity: 0.8
+                        PlasmaComponents3.Label {
+                            textFormat: Text.PlainText
+                            Layout.fillWidth: true
+                            text: i18n("7 days: %1", view.hours(card.project.weekMs)) + " · " + i18n("all: %1 · %2", view.hours(card.project.workedMs), view.money(card.project.cost))
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.65
+                            elide: Text.ElideRight
+                        }
                     }
                     PlasmaComponents3.ToolButton {
+                        Layout.alignment: Qt.AlignTop
                         icon.source: root.iconDir + "chat-new-symbolic.svg"   // (as an account's: at 16 px)
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: Kirigami.Units.iconSizes.small

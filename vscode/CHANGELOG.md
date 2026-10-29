@@ -13,12 +13,17 @@
   camera for the two that were the text buttons *+* and *Screenshot…*;
   while dictation records or writes it down, what it's doing shows beside
   the microphone.
+- **The Projects tab starts folded, and a project's folder line fits:** the
+  first three projects were open, and next to each project's numbers its
+  folder and *last at work* line ran out of room in a narrow sidebar, cut
+  right after the folder. Every project starts folded now, the numbers are
+  a line of their own under the folder, and the arrow sits on the name.
 - **A pet you hold swings as in the widget:** one you held and swung kept
   swinging like a pendulum for seconds, its burrow swinging with it as it
   dug in; its springs were only roughly the widget's. They're stepped as
   Qt steps the widget's now (16 ms at a time, in the same order), so put
-  down, it wobbles back upright as in Plasma and has settled before its
-  burrow opens.
+  down, it wobbles back upright as in Plasma, a little, and stands upright
+  once its burrow opens: the burrow never swings.
 - **Plan usage keeps up with chats in Claude's VS Code panel:** the panel
   runs no status line, and Claude Code updates its own copy of the usage
   only when `/usage` runs, so an account used only there showed the same

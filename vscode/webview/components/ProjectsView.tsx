@@ -47,7 +47,7 @@ export function ProjectsView() {
   return (
     <div class="projects">
       {projects.map((p, i) => {
-        const unfolded = open[p.path] ?? i < 3;
+        const unfolded = open[p.path] ?? false;
         return (
           <section key={p.path} class="project">
             <div class="project-head">
@@ -56,12 +56,11 @@ export function ProjectsView() {
                 <span class="project-title">
                   <strong>{p.name}</strong>
                   <span class="small muted project-meta" title={p.path}>{p.short} · last at work {duration(Math.max(60000, now - p.lastAt))} ago</span>
+                  <span class="small muted project-numbers">
+                    7 days: {hoursText(p.weekMs)} · all: {hoursText(p.workedMs)} · {money(p.cost, answer.data?.currency)}
+                  </span>
                 </span>
               </button>
-              <span class="small muted project-numbers">
-                <span>7 days: {hoursText(p.weekMs)}</span>
-                <span>all: {hoursText(p.workedMs)} · {money(p.cost, answer.data?.currency)}</span>
-              </span>
               <button type="button" class="icon-btn" title={`New chat in ${p.short}`} aria-label="New chat here"
                 onClick={() => post({ type: "newChatIn", path: p.path, profileDir: p.chats[0]?.profileDir ?? "" })}>
                 <Icon name="newChat" />
