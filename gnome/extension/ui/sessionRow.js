@@ -55,12 +55,14 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
 
     if (showProfile)
         tags.push(tips.add(tag(s.profile), 'The Claude profile (config folder) this session runs in'));
-    const kindTag = s.entrypoint === 'claude-vscode' ? 'Claude Code panel' : s.kind === 'bg' ? 'Background' : '';
-    if (kindTag) {
-        tags.push(tips.add(tag(kindTag), s.entrypoint === 'claude-vscode'
-            ? "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."
-            : "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."));
-    }
+    // where it runs, in the same words as Plasma's and VS Code's
+    const [kindTag, kindTip] = s.pid === null ? ['Not open', 'No terminal or panel has it open: a reply goes on with it in the background.']
+        : s.kind === 'bg' ? ['Background', "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."]
+        : s.entrypoint === 'claude-vscode' ? ['Claude Code panel', "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."]
+        : s.tmux ? ['Tmux', 'It runs in a tmux pane.']
+        : s.vscodeTerminal || s.terminalApp === 'VS Code' ? ['VS Code terminal', 'It runs in a terminal of VS Code.']
+        : ['Terminal', s.terminalApp ? L.fmt('It runs in a terminal (%1).', s.terminalApp) : 'It runs in a terminal.'];
+    tags.push(tips.add(tag(kindTag), kindTip));
     // a background session shown in a terminal too (claude attach)
     if (s.kind === 'bg' && s.attached) {
         const where = s.attached.in === 'tmux' ? 'Tmux' : s.attached.in === 'vscode' ? 'VS Code terminal' : 'Terminal';

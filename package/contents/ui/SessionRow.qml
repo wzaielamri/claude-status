@@ -13,8 +13,13 @@ RowLayout {
     property string remoteHost: ""   // set for a session on an SSH host
     property string account: ""      // its account's title
 
-    readonly property string tag: session.entrypoint === "claude-vscode" ? i18n("Claude Code panel")
-                                  : session.kind === "bg" ? i18n("Background") : ""
+    // Where it runs, in the chat pane's words (ChatPane.qml where)
+    readonly property string tag: session.pid === null ? i18nc("where a chat runs", "Not open")
+                                  : session.kind === "bg" ? i18n("Background")
+                                  : session.entrypoint === "claude-vscode" ? i18n("Claude Code panel")
+                                  : session.tmux ? "Tmux"
+                                  : session.vscodeTerminal || session.terminalApp === "VS Code" ? i18nc("where a chat runs", "VS Code terminal")
+                                  : i18nc("where a chat runs", "Terminal")
     // A background session with a running process can be stopped (`claude stop`),
     // and so can a chat with a process of its own, whatever it's doing: in a
     // terminal its claude quits (the chat is kept), in VS Code its tab shows it
@@ -355,9 +360,15 @@ RowLayout {
                             Tag {
                                 visible: row.tag !== ""
                                 text: row.tag
-                                tooltip: row.session.entrypoint === "claude-vscode"
+                                tooltip: row.session.pid === null ? i18n("No terminal or panel has it open: a reply goes on with it in the background.")
+                                         : row.session.kind === "bg"
+                                         ? i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
+                                         : row.session.entrypoint === "claude-vscode"
                                          ? i18n("Runs in VS Code's Claude Code panel. Click the name to open the conversation there.")
-                                         : i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
+                                         : row.session.tmux ? i18n("It runs in a tmux pane.")
+                                         : row.session.vscodeTerminal || row.session.terminalApp === "VS Code" ? i18n("It runs in a terminal of VS Code.")
+                                         : row.session.terminalApp ? i18n("It runs in a terminal (%1).", row.session.terminalApp)
+                                         : i18n("It runs in a terminal.")
                             }
                             // a background session shown in a terminal too (claude attach)
                             Tag {
@@ -534,7 +545,7 @@ RowLayout {
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
 
@@ -556,7 +567,7 @@ RowLayout {
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, true)
 
@@ -576,7 +587,7 @@ RowLayout {
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.keepGoing(row.session, true)
 
@@ -596,7 +607,7 @@ RowLayout {
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: root.openShareMenu(shareButton, {
                         chatId: row.session.chatId, name: row.session.name, profileDir: row.session.profileDir,
@@ -619,7 +630,7 @@ RowLayout {
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: row.remoteHost ? root.remoteDismiss(row.remoteHost, row.session.sessionId)
                                               : root.dismissSession(row.session.sessionId)
@@ -639,7 +650,7 @@ RowLayout {
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
                     onClicked: {
                         root.stopConfirmBusy = row.session.state !== "idle"

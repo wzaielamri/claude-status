@@ -29,20 +29,21 @@
   and the line under its bars says *Fetching the plan usage…* until the
   numbers are in.
 - **A background session shown in a terminal says so:** beside its
-  *Background* tag, in the list and in the chat tab, where `claude attach`
-  shows it: *Terminal* (its tooltip names the terminal), *Tmux* or *VS Code
-  terminal*. Claude Code doesn't say which session an agent view switched
-  to, so it's the one the view was opened for.
+  *Background* tag, in the list and in the chat tab: *Terminal* (its
+  tooltip names the terminal), *Tmux* or *VS Code terminal*, for `claude
+  attach` and for Claude Code's agent view. Where the terminal says its
+  tab's title (Konsole, tmux), the tag follows the session the title names.
 - **The chat tab's Chat tab is your messages and Claude's replies, and a
   Steps tab has the rest:** **Chat** shows only what you and Claude say
   (and what needs you: a permission, a question, a plan), with what it's
   doing on the working line; **Steps** is what the Chat tab was, every tool
   call too. The **Output** tab of a background session is gone: **Open its
   window** shows any chat where it runs.
-- **A tag under a chat's name says where it runs:** *Background*, *Not
-  open*, *Tmux*, *Terminal* (its tooltip names the terminal: Konsole,
-  kitty…), *VS Code terminal* or *Claude Code panel*, next to its folder
-  in the chat tab.
+- **A tag says where a chat runs, in the list and in the chat tab:**
+  *Terminal* (its tooltip names the terminal), *VS Code terminal*, *Tmux*,
+  *Claude Code panel*, *Background* or *Not open*, as in the widget.
+- **A row's buttons are packed close:** narrow buttons side by side, and
+  what's under them is cut right where they begin.
 - **The same words everywhere:** a chat in the Claude Code extension is in
   its *Claude Code panel*, as in the widget (it was *Claude Code tab* here,
   *VS Code* on its row), the switch for reopened chats too, and every tag

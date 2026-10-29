@@ -27,7 +27,7 @@ import {
   tasksTitle,
   usageLevel,
 } from "../../src/shared/model";
-import { attachedTag, reviewPending, shownAsk, testsText } from "../../src/shared/pane";
+import { attachedTag, chatWhere, reviewPending, shownAsk, testsText, whereTag } from "../../src/shared/pane";
 import type { Group, Session } from "../../src/shared/types";
 import { post } from "../env";
 import { pets } from "../pets";
@@ -74,7 +74,8 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
   const petColor = pets.petColor(petKeyOf(s, host));
   const agents = s.agents;
   const showAgents = !!agents && !!ui.agents[rowKey];
-  const tag = s.entrypoint === "claude-vscode" ? "Claude Code panel" : isBackground(s) ? "Background" : "";
+  // where it runs, in the chat tab's words (whereTag)
+  const where = whereTag(chatWhere(s, false), s.terminalApp ?? "");
   const line = peekLine(s, liveMatch(s, useLiveView(s.sessionId, !host && !!s.pid)));
   const canPeek = hasPeek(s);
   const showPeek = canPeek && !!ui.peek[rowKey];
@@ -133,16 +134,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
             </button>
           ) : null}
           {showProfile && s.profile ? <Tag text={s.profile} title="The Claude profile (config folder) this chat runs in" /> : null}
-          {tag ? (
-            <Tag
-              text={tag}
-              title={
-                s.entrypoint === "claude-vscode"
-                  ? "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."
-                  : "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."
-              }
-            />
-          ) : null}
+          <Tag text={where.tag} title={where.title} />
           {isBackground(s) && attachedTag(s.attached) ? (
             <Tag text={attachedTag(s.attached)!.tag} title={attachedTag(s.attached)!.title} />
           ) : null}

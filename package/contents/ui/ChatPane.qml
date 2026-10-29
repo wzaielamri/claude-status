@@ -45,7 +45,7 @@ Window {
     // "vscode" (a terminal of VS Code) or "terminal" (another terminal)
     readonly property string where: !row || !row.pid ? "closed" : row.kind === "bg" ? "background"
                                     : row.entrypoint === "claude-vscode" ? "claude" : row.tmux ? "tmux"
-                                    : row.vscodeTerminal ? "vscode" : "terminal"
+                                    : row.vscodeTerminal || row.terminalApp === "VS Code" ? "vscode" : "terminal"
 
     title: i18nc("window title: a chat's name", "%1 — Talpy Chat", chatName || chatId.slice(0, 8))
     width: Kirigami.Units.gridUnit * 38

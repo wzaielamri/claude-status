@@ -2244,7 +2244,7 @@ class TerminalTests(unittest.TestCase):
         for names, want in (({10: "claude", 11: "bash", 12: "konsole"}, "Konsole"),
                             ({10: "claude", 11: "fish", 12: "gnome-terminal-"}, "GNOME Terminal"),
                             ({10: "claude", 11: "zsh", 12: "tmux: server", 13: "kitty"}, ""),   # (in tmux)
-                            ({10: "claude", 11: "bash", 12: "code"}, ""),                       # (a VS Code terminal)
+                            ({10: "claude", 11: "bash", 12: "code"}, "VS Code"),                # (a VS Code terminal)
                             ({10: "claude", 11: "sshd-session"}, "")):
             patches = self.tree(names)
             with patches[0], patches[1], patches[2]:
@@ -2252,14 +2252,22 @@ class TerminalTests(unittest.TestCase):
 
     def test_a_background_session_shown_in_a_terminal(self):
         profile = mock.Mock(path=Path("/home/me/.claude"))
-        with mock.patch.object(cs, "attach_clients", lambda: [(20, "0a1b2c3d"), (30, "fix parser")]), \
+        other = mock.Mock(path=Path("/home/me/.claude-work"))
+        with mock.patch.object(cs, "attach_clients", lambda: [(20, "0a1b2c3d", False), (30, "fix parser", False),
+                                                              (40, "Minor version tag", True)]), \
                 mock.patch.object(cs, "tmux_socket", lambda pid: None), \
-                mock.patch.object(cs, "vscode_terminal", lambda pid: 31 if pid == 30 else None), \
-                mock.patch.object(cs, "terminal_name", lambda pid: "Konsole"), \
+                mock.patch.object(cs, "terminal_name", lambda pid: "VS Code" if pid == 30 else "Konsole"), \
                 mock.patch.object(cs, "process_config_dir", lambda pid: "/home/me/.claude"):
             self.assertEqual(cs.attached_in("0a1b2c3d", "", profile), {"in": "terminal", "app": "Konsole"})
             self.assertEqual(cs.attached_in("ffffffff", "fix parser", profile), {"in": "vscode", "app": ""})   # (by its name)
+            self.assertIsNone(cs.attached_in("ffffffff", "fix parser", other), "a name on another profile")
+            # an agent view's tab titled with it: it shows it, whichever profile it's on
+            self.assertEqual(cs.attached_in("eeeeeeee", "Minor version tag", other), {"in": "terminal", "app": "Konsole"})
             self.assertIsNone(cs.attached_in("ffffffff", "other", profile))
+
+    def test_the_title_without_its_marks(self):
+        self.assertEqual(cs.TITLE_MARKS.sub("", "🏠 ◐ Minor version 1.16.2 tag").strip(), "Minor version 1.16.2 tag")
+        self.assertEqual(cs.TITLE_MARKS.sub("", "✳ (draft) notes").strip(), "(draft) notes")
 
 
 class UsageRefreshCommandTests(unittest.TestCase):

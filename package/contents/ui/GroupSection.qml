@@ -770,7 +770,7 @@ ColumnLayout {
                         Layout.preferredHeight: recentButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: recentButtons.buttonWidth
                         onClicked: recentLine.open()
 
                         PlasmaCore.ToolTipArea {
@@ -790,7 +790,7 @@ ColumnLayout {
                         Layout.preferredHeight: recentButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: recentButtons.buttonWidth
                         onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, true)
 
                         PlasmaCore.ToolTipArea {
@@ -809,7 +809,7 @@ ColumnLayout {
                         Layout.preferredHeight: recentButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: recentButtons.buttonWidth
                         onClicked: root.openShareMenu(recentShare, {
                             chatId: recentLine.chat.sessionId, name: recentLine.chat.name,
                             profileDir: recentLine.chat.profileDir, shared: recentLine.chat.shared, host: section.remoteHost
@@ -1005,7 +1005,7 @@ ColumnLayout {
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, true)
 
                         PlasmaCore.ToolTipArea {
@@ -1024,7 +1024,7 @@ ColumnLayout {
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.editPlan(planLine.plan, section.remoteHost)
 
                         PlasmaCore.ToolTipArea {
@@ -1047,7 +1047,7 @@ ColumnLayout {
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
 
                         PlasmaCore.ToolTipArea {
@@ -1067,7 +1067,7 @@ ColumnLayout {
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.togglePlanComposer(planLine.composerKey)
 
                         PlasmaCore.ToolTipArea {
@@ -1085,7 +1085,7 @@ ColumnLayout {
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.continuePlanChat(planLine.plan, section.group, section.remoteHost)
 
                         PlasmaCore.ToolTipArea {
@@ -1104,7 +1104,7 @@ ColumnLayout {
                         Layout.preferredHeight: planButtons.buttonSize
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: icon.width
-                        Layout.preferredWidth: Layout.preferredHeight
+                        Layout.preferredWidth: planButtons.buttonWidth
                         onClicked: root.openPlanMenu(planShare, planLine.plan, section.remoteHost)
 
                         PlasmaCore.ToolTipArea {
@@ -1247,7 +1247,7 @@ ColumnLayout {
                     Layout.preferredHeight: memoryButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: icon.width
-                    Layout.preferredWidth: Layout.preferredHeight
+                    Layout.preferredWidth: memoryButtons.buttonWidth
                     onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
 
                     PlasmaCore.ToolTipArea {

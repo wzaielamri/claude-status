@@ -5445,13 +5445,13 @@ def process_name(pid):
 
 
 def terminal_name(pid):
-    """The name of the terminal pid runs in (Konsole, kitty, GNOME Terminal…),
-    from the processes it runs under, or "": none known (tmux, a VS Code
-    terminal, over SSH, a service)."""
+    """The name of the terminal pid runs in (Konsole, kitty, GNOME Terminal…;
+    "VS Code" for a terminal of VS Code), from the processes it runs under, or
+    "": none known (tmux, over SSH, a service)."""
     child, seen = None, set()
     while isinstance(pid, int) and pid > 1 and pid not in seen and len(seen) < 64:
         if child is not None and is_vscode_terminal_host(pid):
-            return ""
+            return "VS Code"
         comm = process_name(pid)
         if not comm:
             return ""
@@ -5468,10 +5468,14 @@ _attaching = [0.0, []]   # (when looked for, [(pid, what it attaches to)]): once
 
 
 def attach_clients():
-    """The `claude attach` processes on this machine: [(pid, the background
-    session it shows: its id or name)], looked for once a second at most.
-    Once attached, one runs on as `claude agents`, the session it shows
-    picked in its environment (CLAUDE_AGENTS_SELECT)."""
+    """The terminals that show a background session on this machine: [(pid,
+    the session: its id or name, named by the terminal's tab title)], looked
+    for once a second at most. One shows it as `claude attach <id>`, which runs
+    on as the agent view (`claude agents`, the session it was opened for in
+    CLAUDE_AGENTS_SELECT), or as a plain `claude` with no session of its own
+    (the agent view too). An agent view can switch to another session: where
+    the terminal says its tab's title (Konsole, Yakuake, tmux), the session
+    named there is the one it shows (Claude Code titles the tab with it)."""
     if time.monotonic() - _attaching[0] < 1:
         return _attaching[1]
     found = []
@@ -5482,19 +5486,59 @@ def attach_clients():
     for name in names:
         if not name.isdigit() or process_name(int(name)) != "claude":
             continue
+        pid = int(name)
         try:
-            with open(f"/proc/{name}/cmdline", "rb") as f:
-                argv = f.read().split(b"\0")
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                argv = [a.decode(errors="replace") for a in f.read().split(b"\0")]
         except OSError:
             continue
-        if len(argv) >= 3 and argv[1] == b"attach":
-            found.append((int(name), argv[2].decode(errors="replace")))
-        elif len(argv) >= 2 and argv[1] == b"agents":
-            picked = process_environ_value(int(name), "CLAUDE_AGENTS_SELECT")
-            if picked:
-                found.append((int(name), picked))
+        sub = argv[1] if len(argv) > 1 else ""
+        if sub == "attach" and len(argv) >= 3 and argv[2]:
+            opened = argv[2]
+        elif sub == "agents" or (sub in ("", "--continue") and not own_session(pid)):
+            opened = process_environ_value(pid, "CLAUDE_AGENTS_SELECT")
+        else:
+            continue
+        title = tab_title(pid)
+        if title:
+            found.append((pid, title, True))
+        elif opened:
+            found.append((pid, opened, False))
     _attaching[0], _attaching[1] = time.monotonic(), found
     return found
+
+
+def own_session(pid):
+    """Is pid a chat of its own (a session file under its config folder)?"""
+    folder = process_config_dir(pid)
+    return bool(folder) and os.path.isfile(os.path.join(folder, "sessions", f"{pid}.json"))
+
+
+TITLE_MARKS = re.compile(r"^[^\w(\[]+")   # (what Claude and the terminal put before the title: a spinner, a state, an icon)
+
+
+def tab_title(pid):
+    """The title of the terminal tab pid runs in, where the terminal says it
+    (Konsole and Yakuake over D-Bus, tmux), without the marks before it, or ""."""
+    service, session = process_environ_value(pid, "KONSOLE_DBUS_SERVICE"), process_environ_value(pid, "KONSOLE_DBUS_SESSION")
+    title = ""
+    try:
+        import shutil
+        import subprocess
+        if re.fullmatch(r"[:\w.-]+", service) and re.fullmatch(r"/Sessions/\d+", session) and shutil.which("busctl"):
+            r = subprocess.run(["busctl", "--user", "--json=short", "call", service, session, "org.kde.konsole.Session",
+                                "title", "i", "1"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2)
+            if r.returncode == 0:
+                title = json.loads(r.stdout.decode("utf-8", "replace"))["data"][0]
+        elif tmux_socket(pid) and process_environ_value(pid, "TMUX_PANE") and shutil.which("tmux"):
+            r = subprocess.run(["tmux", "-S", tmux_socket(pid), "display-message", "-p", "-t",
+                                process_environ_value(pid, "TMUX_PANE"), "#{pane_title}"],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2)
+            if r.returncode == 0:
+                title = r.stdout.decode("utf-8", "replace").strip()
+    except (OSError, ValueError, KeyError, IndexError, TypeError, subprocess.TimeoutExpired):
+        return ""
+    return TITLE_MARKS.sub("", title if isinstance(title, str) else "").strip()
 
 
 def process_environ_value(pid, key):
@@ -5509,17 +5553,17 @@ def process_environ_value(pid, key):
 
 
 def attached_in(job_id, name, profile):
-    """Where a background session is shown (claude attach): {"in": "tmux",
+    """Where a background session is shown (attach_clients): {"in": "tmux",
     "vscode" (a VS Code terminal) or "terminal", "app": the terminal's name or
-    ""}, or None: nowhere. By its id, or by its name on its own profile."""
-    for pid, what in attach_clients():
-        if what != job_id and not (name and what == name and process_config_dir(pid) == str(profile.path.resolve())):
+    ""}, or None: nowhere. By its id, or by its name: on its own profile, or
+    the one the tab's title says (the agent view shows it, whichever profile)."""
+    for pid, what, titled in attach_clients():
+        if what != job_id and not (name and what == name and (titled or process_config_dir(pid) == str(profile.path.resolve()))):
             continue
         if tmux_socket(pid):
             return {"in": "tmux", "app": ""}
-        if vscode_terminal(pid) is not None:
-            return {"in": "vscode", "app": ""}
-        return {"in": "terminal", "app": terminal_name(pid)}
+        app = terminal_name(pid)
+        return {"in": "vscode", "app": ""} if app == "VS Code" else {"in": "terminal", "app": app}
     return None
 
 

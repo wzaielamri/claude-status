@@ -1129,11 +1129,17 @@ button:focus-visible {
   top: 1px;
   right: 2px;
   display: flex;
-  padding-left: 4px;
+  padding-left: 0; /* (what's under them is cut where the first one starts) */
   border-radius: 4px;
   background: linear-gradient(var(--cs-hover), var(--cs-hover)), var(--cs-bg);
   opacity: 0;
   pointer-events: none;
+}
+
+/* packed close: 16 px icons, 2 px each side, none between (as in the widget) */
+.row-actions .icon-btn {
+  min-width: 20px;
+  padding: 0 2px;
 }
 
 .session:hover > .row-actions,

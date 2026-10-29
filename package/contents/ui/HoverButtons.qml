@@ -16,10 +16,11 @@ Item {
     property Item under: null               // what stands at the line's end
     property real lineHeight: 0             // the line's (the buttons are centered on it, a little taller)
     default property alias buttons: row.data
-    readonly property real buttonSize: Math.round(Kirigami.Units.iconSizes.small * 1.375)   // (22 px, 16 px icons: as in VS Code)
+    readonly property real buttonSize: Math.round(Kirigami.Units.iconSizes.small * 1.375)   // (22 px high, 16 px icons: as in VS Code)
+    readonly property real buttonWidth: Kirigami.Units.iconSizes.small + 4                  // (packed close: 2 px each side)
     // how much of the line's end they cover now (CoveredEnd.covered), and how
     // far past what stands there
-    readonly property real covering: shown ? row.width + Kirigami.Units.smallSpacing : 0
+    readonly property real covering: shown ? row.width : 0   // (cut where the first one starts)
     readonly property real beyond: Math.max(0, covering - (under ? under.width : 0))
 
     Layout.alignment: Qt.AlignTop
@@ -32,7 +33,7 @@ Item {
         id: row
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Kirigami.Units.smallSpacing / 2
+        spacing: 0
         opacity: hover.shown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity {

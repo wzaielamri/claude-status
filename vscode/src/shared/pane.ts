@@ -91,12 +91,12 @@ export interface PaneChat {
 // window's or another's) or another terminal
 export type ChatWhere = "background" | "closed" | "claude" | "tmux" | "vscode" | "terminal";
 
-export function chatWhere(s: Pick<Session, "pid" | "kind" | "entrypoint" | "tmux" | "vscodeTerminal"> | undefined, terminalHere: boolean): ChatWhere {
+export function chatWhere(s: Pick<Session, "pid" | "kind" | "entrypoint" | "tmux" | "vscodeTerminal" | "terminalApp"> | undefined, terminalHere: boolean): ChatWhere {
   if (!s || !s.pid) return "closed";
   if (s.kind === "bg") return "background";
   if (s.entrypoint === "claude-vscode") return "claude";
   if (s.tmux) return "tmux";
-  return terminalHere || s.vscodeTerminal ? "vscode" : "terminal";
+  return terminalHere || s.vscodeTerminal || s.terminalApp === "VS Code" ? "vscode" : "terminal";
 }
 
 // A background session shown in a terminal too (claude attach): its second tag
