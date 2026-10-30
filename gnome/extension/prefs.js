@@ -347,9 +347,12 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         const rerender = () => state.render();
         if (state.confirm === `remove:${a.key}` || state.confirm === `logout:${a.key}`) {
             const removing = state.confirm.startsWith('remove:');
-            row.subtitle = esc(removing
-                ? `Remove ${a.label}? It logs out, then moves ${a.folder} to the Trash with its chats, history and settings. Chats shared with your other accounts stay on them.`
-                : `Log out of ${a.label}? Claude deletes its login; its chats and history stay, and Log in… signs it in again.`);
+            // (an SSH host's folder goes to that host's Trash)
+            row.subtitle = esc(removing && state.host
+                ? `Remove ${a.label} on ${state.host}? It logs out, then moves ${a.folder} to the Trash of ${state.host} with its chats, history and settings (restore it from there if you change your mind). Chats shared with your other accounts stay on them.`
+                : removing
+                    ? `Remove ${a.label}? It logs out, then moves ${a.folder} to the Trash with its chats, history and settings (restore it from there if you change your mind). Chats shared with your other accounts stay on them.`
+                    : `Log out of ${a.label}? Claude deletes its login; its chats and history stay, and Log in… signs it in again (also with another account).`);
             button(removing ? 'Remove' : 'Log out', () => act([removing ? '--remove' : '--logout', a.key], a.key),
                 [removing ? 'destructive-action' : 'suggested-action']);
             button('Cancel', () => {
@@ -432,14 +435,19 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         const saved = new Adw.ActionRow({title: 'Saved history'});
         saved.add_suffix(forget);
         let syncing = false;
+        let deletedChats = 0;   // (in the history: off forgets them, so it asks first)
+        const setKeep = on => {
+            syncing = true;
+            keep.active = on;
+            syncing = false;
+        };
         const sync = async () => {
             const st = await week(['--history-status']);
             if (st.keep === undefined)
                 return;
-            syncing = true;
-            keep.active = st.keep;
+            setKeep(st.keep);
             keep.sensitive = true;
-            syncing = false;
+            deletedChats = st.deletedChats || 0;
             saved.subtitle = st.since ? `Kept since ${st.since}, with ${st.deletedChats} chats Claude has deleted · ${st.sizeKB} KB` : 'Nothing kept yet';
             forget.sensitive = !!st.since;
         };
@@ -447,6 +455,24 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         keep.connect('notify::active', async () => {
             if (syncing)
                 return;
+            if (!keep.active && deletedChats > 0) {
+                // the numbers of the chats Claude has deleted go for good: asked first
+                const dialog = new Adw.AlertDialog({heading: 'Stop keeping the history?',
+                    body: deletedChats === 1 ? 'The Recap forgets the numbers of the 1 chat Claude has deleted, for good.'
+                        : `The Recap forgets the numbers of the ${deletedChats} chats Claude has deleted, for good.`});
+                dialog.add_response('cancel', 'Cancel');
+                dialog.add_response('off', 'Stop Keeping It');
+                dialog.set_response_appearance('off', Adw.ResponseAppearance.DESTRUCTIVE);
+                dialog.choose(window, null, async (d, res) => {
+                    if (d.choose_finish(res) !== 'off') {
+                        setKeep(true);   // (kept on)
+                        return;
+                    }
+                    said(await week(['--history', 'off']));
+                    sync();
+                });
+                return;
+            }
             said(await week(['--history', keep.active ? 'on' : 'off']));
             sync();
         });
