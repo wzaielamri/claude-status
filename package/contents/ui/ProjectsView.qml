@@ -69,6 +69,27 @@ PlasmaComponents3.ScrollView {
                       : i18nc("duration in hours and minutes", "%1h %2m", Math.floor(m / 60), m % 60)
     }
 
+    // A plan's or a memory's button, its title as it is (one with <tags> in it isn't drawn as markup)
+    component Chip: PlasmaComponents3.ToolButton {
+        id: chip
+        contentItem: RowLayout {
+            spacing: Kirigami.Units.smallSpacing
+            Kirigami.Icon {
+                source: chip.icon.name
+                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+            }
+            Text {
+                Layout.fillWidth: true
+                text: chip.text
+                textFormat: Text.PlainText
+                font: chip.font
+                color: Kirigami.Theme.textColor
+                elide: Text.ElideRight
+            }
+        }
+    }
+
     ColumnLayout {
         width: view.availableWidth
         spacing: Kirigami.Units.largeSpacing
@@ -249,7 +270,7 @@ PlasmaComponents3.ScrollView {
                     spacing: Kirigami.Units.smallSpacing
                     Repeater {
                         model: Math.min(4, card.here.plans.length)
-                        delegate: PlasmaComponents3.ToolButton {
+                        delegate: Chip {
                             required property int index
                             readonly property var plan: card.here.plans[index]
                             icon.name: "view-task"
@@ -259,10 +280,10 @@ PlasmaComponents3.ScrollView {
                     }
                     Repeater {
                         model: Math.min(4, card.here.memories.length)
-                        delegate: PlasmaComponents3.ToolButton {
+                        delegate: Chip {
                             required property int index
                             readonly property var memory: card.here.memories[index]
-                            icon.name: "note"
+                            icon.name: root.memoryIcon(memory ? memory.type : "")   // (as under its account)
                             text: memory ? memory.name : ""
                             onClicked: if (memory) root.openMemory(memory, "", false)
                         }
