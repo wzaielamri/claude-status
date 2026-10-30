@@ -12,8 +12,11 @@ a new chat (used by the Talpy Den widget).
                                                  (in VS Code's Claude extension instead)
     python3 -I jump.py --remote-new-vscode HOST [--cwd FOLDER_ON_HOST] [--account CONFIG_DIR|-]   (the same on an SSH host;
                                      --account first has VS Code's Claude there run on that account)
-    python3 -I jump.py --dismiss SESSION_ID      (hide a finished session in the widget)
+    python3 -I jump.py --dismiss SESSION_ID      (hide a finished chat)
     python3 -I jump.py --undismiss-all           (show hidden ones again)
+    python3 -I jump.py --hide KIND ID            (hide a chat, a plan, a memory or a project: KIND
+                                                  chats|plans|memories|projects, ID its id, slug, key or folder)
+    python3 -I jump.py --show-hidden KIND        (show the hidden ones of KIND again)
     python3 -I jump.py --resume SESSION_ID --profile PROFILE    (reopen a chat there)
     python3 -I jump.py --resume SESSION_ID --profile PROFILE --vscode   (in VS Code's Claude extension)
     python3 -I jump.py --resume SESSION_ID [--profile PROFILE] --print-command   (the command that reopens it)
@@ -2317,17 +2320,12 @@ def unshare(home, extra_dirs, session_id, profile_dir):
 
 
 def dismiss(home, extra_dirs, session_id):
-    """Hide a finished session from the widget's list. Nothing of Claude's is touched."""
-    cs.change_dismissed(cs.cache_dir(home), add=session_id)
-    return True, "Removed from the list"
+    """Hide a finished chat from its list. Nothing of Claude's is touched."""
+    return cs.hide_item(cs.cache_dir(home), "chats", session_id)
 
 
 def undismiss_all(home, extra_dirs, _session_id=None):
-    cache_root = cs.cache_dir(home)
-    count = len(cs.load_dismissed(cache_root))
-    if count:
-        cs.change_dismissed(cache_root, clear=True)
-    return True, f"Showing {count} hidden chat{'s' if count != 1 else ''} again" if count else "No chat was hidden"
+    return cs.show_hidden(cs.cache_dir(home), "chats")
 
 
 USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile PROFILE] [--config-dir DIR]...\n"
@@ -2354,6 +2352,7 @@ USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile P
          "               (a chat goes on by itself after each usage limit, until it's done)\n"
          "       jump.py --unqueue|--start-queued TASK_ID\n"
          "       jump.py --star|--unstar CHAT_ID [--host HOST]   (starred: listed under the account's Starred)\n"
+         "       jump.py --hide chats|plans|memories|projects ID | --show-hidden chats|plans|memories|projects\n"
          "       jump.py --star-plan|--unstar-plan SLUG [--host HOST]\n"
          "       jump.py --requeue TASK_ID --at MS   (it waits on until MS)\n"
          "       jump.py --share SESSION_ID\n"
@@ -2403,7 +2402,7 @@ def main(argv=None):
     agent_id, open_it, run_file, account, vscode_terminal = None, True, None, None, None
     task, background, end_first, to = Task(), False, False, None
     start_at, queue_host, account_title, scheduled, keep = None, "", "", False, False
-    feedback_plan, comments, extra_out = None, [], {}
+    feedback_plan, comments, extra_out, hide_kind = None, [], {}, None
     while args:
         arg = args.pop(0)
         if arg == "--config-dir" and args:
@@ -2520,6 +2519,10 @@ def main(argv=None):
             action = dismiss
         elif arg == "--undismiss-all":
             action, session_id = undismiss_all, session_id or "-"
+        elif arg == "--hide" and len(args) >= 2:
+            action, hide_kind, session_id = arg, args.pop(0), args.pop(0)
+        elif arg == "--show-hidden" and args:
+            action, hide_kind, session_id = arg, args.pop(0), "-"
         elif arg in ("--remote-vscode", "--remote-terminal", "--remote-new-vscode", "--remote-resume-vscode",
                      "--remote-edit") and args:
             action, remote_host = arg, args.pop(0)
@@ -2605,6 +2608,10 @@ def main(argv=None):
                                on=action.startswith("--star"))
         elif action in (open_plan, edit_plan, unshare_plan):
             ok, message = action(Path.home(), extra, session_id, profile_dir)
+        elif action == "--hide":
+            ok, message = cs.hide_item(cs.cache_dir(Path.home()), hide_kind, session_id)
+        elif action == "--show-hidden":
+            ok, message = cs.show_hidden(cs.cache_dir(Path.home()), hide_kind)
         elif action == "--remote-edit":
             ok, message = edit_remote_file(remote_host, session_id)
         elif action in ("--open-memory", "--edit-memory"):

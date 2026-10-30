@@ -1881,3 +1881,57 @@ class MarkdownTests(Fixture):
         self.assertEqual(mp.body("## Port the parser to C#"), "<h2>Port the parser to C#</h2>")
         self.assertEqual(mp.body("## Done ##"), "<h2>Done</h2>")
         self.assertIn("<title>Notes on F#</title>", mp.page("# Notes on F#"))
+
+
+class HideTests(Fixture):
+    """Hide: a chat, a plan, a memory or a project left out of its list (jump.py --hide KIND ID)."""
+
+    def setUp(self):
+        super().setUp()
+        os.environ["XDG_CACHE_HOME"] = str(self.cache.parent)
+        self.addCleanup(os.environ.pop, "XDG_CACHE_HOME", None)
+        self.cache = cs.cache_dir(self.home)
+
+    def run_jump(self, *args):
+        out = io.StringIO()
+        with mock.patch.object(Path, "home", return_value=self.home), contextlib.redirect_stdout(out):
+            jump.main(list(args))
+        return json.loads(out.getvalue())
+
+    def test_plans_memories_and_projects_hide_and_come_back(self):
+        w = self.home / ".claude-work"
+        for i, slug in enumerate(["old-plan", "new-plan"]):
+            write(w / f"plans/{slug}.md", f"# {slug}\n")
+            os.utime(w / f"plans/{slug}.md", (self.now - 1000 + i, self.now - 1000 + i))
+        mem = w / "projects/-gone-folder/memory"
+        write(mem / "a.md", "---\nname: a\n---\n")
+        write(mem / "b.md", "---\nname: b\n---\n")
+        r = self.collect(with_tokens=False, plans=1)
+        self.assertEqual((r["hiddenPlans"], r["hiddenMemories"], r["hiddenProjects"]), (0, 0, 0))
+        key = next(m["key"] for m in self.group(r, "work")["memories"] if m["name"] == "a")
+        self.assertEqual(self.run_jump("--hide", "plans", "new-plan")["message"], "Hid this plan")
+        self.assertEqual(self.run_jump("--hide", "memories", key)["message"], "Hid this memory")
+        self.assertEqual(self.run_jump("--hide", "projects", "/r/app")["message"], "Hid this project")
+        self.assertFalse(self.run_jump("--hide", "plans", "not a slug")["ok"])
+        self.assertFalse(self.run_jump("--hide", "folders", "/r/app")["ok"])
+        r = self.collect(with_tokens=False, plans=1)
+        work = self.group(r, "work")
+        # (the next one moves up: the list keeps its length)
+        self.assertEqual([p["slug"] for p in work["plans"]], ["old-plan"])
+        self.assertEqual([m["name"] for m in work["memories"]], ["b"])
+        self.assertEqual((r["hiddenPlans"], r["hiddenMemories"], r["hiddenProjects"]), (1, 1, 1))
+        self.assertEqual(self.run_jump("--show-hidden", "plans")["message"], "Showing 1 hidden plan again")
+        self.assertEqual(self.run_jump("--show-hidden", "plans")["message"], "No plan was hidden")
+        self.assertEqual(self.run_jump("--show-hidden", "memories")["message"], "Showing 1 hidden memory again")
+        self.assertEqual(self.run_jump("--show-hidden", "projects")["message"], "Showing 1 hidden project again")
+        r = self.collect(with_tokens=False, plans=1)
+        self.assertEqual([p["slug"] for p in self.group(r, "work")["plans"]], ["new-plan"])
+        self.assertEqual((r["hiddenPlans"], r["hiddenMemories"], r["hiddenProjects"]), (0, 0, 0))
+
+    def test_chats_hide_as_dismissed_ones_do(self):
+        self.assertEqual(self.run_jump("--hide", "chats", "bgdone")["message"], "Hid this chat")
+        self.assertIn("bgdone", cs.load_dismissed(self.cache))
+        self.assertEqual(self.collect(with_tokens=False)["dismissed"], 1)
+        self.assertEqual(self.run_jump("--dismiss", "dead")["message"], "Hid this chat")
+        self.assertEqual(self.run_jump("--show-hidden", "chats")["message"], "Showing 2 hidden chats again")
+        self.assertEqual(self.run_jump("--undismiss-all")["message"], "No chat was hidden")

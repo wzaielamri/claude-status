@@ -4295,12 +4295,13 @@ def all_transcripts(ctx):
     return found
 
 
-def account_plans(group, ctx, limit=PLANS_LISTED, starred=frozenset()):
+def account_plans(group, ctx, limit=PLANS_LISTED, starred=frozenset(), hidden=frozenset(), left_out=None):
     """The plans of an account's profiles, newest first: [{"key", "slug",
     "title", "path", "profileDir", "profile", "updatedAt", "shared", "chatId",
     "cwd", "cwdShort", "starred"}], the chat being the one that made it
     (where it's still there; None else). The first limit of them, then the
-    starred ones (slugs in starred) that are older."""
+    starred ones (slugs in starred) that are older. The ones you hid (slugs
+    in hidden) are left out, their slugs added to the set left_out."""
     by_key = {p.key: p for p in ctx.profiles}
     found, seen = [], set()
     for key in group["profileKeys"]:
@@ -4319,6 +4320,9 @@ def account_plans(group, ctx, limit=PLANS_LISTED, starred=frozenset()):
             seen.add((st.st_dev, st.st_ino))
             found.append((st.st_mtime, p, f, st))
     found.sort(key=lambda c: -c[0])
+    if left_out is not None:
+        left_out.update(c[2].stem for c in found if c[2].stem in hidden)
+    found = [c for c in found if c[2].stem not in hidden]
     found = [c for i, c in enumerate(found) if i < limit or c[2].stem in starred]
     plans = []
     for t, p, f, st in found:
@@ -4471,11 +4475,17 @@ def memory_folder(project):
     return "/" + (project.name[1:] if project.name.startswith("-") else project.name).replace("-", "/"), True
 
 
-def account_memories(group, ctx, limit=MEMORIES_LISTED):
+def memory_key(profile, path):
+    """The key a memory file is listed by: <profile>/<project>/<name>/memory."""
+    return f"{profile.key}/{path.parent.parent.name}/{path.stem}/memory"
+
+
+def account_memories(group, ctx, limit=MEMORIES_LISTED, hidden=frozenset(), left_out=None):
     """The memories of an account's profiles, newest first: [{"key", "name",
     "description", "type", "path", "folder", "folderShort", "folderGone"
     (that folder isn't there any more: memory_folder), "profileDir",
-    "profile", "updatedAt"}]."""
+    "profile", "updatedAt"}]. The ones you hid (keys in hidden) are left
+    out, their keys added to the set left_out."""
     by_key = {p.key: p for p in ctx.profiles}
     found, seen = [], set()
     for key in group["profileKeys"]:
@@ -4495,6 +4505,13 @@ def account_memories(group, ctx, limit=MEMORIES_LISTED):
             found.append((st.st_mtime, p, f))
     found.sort(key=lambda c: -c[0])
     folders, out = {}, account_instructions(group, ctx)
+    if hidden:
+        hid = {m["key"] for m in out if m["key"] in hidden} | {memory_key(p, f) for _, p, f in found
+                                                                  if memory_key(p, f) in hidden}
+        if left_out is not None:
+            left_out.update(hid)
+        out = [m for m in out if m["key"] not in hid]
+        found = [c for c in found if memory_key(c[1], c[2]) not in hid]
     for t, p, f in found[:limit]:
         project = f.parent.parent
         if project not in folders:
@@ -4502,7 +4519,7 @@ def account_memories(group, ctx, limit=MEMORIES_LISTED):
         head = memory_head(f)
         folder, gone = folders[project]
         out.append({
-            "key": f"{p.key}/{project.name}/{f.stem}/memory",
+            "key": memory_key(p, f),
             "name": clean_text(head.get("name") or f.stem, 120),
             "description": clean_text(head.get("description"), 300),
             "type": head.get("type") if head.get("type") in ("user", "feedback", "project", "reference") else "",
@@ -6980,6 +6997,108 @@ def change_dismissed(cache_root, add=None, forget=(), clear=False, now_ms=None):
         return sessions
 
 
+# ---------------------------------------------------------------- hidden plans, memories and projects
+#
+# Hide (the × on a line) leaves a chat, a plan, a memory or a project out of
+# its list, on this computer (an SSH host's on that host: remote.py --hide);
+# Show Hidden … Again brings that kind back. Chats are kept in dismissed.json
+# (above), the others in hidden.json: a plan by its slug, a memory by its
+# key, a project by its folder. Nothing of Claude's is touched.
+
+HIDE_KINDS = ("chats", "plans", "memories", "projects")
+HIDE_WORDS = {"chats": ("chat", "chats"), "plans": ("plan", "plans"), "memories": ("memory", "memories"),
+              "projects": ("project", "projects")}
+HIDDEN_ID_MAX = 4096
+
+
+def hidden_id_ok(kind, item_id):
+    if kind == "chats":
+        return valid_id(item_id)
+    if kind == "plans":
+        return isinstance(item_id, str) and bool(PLAN_SLUG.match(item_id))
+    return (isinstance(item_id, str) and 0 < len(item_id) <= HIDDEN_ID_MAX and "\n" not in item_id
+            and (kind != "projects" or item_id.startswith("/")))
+
+
+def load_hidden(cache_root):
+    """{"plans": {slug: when}, "memories": {key: when}, "projects": {folder: when}}: what you hid."""
+    data = read_json(cache_root / "hidden.json")
+    data = data if isinstance(data, dict) else {}
+    out = {}
+    for kind in HIDE_KINDS[1:]:
+        items = data.get(kind) if isinstance(data.get(kind), dict) else {}
+        out[kind] = {i: t for i, t in items.items() if hidden_id_ok(kind, i)}
+    return out
+
+
+def change_hidden(cache_root, kind, add=None, forget=(), clear=False, now_ms=None):
+    """Change what's hidden of kind ("plans", "memories", "projects") under
+    a lock: every copy of Talpy Den writes hidden.json. What's hidden of it now."""
+    private_dir(cache_root)
+    with open(cache_root / "hidden.lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        hidden = load_hidden(cache_root)
+        before = dict(hidden[kind])
+        if clear:
+            hidden[kind] = {}
+        for i in forget:
+            hidden[kind].pop(i, None)
+        if add is not None:
+            hidden[kind][add] = int(time.time() * 1000) if now_ms is None else now_ms
+        if hidden[kind] != before:
+            write_json_atomic(cache_root / "hidden.json", hidden)
+        return hidden[kind]
+
+
+def hide_item(cache_root, kind, item_id):
+    """Hide a chat, a plan, a memory or a project (kind chats, plans,
+    memories, projects): (ok, message)."""
+    if kind not in HIDE_KINDS:
+        return False, "Only chats, plans, memories and projects can be hidden"
+    one = HIDE_WORDS[kind][0]
+    if not hidden_id_ok(kind, item_id):
+        return False, f"Not a {one}: {item_id}"
+    if kind == "chats":
+        change_dismissed(cache_root, add=item_id)
+    else:
+        change_hidden(cache_root, kind, add=item_id)
+    return True, f"Hid this {one}"
+
+
+def show_hidden(cache_root, kind):
+    """Show the hidden chats (plans, memories, projects) again: (ok, message)."""
+    if kind not in HIDE_KINDS:
+        return False, "Only chats, plans, memories and projects can be hidden"
+    one, many = HIDE_WORDS[kind]
+    count = len(load_dismissed(cache_root) if kind == "chats" else load_hidden(cache_root)[kind])
+    if not count:
+        return True, f"No {one} was hidden"
+    if kind == "chats":
+        change_dismissed(cache_root, clear=True)
+    else:
+        change_hidden(cache_root, kind, clear=True)
+    return True, f"Showing {count} hidden {one if count == 1 else many} again"
+
+
+def forget_deleted(cache_root, kind, item_id, host=""):
+    """A chat, a plan or a memory was deleted (sharing.delete_chat, …):
+    the stars, the queue, keep going and what's hidden here forget it (of
+    host: its stars and queued tasks, kept here; the rest is the host's)."""
+    if kind in ("chats", "plans"):
+        change_stars(cache_root, kind, item_id, host, on=False)
+    if kind == "chats":
+        for t in load_queue(cache_root):
+            if t.get("chat") == item_id and (t.get("host") or "") == (host or ""):
+                change_queue(cache_root, take=t["id"])
+    if host:
+        return
+    if kind == "chats":
+        keep_chat(cache_root, "", item_id, on=False)
+        change_dismissed(cache_root, forget=[item_id])
+    else:
+        change_hidden(cache_root, kind, forget=[item_id])
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -7131,7 +7250,7 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
     # Removed from the list by the user: hidden while finished; one that runs
     # again comes back (and is forgotten).
     dismissed = load_dismissed(cache_root)
-    forget, hidden = set(), 0
+    forget, dismissed_rows = set(), 0
     for g in groups:
         shown = []
         for s in g["sessions"]:
@@ -7140,7 +7259,7 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
             former = s.pop("formerIds", None) or []
             ids = [i for i in (s["sessionId"], s.get("chatId"), *former) if i in dismissed]
             if ids and s["state"] == "done":
-                hidden += 1
+                dismissed_rows += 1
             else:
                 forget.update(ids)  # it runs again: it comes back (and is forgotten)
                 shown.append(s)
@@ -7173,6 +7292,8 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
     except Exception as exc:
         errors.append(f"starred chats and plans: {exc}")
         starred = {kind: set() for kind in STAR_KINDS}
+    hidden = load_hidden(cache_root)  # (the plans, memories and projects you hid: left out)
+    left_out = {"plans": set(), "memories": set()}
     try:
         # a finished session you removed from the list is still one of your
         # recent chats: it shows there
@@ -7187,14 +7308,14 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
             s["starred"] = (s.get("chatId") or s["sessionId"]) in starred["chats"]
         note_limit_hits(g)  # (of its listed chats and its recent ones)
         try:
-            listed = account_plans(g, ctx, plans, starred["plans"])
+            listed = account_plans(g, ctx, plans, starred["plans"], hidden["plans"], left_out["plans"])
             g["plans"] = listed[:max(0, plans)]
             g["starredPlans"] = [dict(pl, key=pl["key"][:-len("/plan")] + "/starred") for pl in listed if pl["starred"]]
         except Exception as exc:
             errors.append(f"{g['title']}: plans: {exc}")
             g["plans"], g["starredPlans"] = [], []
         try:
-            g["memories"] = account_memories(g, ctx)
+            g["memories"] = account_memories(g, ctx, hidden=hidden["memories"], left_out=left_out["memories"])
         except Exception as exc:
             errors.append(f"{g['title']}: memories: {exc}")
             g["memories"] = []
@@ -7236,7 +7357,11 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
         "keep": [],  # the chats that keep going (kept_chats, after look_after_kept)
         "counts": counts,
         "groups": groups,
-        "dismissed": hidden,
+        "dismissed": dismissed_rows,  # (the finished chats you hid: Show Hidden Chats Again)
+        # what you hid of the others (Show Hidden Plans / Memories / Projects Again)
+        "hiddenPlans": len(left_out["plans"]),
+        "hiddenMemories": len(left_out["memories"]),
+        "hiddenProjects": len(hidden["projects"]),  # (the Projects tab leaves them out: week.py --projects)
         "canShare": True,  # jump.py shares chats between this computer's profiles (sharing.py)
         "reviewed": load_reviewed(cache_root),  # {review_key: when}: chats marked reviewed (pane.py --reviewed)
         "reviewedSince": reviewed_since(cache_root, now_ms),  # (what chats changed before isn't to review)
@@ -7787,6 +7912,7 @@ USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent 
                     [--usage-refresh N]
        talpy_den.py --fetch-usage [--config-dir DIR]...
        talpy_den.py --dismiss SESSION_ID | --undismiss-all
+       talpy_den.py --hide chats|plans|memories|projects ID | --show-hidden chats|plans|memories|projects
        talpy_den.py --end SESSION_ID [--profile PROFILE] [--busy] [--config-dir DIR]...
        talpy_den.py --interrupt SESSION_ID [--profile PROFILE] [--config-dir DIR]...
        talpy_den.py --agent-run AGENT_ID --chat CHAT_ID [--profile PROFILE] [--config-dir DIR]...
@@ -7812,7 +7938,9 @@ USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent 
                     each chat here, and print the JSON after a marker line
   --local           with --remote: this computer's status for its VS Code extension (VS Code's
                     account is this computer's VS Code's, not a VS Code server's)
-  --dismiss ID      hide a finished session in the widget (--undismiss-all shows them again)
+  --dismiss ID      hide a finished chat (--undismiss-all shows them again)
+  --hide KIND ID    hide a chat, a plan (its slug), a memory (its key) or a project (its
+                    folder) from its list (--show-hidden KIND shows that kind again)
   --end ID          stop a chat in a terminal or VS Code (it's kept); only an idle one
                     unless --busy (you were told it's working or waiting)
   --interrupt ID    interrupt a working chat in tmux (Ctrl+C in its pane)
@@ -7837,6 +7965,7 @@ def main(argv=None):
     args = sys.argv[1:] if argv is None else list(argv)
     config_dirs, with_tokens, pretty, done_hours = [], True, False, KEEP_DONE_HOURS
     recent, remote, local, dismiss, undismiss = RECENT_CHATS, False, False, None, False
+    hide_kind, hide_id, show_kind = None, None, None
     end, interrupt, profile_key, busy, instance, interval_ms = None, None, None, False, None, 2000
     agent_run_id, chat_id, plans, find, find_limit = None, None, PLANS_LISTED, None, FIND_LIMIT
     task_folder, task_action, prompt, plan_slug, plan_profile, plan_text = None, None, "", None, None, None
@@ -7921,6 +8050,10 @@ def main(argv=None):
             dismiss = args.pop(0)
         elif arg == "--undismiss-all":
             undismiss = True
+        elif arg == "--hide" and len(args) >= 2:
+            hide_kind, hide_id = args.pop(0), args.pop(0)
+        elif arg == "--show-hidden" and args:
+            show_kind = args.pop(0)
         elif arg.startswith("--config-dir="):
             config_dirs.append(arg.partition("=")[2])
         elif arg == "--no-tokens":
@@ -7990,10 +8123,14 @@ def main(argv=None):
         ok, message = set_vscode_server_config_dir(home, None if vscode_account == "-" else vscode_account,
                                                    vscode_server, config_dirs)
         result = {"ok": ok, "message": message}
-    elif dismiss is not None or undismiss:
+    elif dismiss is not None or undismiss or hide_kind is not None or show_kind is not None:
         try:
-            change_dismissed(cache_root, add=dismiss, clear=undismiss)
-            result = {"ok": True, "message": "Removed from the list" if dismiss is not None else "Shown again"}
+            if dismiss is not None or hide_kind is not None:
+                ok, message = hide_item(cache_root, "chats" if dismiss is not None else hide_kind,
+                                        dismiss if dismiss is not None else hide_id)
+            else:
+                ok, message = show_hidden(cache_root, "chats" if undismiss else show_kind)
+            result = {"ok": ok, "message": message}
         except OSError as exc:
             result = {"ok": False, "message": str(exc)}
     else:

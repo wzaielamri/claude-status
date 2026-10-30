@@ -7,8 +7,11 @@
     python3 -I remote.py --run HOST COMMAND         run COMMAND on HOST (e.g. claude stop)
     python3 -I remote.py --end HOST SESSION_ID [PROFILE] [--busy]   stop a chat in a terminal or VS Code there
     python3 -I remote.py --interrupt HOST SESSION_ID [PROFILE]      interrupt a working chat in tmux there
-    python3 -I remote.py --dismiss HOST SESSION_ID  hide a finished session of HOST
+    python3 -I remote.py --dismiss HOST SESSION_ID  hide a finished chat of HOST
     python3 -I remote.py --undismiss-all HOST
+    python3 -I remote.py --hide HOST KIND ID        hide a chat, plan, memory or project of HOST (KIND
+                                                    chats|plans|memories|projects; kept there)
+    python3 -I remote.py --show-hidden HOST KIND    show HOST's hidden ones of KIND again
     python3 -I remote.py --agent-run HOST CHAT_ID AGENT_ID [PROFILE] [--no-open]   a subagent's run there, as a Markdown file here
     python3 -I remote.py --share HOST CHAT_ID [PROFILE]    share a chat with every account there (from PROFILE's copy)
     python3 -I remote.py --continue HOST CHAT_ID PROFILE [--print-command]   share it with PROFILE there if needed,
@@ -374,8 +377,14 @@ def vscode_account(host, config_dir):
 
 
 def dismiss(host, session_id=None):
-    """Hide a finished session in the host's list (or show all again)."""
+    """Hide a finished chat in the host's list (or show all again)."""
     return run_status_script(host, ["--dismiss", session_id] if session_id else ["--undismiss-all"])
+
+
+def hide(host, kind, item_id=None):
+    """Hide a chat, plan, memory or project in the host's lists (kept on the
+    host, as its status leaves them out there), or show that kind again."""
+    return run_status_script(host, ["--hide", kind, item_id] if item_id is not None else ["--show-hidden", kind])
 
 
 def end(host, session_id, profile=None, busy=False):
@@ -780,6 +789,9 @@ def main(argv=None):
             out = {"ok": ok, "message": message}
         elif action == "--dismiss" and len(args) == 2:
             ok, message = dismiss(args[0], args[1])
+            out = {"ok": ok, "message": message}
+        elif action in ("--hide", "--show-hidden") and len(args) == (3 if action == "--hide" else 2):
+            ok, message = hide(*args)
             out = {"ok": ok, "message": message}
         elif action == "--end" and len([a for a in args if a != "--busy"]) in (2, 3):
             ok, message = end(*[a for a in args if a != "--busy"], busy="--busy" in args)

@@ -2515,7 +2515,10 @@ def main(argv=None):
             chats = chats_between(cache, profiles, 0, now_ms + 1, home)
             for cid, c in chats.items():
                 c["id"] = cid
-            result = {"ok": True, "generatedAt": now_ms, "projects": projects(list(chats.values()), now_ms, home),
+            rows = projects(list(chats.values()), now_ms, home)
+            hidden = cs.load_hidden(cache_root)["projects"]  # (the ones you hid: jump.py --hide projects FOLDER)
+            result = {"ok": True, "generatedAt": now_ms, "projects": [p for p in rows if p["path"] not in hidden],
+                      "hidden": sum(p["path"] in hidden for p in rows),
                       "currency": currency_of(currency, cache_root, now_ms / 1000)}
         except Exception as exc:
             result = {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}

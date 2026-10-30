@@ -345,12 +345,23 @@ class ActionTests(FakeSSH):
         self.assertIn("refused the login", message)
 
     def test_dismiss_on_the_host(self):
-        self.assertEqual(remote.dismiss("lab", "abc12345"), (True, "Removed from the list"))
+        self.assertEqual(remote.dismiss("lab", "abc12345"), (True, "Hid this chat"))
         self.assertIn("abc12345", cs.load_dismissed(self.fake_home / ".cache/talpy-den"))
         out = remote.status("lab", tokens=False)
         self.assertEqual(out["result"]["groups"][0]["sessions"], [])
         self.assertEqual(remote.dismiss("lab")[0], True)
         self.assertEqual(cs.load_dismissed(self.fake_home / ".cache/talpy-den"), {})
+
+    def test_hide_on_the_host(self):
+        # (kept on the host: its status leaves them out there)
+        self.assertEqual(remote.hide("lab", "plans", "calm-red-owl"), (True, "Hid this plan"))
+        self.assertEqual(remote.hide("lab", "projects", "/srv/app"), (True, "Hid this project"))
+        self.assertEqual(list(cs.load_hidden(self.fake_home / ".cache/talpy-den")["plans"]), ["calm-red-owl"])
+        self.assertEqual(remote.status("lab", tokens=False)["result"]["hiddenProjects"], 1)
+        self.assertEqual(remote.hide("lab", "plans"), (True, "Showing 1 hidden plan again"))
+        self.assertEqual(remote.hide("lab", "memories"), (True, "No memory was hidden"))
+        self.assertEqual(remote.hide("lab", "chats", "abc12345"), (True, "Hid this chat"))
+        self.assertIn("abc12345", cs.load_dismissed(self.fake_home / ".cache/talpy-den"))
 
     def test_stop_an_idle_chat_on_the_host(self):
         proc = subprocess.Popen([sys.executable, "-c", "print('ready', flush=True); import time; time.sleep(60)"],
@@ -609,7 +620,7 @@ class HostNoiseTests(FakeSSH):
 
     def test_warnings_on_stderr(self):
         self.mode("warning")
-        self.assertEqual(remote.dismiss("lab", "abc12345"), (True, "Removed from the list"))
+        self.assertEqual(remote.dismiss("lab", "abc12345"), (True, "Hid this chat"))
         self.assertEqual(remote.run("lab", "echo hello"), (True, "hello"))
         ok, message = remote.end("lab", "not-there")
         self.assertFalse(ok)

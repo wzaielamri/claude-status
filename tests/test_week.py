@@ -1128,6 +1128,25 @@ class OutputTests(Home):
             answer = json.loads(text[text.rfind("\n" + cs.REMOTE_MARK) + 1 + len(cs.REMOTE_MARK):])
             self.assertEqual(list(answer["chats"]), chats, (since, until, now))
 
+    def test_a_hidden_project_is_left_out_of_the_projects_tab(self):
+        import io
+        from contextlib import redirect_stdout
+        self.write(Transcript().prompt(self.t0).reply(self.t0 + 1000, "a").duration(self.t0 + 2000, 2000))
+        saved = dict(os.environ)
+        self.addCleanup(lambda: (os.environ.clear(), os.environ.update(saved)))
+        os.environ["HOME"], os.environ["XDG_CACHE_HOME"] = str(self.home), str(self.cache_root)
+
+        def projects():
+            out = io.StringIO()
+            with redirect_stdout(out):
+                week.main(["--projects"])
+            return json.loads(out.getvalue())
+        result = projects()
+        self.assertEqual((len(result["projects"]), result["hidden"]), (1, 0))
+        cs.hide_item(cs.cache_dir(self.home), "projects", result["projects"][0]["path"])
+        result = projects()
+        self.assertEqual((result["projects"], result["hidden"]), ([], 1))
+
 
 if __name__ == "__main__":
     unittest.main()
