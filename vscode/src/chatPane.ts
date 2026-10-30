@@ -10,6 +10,7 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { Actions } from "./actions";
@@ -549,7 +550,8 @@ class Pane implements vscode.Disposable {
         break;
       case "pickFiles": {
         // + : VS Code's own file dialog, in the chat's folder; an SSH host's chat takes pictures
-        const folder = !this.host && this.chat.cwd ? vscode.Uri.file(this.chat.cwd) : undefined;
+        // (an SSH host's chat: this computer's files, which go there, also in a window connected to it)
+        const folder = !this.host && this.chat.cwd ? vscode.Uri.file(this.chat.cwd) : this.host ? vscode.Uri.file(os.homedir()) : undefined;
         const picked = await vscode.window.showOpenDialog({
           canSelectMany: true, openLabel: "Attach", defaultUri: folder, title: "Attach to your reply",
           ...(this.host ? { filters: { Pictures: ["png", "jpg", "jpeg", "webp", "gif"] } } : {}),
