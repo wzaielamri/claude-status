@@ -20,7 +20,7 @@ import { Dashboard } from "./dashboard";
 import { carryOverSettings, settingNames } from "./legacySettings";
 import { Notifier } from "./notify";
 import { PlanReview, planFileOf } from "./planReview";
-import { allGroups, countStates, hiddenCount, type HiddenKind } from "./shared/model";
+import { allGroups, countStates, duration, hiddenCount, type HiddenKind } from "./shared/model";
 import { StatusBar } from "./statusBar";
 import { registerPreview, setUpUsageBars } from "./statusline";
 import { terminalLinkOf, Terminals } from "./terminals";
@@ -70,10 +70,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // and other windows don't show it again)
   const mondayRecap = async (): Promise<void> => {
     if (!notifier.isLeader() || !vscode.workspace.getConfiguration("talpyDen").get<boolean>("mondayRecap", true)) return;
-    const r = await backend.mondayRecap(configDirArgs());
+    // (with the SSH hosts the Recap counts, so its numbers match the Recap it opens)
+    const r = await backend.mondayRecap([...dash.answeringHosts().flatMap((h) => ["--host", h]), ...configDirArgs()]);
     if (!r?.ok || !r.due) return;
-    const h = (ms: number) => Math.round(ms / 3600000);
-    const parts = [`Claude worked ${h(r.workedMs)} h over ${r.chats} chats; you, ${h(r.youMs)} h and ${r.prompts} prompts.`];
+    const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+    const parts = [`Claude worked ${duration(r.workedMs)} over ${n(r.chats, "chat")}; you, ${duration(r.youMs)} and ${n(r.prompts, "prompt")}.`];
     if (r.project) parts.push(`Most of it in ${r.project}.`);
     if (r.workedBefore > 0) {
       const change = Math.round(((r.workedMs - r.workedBefore) / r.workedBefore) * 100);

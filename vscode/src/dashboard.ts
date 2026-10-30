@@ -262,6 +262,15 @@ export class Dashboard implements vscode.Disposable {
   }
 
   // The hosts to check: the window's own host first, then the picked ones
+  // The SSH hosts shown whose last check answered (the Recap and the Monday
+  // recap count these: one out of reach would hold them up)
+  answeringHosts(): string[] {
+    return this.shownHosts().filter((name) => {
+      const h = this.hosts.get(name);
+      return !!h && h.ok && !!h.result;
+    });
+  }
+
   shownHosts(): string[] {
     const list = settings.sshHosts();
     if (this.windowHost && !this.windowHostOff && settings.includeCurrentRemote() && !list.includes(this.windowHost)) list.unshift(this.windowHost);
@@ -640,10 +649,7 @@ export class Dashboard implements vscode.Disposable {
   // check answered (one out of reach would hold it up)
   async week(back: number, account: string, span: WeekSpan = "week"): Promise<{ recap?: WeekRecap; error?: string }> {
     if (this.demoPhase !== null) return { recap: demoWeek(Date.now(), back, account, span) };
-    const hosts = this.shownHosts().filter((name) => {
-      const h = this.hosts.get(name);
-      return !!h && h.ok && !!h.result;
-    });
+    const hosts = this.answeringHosts();
     const currency = settings.recapCurrency();
     return this.backend.week([
       "--span", span,
