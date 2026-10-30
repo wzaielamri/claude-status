@@ -27,6 +27,8 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     const agents = s.agents || null;
     const showAgents = ctx.ui.expandedAgents[rowKey] === true;
     const tasks = s.tasks && s.tasks.total ? s.tasks : null;
+    // its changes, compared side by side in VS Code (not an SSH host's files)
+    const canCompare = !!s.changes && !remoteHost && ctx.vscodeInstalled && !!s.chatId;
     const canPeek = L.canPeek(s, remoteHost);
     const showPeek = canPeek && ctx.ui.expandedPeek[rowKey] === true;
     const open = () => (remoteHost ? ctx.remoteShow(remoteHost, s) : ctx.jumpTo(s.sessionId, s.profileDir));
@@ -95,14 +97,14 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     if (s.changes) {
         // the files it changed: compared in VS Code (chats on this computer)
         const t = tag(L.changesTag(s.changes));
-        if (!remoteHost) {
+        if (canCompare) {
             t.add_style_class_name('claude-clickable');
             t.connect('button-release-event', () => {
                 ctx.showChanges(s.chatId || s.sessionId, s.profileDir, false);
                 return Clutter.EVENT_STOP;
             });
         }
-        tags.push(tips.add(t, () => L.changesTooltip(s.changes, remoteHost)));
+        tags.push(tips.add(t, () => L.changesTooltip(s.changes, remoteHost, ctx.vscodeInstalled)));
     }
     const end = box('claude-line');
     end.add_child(label(L.stateText(s, ctx.now),
@@ -188,7 +190,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
         body.add_child(more);
     }
     if (showPeek)
-        body.add_child(buildPeek(ctx, s, remoteHost));
+        body.add_child(buildPeek(ctx, s, remoteHost, canCompare));
 
     if (showAgents && agents)
         body.add_child(buildAgentsTree(ctx, s, agents, rowKey, remoteHost));
@@ -254,7 +256,7 @@ function sharedTooltip(s) {
 
 // The last exchange (your prompt, Claude's reply), its tasks, and buttons
 // that compare the files it changed (all of them, or the last turn's)
-function buildPeek(ctx, s, remoteHost) {
+function buildPeek(ctx, s, remoteHost, canCompare) {
     const peek = s.peek || {};
     const box_ = column('claude-peek', {x_expand: true});
     if (peek.prompt)
@@ -275,7 +277,7 @@ function buildPeek(ctx, s, remoteHost) {
             list.add_child(label(L.fmt('… and %1 more', s.tasks.total - s.tasks.items.length), 'claude-small claude-dim'));
         box_.add_child(list);
     }
-    if (s.changes && !remoteHost) {
+    if (canCompare) {
         const buttons = box('claude-confirm-buttons');
         const all = textButton(L.fmt(s.changes.count === 1 ? 'Compare changes (%1 file)' : 'Compare changes (%1 files)', s.changes.count),
             () => ctx.showChanges(s.chatId || s.sessionId, s.profileDir, false), 'claude-text-button claude-confirm-button');

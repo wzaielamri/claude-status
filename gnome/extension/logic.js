@@ -993,14 +993,17 @@ export function changesTag(changes) {
     return fmt('±%1', changes.count);
 }
 
-export function changesTooltip(changes, remoteHost) {
+// (vscodeInstalled: VS Code shows them side by side, so without it they
+// can't be compared: Plasma's canCompare)
+export function changesTooltip(changes, remoteHost, vscodeInstalled = true) {
     const lines = changes.files.slice();
     if (changes.count > changes.files.length)
         lines.push(fmt('… and %1 more', changes.count - changes.files.length));
     lines.push('');
     lines.push(remoteHost
         ? fmt('On %1: comparing them works for chats on this computer.', remoteHost)
-        : 'Click to compare them with how they were before the chat, side by side in VS Code.');
+        : !vscodeInstalled ? 'Install VS Code to compare them side by side.'
+            : 'Click to compare them with how they were before the chat, side by side in VS Code.');
     return [plural(changes.count, '%1 file changed', '%1 files changed'), lines.join('\n')];
 }
 

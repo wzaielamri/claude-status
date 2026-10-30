@@ -275,6 +275,12 @@ test("a Recap row's 6, 12 and 18 o'clock lines go by the day's own clock", () =>
     }
 });
 
+test("a chat's changed files: compared in VS Code, when it's there", () => {
+    const changes = {count: 1, files: ['a.py']};
+    eq(L.changesTooltip(changes, '')[1].endsWith('side by side in VS Code.'), true);
+    eq(L.changesTooltip(changes, '', false)[1].endsWith('Install VS Code to compare them side by side.'), true);
+});
+
 test('helper output', () => {
     eq(L.helperResult('{"ok": true, "message": "x"}', ''), {ok: true, message: 'x'});
     eq(L.helperResult('', 'Traceback\nValueError: no'), {ok: false, message: 'ValueError: no'});
