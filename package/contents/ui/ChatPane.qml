@@ -539,7 +539,7 @@ Window {
         if (asked.chat !== chatId) {
             if (kind === "send" || kind === "later") {
                 if (result.ok && result.how === "vscode" && result.link)
-                    Qt.openUrlExternally(result.link)
+                    root.openVscodeLink(asked.target ? asked.target.sessionId || asked.chat : asked.chat, result.link, asked.host)
                 else if (result.ok && result.how === "copy" && result.copied)
                     root.openRow(asked.target, asked.host)
                 else if (!result.ok || result.how === "ask" || result.how === "copy") {
@@ -618,7 +618,7 @@ Window {
                 return
             }
             if (result.how === "vscode" && result.link)
-                Qt.openUrlExternally(result.link)
+                root.openVscodeLink(sessionId || chatId, result.link, host)
             if (result.how === "copy") {
                 if (!result.copied) {   // (your message stays in the box)
                     infoBad = true
@@ -804,6 +804,14 @@ Window {
         const text = replyBox.text.trim()
         if (!text || sending)
             return
+        // (it goes on the command line: one too long for it is refused here, as
+        // VS Code does, and stays in the box)
+        if (text.length > 100000 || utf8Length(text) > 120000) {
+            info = i18n("That message is too long")
+            infoBad = true
+            infoTimer.restart()
+            return
+        }
         sending = true
         sendStale.restart()
         run(afterTurn ? "later" : "send", "--send " + root.shellQuote(chatId) + " --text " + root.shellQuote(text)
@@ -811,6 +819,14 @@ Window {
             + (afterTurn ? " --after-turn --name " + root.shellQuote(chatName) : "") + paneArgs(), replyBox.text)
         if (afterTurn)
             replyBox.text = ""
+    }
+    function utf8Length(text) {
+        let n = 0
+        for (const c of text) {
+            const code = c.codePointAt(0)
+            n += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4
+        }
+        return n
     }
     // The box without the message that went (what you typed after it stays)
     function withoutSent(box, sent) {

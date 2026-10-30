@@ -1831,6 +1831,17 @@ PlasmoidItem {
         }
     }
 
+    // A reply to a chat in a Claude Code panel (pane.py --send's link): in the
+    // VS Code window that runs the chat, raised first (jump.py --vscode-link);
+    // an SSH host's opens as the link says
+    function openVscodeLink(sessionId, link, host) {
+        if (host || !sessionId)
+            Qt.openUrlExternally(link)
+        else
+            jumper.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --vscode-link " + shellQuote(sessionId)
+                                 + " " + shellQuote(link) + configDirArgs + " # " + Date.now())
+    }
+
     // A recent chat, reopened in VS Code's Claude extension (in its folder)
     function resumeInVscode(sessionId, profileDir) {
         jumper.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --resume " + shellQuote(sessionId)
@@ -3310,7 +3321,7 @@ PlasmoidItem {
                 root.paneDraft = draft.text
             } else {
                 if (draft && result.how === "vscode" && result.link)
-                    Qt.openUrlExternally(result.link)
+                    root.openVscodeLink(draft.session.sessionId || draft.session.chatId, result.link, draft.host)
                 root.actionError = ""
                 if (result.message) {
                     root.actionInfo = result.message
