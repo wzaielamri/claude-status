@@ -34,6 +34,7 @@ export interface Still {
 export class Talpy {
     constructor(opts?: { colors?: TalpyColors; theme?: TalpyTheme; words?: (s: string) => string; travels?: boolean; brain?: boolean });
     onTravel: ((ms: number) => void) | null;
+    onTravelStop: (() => void) | null;   // a move cut short while it tunnels: it stops where it is
     facingLeft: boolean;
     travels: boolean;
     readonly busy: boolean;

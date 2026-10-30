@@ -189,8 +189,8 @@ export class Pet {
       travels: this.lone && !reducedMotion(), // (no digging about, then)
     });
     this.talpy.onTravel = (ms) => this.travel(ms);
-    // (cut short while it tunnels: it pops up where it is; talpy.d.mts doesn't name this hook yet)
-    (this.talpy as Talpy & { onTravelStop: (() => void) | null }).onTravelStop = () => this.stride.stop();
+    // (cut short while it tunnels: it pops up where it is)
+    this.talpy.onTravelStop = () => this.stride.stop();
     this.talpy.tick(clock.now());
     this.lastMood = this.mood;
     this.talpy.setMood(this.lastMood);
