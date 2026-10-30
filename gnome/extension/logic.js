@@ -328,20 +328,20 @@ export function openHint(session, remoteHost) {
         if (session.entrypoint === 'claude-vscode' && !session.openCommand)
             return fmt('Show this conversation in VS Code (connected to %1)', remoteHost);
         if (!session.openCommand)
-            return fmt('Switch to the terminal with the ssh session to %1', remoteHost);
+            return fmt('Switch to the terminal with the ssh connection to %1', remoteHost);
         if (session.kind === 'chat')
             return fmt('Reopen this chat on %1 in a terminal (ssh)', remoteHost);
-        return fmt('Open this background session on %1 in a terminal (ssh)', remoteHost);
+        return fmt('Open this background chat on %1 in a terminal (ssh)', remoteHost);
     }
     if (session.entrypoint === 'claude-vscode')
         return 'Open this conversation in VS Code';
     if (session.kind === 'chat')
         return 'Reopen this chat in a terminal (claude --resume)';
     if (session.kind === 'bg' && session.pid === null)
-        return 'Reopen this background session in a terminal';
+        return 'Reopen this background chat in a terminal';
     if (session.kind === 'bg')
-        return 'Show this background session in a terminal';
-    return 'Switch to the terminal running this session';
+        return 'Show this background chat in a terminal';
+    return 'Switch to the terminal running this chat';
 }
 
 // A chat with a process of its own can be stopped, whatever it's doing: in a
@@ -373,7 +373,7 @@ export function stopTip(session) {
         return ['Stop this chat',
             'Asks first. The current step is cut off, Claude quits and its terminal stays open; the chat is kept and shows under Recent chats.'];
     }
-    return ['Stop this background session', 'Asks first. The conversation is kept; claude attach resumes it.'];
+    return ['Stop this background chat', 'Asks first. The conversation is kept; claude attach resumes it.'];
 }
 
 export function stopQuestion(session) {
@@ -1236,7 +1236,7 @@ export function chatRecapTooltip(stats, costUsd, now) {
     if (stats.startedAt)
         lines.push(fmt('Started %1 ago, last busy %2 ago.', duration(now - stats.startedAt), duration(now - (stats.lastAt || now))));
     if (typeof costUsd === 'number' && costUsd > 0)
-        lines.push(fmt('At API prices this session would cost $%1 (from the status line; a plan pays differently).', costUsd.toFixed(2)));
+        lines.push(fmt('At API prices this chat would cost $%1 (from the status line; a plan pays differently).', costUsd.toFixed(2)));
     return lines.join('\n');
 }
 

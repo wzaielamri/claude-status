@@ -54,10 +54,10 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     const tags = [];
 
     if (showProfile)
-        tags.push(tips.add(tag(s.profile), 'The Claude profile (config folder) this session runs in'));
+        tags.push(tips.add(tag(s.profile), 'The Claude profile (config folder) this chat runs in'));
     // where it runs, in the same words as Plasma's and VS Code's
     const [kindTag, kindTip] = s.pid === null ? ['Not open', 'No terminal or panel has it open: a reply goes on with it in the background.']
-        : s.kind === 'bg' ? ['Background', "A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."]
+        : s.kind === 'bg' ? ['Background', "A background chat: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach)."]
         : s.entrypoint === 'claude-vscode' ? ['Claude Code panel', "Runs in VS Code's Claude Code panel. Click the name to open the conversation there."]
         : s.tmux ? ['Tmux', 'It runs in a tmux pane.']
         : s.vscodeTerminal || s.terminalApp === 'VS Code' ? ['VS Code terminal', 'It runs in a terminal of VS Code.']
@@ -231,17 +231,17 @@ function sharedTooltip(s) {
         if (info.movedHere)
             text += "\nThe shared chat continued here, so it isn't listed itself.";
         if (info.stoppedCopies)
-            text += `\n${L.fmt('Its background session on %1 was stopped; %1 shows a link to this copy.', info.stoppedCopies.join(', '))}`;
+            text += `\n${L.fmt('Its background chat on %1 was stopped; %1 shows a link to this copy.', info.stoppedCopies.join(', '))}`;
         return ['Copy of a shared chat', text];
     }
-    let text = L.fmt('This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one session can have it open at a time.',
+    let text = L.fmt('This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one Claude can have it open at a time.',
         info.profiles.join(' + '));
     if (s.kind === 'chat')
         text += `\n${L.fmt('Listed here because it was used on %1 last.', s.profile)}`;
     if (info.openIn)
         text += `\n${L.fmt('Open in %1 right now.', info.openIn)}`;
     if (info.stoppedCopies)
-        text += `\n${L.fmt('Its background session on %1 was stopped; %1 shows a link to this chat.', info.stoppedCopies.join(', '))}`;
+        text += `\n${L.fmt('Its background chat on %1 was stopped; %1 shows a link to this chat.', info.stoppedCopies.join(', '))}`;
     return ['Shared chat', text];
 }
 
@@ -392,7 +392,7 @@ export function buildShareMenu(ctx, chat, rowKey) {
 // Asks before a shared chat is kept on one account only (the others lose it)
 export function buildKeepOnly(ctx) {
     const c = ctx.ui.shareConfirm;
-    return confirmBox(L.fmt("Keep “%1” only on %2? It leaves the chat lists of %3; the conversation stays on %2. It can't be open in a session meanwhile.",
+    return confirmBox(L.fmt("Keep “%1” only on %2? It leaves the chat lists of %3; the conversation stays on %2. It can't be open in Claude meanwhile.",
         c.name, c.account, c.others), [
         [L.fmt('Keep only on %1', c.account), 'window-close-symbolic', () => ctx.confirmKeepOnly()],
         ['Cancel', '', () => ctx.cancelKeepOnly()],

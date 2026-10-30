@@ -48,7 +48,7 @@ export class Notifier {
             gicon: pose && poseFile ? this._icon(poseFile) : new Gio.ThemedIcon({name: n.icon}),
         });
         if (onOpen) {
-            notification.addAction(n.action || 'Open session', onOpen);
+            notification.addAction(n.action || 'Open chat', onOpen);
             notification.connect('activated', onOpen);
         }
         notification.connect('destroy', () => {

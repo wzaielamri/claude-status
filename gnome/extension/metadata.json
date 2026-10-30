@@ -1,7 +1,7 @@
 {
   "uuid": "talpy-den@wzaielamri.github.io",
   "name": "Talpy Den",
-  "description": "Keeps all your Claude Code sessions in view: which are working, which need you, plan usage and tokens, across accounts and SSH hosts.\n\nAn independent project, not affiliated with or endorsed by Anthropic.",
+  "description": "Keeps all your Claude Code chats in view: which are working, which need you, plan usage and tokens, across accounts and SSH hosts.\n\nAn independent project, not affiliated with or endorsed by Anthropic.",
   "shell-version": ["49", "50"],
   "url": "https://github.com/wzaielamri/talpy-den",
   "settings-schema": "org.gnome.shell.extensions.talpy-den",

@@ -55,7 +55,7 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
             return row;
         };
 
-        const sessions = new Adw.PreferencesGroup({title: 'Sessions',
+        const sessions = new Adw.PreferencesGroup({title: 'Chats',
             description: '~/.claude and ~/.claude-* are found automatically.'});
         sessions.add(spin('poll-interval', 'Check every', 'milliseconds', 1000, 60000, 500));
         sessions.add(spin('idle-poll-interval', '…while nothing runs',
@@ -69,8 +69,8 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         page.add(sessions);
 
         const notify = new Adw.PreferencesGroup({title: 'Notifications'});
-        notify.add(toggle('notify-waiting', 'When a session needs input', 'a permission prompt or a question'));
-        notify.add(toggle('notify-done', 'When a session finishes its turn'));
+        notify.add(toggle('notify-waiting', 'When a chat needs input', 'a permission prompt or a question'));
+        notify.add(toggle('notify-done', 'When a chat finishes its turn'));
         notify.add(spin('notify-done-min-seconds', '…if the turn took at least',
             'seconds; also picks which finished turns the shortcut goes to, notifications on or off', 0, 3600, 10));
         notify.add(toggle('away-digest', 'A summary when you come back',
@@ -90,11 +90,11 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         sounds.add(needs(spin('sound-volume', 'Volume', 'percent', 0, 100, 5), 'notify-sound'));
         sounds.add(needs(this._soundRow(window, settings, 'sound-waiting', 'Needs input'), 'notify-sound'));
         sounds.add(needs(this._soundRow(window, settings, 'sound-done', 'Finished'), 'notify-sound'));
-        sounds.add(needs(this._soundRow(window, settings, 'sound-failed', 'Failed'), 'notify-sound'));
+        sounds.add(needs(this._soundRow(window, settings, 'sound-failed', 'Failed or stopped'), 'notify-sound'));
         page.add(sounds);
 
         const ssh = new Adw.PreferencesGroup({title: 'SSH hosts',
-            description: "Pick SSH hosts with the server button at the top of the popup. They need key-based login (the widget can't type a password) and python3 on the host; nothing gets installed there."});
+            description: "Pick SSH hosts with the SSH hosts button at the top of the popup. They need key-based login (Talpy Den can't type a password) and python3 on the host; nothing gets installed there."});
         ssh.add(spin('remote-poll-seconds', 'Check SSH hosts every', 'seconds', 10, 600, 10));
         page.add(ssh);
 
@@ -141,7 +141,7 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         page.add(list);
 
         const add = new Adw.PreferencesGroup({title: 'Add an account',
-            description: "A terminal opens with Claude's own login: sign in in your browser with the other account. Claude keeps the login in the new folder; the extension never sees it."});
+            description: "A terminal opens with Claude's own login: sign in in your browser with the other account. Claude keeps the login in the new folder; Talpy Den never sees it."});
         const nameRow = new Adw.EntryRow({title: 'Name, e.g. work (its folder: ~/.claude-NAME)'});
         add.add(nameRow);
         const shareRow = new Adw.ComboRow({title: 'Settings',

@@ -63,7 +63,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
             const login = textButton('Log in…', () => ctx.logIn(group, remoteHost), 'claude-text-button claude-login-button');
             tips.add(login, [L.fmt('Log in to %1', group.title), remoteHost
                 ? L.fmt("Opens a terminal with Claude's own login on %1 (over ssh): open the address it shows in your browser, sign in, and paste the code you get back.", remoteHost)
-                : "Opens a terminal with Claude's own login (claude auth login): sign in in your browser with the account for this folder. The extension never sees the login."]);
+                : "Opens a terminal with Claude's own login (claude auth login): sign in in your browser with the account for this folder. Talpy Den never sees the login."]);
             row.add_child(login);
         }
         section.add_child(row);
@@ -96,7 +96,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
     const asOf = label(L.planUsageText(group.limits, ctx.now, group.limitsFrom, group.usageFetchAt), 'claude-small claude-dim', {x_expand: true});
     if (!group.limits) {
         tips.add(asOf, ['No plan usage yet',
-            'Plan limits come from the Claude Code status line (statusline-snippet.sh). They update whenever a session of this account gets a reply.']);
+            'Plan limits come from the Claude Code status line (statusline-snippet.sh). They update whenever a chat of this account gets a reply.']);
     }
     limits.add_child(asOf);
     if (!group.loggedOut && !group.limitsHidden)   // (hidden: the account shows it where it's listed first)
@@ -294,7 +294,7 @@ function buildSharedLine(ctx, chat, remoteHost) {
             ? L.fmt('This chat is shared with this account too, but it continued on %1 in a copy Claude forked from it. New messages are only in that copy. Click to go to it.', chat.profile)
             : "This chat is shared with this account too. It's listed once, under the account it's used on. Click to go to it.";
         if (chat.stoppedHere)
-            text += '\nIts background session on this account was stopped.';
+            text += '\nIts background chat on this account was stopped.';
         return [title, text];
     });
     line.add_child(name);
@@ -389,7 +389,7 @@ export function buildHostSection(ctx, host) {
     head.add_child(tips.add(iconButton('view-refresh-symbolic', () => ctx.pollHost(host)),
         [L.fmt('Refresh %1', host), L.fmt("Checked every %1 seconds while it's shown.", ctx.remotePollSeconds)]));
     head.add_child(tips.add(iconButton('window-close-symbolic', () => ctx.toggleHost(host)),
-        [L.fmt('Stop showing %1', host), 'Pick it again from the hosts list at the top.']));
+        [L.fmt('Stop showing %1', host), 'Pick it again with the SSH hosts button at the top.']));
     section.add_child(head);
 
     if (info.error) {

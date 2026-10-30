@@ -464,10 +464,10 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this.menu.close();
             return;
         }
-        this._showError(L.fmt("Couldn't open the session: %1", result.message));
+        this._showError(L.fmt("Couldn't open the chat: %1", result.message));
         this._oops();
         if (!this.menu.isOpen) {
-            this._notifier.notify({key: 'jump-error', kind: 'error', title: "Couldn't open the session",
+            this._notifier.notify({key: 'jump-error', kind: 'error', title: "Couldn't open the chat",
                 body: result.message, icon: 'dialog-error-symbolic', session: null},
             this._settings.get_boolean('show-pet'), null);
         }
@@ -487,7 +487,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;   // turned off meanwhile (e.g. the screen locked)
         if (!result.ok)
-            this._showError(L.fmt("Couldn't stop the session: %1", result.message));
+            this._showError(L.fmt("Couldn't stop the chat: %1", result.message));
         this.refresh();
     }
 
@@ -498,7 +498,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         if (this._destroyed)
             return;
         if (!result.ok)
-            this._showError(L.fmt("Couldn't interrupt the session: %1", result.message));
+            this._showError(L.fmt("Couldn't interrupt the chat: %1", result.message));
         this.refresh();
     }
 
@@ -780,8 +780,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             if (kind === 'open')
                 this.menu.close();
         } else {
-            this._showError(kind === 'open' ? L.fmt("Couldn't open the session: %1", result.message)
-                : kind === 'stop' ? L.fmt("Couldn't stop the session: %1", result.message) : result.message);
+            this._showError(kind === 'open' ? L.fmt("Couldn't open the chat: %1", result.message)
+                : kind === 'stop' ? L.fmt("Couldn't stop the chat: %1", result.message) : result.message);
             this._oops();
             if (!this.menu.isOpen) {   // e.g. from a notification or the hotkey: say so
                 this._notifier.notify({key: 'remote-error', kind: 'error', title: L.fmt("That didn't work on %1", host),
@@ -812,7 +812,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
     remoteOpen(host, command) {
         this.ui.openMenu = null;
         if (!command) {
-            this._showError(L.fmt("This session runs in a terminal on %1; the widget can't bring it here.", host));
+            this._showError(L.fmt("This chat runs in a terminal on %1; Talpy Den can't bring it here.", host));
             return;
         }
         this._remoteAction('open', host, ['--open', host, command]);
@@ -971,7 +971,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         });
         this.tips.add(hostsButton, () => ['SSH hosts', this.shownHosts.length > 0
             ? L.fmt('Showing Claude on %1. Click to pick hosts from ~/.ssh/config.', this.shownHosts.join(', '))
-            : 'Show Claude sessions of your SSH hosts (from ~/.ssh/config) here too.']);
+            : 'Show the Claude chats of your SSH hosts (from ~/.ssh/config) here too.']);
         header.add_child(hostsButton);
         header.add_child(this.tips.add(iconButton('view-refresh-symbolic', () => {
             this.refreshAll();

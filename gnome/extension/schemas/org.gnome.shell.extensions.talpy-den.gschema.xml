@@ -19,11 +19,11 @@
     </key>
     <key name="notify-waiting" type="b">
       <default>true</default>
-      <summary>Notify when a session needs input</summary>
+      <summary>Notify when a chat needs input</summary>
     </key>
     <key name="notify-done" type="b">
       <default>true</default>
-      <summary>Notify when a session finishes working</summary>
+      <summary>Notify when a chat finishes working</summary>
     </key>
     <key name="notify-done-min-seconds" type="i">
       <default>30</default>
@@ -41,15 +41,15 @@
     </key>
     <key name="sound-waiting" type="s">
       <default>'message-new-instant'</default>
-      <summary>Sound when a session needs input: sound theme names (comma separated, first found) or a file</summary>
+      <summary>Sound when a chat needs input: sound theme names (comma separated, first found) or a file</summary>
     </key>
     <key name="sound-done" type="s">
       <default>'outcome-success,complete'</default>
-      <summary>Sound when a session finishes</summary>
+      <summary>Sound when a chat finishes</summary>
     </key>
     <key name="sound-failed" type="s">
       <default>'dialog-error'</default>
-      <summary>Sound when a background session fails</summary>
+      <summary>Sound when a chat fails, or a usage limit or an expired login stops it</summary>
     </key>
     <key name="recent-chats" type="i">
       <default>5</default>
@@ -58,7 +58,7 @@
     </key>
     <key name="ssh-hosts" type="as">
       <default>[]</default>
-      <summary>SSH hosts (from ~/.ssh/config) shown in the popup, comma separated</summary>
+      <summary>SSH hosts (from ~/.ssh/config) shown in the popup, one per entry</summary>
     </key>
     <key name="remote-poll-seconds" type="i">
       <default>30</default>

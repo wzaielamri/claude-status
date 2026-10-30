@@ -357,7 +357,7 @@ function buildPlan(ctx, recap) {
             line.add_child(label(L.weekPlanText(w, recap.generatedAt),
                 `claude-small claude-stats-numbers claude-week-plan-numbers ${w.pct >= 90 ? 'claude-fg-bad' : 'claude-dim'}`));
             ctx.tips.add(line, [L.fmt('%1: %2% used', w.label, Math.round(w.pct)),
-                'How this window of your plan filled up, from its start (on the left) to when it resets (on the right), as the extension saw it.']);
+                'How this window of your plan filled up, from its start (on the left) to when it resets (on the right), as Talpy Den saw it.']);
             section.add_child(line);
         }
     }
