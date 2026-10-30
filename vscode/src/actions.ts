@@ -482,9 +482,10 @@ export class Actions {
     this.refresh(host);
   }
 
+  // (what it did may come after a check that has already read the files: then it checks again)
   private refresh(host?: string): void {
-    if (host) void this.dash.pollHost(host);
-    else void this.dash.refresh();
+    if (host) void this.dash.pollHost(host, true);
+    else void this.dash.refresh(true);
   }
 
   // ---------------------------------------------------------------- shared chats

@@ -306,7 +306,7 @@
         {
           "command": "talpyDen.sendPlanFeedback",
           "group": "navigation",
-          "when": "resourcePath =~ /\\/\\.claude[^/]*\\/plans\\/[^/]+\\.md$/ || resourceExtname == .md && resourceDirname in talpyDen.planFolders"
+          "when": "resourceScheme == file && (resourcePath =~ /\\/\\.claude[^/]*\\/plans\\/[^/]+\\.md$/ || resourceExtname == .md && resourceDirname in talpyDen.planFolders)"
         }
       ],
       "comments/commentThread/context": [

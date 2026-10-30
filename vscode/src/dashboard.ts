@@ -39,6 +39,7 @@ export class Dashboard implements vscode.Disposable {
   private visible = false;
   private localBusy = false;
   private hostBusy = new Set<string>();
+  private hostAgain = new Set<string>(); // an action there while its check ran: checked again after it
   private localTimer?: NodeJS.Timeout;
   private hostTimer?: NodeJS.Timeout;
   private retryTimer?: NodeJS.Timeout; // Python didn't work: try again (its own timer: polls mustn't cancel it)
@@ -372,7 +373,10 @@ export class Dashboard implements vscode.Disposable {
     void this.refresh();
   }
 
-  async pollHost(host: string): Promise<void> {
+  // (changed: something was done there while a check ran, which may have
+  // read it before: it checks again once that's done)
+  async pollHost(host: string, changed = false): Promise<void> {
+    if (this.hostBusy.has(host) && changed) this.hostAgain.add(host);
     if (this.hostBusy.has(host) || this.demo || this.disposed) return;
     const h = this.hosts.get(host);
     if (!h) return;
@@ -407,6 +411,7 @@ export class Dashboard implements vscode.Disposable {
       const h2 = this.hosts.get(host);
       if (h2) h2.loading = false;
       this.emit();
+      if (this.hostAgain.delete(host) && h2) void this.pollHost(host);
     }
   }
 
