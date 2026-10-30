@@ -318,6 +318,17 @@ class ParkedJobTests(unittest.TestCase):
 
 
 class LimitTests(Fixture):
+    def test_a_fetch_under_any_folder_of_the_account_says_its_on_its_way(self):
+        # (~/.claude and ~/.claude-personal are one account: the fetch is claimed under the one that fetches)
+        write(self.cache / "usage-check.json", {"started": {str((self.home / ".claude-personal").resolve()): 1234}})
+        g = next(g for g in self.collect(with_tokens=False)["groups"] if ".claude-personal" in g["profileKeys"])
+        self.assertEqual((len(g["profileKeys"]), g["usageFetchAt"]), (2, 1234))
+
+    def test_unknown_values_name_no_front_end(self):
+        text = cs.unknown_values_text({("status", "napping"): "2.1.400"})
+        self.assertEqual(text, "Claude Code 2.1.400 writes something Talpy Den doesn't know yet (status \"napping\"): "
+                               "some chats may show the wrong state until Talpy Den is updated.")
+
     def snapshot(self, profile, sid, data, age=0):
         path = self.cache / "statusline" / profile / f"{sid}.json"
         write(path, data)
@@ -2257,7 +2268,7 @@ class TerminalTests(unittest.TestCase):
                                                               (40, "Minor version tag", True)]), \
                 mock.patch.object(cs, "tmux_socket", lambda pid: None), \
                 mock.patch.object(cs, "terminal_name", lambda pid: "VS Code" if pid == 30 else "Konsole"), \
-                mock.patch.object(cs, "process_config_dir", lambda pid: "/home/me/.claude"):
+                mock.patch.object(cs, "process_config_dir", lambda pid: Path("/home/me/.claude")):  # (resolved, as it is)
             self.assertEqual(cs.attached_in("0a1b2c3d", "", profile), {"in": "terminal", "app": "Konsole"})
             self.assertEqual(cs.attached_in("ffffffff", "fix parser", profile), {"in": "vscode", "app": ""})   # (by its name)
             self.assertIsNone(cs.attached_in("ffffffff", "fix parser", other), "a name on another profile")

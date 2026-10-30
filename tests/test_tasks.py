@@ -305,6 +305,30 @@ class RowTests(Fixture):
                                                      prompt(cs.CONTINUE_PROMPT, self.now - 10)))
         row = next(s for s in self.group(self.collect(with_tokens=False), "work")["sessions"] if s["sessionId"] == sid)
         self.assertEqual(row["name"], "Thesis build fix")
+        # (also when it went on after a turn that broke off)
+        write(w / "sessions/32.json", session(sid, kind="bg", jobId="e3de1242", cwd="/tmp/x", name=cs.RETRY_PROMPT))
+        row = next(s for s in self.group(self.collect(with_tokens=False), "work")["sessions"] if s["sessionId"] == sid)
+        self.assertEqual(row["name"], "Thesis build fix")
+
+    def test_ultracode_stays_on_after_a_big_turn(self):
+        # Claude notes it again only every 10th prompt: past a turn with big
+        # tool results, the end of the transcript doesn't say
+        on = {"type": "attachment", "attachment": {"type": "ultra_effort_enter", "reminderType": "full"}}
+        big = {"type": "user", "timestamp": iso(self.now - 50),
+               "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t", "content": "x" * 100_000}]}}
+        path = self.home / ".claude-work/projects/-tmp-x/ultra.jsonl"
+        write(self.home / ".claude-work/sessions/33.json", session("ultra", cwd="/tmp/x"))
+        write(path, lines(prompt("go", self.now - 60), on, reply("On it.", self.now - 55), *[big] * 3,
+                          reply("Done.", self.now - 40, msg_id="m2"), prompt("and now?", self.now - 30),
+                          reply("Sure.", self.now - 20, msg_id="m3")))
+        self.assertFalse(cs.chat_peek(path)["ultracode"])
+        row = lambda: next(s for s in self.group(self.collect(with_tokens=False), "work")["sessions"] if s["sessionId"] == "ultra")
+        self.assertTrue(row()["peek"]["ultracode"])
+        # turned off: off
+        with open(path, "a") as f:
+            f.write(lines({"type": "attachment", "attachment": {"type": "ultra_effort_exit"}}, *[big] * 3,
+                          prompt("more", self.now - 10), reply("Ok.", self.now - 5, msg_id="m4")))
+        self.assertFalse(row()["peek"]["ultracode"])
 
     def test_working_again_isnt_stopped(self):
         w = self.home / ".claude-work"

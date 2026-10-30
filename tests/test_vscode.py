@@ -258,6 +258,14 @@ class ProfileTests(Home):
         cs.add_remote_commands(result, self.home, claude="/usr/bin/claude")
         self.assertEqual({g["chatProfile"]: g["configDir"] for g in result["groups"]},
                          {".claude-work": str(self.home / ".claude"), ".claude-personal": str(self.home / ".claude-personal")})
+        # a starred chat (and a starred plan's chat) opens like a recent one: its ★ Starred entry is a copy
+        chat = {"profileDir": ".claude-personal", "sessionId": "0a1b2c3d", "cwd": "/srv/app"}
+        plan = {"chatProfileDir": ".claude-personal", "chatId": "0a1b2c3d", "cwd": "/srv/app"}
+        result = {"groups": [{"chatProfile": None, "sessions": [], "recent": [], "starred": [chat],
+                              "plans": [], "starredPlans": [plan]}]}
+        cs.add_remote_commands(result, self.home, claude="/usr/bin/claude")
+        self.assertIn("--resume 0a1b2c3d", chat["openCommand"])
+        self.assertEqual(plan["openCommand"], chat["openCommand"])
 
     def test_the_account_vscode_is_on_comes_first(self):
         # You switch VS Code's account in its settings; ~/.claude (listed

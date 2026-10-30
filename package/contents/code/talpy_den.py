@@ -389,8 +389,8 @@ def unknown_values_text(unknown):
         return None
     versions = sorted({v for v in unknown.values() if v}, key=version_key)
     found = ", ".join(f'{what} "{value}"' for what, value in sorted(unknown))
-    return (f"{'Claude Code ' + versions[-1] if versions else 'Claude Code'} writes something this widget "
-            f"doesn't know yet ({found}): some chats may show the wrong state until the widget is updated.")
+    return (f"{'Claude Code ' + versions[-1] if versions else 'Claude Code'} writes something Talpy Den "
+            f"doesn't know yet ({found}): some chats may show the wrong state until Talpy Den is updated.")
 
 
 def session_state(entry, job=None):
@@ -754,20 +754,24 @@ def finish_row(row, job, job_id, profile, ctx, alive):
     if chats is not None:
         path = transcript_path(profile, row["chatId"])
         row["peek"] = chats.peek(path)
-        if row["peek"] and not row["peek"].get("mode") and path is not None:
-            # (its newest entries name none: a chat in the Claude Code panel names it at its first prompt only)
-            mode = chats.edits(path).get("mode")
-            if mode:
-                row["peek"] = dict(row["peek"], mode=mode)
+        if row["peek"] and not (row["peek"].get("mode") and row["peek"].get("ultracode")) and path is not None:
+            # (its newest entries name none: a chat in the Claude Code panel names its mode at its first
+            # prompt only, and Claude notes ultracode again only every few prompts)
+            rec = chats.edits(path)
+            if rec.get("mode") and not row["peek"].get("mode"):
+                row["peek"] = dict(row["peek"], mode=rec["mode"])
+            if rec.get("ultra") and not row["peek"].get("ultracode"):
+                row["peek"] = dict(row["peek"], ultracode=True)
         peek = row["peek"] or {}
         row["plan"] = plan_of(profile, peek.get("slug"))
-        if row["name"].startswith(CONTINUE_PROMPT[:30]) and path is not None and getattr(ctx, "links", None) is not None:
+        went_on = (CONTINUE_PROMPT[:30], RETRY_PROMPT[:30])
+        if row["name"].startswith(went_on) and path is not None and getattr(ctx, "links", None) is not None:
             # a chat that went on by itself is named after that message: its own name instead
             try:
                 own = ctx.links.chat_info(path, path.stat())[0]
             except OSError:
                 own = ""
-            if own and not own.startswith(CONTINUE_PROMPT[:30]):
+            if own and not own.startswith(went_on):
                 row["name"] = clean_text(own, 80)
         if row["plan"] is not None:
             row["plan"]["edited"] = plan_edited(row["plan"]["updatedAt"], mtime(path) if path is not None else None)
@@ -1729,8 +1733,10 @@ def new_edits():
         since then;
     sessions: session ids whose file-history folders hold its backups;
     stats: what the chat did (fold_stats);
-    mode: its permission mode, the newest one named (fold_mode)."""
-    return {"files": {}, "snap": None, "snapFiles": {}, "turn": {}, "sessions": [], "stats": new_stats(), "mode": None}
+    mode: its permission mode, the newest one named (fold_mode);
+    ultra: whether ultracode is on, as the newest note of it says (fold_ultra; None: none)."""
+    return {"files": {}, "snap": None, "snapFiles": {}, "turn": {}, "sessions": [], "stats": new_stats(), "mode": None,
+            "ultra": None}
 
 
 def new_stats():
@@ -1876,9 +1882,23 @@ def fold_mode(rec, e):
         rec["mode"] = mode
 
 
+def fold_ultra(rec, e):
+    """Whether ultracode is on, if the entry notes it (ultracode_of; Claude
+    notes it again only every few prompts, so the end of a transcript may not)."""
+    kind = e["attachment"].get("type") if e.get("type") == "attachment" and isinstance(e.get("attachment"), dict) else None
+    if kind in ("ultra_effort_enter", "ultra_effort_exit"):
+        rec["ultra"] = kind == "ultra_effort_enter"
+
+
 def scan_mode(path, end):
     """The newest permission mode the transcript names up to byte offset end, or None."""
-    rec = {"mode": None}
+    return scan_named(path, end)["mode"]
+
+
+def scan_named(path, end):
+    """{"mode", "ultra"}: the newest permission mode and ultracode note the
+    transcript has up to byte offset end (fold_mode, fold_ultra; None: none)."""
+    rec = {"mode": None, "ultra": None}
     try:
         with open(path, "rb") as f:
             read = 0
@@ -1886,16 +1906,18 @@ def scan_mode(path, end):
                 read += len(line)
                 if read > end:
                     break
-                if b'"permissionMode"' in line:
+                mode, ultra = b'"permissionMode"' in line, ULTRA_LINE.search(line)
+                if mode or ultra:
                     try:
                         e = json.loads(line)
                     except ValueError:
                         continue
                     if isinstance(e, dict):
                         fold_mode(rec, e)
+                        fold_ultra(rec, e)
     except OSError:
         pass
-    return rec["mode"]
+    return rec
 
 
 def scan_edits(path, rec, start=0, sessions=None):
@@ -1916,9 +1938,10 @@ def scan_edits(path, rec, start=0, sessions=None):
                 edits = b'"file-history-' in line or EDIT_LINE.search(line)
                 talk = ASSISTANT_LINE.search(line) or (USER_LINE.search(line) and b'"tool_result"' not in line)
                 mode = b'"permissionMode"' in line
+                ultra = ULTRA_LINE.search(line)
                 if not talk and not rec["stats"].get("started", True) and USER_LINE.search(line):
                     rec["stats"]["started"] = True  # a fork's first entry: tool results, then its directive
-                if edits or talk or mode:
+                if edits or talk or mode or ultra:
                     try:
                         e = json.loads(line)
                     except ValueError:
@@ -1930,6 +1953,8 @@ def scan_edits(path, rec, start=0, sessions=None):
                             fold_stats(rec["stats"], e)
                         if mode:
                             fold_mode(rec, e)
+                        if ultra:
+                            fold_ultra(rec, e)
                 offset += len(line)
     except OSError:
         pass
@@ -2126,9 +2151,9 @@ class ChatCache:
                 size = counted
         else:
             size, rec = 0, new_edits()
-        if "mode" not in rec:   # (kept by an older copy of this script: its mode from what was read, once)
+        if "mode" not in rec or "ultra" not in rec:   # (kept by an older copy of this script: from what was read, once)
             rec = json.loads(json.dumps(rec))
-            rec["mode"] = scan_mode(path, size)
+            rec.update(scan_named(path, size))
             self.changed = True
         if size < st.st_size:
             rec = json.loads(json.dumps(rec))  # a copy: the old one may be kept as is
@@ -5646,7 +5671,7 @@ def attached_in(job_id, name, profile):
     ""}, or None: nowhere. By its id, or by its name: on its own profile, or
     the one the tab's title says (the agent view shows it, whichever profile)."""
     for pid, what, titled in attach_clients():
-        if what != job_id and not (name and what == name and (titled or process_config_dir(pid) == str(profile.path.resolve()))):
+        if what != job_id and not (name and what == name and (titled or process_config_dir(pid) == profile.path.resolve())):
             continue
         if tmux_socket(pid):
             return {"in": "tmux", "app": ""}
@@ -5754,7 +5779,7 @@ def end_for_handover(home, profiles, chat_id, claude=None):
             return stop_background(runs_on, job_id, read_job([runs_on], job_id), home, claude)
         if entry.get("kind") == "interactive":
             return stop_chat(entry)
-        return False, "It's open in a session the widget can't end"
+        return False, "It's open in a session Talpy Den can't end"
     return True, "Nothing had it open"
 
 
@@ -6992,8 +7017,9 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
     # (an account's fetch on its way: its numbers say so until they come)
     fetches = usage_fetches(cache_root)
     for g in groups:
-        member = next((p for p in profiles if p.key in g.get("profileKeys", ())), None)
-        g["usageFetchAt"] = fetches.get(str(member.real)) if member is not None else None
+        # (claimed under whichever of its folders fetches: usage_refresh_profile, usage_now_profile)
+        at = [fetches.get(str(p.real)) for p in profiles if p.key in g.get("profileKeys", ())]
+        g["usageFetchAt"] = max((t for t in at if t is not None), default=None)
     try:
         place_chats(groups, ctx)
     except Exception as exc:
@@ -7630,10 +7656,10 @@ def add_remote_commands(result, home, extra_dirs=(), claude=None):
                     s["stopCommand"] = stop_command(p, s["jobId"], home, job, claude)
             elif s["kind"] == "chat":
                 s["openCommand"] = in_folder(s["cwd"], resume_command(p, s["chatId"], home, s["cwd"], claude))
-        for c in g.get("recent", []):
+        for c in g.get("recent", []) + g.get("starred", []):  # (★ Starred: copies of their own)
             p = profiles.get(c["profileDir"])
             c["openCommand"] = in_folder(c["cwd"], resume_command(p, c["sessionId"], home, c["cwd"], claude)) if p else None
-        for pl in g.get("plans", []):  # its chat, reopened
+        for pl in g.get("plans", []) + g.get("starredPlans", []):  # its chat, reopened
             p = profiles.get(pl.get("chatProfileDir"))
             pl["openCommand"] = (in_folder(pl["cwd"], resume_command(p, pl["chatId"], home, pl["cwd"], claude))
                                  if p is not None and pl.get("chatId") else None)
