@@ -347,8 +347,10 @@ class TalpyDenIndicator extends PanelMenu.Button {
         }
         const c = list[i];
         this._lastHotkey = {key: c.key, at: now};
-        if (this._unseen[c.key])
+        if (this._unseen[c.key]) {
             delete this._unseen[c.key];
+            this._updatePanel();
+        }
         this._openChat(c);
     }
 
@@ -1005,7 +1007,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         const panelBox = box('panel-status-indicators-box claude-panel');
         const iconBin = new St.Widget({layout_manager: new Clutter.BinLayout(), y_align: Clutter.ActorAlign.CENTER});
         this._spark = new TalpyIcon('claude-spark');
-        // the count of chats that need you, on the spark's corner
+        // the count of chats that need you (else of finished turns you haven't seen), on the spark's corner
         this._badge = new St.Label({style_class: 'claude-badge', visible: false,
             x_align: Clutter.ActorAlign.END, y_align: Clutter.ActorAlign.START,
             translation_x: 6, translation_y: -4});
@@ -1031,8 +1033,15 @@ class TalpyDenIndicator extends PanelMenu.Button {
         const c = L.counts(groups);
         const overall = L.overall(groups, c);
         this._spark.setState(L.stateClass(overall), overall);
-        this._badge.text = String(c.waiting);
-        this._badge.visible = c.waiting > 0;
+        // One count at a time, the most urgent: chats that need you (red),
+        // else turns that finished since you last opened the popup (green)
+        const done = Object.keys(this._unseen).length;
+        this._badge.text = String(c.waiting || done);
+        this._badge.visible = c.waiting > 0 || done > 0;
+        if (c.waiting > 0)
+            this._badge.remove_style_class_name('claude-badge-done');
+        else
+            this._badge.add_style_class_name('claude-badge-done');
         const w = this._settings.get_boolean('show-usage-in-panel') ? L.panelWindow(groups) : null;
         this._usage.visible = w !== null;
         if (w) {
