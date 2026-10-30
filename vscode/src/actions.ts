@@ -470,7 +470,7 @@ export class Actions {
       ...(host ? [] : configDirArgs()),
     ];
     const run = (describe: boolean) => this.backend.action(host ? "remote.py" : "jump.py", args(describe));
-    const ask = (await run(true)) as Answer & { question?: string };
+    const ask = await run(true);
     if (!ask.ok) {
       void vscode.window.showWarningMessage(ask.message || "It can't be deleted");
       return;
@@ -516,10 +516,10 @@ export class Actions {
       const others = accounts.filter((g) => g !== pick.group).map((g) => g.title).join(", ");
       const ok = await vscode.window.showWarningMessage(
         `Keep “${chat.name}” only on ${pick.group!.title}?`,
-        { modal: true, detail: `It's removed from ${others || "the other accounts"}.` },
-        "Keep Only There",
+        { modal: true, detail: `It leaves the chat lists of ${others || "the other accounts"}; the conversation stays on ${pick.group!.title}. It can't be open in Claude meanwhile.` },
+        `Keep Only on ${pick.group!.title}`,
       );
-      if (ok !== "Keep Only There") return;
+      if (ok !== `Keep Only on ${pick.group!.title}`) return;
     }
     const flag = { continue: "--continue", share: "--share", keeponly: "--unshare" }[pick.kind2];
     // the account it goes to; for "all accounts", the one whose copy is shared

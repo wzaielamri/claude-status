@@ -46,6 +46,7 @@ export interface Answer {
   file?: string; // --agent-run --no-open: the file it saved
   how?: "resumed" | "typed" | "clipboard"; // --plan-feedback: how it reaches the chat
   text?: string; // --plan-feedback --print-command: the feedback, to paste or type in
+  question?: string; // --delete-chat|plan|memory --describe: what to ask before it deletes
 }
 
 // The environment for helpers: VS Code's own variables would leak into the
@@ -231,6 +232,12 @@ export class Backend {
   }
 
   // The Monday recap (week.py --monday-recap): due once a week for whichever copy asks first
+  // Whether the Recap keeps its history, and how many chats Claude deleted are in it (week.py --history-status)
+  async historyStatus(): Promise<{ keep: boolean; deletedChats: number } | null> {
+    const r = await this.json(["week.py", "--history-status"], 60000);
+    return r?.ok && typeof r.keep === "boolean" ? { keep: r.keep, deletedChats: Number(r.deletedChats) || 0 } : null;
+  }
+
   async mondayRecap(args: string[]): Promise<Record<string, any> | null> {
     return this.json(["week.py", "--monday-recap", ...args], 180000);
   }
@@ -260,6 +267,7 @@ export class Backend {
       ...(typeof r.file === "string" ? { file: r.file } : {}),
       ...(r.how === "resumed" || r.how === "typed" || r.how === "clipboard" ? { how: r.how } : {}),
       ...(typeof r.text === "string" ? { text: r.text } : {}),
+      ...(typeof r.question === "string" ? { question: r.question } : {}),
     };
   }
 

@@ -150,6 +150,7 @@ export class Dashboard implements vscode.Disposable {
   async start(): Promise<void> {
     if (this.disposed) return;
     void this.checkClaudeCode();
+    void this.syncRecapHistory();
     const problem = await this.backend.checkPython();
     if (this.disposed) return;
     if (problem) {
@@ -429,11 +430,10 @@ export class Dashboard implements vscode.Disposable {
         const rows = groupsOf(t.host || "").flatMap((g) =>
           g.sessions.filter((s) => s.chatId === t.chat || s.sessionId === t.chat).map((s) => ({ s, own: (g.profileKeys ?? []).includes(t.profile) })));
         const row = (rows.find((r) => r.own) ?? rows[0])?.s;
-        if (!t.error && !this.starting.has(t.id) && (!row || (row.state !== "working" && row.state !== "waiting")))
-          void this.startQueued(t);
-        continue;
-      }
-      if (!t.due || this.starting.has(t.id)) continue;
+        if (t.error || this.starting.has(t.id) || (row && (row.state === "working" || row.state === "waiting"))) continue;
+        if (t.startAt > Date.now()) continue; // (it waits for a usage limit to reset, as below)
+      } else if (!t.due || this.starting.has(t.id)) continue;
+      // (a reply too: on an account at its usage limit it would stop at once)
       const group = groupsOf(t.host || "").find((g) => (g.profileKeys ?? []).includes(t.profile));
       const reset = group ? limitReset(group, Date.now()) : null;
       if (!reset) {
@@ -443,6 +443,9 @@ export class Dashboard implements vscode.Disposable {
       this.starting.add(t.id);
       void this.backend
         .action("jump.py", ["--requeue", t.id, "--at", String(Math.round(reset.at + 60_000)), ...configDirArgs()])
+        .then((a) => {
+          if (t.afterTurn && a.ok && a.message) this.setActionInfo(a.message); // (It waits for the usage limit: it starts at 14:31)
+        })
         .finally(() => {
           this.starting.delete(t.id);
           void this.refresh();
@@ -649,6 +652,7 @@ export class Dashboard implements vscode.Disposable {
   // check answered (one out of reach would hold it up)
   async week(back: number, account: string, span: WeekSpan = "week"): Promise<{ recap?: WeekRecap; error?: string }> {
     if (this.demoPhase !== null) return { recap: demoWeek(Date.now(), back, account, span) };
+    void this.syncRecapHistory();
     const hosts = this.answeringHosts();
     const currency = settings.recapCurrency();
     return this.backend.week([
@@ -674,10 +678,38 @@ export class Dashboard implements vscode.Disposable {
   // for every copy of the widget's week.py: a file next to their cache), or
   // deleted (it starts again from the transcripts Claude still has)
   async setRecapHistory(keep: boolean): Promise<void> {
-    if (this.demoPhase !== null) return;
+    // (the window it was changed in: every window hears of the change)
+    if (this.demoPhase !== null || !vscode.window.state.focused) return;
+    const now = await this.backend.historyStatus();
+    if (now && now.keep === keep) return; // (the setting caught up with week.py's choice: syncRecapHistory)
+    // off forgets the numbers of the chats Claude has deleted: asked first, as Delete Saved History… does
+    if (!keep && now && now.deletedChats > 0) {
+      const n = now.deletedChats;
+      const pick = await vscode.window.showWarningMessage("Stop keeping the history?", {
+        modal: true,
+        detail: `The Recap forgets the numbers of the ${n} ${n === 1 ? "chat" : "chats"} Claude has deleted, for good.`,
+      }, "Stop Keeping It");
+      if (pick !== "Stop Keeping It") {
+        await vscode.workspace.getConfiguration("talpyDen").update("recapHistory", true, vscode.ConfigurationTarget.Global);
+        return;
+      }
+    }
     const { ok, message } = await this.backend.action("week.py", ["--history", keep ? "on" : "off"]);
     if (ok) void vscode.window.showInformationMessage(`Talpy Den: ${message}.`);
     else void vscode.window.showWarningMessage(`Talpy Den: the Recap's history didn't change: ${message}`);
+  }
+
+  // The setting shows the choice week.py keeps (Talpy Den's settings on
+  // Plasma or GNOME may have changed it)
+  async syncRecapHistory(): Promise<void> {
+    if (this.demoPhase !== null) return;
+    try {
+      const now = await this.backend.historyStatus();
+      if (now && now.keep !== settings.recapHistory())
+        await vscode.workspace.getConfiguration("talpyDen").update("recapHistory", now.keep, vscode.ConfigurationTarget.Global);
+    } catch {
+      // (no answer: the setting stays as it is)
+    }
   }
 
   async forgetRecapHistory(): Promise<void> {

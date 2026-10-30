@@ -62,6 +62,9 @@ test("a reply after a host chat's turn waits while the host's check fails", () =
   const priv = dash as unknown as { hosts: Map<string, unknown>; startDueTasks(s: Status): void; starting: Set<string> };
   try {
     const result = structuredClone(demoState(NOW).hosts[0].result!);
+    // (its account not at a usage limit: a reply there would wait for the reset)
+    Object.assign(result.groups[0], { limits: null, accountLimits: null, cap: null });
+    for (const s of result.groups[0].sessions) s.stopped = null;
     const chat = result.groups[0].sessions[0];
     chat.state = "working";
     const status = { ...structuredClone(demoState(NOW).status!), queue: [
@@ -74,6 +77,30 @@ test("a reply after a host chat's turn waits while the host's check fails", () =
     chat.state = "idle";
     priv.startDueTasks(status);
     assert.deepEqual(actions.map((a) => a.slice(0, 2)), [["--start-queued", "q1"]]);
+  } finally {
+    priv.starting.clear();
+    dash.dispose();
+  }
+});
+
+test("a reply after a chat's turn waits for its account's usage limit to reset, as a queued task does", () => {
+  const actions: string[][] = [];
+  const backend = { action: async (_s: string, args: string[]) => (actions.push(args), { ok: true, message: "" }) } as unknown as Backend;
+  const log = { warn() {}, info() {}, error() {} } as unknown as vscode.LogOutputChannel;
+  const dash = new Dashboard(backend, { handle() {}, isLeader: () => true } as unknown as Notifier, log);
+  const priv = dash as unknown as { startDueTasks(s: Status): void; starting: Set<string> };
+  try {
+    const status = withFiveHour(100);
+    const reset = Date.now() + 3600_000;
+    status.groups[0].limits!.windows[0].resetsAt = reset;
+    status.queue = [{ id: "q2", afterTurn: true, chat: "gone", profile: status.groups[0].profileKeys[0], startAt: 0 } as never];
+    priv.startDueTasks(status);
+    assert.deepEqual(actions.map((a) => a.slice(0, 4)), [["--requeue", "q2", "--at", String(reset + 60_000)]]);
+    priv.starting.clear();
+    actions.length = 0;
+    status.queue = [{ ...status.queue[0], startAt: reset + 60_000 } as never]; // (requeued: it waits)
+    priv.startDueTasks(status);
+    assert.equal(actions.length, 0);
   } finally {
     priv.starting.clear();
     dash.dispose();
