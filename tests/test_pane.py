@@ -1042,6 +1042,12 @@ class SendTests(PaneFixture):
                 mock.patch.object(pane, "copy_to_clipboard") as copy:
             self.assertEqual(self.cli("--send", SID, "--host", "lab", "--text", "x", "--how", "enter")["how"], "typed")
         copy.assert_not_called()
+        # the host itself leaves it to this computer (its own clipboard is out of reach over ssh)
+        with mock.patch.object(pane, "send", return_value=asked), mock.patch.object(pane, "copy_to_clipboard") as copy, \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            pane.main(["--send", SID, "--profile", ".claude-work", "--text", "x", "--how", "enter", "--remote"])
+        copy.assert_not_called()
+        self.assertEqual(json.loads(out.getvalue().split(cs.REMOTE_MARK)[-1])["how"], "ask")
 
     def test_a_long_text_comes_in_a_file_of_its_own(self):
         # (one command-line argument holds 128 KiB at most: VS Code hands over a long reply in a file)
@@ -1079,6 +1085,19 @@ class SendTests(PaneFixture):
             self.assertEqual(jump.start_queued(self.home, [], task["id"]), (True, "Sent"))
         self.assertEqual(sent.call_args[0][1:6], ([], ".claude-work", SID, "next: the docs", None))
         self.assertEqual(cs.load_queue(self.cache), [])
+
+    def test_a_reply_after_the_turn_leaves_keep_going_alone(self):
+        # cancelling it, or turning Keep going off meanwhile, is about the reply only
+        import jump
+        cs.keep_chat(self.cache, ".claude-work", SID, "Fix it")
+        self.cli("--send", SID, "--profile", ".claude-work", "--text", "next: the docs", "--after-turn")
+        (task,) = cs.load_queue(self.cache)
+        with mock.patch.object(jump.cs, "cache_dir", return_value=self.cache):
+            self.assertEqual(jump.unqueue(self.home, [], task["id"]), (True, "Cancelled your message"))
+            self.assertEqual([k["chat"] for k in cs.kept_chats(self.cache)], [SID])
+            self.cli("--send", SID, "--profile", ".claude-work", "--text", "next: the docs", "--after-turn")
+            self.assertEqual(jump.keep_off(self.home, [], SID), (True, "It won't go on by itself any more"))
+        self.assertEqual(len(cs.load_queue(self.cache)), 1)
 
 
 HAVE_GIT = shutil.which("git") is not None

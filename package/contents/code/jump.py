@@ -712,16 +712,37 @@ def jump_remote_terminal(host, name="", vscode_terminal=None, folder=""):
 
 
 def jump_vscode(entry):
+    ok, message = open_in_vscode(entry, CLAUDE_CODE_LINK + "open?" + link_query({"session": entry.get("sessionId", "")}))
+    return ok, "Opened the conversation in VS Code" if ok else message
+
+
+CLAUDE_CODE_LINK = "vscode://anthropic.claude-code/"
+
+
+def open_in_vscode(entry, url):
+    """Open a vscode:// link in the VS Code window of a chat's session entry:
+    VS Code opens a link in the window focused last, so that one's raised
+    first. (ok, message)"""
     pids = ancestors(entry.get("pid"))
     folder = os.path.basename(entry.get("cwd") or "")
     raise_window(pids, folder)  # VS Code titles end with "<folder> - Visual Studio Code"
     time.sleep(0.3)  # let VS Code see its window focused, so the link opens there
-    url = "vscode://anthropic.claude-code/open?" + link_query({"session": entry.get("sessionId", "")})
     opener = shutil.which("xdg-open")
     if not opener:
         return False, "xdg-open is missing; can't hand the session link to VS Code"
-    subprocess.Popen([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    return True, "Opened the conversation in VS Code"
+    subprocess.Popen([opener, url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    return True, ""
+
+
+def open_vscode_link(home, extra_dirs, session_id, link):
+    """Open a link of Claude Code's (a reply's: pane.py --send) in the VS Code
+    window that runs the chat session_id (open_in_vscode), not in whichever
+    was used last. (ok, message)"""
+    if not link.startswith(CLAUDE_CODE_LINK):
+        return False, "Not a link of Claude Code's"
+    entry = cs.find_chat_entry(home, extra_dirs, session_id) if cs.valid_id(session_id or "") else None
+    return open_in_vscode(entry or {}, link)
 
 
 # VS Code has no way to show one of its terminals from outside (and leaves it
@@ -1347,8 +1368,8 @@ def queue_continue(home, extra_dirs, chat_id, profile_dir, folder, text, start_a
             return False, why
     entry = cs.queue_entry(profile_dir, folder or "", text, start_at, host, account, chat=chat_id, name=name)
     cache_root = cs.cache_dir(home)
-    for old in cs.load_queue(cache_root):  # (queued twice: once is enough)
-        if old.get("chat") == chat_id and (old.get("host") or "") == (host or ""):
+    for old in cs.load_queue(cache_root):  # (queued twice: once is enough; not a reply waiting for its turn's end)
+        if old.get("chat") == chat_id and (old.get("host") or "") == (host or "") and not old.get("afterTurn"):
             cs.change_queue(cache_root, take=old["id"])
     cs.change_queue(cache_root, add=entry)
     if keep and not host:
@@ -1372,7 +1393,8 @@ def keep_off(home, extra_dirs, chat_id):
     shows beside it): that one is cancelled on its own (unqueue)."""
     cache_root = cs.cache_dir(home)
     cs.keep_chat(cache_root, "", chat_id, on=False)
-    queued = next((t for t in cs.load_queue(cache_root) if t.get("chat") == chat_id and not t.get("host")), None)
+    queued = next((t for t in cs.load_queue(cache_root)
+                   if t.get("chat") == chat_id and not t.get("host") and not t.get("afterTurn")), None)
     if queued is not None:
         return True, f"It goes on {start_time(queued['startAt'])} as queued, but not after later limits"
     return True, "It won't go on by itself any more"
@@ -1401,6 +1423,8 @@ def requeue(home, extra_dirs, task_id, start_at):
 def unqueue(home, extra_dirs, task_id):
     cache_root = cs.cache_dir(home)
     taken = cs.change_queue(cache_root, take=task_id)
+    if taken and taken.get("afterTurn"):  # (a reply for when its turn ends: keep going stays as it was)
+        return True, "Cancelled your message"
     if taken and taken.get("chat") and not taken.get("host"):
         cs.keep_chat(cache_root, "", taken["chat"], on=False)  # (else it would be queued again at once)
     return True, "Cancelled the queued task" if taken else "It isn't queued any more"
@@ -1432,9 +1456,8 @@ def start_queued(home, extra_dirs, task_id):
                 answer = pane.send(home, extra_dirs, entry["profile"], entry["chat"], task.text, entry.get("session"),
                                    how, claude_path(home))
             ok, message = bool(answer.get("ok")) and answer.get("how") != "ask", answer.get("message") or ""
-            if answer.get("how") == "vscode" and answer.get("link") and shutil.which("xdg-open"):
-                subprocess.Popen([shutil.which("xdg-open"), answer["link"]], stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            if answer.get("how") == "vscode" and isinstance(answer.get("link"), str):
+                open_vscode_link(home, extra_dirs, entry.get("session") or entry["chat"], answer["link"])
         elif entry.get("chat") and entry.get("host"):
             import remote
             answer = remote.continue_chat(entry["host"], entry["profile"], entry["chat"], entry.get("folder") or "",
@@ -2304,7 +2327,7 @@ def undismiss_all(home, extra_dirs, _session_id=None):
     count = len(cs.load_dismissed(cache_root))
     if count:
         cs.change_dismissed(cache_root, clear=True)
-    return True, f"{count} session(s) shown again"
+    return True, f"Showing {count} removed chat{'s' if count != 1 else ''} again" if count else "No chat was removed"
 
 
 USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile PROFILE] [--config-dir DIR]...\n"
@@ -2336,6 +2359,7 @@ USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile P
          "       jump.py --share SESSION_ID\n"
          "       jump.py --remote-vscode HOST SESSION_ID [--cwd FOLDER_ON_HOST]\n"
          "       jump.py --remote-terminal HOST [--name SESSION_NAME] [--vscode-terminal PID [--cwd FOLDER_ON_HOST]]\n"
+         "       jump.py --vscode-link SESSION_ID LINK [--config-dir DIR]...\n"
          "       jump.py --remote-new-vscode HOST [--cwd FOLDER_ON_HOST] [--account CONFIG_DIR|-]\n"
          "               [--prompt TEXT] [--plan SLUG [--plan-profile PROFILE]]\n"
          "       jump.py --resume SESSION_ID --profile PROFILE --vscode\n"
@@ -2364,6 +2388,13 @@ def main(argv=None):
             sys.exit(USAGE)
         ok = place_window(args[1], x, y, w, h)
         print(json.dumps({"ok": bool(ok), "message": "" if ok else "KWin didn't take it"}))
+        return
+    if args[:1] == ["--vscode-link"] and len(args) >= 3:  # --vscode-link SESSION_ID LINK [--config-dir DIR]...
+        dirs = args[3:]
+        if len(dirs) % 2 or any(d != "--config-dir" for d in dirs[::2]):
+            sys.exit(USAGE)
+        ok, message = open_vscode_link(Path.home(), dirs[1::2], args[1], args[2])
+        print(json.dumps({"ok": ok, "message": message}))
         return
     extra, session_id, action, folder, profile_dir = [], None, jump, None, None
     remote_host, name_arg, choose, vscode, print_command = None, "", False, False, False

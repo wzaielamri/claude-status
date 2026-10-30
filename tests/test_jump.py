@@ -889,8 +889,9 @@ class DismissHelperTests(unittest.TestCase):
             try:
                 self.assertTrue(jump.dismiss(Path(tmp), [], "abc")[0])
                 self.assertIn("abc", cs.load_dismissed(cs.cache_dir(Path(tmp))))
-                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "1 session(s) shown again")
+                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "Showing 1 removed chat again")
                 self.assertEqual(cs.load_dismissed(cs.cache_dir(Path(tmp))), {})
+                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "No chat was removed")
             finally:
                 if old is None:
                     os.environ.pop("XDG_CACHE_HOME")
@@ -1379,6 +1380,20 @@ class RemoteShowTests(unittest.TestCase):
     def procs(self, tree, names, argvs):
         return dict(process_children=lambda: tree, proc_name=lambda pid: names.get(pid, "bash"),
                     proc_cmdline=lambda pid: argvs.get(pid, []), host_names=lambda host: {host} | ({"labserver.uni.example"} if host == "labserver" else set()))
+
+    def test_a_reply_link_opens_in_the_window_that_runs_the_chat(self):
+        # (VS Code opens a link in the window focused last: the chat's is raised first)
+        raised, opened = [], []
+        fake = type("S", (), {"Popen": staticmethod(lambda args, **k: opened.append(args)), "DEVNULL": None})
+        entry = {"pid": 500, "cwd": "/home/me/app", "sessionId": "abc-123"}
+        with Patch(raise_window=lambda *a, **k: raised.append(a) or True, ancestors=lambda pid: [pid, 400],
+                   subprocess=fake, shutil=type("W", (), {"which": staticmethod(lambda n: "/usr/bin/" + n)}),
+                   time=type("T", (), {"sleep": staticmethod(lambda s: None)})), \
+                mock.patch.object(cs, "find_chat_entry", return_value=entry):
+            link = "vscode://anthropic.claude-code/open?session=abc-123&prompt=hi"
+            self.assertEqual(jump.open_vscode_link(Path("/home/me"), [], "abc-123", link), (True, ""))
+            self.assertFalse(jump.open_vscode_link(Path("/home/me"), [], "abc-123", "file:///etc/passwd")[0])
+        self.assertEqual((raised, opened), ([([500, 400], "app")], [["/usr/bin/xdg-open", link]]))
 
     def test_vscode_window_connected_to_the_host(self):
         raised, opened = [], []

@@ -1035,7 +1035,7 @@ def send(home, extra_dirs, profile_key, chat_id, text, session_id=None, how="aut
     if entry is not None and entry.get("kind") == "bg":
         job_id = entry.get("jobId")
         if not cs.valid_id(job_id or ""):
-            return {"ok": False, "message": "It runs in a background session the widget can't stop"}
+            return {"ok": False, "message": "It runs in a background session Talpy Den can't stop"}
         runs_on = next((p for p in profiles if cs.matches_profile(p, profile_key)), profile)
         ok, message = cs.stop_background(runs_on, job_id, cs.read_job([runs_on], job_id), home, claude)
         if not ok:
@@ -1745,7 +1745,7 @@ def main(argv=None):
                 result = {"ok": ok, "message": said}
             else:
                 result = send(home, config_dirs, profile, target, text, session, how)
-                if how == "enter" and result.get("how") == "ask":
+                if how == "enter" and result.get("how") == "ask" and not remote:  # (on a host: copied here, above)
                     result = copy_answer((text or "").strip(), ENTER_COPIES)
         elif action == "--answer":
             ok, said = answer_request(cache_root, target, decision, note, answers)
