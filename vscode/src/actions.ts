@@ -35,6 +35,7 @@ import {
   HIDDEN_NOUNS,
   hiddenCount,
   type HiddenKind,
+  keptChat,
   machineStatus,
   nextChatIndex,
   reopensInClaudeCode,
@@ -356,10 +357,14 @@ export class Actions {
             : chat.state === "waiting"
               ? "It's waiting for you: Claude quits without your answer and its terminal stays open. The chat is kept and shows under Recent chats."
               : "It's idle, so nothing is interrupted: Claude quits and its terminal stays open. The chat is kept and shows under Recent chats.";
+    // (one that keeps going: Stop leaves Keep going on, for the next limit, or turns it off too)
+    const kept = chat.host ? null : keptChat(this.dash.state().status, chat.chatId || chat.sessionId);
+    const keepOff = "Stop and turn Keep going off";
     const choice = await vscode.window.showWarningMessage(
       interruptible ? `Interrupt or stop “${chat.name}”?` : `Stop “${chat.name}”?`,
-      { modal: true, detail },
+      { modal: true, detail: kept ? `${detail}\n\nIt keeps going after usage limits.` : detail },
       ...(interruptible ? ["Interrupt", "Stop"] : ["Stop"]),
+      ...(kept ? [keepOff] : []),
     );
     if (choice === "Interrupt") {
       if (terminal) {
@@ -374,7 +379,7 @@ export class Actions {
       this.refresh(chat.host);
       return;
     }
-    if (choice !== "Stop") return;
+    if (choice !== "Stop" && choice !== keepOff) return;
     let answer: Answer;
     if (chat.host && chatProcess) {
       answer = await this.backend.action("remote.py", ["--end", chat.host, chat.sessionId, ...(chat.profileDir ? [chat.profileDir] : []), ...(busy ? ["--busy"] : [])]);
@@ -383,9 +388,10 @@ export class Actions {
       answer = await this.backend.action("remote.py", ["--run", chat.host, chat.stopCommand]);
     } else {
       const profile = chat.profileDir ? ["--profile", chat.profileDir] : [];
-      answer = await this.backend.action("jump.py", ["--stop", chat.sessionId, ...profile, ...(busy ? ["--busy"] : []), ...configDirArgs()]);
+      const off = choice === keepOff && kept ? ["--and-keep-off", kept.chat] : [];
+      answer = await this.backend.action("jump.py", ["--stop", chat.sessionId, ...profile, ...(busy ? ["--busy"] : []), ...off, ...configDirArgs()]);
     }
-    if (this.report(answer, "Couldn't stop the chat") && /killed|ended/.test(answer.message)) this.dash.setActionInfo(answer.message);
+    if (this.report(answer, "Couldn't stop the chat") && (choice === keepOff || /killed|ended/.test(answer.message))) this.dash.setActionInfo(answer.message);
     this.refresh(chat.host);
   }
 

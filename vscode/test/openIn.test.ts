@@ -171,7 +171,7 @@ test("a chat running in a terminal can move to a Claude Code panel, when Claude 
 // what they ran: helpers (jump.py, without the --config-dir of the machine
 // the tests run on), terminals, and what failed
 // (claudeCode: false, Claude Code isn't here; recent, starred: what the account lists)
-function actionsHere(answers: { ok: boolean; message: string; command?: string }[] = [], opts: { claudeCode?: boolean; recent?: unknown[]; starred?: unknown[] } = {}) {
+function actionsHere(answers: { ok: boolean; message: string; command?: string }[] = [], opts: { claudeCode?: boolean; recent?: unknown[]; starred?: unknown[]; keep?: unknown[] } = {}) {
   const work = { id: "w", title: "work", profileKeys: ["work"], sessions: [], recent: opts.recent ?? [], starred: opts.starred ?? [] } as unknown as Group;
   const helpers: string[][] = [];
   const runs: string[] = [];
@@ -179,7 +179,7 @@ function actionsHere(answers: { ok: boolean; message: string; command?: string }
   const dash = { opened() {},
     demo: false,
     currentHost: undefined,
-    state: () => ({ status: { groups: [work], cli: { installed: true } }, hosts: [] }),
+    state: () => ({ status: { groups: [work], cli: { installed: true }, keep: opts.keep ?? [] }, hosts: [] }),
     claudeCodeInfo: () => (opts.claudeCode === false ? { available: false, profileKey: null } : { available: true, profileKey: "work" }),
     setActionError: (m: string) => void failures.push(m),
     setActionInfo: () => undefined,
@@ -199,6 +199,31 @@ function actionsHere(answers: { ok: boolean; message: string; command?: string }
   );
   return { actions, helpers, runs, failures };
 }
+
+test("stopping a chat that keeps going asks whether Keep going goes off too", async () => {
+  const fix = { key: "k", sessionId: "s1", chatId: "c1", profileDir: "work", name: "Fix", state: "idle", kind: "interactive", entrypoint: "cli", pid: 42 };
+  const window = vscode.window as unknown as { showWarningMessage: (...a: unknown[]) => Promise<unknown> };
+  const was = window.showWarningMessage;
+  const asked: unknown[][] = [];
+  try {
+    for (const [keep, choice, flags] of [
+      [[{ chat: "c1" }], "Stop and turn Keep going off", ["--and-keep-off", "c1"]],
+      [[{ chat: "c1" }], "Stop", []],
+      [[], "Stop", []],
+    ] as [unknown[], string, string[]][]) {
+      const { actions, helpers } = actionsHere([], { keep });
+      asked.length = 0;
+      window.showWarningMessage = async (...a: unknown[]) => (asked.push(a), choice);
+      await actions.stop(fix as never);
+      const detail = (asked[0][1] as { detail: string }).detail;
+      assert.equal(/It keeps going after usage limits\./.test(detail), keep.length > 0);
+      assert.equal(asked[0].includes("Stop and turn Keep going off"), keep.length > 0);
+      assert.deepEqual(helpers.at(-1), ["--stop", "s1", "--profile", "work", ...flags]);
+    }
+  } finally {
+    window.showWarningMessage = was;
+  }
+});
 
 test("a chat that isn't running reopens where the switch says, from its tab or its row too", async () => {
   const { overrides } = await import("./vscode-stub");
