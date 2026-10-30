@@ -615,6 +615,14 @@ ColumnLayout {
             readonly property bool canOpen: recentOpenIn.inVscode
                                             || (recentOpenIn.terminalHere && (!section.remoteHost || !!chat.openCommand))
 
+            // a click on its name
+            function click() {
+                if (Plasmoid.configuration.clickOpensPane)
+                    root.openPane(chat, section.remoteHost, "chat")
+                else if (canOpen)
+                    open()
+            }
+
             function open() {
                 if (section.remoteHost && recentOpenIn.inVscode)
                     root.remoteResumeVscode(section.remoteHost, chat.sessionId, chat.cwd)
@@ -634,6 +642,9 @@ ColumnLayout {
             HoverHandler {
                 id: recentHover
             }
+            TouchHold {
+                buttons: recentButtons
+            }
 
             RowLayout {
                 Layout.fillWidth: true
@@ -643,10 +654,14 @@ ColumnLayout {
                     id: recentName
                     textFormat: Text.PlainText
                     text: recentLine.chat.name
-                    font.underline: recentMouse.containsMouse
+                    font.underline: recentMouse.containsMouse || activeFocus
                     opacity: recentLine.canOpen || Plasmoid.configuration.clickOpensPane ? 1 : 0.6
                     elide: Text.ElideRight
                     Layout.fillWidth: true
+                    // (Tab: its buttons show; Enter: as a click)
+                    activeFocusOnTab: true
+                    Keys.onReturnPressed: recentLine.click()
+                    Keys.onEnterPressed: recentLine.click()
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
@@ -671,8 +686,11 @@ ColumnLayout {
                             enabled: recentLine.canOpen || Plasmoid.configuration.clickOpensPane
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: Plasmoid.configuration.clickOpensPane
-                                       ? root.openPane(recentLine.chat, section.remoteHost, "chat") : recentLine.open()
+                            onClicked: if (!recentButtons.holding) recentLine.click()
+
+                            TouchHold {
+                                buttons: recentButtons
+                            }
                         }
                     }
                 }
@@ -792,7 +810,8 @@ ColumnLayout {
                 HoverButtons {
                     id: recentButtons
                     lineHeight: recentName.implicitHeight
-                    shown: recentHover.hovered || root.deleteAsk.key === recentLine.rowKey
+                    shown: recentHover.hovered || recentName.activeFocus || recentButtons.focused || recentButtons.held
+                           || root.deleteAsk.key === recentLine.rowKey
                     under: recentEnd
 
                     PlasmaComponents3.ToolButton {
@@ -947,6 +966,9 @@ ColumnLayout {
             HoverHandler {
                 id: planHover
             }
+            TouchHold {
+                buttons: planButtons
+            }
 
             RowLayout {
                 Layout.fillWidth: true
@@ -962,9 +984,13 @@ ColumnLayout {
                     id: planName
                     textFormat: Text.PlainText
                     text: planLine.plan.title
-                    font.underline: planMouse.containsMouse
+                    font.underline: planMouse.containsMouse || activeFocus
                     elide: Text.ElideRight
                     Layout.fillWidth: true
+                    // (Tab: its buttons show; Enter: as a click)
+                    activeFocusOnTab: true
+                    Keys.onReturnPressed: root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
+                    Keys.onEnterPressed: root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
@@ -983,7 +1009,11 @@ ColumnLayout {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
+                            onClicked: if (!planButtons.holding) root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
+
+                            TouchHold {
+                                buttons: planButtons
+                            }
                         }
                     }
                 }
@@ -1051,7 +1081,8 @@ ColumnLayout {
                 HoverButtons {
                     id: planButtons
                     lineHeight: planName.implicitHeight
-                    shown: planHover.hovered || root.planComposer === planLine.composerKey || root.deleteAsk.key === planLine.composerKey
+                    shown: planHover.hovered || planName.activeFocus || planButtons.focused || planButtons.held
+                           || root.planComposer === planLine.composerKey || root.deleteAsk.key === planLine.composerKey
                     under: planEnd
 
                     PlasmaComponents3.ToolButton {
@@ -1265,6 +1296,9 @@ ColumnLayout {
             HoverHandler {
                 id: memoryHover
             }
+            TouchHold {
+                buttons: memoryButtons
+            }
 
             RowLayout {
                 Layout.fillWidth: true
@@ -1280,10 +1314,14 @@ ColumnLayout {
                     id: memoryName
                     textFormat: Text.PlainText
                     text: memoryLine.memory.description || memoryLine.memory.name
-                    font.underline: memoryMouse.containsMouse
+                    font.underline: memoryMouse.containsMouse || activeFocus
                     opacity: memoryLine.canOpen ? 1 : 0.7
                     elide: Text.ElideRight
                     Layout.fillWidth: true
+                    // (Tab: its buttons show; Enter: as a click)
+                    activeFocusOnTab: true
+                    Keys.onReturnPressed: if (memoryLine.canOpen) root.openMemory(memoryLine.memory, section.remoteHost, false)
+                    Keys.onEnterPressed: if (memoryLine.canOpen) root.openMemory(memoryLine.memory, section.remoteHost, false)
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
@@ -1304,7 +1342,11 @@ ColumnLayout {
                             enabled: memoryLine.canOpen
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.openMemory(memoryLine.memory, section.remoteHost, false)
+                            onClicked: if (!memoryButtons.holding) root.openMemory(memoryLine.memory, section.remoteHost, false)
+
+                            TouchHold {
+                                buttons: memoryButtons
+                            }
                         }
                     }
                 }
@@ -1343,7 +1385,8 @@ ColumnLayout {
                 HoverButtons {
                     id: memoryButtons
                     lineHeight: memoryName.implicitHeight
-                    shown: memoryHover.hovered || (memoryLine.itemKey !== "" && root.deleteAsk.key === memoryLine.itemKey)
+                    shown: memoryHover.hovered || memoryName.activeFocus || memoryButtons.focused || memoryButtons.held
+                           || (memoryLine.itemKey !== "" && root.deleteAsk.key === memoryLine.itemKey)
                     under: memoryEnd
 
                     PlasmaComponents3.ToolButton {

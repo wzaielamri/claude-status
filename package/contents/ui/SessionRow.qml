@@ -112,7 +112,9 @@ RowLayout {
     }
     readonly property bool confirmingStop: session.key !== "" && root.stopConfirmSession === rowKey
     // (a question gone with the chat it was about, stopped meanwhile, leaves no buttons up)
-    readonly property bool buttonsShown: rowHover.hovered || (confirmingStop && canStop)
+    // (and while the keyboard is on its name or a button, or a finger held it: HoverButtons)
+    readonly property bool buttonsShown: rowHover.hovered || nameLabel.activeFocus || rowButtons.focused || rowButtons.held
+                                         || (confirmingStop && canStop)
                                          || (session.key !== "" && root.deleteAsk.key === rowKey)
     // A finished chat can be shared, continued on another account or kept on
     // one (jump.py; on an SSH host, between its accounts: remote.py); not
@@ -266,6 +268,9 @@ RowLayout {
     HoverHandler {
         id: rowHover
     }
+    TouchHold {
+        buttons: rowButtons
+    }
     Layout.rightMargin: Kirigami.Units.smallSpacing
 
     // A bar in the color of the chat's pet, to spot which pet is which
@@ -320,9 +325,13 @@ RowLayout {
                             textFormat: Text.PlainText
                             text: row.session.name
                             font.bold: true
-                            font.underline: nameMouse.containsMouse
+                            font.underline: nameMouse.containsMouse || activeFocus
                             elide: Text.ElideRight
                             width: Math.min(implicitWidth, nameLine.width)
+                            // (Tab: its buttons show; Enter: as a click)
+                            activeFocusOnTab: true
+                            Keys.onReturnPressed: root.clickChat(row.session, row.remoteHost)
+                            Keys.onEnterPressed: root.clickChat(row.session, row.remoteHost)
 
                             // Click the name to jump to the session
                             PlasmaCore.ToolTipArea {
@@ -338,7 +347,11 @@ RowLayout {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.clickChat(row.session, row.remoteHost)
+                                    onClicked: if (!rowButtons.holding) root.clickChat(row.session, row.remoteHost)
+
+                                    TouchHold {
+                                        buttons: rowButtons
+                                    }
                                 }
                             }
                         }

@@ -8,11 +8,29 @@ import org.kde.kirigami as Kirigami
 // covered while they show, and nothing is drawn behind them (over a popup
 // that shows the desktop through, a ground of their own was a dark box).
 // Where they reach past it, the row cuts what's under them (beyond). Put it
-// last in the line's RowLayout; its buttons take buttonSize.
+// last in the line's RowLayout; its buttons take buttonSize. Not only on
+// hover: the line shows them too while one of them has the keyboard's focus
+// (focused: Tab, from the line's name), and after a press and hold with a
+// finger (held: TouchHold.qml) until the popup hides.
 Item {
     id: hover
 
     property bool shown: false
+    readonly property bool focused: {
+        for (const button of row.children)
+            if (button.visualFocus)   // (by the keyboard: a click leaves them to the mouse)
+                return true
+        return false
+    }
+    property bool held: false
+    property bool holding: false   // (a finger holds the line now: its click isn't one)
+    Connections {
+        target: root
+        enabled: hover.held
+        function onDashboardShownChanged() {
+            hover.held = false
+        }
+    }
     property Item under: null               // what stands at the line's end
     property real lineHeight: 0             // the line's (the buttons are centered on it, a little taller)
     default property alias buttons: row.data

@@ -128,6 +128,22 @@ PlasmaComponents3.ScrollView {
                 readonly property var project: view.projects[index] || ({ name: "", path: "", short: "", chats: [], chatCount: 0 })
                 readonly property bool unfolded: view.isOpen(project, index)
                 readonly property var here: unfolded ? view.now(project) : ({ sessions: [], plans: [], memories: [], recap: "" })
+                // its hide button: on hover, while the keyboard is on its line
+                // (Tab), or after a press and hold with a finger (TouchHold.qml)
+                readonly property bool buttonsShown: cardHover.hovered || projectName.activeFocus || newHere.visualFocus
+                                                     || hideHere.visualFocus || held
+                property bool held: false
+                property bool holding: false
+                Connections {
+                    target: root
+                    enabled: card.held
+                    function onDashboardShownChanged() {
+                        card.held = false
+                    }
+                }
+                function fold() {
+                    view.open = Object.assign({}, view.open, { [project.path]: !unfolded })
+                }
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -143,6 +159,9 @@ PlasmaComponents3.ScrollView {
 
                     HoverHandler {
                         id: cardHover
+                    }
+                    TouchHold {
+                        buttons: card
                     }
                     Kirigami.Icon {
                         source: card.unfolded ? "go-down" : "go-next"
@@ -162,6 +181,11 @@ PlasmaComponents3.ScrollView {
                             Layout.fillWidth: true
                             text: card.project.name
                             elide: Text.ElideRight
+                            // (Tab: its hide button shows; Enter: folds it open or shut, as a click)
+                            activeFocusOnTab: true
+                            font.underline: activeFocus
+                            Keys.onReturnPressed: card.fold()
+                            Keys.onEnterPressed: card.fold()
                         }
                         PlasmaComponents3.Label {
                             textFormat: Text.PlainText
@@ -181,6 +205,7 @@ PlasmaComponents3.ScrollView {
                         }
                     }
                     PlasmaComponents3.ToolButton {
+                        id: newHere
                         Layout.alignment: Qt.AlignTop
                         icon.source: root.iconDir + "chat-new-symbolic.svg"   // (as an account's: at 16 px)
                         icon.width: Kirigami.Units.iconSizes.small
@@ -198,9 +223,10 @@ PlasmaComponents3.ScrollView {
                     }
                     // on hover: hide it here (nothing is deleted; its chats, plans and memories stay in their lists)
                     PlasmaComponents3.ToolButton {
+                        id: hideHere
                         Layout.alignment: Qt.AlignTop
-                        opacity: cardHover.hovered ? 1 : 0
-                        enabled: cardHover.hovered
+                        opacity: card.buttonsShown ? 1 : 0
+                        enabled: card.buttonsShown
                         icon.name: "window-close"
                         icon.width: Kirigami.Units.iconSizes.small
                         icon.height: Kirigami.Units.iconSizes.small
@@ -216,7 +242,7 @@ PlasmaComponents3.ScrollView {
                         }
                     }
                     TapHandler {
-                        onTapped: view.open = Object.assign({}, view.open, { [card.project.path]: !card.unfolded })
+                        onTapped: card.fold()
                     }
                 }
 
