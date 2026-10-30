@@ -299,9 +299,9 @@ ColumnLayout {
         font.pointSize: ask.smallPt
         opacity: 0.7
         text: ask.plan
-              ? i18n("Approve it in the chat, or turn on \"Answer permission prompts from the widget\" in the settings (it takes plans too) to approve it here.")
+              ? i18n("Approve it in the chat, or turn on \"Answer permission prompts from Talpy Den\" in the settings (it takes plans too) to approve it here.")
               : ask.asksQuestions
-              ? i18n("Answer it in the chat, or turn on \"Answer permission prompts from the widget\" in the settings (it answers Claude's questions too) to answer it here.")
-              : i18n("Answer it in the chat, or turn on \"Answer permission prompts from the widget\" in the settings to answer it here.")
+              ? i18n("Answer it in the chat, or turn on \"Answer permission prompts from Talpy Den\" in the settings (it answers Claude's questions too) to answer it here.")
+              : i18n("Answer it in the chat, or turn on \"Answer permission prompts from Talpy Den\" in the settings to answer it here.")
     }
 }

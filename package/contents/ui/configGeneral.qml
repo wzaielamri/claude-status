@@ -370,7 +370,7 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             text: (page.liveOn ? i18n("Live mode is on: a working chat's steps show as they happen, and it's checked every 6 s, so the first one doesn't apply. ") : "")
-                  + i18n("A chat that starts, ends, starts working, asks for something or finishes its turn shows at once either way: the widget watches Claude's session files.")
+                  + i18n("A chat that starts, ends, starts working, asks for something or finishes its turn shows at once either way: Talpy Den watches the files Claude keeps for its chats.")
         }
 
         QQC2.TextField {
@@ -382,12 +382,12 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: notifyWaiting
             Kirigami.FormData.label: i18n("Notify:")
-            text: i18n("When a session needs input (permission, question)")
+            text: i18n("When a chat needs input (permission, question)")
         }
 
         QQC2.CheckBox {
             id: notifyDone
-            text: i18n("When a session finishes its turn")
+            text: i18n("When a chat finishes its turn")
         }
 
         QQC2.SpinBox {
@@ -416,7 +416,7 @@ KCM.SimpleKCM {
 
         QQC2.CheckBox {
             id: relayBox
-            text: i18n("Answer permission prompts from the widget")
+            text: i18n("Answer permission prompts from Talpy Den")
             checked: page.relay !== null && page.relay.on
             enabled: page.relay !== null
             onToggled: page.setRelay(checked)
@@ -445,7 +445,7 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             text: (page.liveMessage ? page.liveMessage + "\n" : "")
-                  + i18n("Adds a hook to each Claude profile's settings.json that notes each step of each chat as it happens (Claude doesn't wait for it): rows, the chat pane and the line under the big Talpy follow every tool call at once, and the widget checks the rest less often. Without it, a chat that starts, waits or finishes still shows at once; its steps show at each check. Applies at once.")
+                  + i18n("Adds a hook to each Claude profile's settings.json that notes each step of each chat as it happens (Claude doesn't wait for it): rows, the chat pane and the line under the big Talpy follow every tool call at once, and Talpy Den checks the rest less often. Without it, a chat that starts, waits or finishes still shows at once; its steps show at each check. Applies at once.")
         }
 
         QQC2.CheckBox {
@@ -462,7 +462,7 @@ KCM.SimpleKCM {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             text: (page.keysMessage ? page.keysMessage + "\n" : "")
-                  + i18n("Two global shortcuts answer the chat that has waited longest for a permission, from anywhere: Allow once (a plan: Approve) or Deny (a plan: Keep planning); a note on screen says what was answered. They take \"Answer permission prompts from the widget\"; Claude's questions are answered in the panel. Pick other keys in System Settings → Shortcuts → Talpy Den. Applies at once.")
+                  + i18n("Two global shortcuts answer the chat that has waited longest for a permission, from anywhere: Allow once (a plan: Approve) or Deny (a plan: Keep planning); a note on screen says what was answered. They take \"Answer permission prompts from Talpy Den\"; Claude's questions are answered in the panel. Pick other keys in System Settings → Shortcuts → Talpy Den. Applies at once.")
         }
 
         QQC2.TextField {
@@ -724,7 +724,7 @@ KCM.SimpleKCM {
 
         SoundChooser {
             id: soundFailed
-            Kirigami.FormData.label: i18n("Failed:")
+            Kirigami.FormData.label: i18n("Failed or stopped:")
             enabled: notifySound.checked && notifyDone.checked
             onPreview: sound => page.play(sound)
         }
@@ -827,7 +827,7 @@ KCM.SimpleKCM {
             wrapMode: Text.Wrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: i18n("Pick SSH hosts with the server button at the top of the popup. A host that wants a password (or a passphrase, a code, its host key confirmed) shows Log in…, which opens a terminal where ssh asks for it: the widget never sees it. With your key in the agent (ssh-add) that isn't needed. The host needs python3; nothing gets installed there.")
+            text: i18n("Pick SSH hosts with the SSH hosts button at the top of the popup. A host that wants a password (or a passphrase, a code, its host key confirmed) shows Log in…, which opens a terminal where ssh asks for it: Talpy Den never sees it. With your key in the agent (ssh-add) that isn't needed. The host needs python3; nothing gets installed there.")
         }
 
         QQC2.CheckBox {
@@ -1014,7 +1014,7 @@ KCM.SimpleKCM {
             wrapMode: Text.Wrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: i18n("Plans and subagent runs are Markdown. Okular shows it rendered; in your browser the widget shows it as a page of its own (it loads nothing from the internet). VS Code's preview needs the Talpy Den extension for VS Code 1.13 or newer, else the file opens in its editor. Your app for Markdown files is often a text editor: a change you make there to a plan is the plan's. Whatever you pick that isn't installed, your browser shows it.")
+            text: i18n("Plans and subagent runs are Markdown. Okular shows it rendered; in your browser Talpy Den shows it as a page of its own (it loads nothing from the internet). VS Code's preview needs the Talpy Den extension for VS Code 1.13 or newer, else the file opens in its editor. Your app for Markdown files is often a text editor: a change you make there to a plan is the plan's. Whatever you pick that isn't installed, your browser shows it.")
         }
     }
 }

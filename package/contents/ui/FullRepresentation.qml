@@ -125,7 +125,7 @@ PlasmaExtras.Representation {
                     mainText: i18n("SSH hosts")
                     subText: root.shownHosts.length > 0
                              ? i18n("Showing Claude on %1. Click to pick hosts from ~/.ssh/config.", root.shownHosts.join(", "))
-                             : i18n("Show Claude sessions of your SSH hosts (from ~/.ssh/config) here too.")
+                             : i18n("Show the Claude chats of your SSH hosts (from ~/.ssh/config) here too.")
                 }
             }
             PlasmaComponents3.ToolButton {
@@ -380,8 +380,8 @@ PlasmaExtras.Representation {
                         Layout.margins: Kirigami.Units.gridUnit
                         visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length === 0
                         iconName: "dialog-information"
-                        text: i18n("No Claude Code config found")
-                        explanation: i18n("Looked for ~/.claude and ~/.claude-*. Add other dirs in the widget settings.")
+                        text: i18n("No Claude Code chats yet")
+                        explanation: i18n("Your Claude Code chats show up here once you start claude in a terminal or open Claude in VS Code. Talpy Den looks in ~/.claude and ~/.claude-*; other folders go in its settings (Extra config dirs).")
                     }
 
                     // (some room under the last line, scrolled to the end too)

@@ -140,7 +140,7 @@ Rectangle {
                     subText: (box.plan ? i18n("The chat starts with the plan as its first message, and what you add here.")
                                        : i18n("With a task, the chat starts with it as its first message. Without one, it opens empty."))
                              + " " + i18n("Then click the folder it's for (Ctrl+Enter: the first one).")
-                             + "\n\n" + (box.remoteHost ? i18n("Ctrl+V pastes a picture too: Claude gets it with the task, once you let the widget copy it to %1.", box.remoteHost)
+                             + "\n\n" + (box.remoteHost ? i18n("Ctrl+V pastes a picture too: Claude gets it with the task, once you let Talpy Den copy it to %1.", box.remoteHost)
                                                          : i18n("Ctrl+V pastes a picture too: Claude gets it with the task."))
                 }
             }
@@ -294,7 +294,7 @@ Rectangle {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Wait for the usage limit")
-                subText: i18n("This account is at its usage limit. The task waits under the account and starts in the background a minute after the limit resets, while the widget runs (or as soon as it runs again). You can start or cancel it before.")
+                subText: i18n("This account is at its usage limit. The task waits under the account and starts in the background a minute after the limit resets, while Talpy Den runs (or as soon as it runs again). You can start or cancel it before.")
             }
         }
 
@@ -314,7 +314,7 @@ Rectangle {
                     textFormat: Text.PlainText
                     anchors.fill: parent
                     mainText: i18n("Start it later")
-                    subText: i18n("The task waits under the account and starts in the background on the day and at the time you pick, while the widget runs (or as soon as it runs again). You can start or cancel it before.")
+                    subText: i18n("The task waits under the account and starts in the background on the day and at the time you pick, while Talpy Den runs (or as soon as it runs again). You can start or cancel it before.")
                 }
             }
             // the day: today and the next six
@@ -412,8 +412,8 @@ Rectangle {
                     active: folderRow.untrusted
                     mainText: i18n("Claude doesn't trust this folder yet")
                     subText: folderRow.folder.short === "~"
-                             ? i18n("Claude never keeps trusting your home folder, and a background session can't ask: start it in a terminal, or pick a project folder.")
-                             : i18n("A background session can't ask whether you trust it: start a chat there in a terminal once and say yes.")
+                             ? i18n("Claude never keeps trusting your home folder, and a background chat can't ask: start it in a terminal, or pick a project folder.")
+                             : i18n("A background chat can't ask whether you trust it: start a chat there in a terminal once and say yes.")
                 }
             }
         }

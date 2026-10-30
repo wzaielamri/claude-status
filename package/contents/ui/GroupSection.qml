@@ -68,7 +68,7 @@ ColumnLayout {
             tooltip: (section.remoteHost
                       ? i18n("Listed first; VS Code's Claude on %1 (its VS Code server) and plain claude there run on it.", section.remoteHost)
                       : i18n("Listed first, its 5-hour usage is next to the panel icon, and VS Code's Claude and plain claude run on it."))
-                     + " " + i18n("Change it in the widget's settings: Accounts, Make Default.")
+                     + " " + i18n("Change it in Talpy Den's settings: Accounts, Make Default.")
         }
         PlasmaComponents3.ToolButton {
             id: newChatButton
@@ -182,7 +182,7 @@ ColumnLayout {
                 mainText: i18n("Log in to %1", section.group.title)
                 subText: section.remoteHost
                          ? i18n("Opens a terminal with Claude's own login on %1 (over ssh): open the address it shows in your browser, sign in, and paste the code you get back.", section.remoteHost)
-                         : i18n("Opens a terminal with Claude's own login (claude auth login): sign in in your browser with the account for this folder. The widget never sees the login.")
+                         : i18n("Opens a terminal with Claude's own login (claude auth login): sign in in your browser with the account for this folder. Talpy Den never sees the login.")
             }
             onClicked: root.logIn(section.group, section.remoteHost)
         }
@@ -235,7 +235,7 @@ ColumnLayout {
                 anchors.fill: parent
                 active: !section.group.limits
                 mainText: i18n("No plan usage yet")
-                subText: i18n("Plan limits come from the Claude Code status line (statusline-snippet.sh). They update whenever a session of this account gets a reply.")
+                subText: i18n("Plan limits come from the Claude Code status line (statusline-snippet.sh). They update whenever a chat of this account gets a reply.")
             }
         }
     }
@@ -385,7 +385,7 @@ ColumnLayout {
                                                             : i18n("Waits for the usage limit")
                         subText: queuedLine.what + "\n\n"
                                  + (queuedLine.task.chat
-                                    ? i18n("The chat goes on in the background in %1, at %2, telling Claude that the limit has reset. A session that still has it open (in a terminal, or in the background) ends first; if it went on before then, nothing happens.",
+                                    ? i18n("The chat goes on in the background in %1, at %2, telling Claude that the limit has reset. A Claude that still has it open (in a terminal, or in the background) quits first; if it went on before then, nothing happens.",
                                            queuedLine.folder, root.startText(queuedLine.task.startAt))
                                     : i18n("Starts in the background in %1, at %2.", queuedLine.folder, root.startText(queuedLine.task.startAt)))
                     }
@@ -492,7 +492,7 @@ ColumnLayout {
                     subText: (sharedLine.chat.copy
                               ? i18n("This chat is shared with this account too, but it continued on %1 in a copy Claude forked from it. New messages are only in that copy. Click to go to it.", sharedLine.chat.profile)
                               : i18n("This chat is shared with this account too. It's listed once, under the account it's used on. Click to go to it."))
-                             + (sharedLine.chat.stoppedHere ? "\n" + i18n("Its background session on this account was stopped.") : "")
+                             + (sharedLine.chat.stoppedHere ? "\n" + i18n("Its background chat on this account was stopped.") : "")
 
                     MouseArea {
                         id: sharedMouse
@@ -658,7 +658,7 @@ ColumnLayout {
                     visible: goingOn !== null
                              || (!!recentLine.chat.stopped && recentLine.chat.stopped.kind === "limit" && !recentLine.chat.stopped.over)
                     text: goingOn ? i18nc("a chat that goes on by itself at this time", "⏱ %1", root.startText(goingOn.startAt))
-                                  : i18n("limit")
+                                  : i18n("Limit")
                     warning: goingOn === null
                     active: goingOn !== null
                     clickable: goingOn !== null || goOnAt > 0

@@ -826,7 +826,7 @@ Window {
         if (route === "terminal")
             return i18n("Its terminal takes no text from outside: Enter copies your message and opens its tab, to paste it there. Send, go on in the background: Claude there quits and the chat goes on in the background.") + where
         if (row && row.pid && row.kind === "bg")
-            return i18n("Its background session stops, then goes on with your message.") + where
+            return i18n("Its background chat stops, then goes on with your message.") + where
         return i18n("The chat goes on in the background with your message.") + where
     }
 
@@ -1102,7 +1102,7 @@ Window {
                           : pane.where === "tmux" ? "Tmux"
                           : pane.where === "vscode" ? i18nc("where a chat runs", "VS Code terminal")
                           : i18nc("where a chat runs", "Terminal")
-                    tooltip: pane.where === "background" ? i18n("A background session: Claude's background service runs it, with no terminal of its own. Open its window to see it in a terminal (claude attach).")
+                    tooltip: pane.where === "background" ? i18n("A background chat: Claude's background service runs it, with no terminal of its own. Open its window to see it in a terminal (claude attach).")
                              : pane.where === "closed" ? i18n("No terminal or tab has it open: a reply goes on with it in the background.")
                              : pane.where === "claude" ? i18n("It runs in VS Code's Claude Code panel (the Claude Code extension).")
                              : pane.where === "tmux" ? i18n("It runs in a tmux pane.")
@@ -1129,7 +1129,7 @@ Window {
                     tooltip: !info ? "" : info.forkOf
                              ? i18n("A copy of a chat shared between the %1 profiles: Claude forked it into a chat of its own on %2, so new messages here are only on %2.",
                                     info.profiles.join(" + "), info.forkOn)
-                             : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one session can have it open at a time.",
+                             : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one Claude can have it open at a time.",
                                     info.profiles.join(" + "))
                 }
                 Tag {
@@ -2021,7 +2021,7 @@ Window {
                                 textFormat: Text.PlainText
                                 anchors.fill: parent
                                 mainText: i18n("Send when this turn ends")
-                                subText: i18n("The widget keeps it and sends it once Claude's turn is over (also with the popup closed).")
+                                subText: i18n("Talpy Den keeps it and sends it once Claude's turn is over (also with the popup closed).")
                             }
                         }
                         PlasmaComponents3.Button {

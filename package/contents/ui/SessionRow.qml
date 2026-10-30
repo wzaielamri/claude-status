@@ -33,7 +33,7 @@ RowLayout {
                                          && session.reason !== "background shell"
     readonly property bool canStop: canEnd || (session.kind === "bg" && session.pid !== null && (!remoteHost || !!session.stopCommand))
     readonly property string stopTitle: row.canInterrupt ? i18n("Interrupt or stop this chat")
-                                        : row.canEnd ? i18n("Stop this chat") : i18n("Stop this background session")
+                                        : row.canEnd ? i18n("Stop this chat") : i18n("Stop this background chat")
     readonly property string stopTip: row.canInterrupt
         ? i18n("Asks first. Interrupting is like Ctrl+C in its tmux pane, or the stop button in VS Code: the current step and its subagents stop, and the chat stays open there.")
         : row.canEnd && row.inVscode
@@ -164,14 +164,14 @@ RowLayout {
     readonly property string openHint: remoteHost
                                        ? (session.entrypoint === "claude-vscode" && !session.openCommand
                                           ? i18n("Show this conversation in VS Code (connected to %1)", remoteHost)
-                                          : !session.openCommand ? i18n("Switch to the terminal with the ssh session to %1", remoteHost)
+                                          : !session.openCommand ? i18n("Switch to the terminal with the ssh connection to %1", remoteHost)
                                           : session.kind === "chat" ? i18n("Reopen this chat on %1 in a terminal (ssh)", remoteHost)
-                                          : i18n("Open this background session on %1 in a terminal (ssh)", remoteHost))
+                                          : i18n("Open this background chat on %1 in a terminal (ssh)", remoteHost))
                                        : session.entrypoint === "claude-vscode" ? i18n("Open this conversation in VS Code")
                                        : session.kind === "chat" ? i18n("Reopen this chat in a terminal (claude --resume)")
-                                       : session.kind === "bg" && session.pid === null ? i18n("Reopen this background session in a terminal")
-                                       : session.kind === "bg" ? i18n("Show this background session in a terminal")
-                                       : i18n("Switch to the terminal running this session")
+                                       : session.kind === "bg" && session.pid === null ? i18n("Reopen this background chat in a terminal")
+                                       : session.kind === "bg" ? i18n("Show this background chat in a terminal")
+                                       : i18n("Switch to the terminal running this chat")
 
     // Stop (the question's answer): only stopped if it's as the question
     // says now (busy: working or waiting; an idle one that got busy isn't);
@@ -371,14 +371,14 @@ RowLayout {
                             Tag {
                                 visible: row.showProfile
                                 text: row.session.profile
-                                tooltip: i18n("The Claude profile (config folder) this session runs in")
+                                tooltip: i18n("The Claude profile (config folder) this chat runs in")
                             }
                             Tag {
                                 visible: row.tag !== ""
                                 text: row.tag
                                 tooltip: row.session.pid === null ? i18n("No terminal or panel has it open: a reply goes on with it in the background.")
                                          : row.session.kind === "bg"
-                                         ? i18n("A background session: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
+                                         ? i18n("A background chat: Claude's background service runs it, with no terminal of its own. Click the name to open it in a terminal (claude attach).")
                                          : row.session.entrypoint === "claude-vscode"
                                          ? i18n("Runs in VS Code's Claude Code panel. Click the name to open the conversation there.")
                                          : row.session.tmux ? i18n("It runs in a tmux pane.")
@@ -406,12 +406,12 @@ RowLayout {
                                            ? i18n("A copy of a chat shared between the %1 profiles: Claude forked it into a chat of its own on %2, so new messages here are only on %2.",
                                                   info.profiles.join(" + "), info.forkOn)
                                              + (info.movedHere ? "\n" + i18n("The shared chat continued here, so it isn't listed itself.") : "")
-                                             + (info.stoppedCopies ? "\n" + i18n("Its background session on %1 was stopped; %1 shows a link to this copy.", info.stoppedCopies.join(", ")) : "")
-                                           : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one session can have it open at a time.",
+                                             + (info.stoppedCopies ? "\n" + i18n("Its background chat on %1 was stopped; %1 shows a link to this copy.", info.stoppedCopies.join(", ")) : "")
+                                           : i18n("This chat is shared between the %1 profiles: it continues on whichever account you open it with. Only one Claude can have it open at a time.",
                                                   info.profiles.join(" + "))
                                              + (row.session.kind === "chat" ? "\n" + i18n("Listed here because it was used on %1 last.", row.session.profile) : "")
                                              + (info.openIn ? "\n" + i18n("Open in %1 right now.", info.openIn) : "")
-                                             + (info.stoppedCopies ? "\n" + i18n("Its background session on %1 was stopped; %1 shows a link to this chat.", info.stoppedCopies.join(", ")) : "")
+                                             + (info.stoppedCopies ? "\n" + i18n("Its background chat on %1 was stopped; %1 shows a link to this chat.", info.stoppedCopies.join(", ")) : "")
                             }
                             Tag {
                                 visible: row.agents !== null
@@ -859,7 +859,7 @@ RowLayout {
                                     : i18n("%1's plan usage isn't known here.", row.handover.title))
                                    + " " + (row.session.pid !== null
                                             ? (row.session.kind === "bg"
-                                               ? i18n("This background session is stopped first (claude stop); then the chat is shared with %1 and reopens there in a terminal.", row.handover.title)
+                                               ? i18n("This background chat is stopped first (claude stop); then the chat is shared with %1 and reopens there in a terminal.", row.handover.title)
                                                : i18n("Claude here quits first (its terminal stays open); then the chat is shared with %1 and reopens there in a terminal.", row.handover.title))
                                             : i18n("The chat is shared with %1 and reopens there in a terminal.", row.handover.title))
                     }
@@ -886,7 +886,7 @@ RowLayout {
                                               : i18n("Go on once the limit resets")
                         subText: (row.goingOn ? "" : i18n("At %1, a minute after the limit resets, the chat goes on in the background, telling Claude that the limit has reset.", root.startText(row.goOnAt)) + " ")
                                  + (row.session.pid === null || row.session.pid === undefined ? ""
-                                    : row.session.kind === "bg" ? i18n("This background session is stopped first (claude stop).")
+                                    : row.session.kind === "bg" ? i18n("This background chat is stopped first (claude stop).")
                                     : i18n("Claude here quits first (its terminal stays open); open the chat from here to see it.")) + " "
                                  + i18n("It goes on in the permission mode it had.") + " "
                                  + i18n("If it went on before then, nothing happens.")
@@ -911,7 +911,7 @@ RowLayout {
                         mainText: i18n("Keep going until it's done")
                         subText: i18n("At %1, a minute after the limit resets, the chat goes on in the background, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.", root.startText(row.goOnAt))
                                  + " " + (row.session.pid === null || row.session.pid === undefined ? ""
-                                          : row.session.kind === "bg" ? i18n("This background session is stopped first (claude stop).")
+                                          : row.session.kind === "bg" ? i18n("This background chat is stopped first (claude stop).")
                                           : i18n("Claude here quits first (its terminal stays open); open the chat from here to see it."))
                     }
                 }
@@ -1074,7 +1074,7 @@ RowLayout {
                                           root.formatTokens(row.recap.tokens.input), root.formatTokens(row.recap.tokens.output),
                                           root.formatTokens(row.recap.tokens.cacheRead), root.formatTokens(row.recap.tokens.cacheWrite))
                                    + "\n" + i18n("Worked: how long Claude was at it, from each prompt of yours to its last step.")
-                                   + (row.session.costUsd ? "\n" + i18n("The price is what this session would cost through the API, from the status line.") : "")
+                                   + (row.session.costUsd ? "\n" + i18n("The price is what this chat would cost through the API, from the status line.") : "")
                     }
                 }
             }

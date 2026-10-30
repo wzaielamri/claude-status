@@ -969,7 +969,7 @@ PlasmaComponents3.ScrollView {
                                     textFormat: Text.PlainText
                                     anchors.fill: parent
                                     mainText: i18n("%1: %2% used", planRow.win.label, Math.round(planRow.win.pct))
-                                    subText: i18n("How this window of your plan filled up, from its start (on the left) to when it resets (on the right), as the widget saw it.")
+                                    subText: i18n("How this window of your plan filled up, from its start (on the left) to when it resets (on the right), as Talpy Den saw it.")
                                 }
                             }
                             PlasmaComponents3.Label {

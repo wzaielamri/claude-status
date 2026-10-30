@@ -462,7 +462,7 @@ KCM.SimpleKCM {
                 font: Kirigami.Theme.smallFont
                 opacity: 0.7
                 text: page.canCheck
-                      ? i18n("A terminal opens with Claude's own login: sign in in your browser with the other account. Claude keeps the login in the new folder; the widget never sees it. The account shows up in the popup right away.")
+                      ? i18n("A terminal opens with Claude's own login: sign in in your browser with the other account. Claude keeps the login in the new folder; Talpy Den never sees it. The account shows up in the popup right away.")
                       : i18n("Needs the claude command, which isn't found (on PATH, in ~/.local/bin, npm's or nvm's folders).")
             }
         }

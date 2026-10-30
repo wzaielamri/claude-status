@@ -99,7 +99,7 @@ ColumnLayout {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Disconnect from %1", hostSection.host)
-                subText: i18n("Closes the connection you logged in with: to check %1 again, the widget asks you to log in.", hostSection.host)
+                subText: i18n("Closes the connection you logged in with: to check %1 again, Talpy Den asks you to log in.", hostSection.host)
             }
         }
         PlasmaComponents3.ToolButton {
@@ -123,7 +123,7 @@ ColumnLayout {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Stop showing %1", hostSection.host)
-                subText: i18n("Pick it again from the hosts menu at the top.")
+                subText: i18n("Pick it again with the SSH hosts button at the top.")
             }
         }
     }
@@ -154,7 +154,7 @@ ColumnLayout {
                 textFormat: Text.PlainText
                 anchors.fill: parent
                 mainText: i18n("Log in to %1", hostSection.host)
-                subText: i18n("Opens a terminal where ssh asks for what it needs. It goes to ssh only: the widget never sees it and keeps nothing. The checks then use that connection until 30 minutes after they stop, until you log out, or until you disconnect.")
+                subText: i18n("Opens a terminal where ssh asks for what it needs. It goes to ssh only: Talpy Den never sees it and keeps nothing. The checks then use that connection until 30 minutes after they stop, until you log out, or until you disconnect.")
             }
         }
     }

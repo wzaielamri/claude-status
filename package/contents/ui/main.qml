@@ -858,11 +858,11 @@ PlasmoidItem {
                 root.actionError = ""
                 root.expanded = false
             } else {
-                root.actionError = i18n("Couldn't open the session: %1", result.message)
+                root.actionError = i18n("Couldn't open the chat: %1", result.message)
                 actionErrorTimer.restart()
                 root.petEvent("oops", i18n("Hmm, that didn't work."), "")
                 if (!root.dashboardShown)
-                    root.notify("jump-error", null, "error", i18n("Couldn't open the session"), result.message, "dialog-error")
+                    root.notify("jump-error", null, "error", i18n("Couldn't open the chat"), result.message, "dialog-error")
             }
         }
     }
@@ -876,7 +876,7 @@ PlasmoidItem {
             disconnectSource(source)
             const result = root.helperResult(data)
             if (!result.ok) {
-                root.actionError = i18n("Couldn't stop the session: %1", result.message)
+                root.actionError = i18n("Couldn't stop the chat: %1", result.message)
                 actionErrorTimer.restart()
             } else {
                 root.actionError = ""
@@ -2172,8 +2172,8 @@ PlasmoidItem {
                     actionInfoTimer.restart()
                 }
             } else {
-                root.actionError = what === "open" ? i18n("Couldn't open the session: %1", result.message)
-                                 : what === "stop" ? i18n("Couldn't stop the session: %1", result.message)
+                root.actionError = what === "open" ? i18n("Couldn't open the chat: %1", result.message)
+                                 : what === "stop" ? i18n("Couldn't stop the chat: %1", result.message)
                                  : what === "run" ? i18n("Couldn't open the subagent's run: %1", result.message)
                                  : what === "plan" ? i18n("Couldn't open the plan: %1", result.message)
                                  : what === "task" ? i18n("Couldn't start it: %1", result.message)
@@ -2220,7 +2220,7 @@ PlasmoidItem {
 
     function remoteOpen(host, command) {
         if (!command) {
-            actionError = i18n("This session runs in a terminal on %1; the widget can't bring it here.", host)
+            actionError = i18n("This chat runs in a terminal on %1; Talpy Den can't bring it here.", host)
             actionErrorTimer.restart()
             return
         }

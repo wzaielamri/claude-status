@@ -22,11 +22,11 @@
       <default></default>
     </entry>
     <entry name="notifyWaiting" type="Bool">
-      <label>Notify when a session needs input</label>
+      <label>Notify when a chat needs input</label>
       <default>true</default>
     </entry>
     <entry name="notifyDone" type="Bool">
-      <label>Notify when a session finishes working</label>
+      <label>Notify when a chat finishes working</label>
       <default>true</default>
     </entry>
     <entry name="notifyDoneMinSeconds" type="Int">
@@ -46,15 +46,15 @@
       <max>100</max>
     </entry>
     <entry name="soundWaiting" type="String">
-      <label>Sound when a session needs input: sound theme names (comma separated, first found) or a file</label>
+      <label>Sound when a chat needs input: sound theme names (comma separated, first found) or a file</label>
       <default>message-new-instant</default>
     </entry>
     <entry name="soundDone" type="String">
-      <label>Sound when a session finishes</label>
+      <label>Sound when a chat finishes</label>
       <default>outcome-success,complete</default>
     </entry>
     <entry name="soundFailed" type="String">
-      <label>Sound when a background session fails</label>
+      <label>Sound when a chat fails, or a usage limit or an expired login stops it</label>
       <default>dialog-error</default>
     </entry>
     <entry name="recentChats" type="Int">
@@ -144,7 +144,7 @@
       <default></default>
     </entry>
     <entry name="shortcutGoesToChat" type="Bool">
-      <label>The widget's keyboard shortcut goes to the chat that needs you (else it opens the popup)</label>
+      <label>Talpy Den's keyboard shortcut goes to the chat that needs you (else it opens the popup)</label>
       <default>true</default>
     </entry>
     <entry name="clickOpensPane" type="Bool">
