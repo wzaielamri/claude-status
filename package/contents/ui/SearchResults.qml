@@ -28,7 +28,9 @@ ColumnLayout {
             readonly property var projects: answer.projects || []
             readonly property var plans: answer.plans || []
             readonly property var memories: answer.memories || []
-            readonly property bool nothing: answer.results.length + projects.length + plans.length + memories.length === 0
+            // (a host shown since the words were typed is searched as it comes: not "nothing" before its answer)
+            readonly property bool nothing: host in root.searchResults
+                                            && answer.results.length + projects.length + plans.length + memories.length === 0
             // Folded or not (main.qml: searchShown): the source, and each kind
             // of thing it found. Chats show at first; the rest show too when
             // no chat has the words
@@ -206,7 +208,9 @@ ColumnLayout {
                     detail: memory.folderShort || i18n("every folder")
                     account: root.hostGroups(block.host).length > 1 ? memory.profile : ""
                     tipTitle: memory.name
-                    tip: i18n("A memory on %1. Click to read it.", memory.account)
+                    tip: !block.host ? i18n("A memory on %1. Click to read it.", memory.account)
+                         : root.vscodeInstalled ? i18n("A memory on %1. Click to open its file on %2 in VS Code (Remote - SSH).", memory.account, block.host)
+                         : i18n("A memory on %1. Needs VS Code (Remote - SSH) to open a memory on %2.", memory.account, block.host)
                     enabled: !block.host || root.vscodeInstalled
                     onActivated: root.openMemory(memory, block.host, false)
                 }

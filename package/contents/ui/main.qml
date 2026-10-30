@@ -1952,6 +1952,8 @@ PlasmoidItem {
             if (!(host in next))
                 forgetSource("ssh:" + host)  // shown again later, it starts afresh
         remote = next
+        if (searchOpen && shownHosts.some(host => !(host in searchResults)))
+            runSearch()   // (a host shown while you search is searched too)
     }
 
     // What a source's chats were (and their notifications): gone with the source
