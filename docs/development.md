@@ -16,7 +16,7 @@ tools/gnome/shell.sh /tmp/gnome                 # run it in a headless GNOME She
 tools/gnome/shell.sh /tmp/gnome tools/gnome/steps-actions.sh   # jumping, notifications, settings, turning it off and on
 ```
 
-VS Code extension (in `vscode/`; its [README](../vscode/README.md#development) says more):
+VS Code extension (in `vscode/`; [In VS Code](vscode.md#development) says more):
 
 ```bash
 cd vscode && npm ci                             # once

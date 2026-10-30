@@ -1,6 +1,6 @@
 # On GNOME
 
-The same dashboard as a GNOME Shell extension: Talpy in the top bar, the popup with your accounts, chats, plan usage, SSH hosts, notifications and pets, and its **Recap** tab. It uses the same scripts as the Plasma widget.
+The same dashboard as a GNOME Shell extension: Talpy in the top bar, the popup with your accounts, chats, plan usage, SSH hosts, notifications and pets, and its **Recap** tab. It uses the same scripts as Talpy Den on Plasma.
 
 **Requirements:** GNOME Shell 49 or 50 (Ubuntu 26.04 LTS has 50), or 43 or 44 (Debian 12; [see below](#gnome-shell-43-and-44)), python3, jq (`sudo apt install jq`); zenity for *Choose folder…* (Ubuntu has it).
 
@@ -8,14 +8,16 @@ The same dashboard as a GNOME Shell extension: Talpy in the top bar, the popup w
 
 **What's different from Plasma:**
 
-- Not on GNOME yet: **Continue on …** and **Go on at …** for a chat a usage limit stopped, Claude's recaps and permission modes, starting a chat with a task or in the background, queued tasks, finding a chat, starred chats, plans, memories, **⚠ same files**, the chat pane (replying, dictating, answering permission prompts and Claude's questions, the review). Nor are the **Projects** tab, the Focus view (the filter button), changes showing the moment they happen and *Live mode* (GNOME checks every few seconds instead), and in the Recap the Tokens number, the Day view's lane per chat, the share button's picture and the Monday recap. Nor are the share button on an SSH host's chats, **Log in…** for an SSH host that wants a password, and the *Phone* and *Plan usage on SSH hosts* settings (an account on this computer and on a host shows its plan usage once, where it's listed first, with the newest numbers: the setting's default).
+- Not on GNOME yet: **Continue on …**, **Go on at …** and **Keep going** (↻) for a chat a usage limit stopped, the usage cap, Claude's recaps and permission modes, starting a chat with a task or in the background, queued tasks, finding a chat, starred chats, plans and memories (so nor hiding or deleting those), **⚠ Same files**, the chat pane (replying, dictating, answering permission prompts and Claude's questions, with or without the keyboard answers, the review). Nor are the **Projects** tab, the Focus view (the filter button), changes showing the moment they happen and *Live mode* (GNOME checks every few seconds instead), and in the Recap the Tokens number, the Day view's lane per chat, the share button's picture and the Monday recap. Nor are the share button on an SSH host's chats, **Log in…** for an SSH host that wants a password, and the *Phone* and *Plan usage on SSH hosts* settings (an account on this computer and on a host shows its plan usage once, where it's listed first, with the newest numbers: the setting's default).
 - Jumping to a chat brings its window to the front. Konsole and tmux also switch to the right tab or pane; in Ptyxis and GNOME Terminal the window comes up, but not the tab. New chats open in your default terminal (`xdg-terminal-exec`, else Ptyxis, GNOME Terminal or Console).
-- You can't pick the pets up (they do everything else, with the same Talpy as the Plasma widget).
+- You can't pick the pets up or give the big Talpy a cookie (they do everything else, with the same Talpy as on Plasma). With *Reduce Animation* on (Settings → Accessibility) they stay calm: the big Talpy doesn't dig about his stage, a pet whose spot moved is just there, and the light and the night's stars don't pulse or twinkle.
+- The top-bar icon doesn't blink or pulse (Plasma's *Icon* setting); its badge counts the chats that need you in red, else the turns that finished since you last opened the popup in green.
+- Hiding and deleting are for chats: the × on a finished chat hides it (**Hide this chat**), and **Show Hidden Chats Again (N)** in the menu at the bottom of the popup brings them back (an SSH host's: the eye button next to its name). The trash button beside the × (and on **Recent chats**) deletes a chat to the Trash after a question that says what goes and on which accounts; an SSH host's goes to that host's Trash. A chat's buttons also show while its name or one of them has the keyboard's focus.
 - The menu at the bottom of the popup replaces the right-click menu; a middle click on the icon refreshes.
 - Working chats are blue rather than your accent color (Ubuntu's orange would look like "needs you").
 - Sounds come from your GNOME sound theme and stay quiet with Do Not Disturb.
 - The shortcut to the chat that needs you is **Super+Shift+C** (change it in the settings).
-- GNOME turns extensions off while the screen is locked, so nothing notifies then; when you're back after 5 minutes or more, the summary comes as soon as the chats have been checked. After a shorter lock (or with the summary off), the first check notifies what changed meanwhile.
+- GNOME turns extensions off while the screen is locked, so nothing new notifies then (the notifications already in the tray stay); when you're back after 5 minutes or more, the summary comes as soon as the chats have been checked. After a shorter lock (or with the summary off), the first check notifies what changed meanwhile.
 
 **Tested** in a headless GNOME Shell 50.1 on Ubuntu 26.04 (`tools/gnome/shell.sh`: the popup, jumping, notifications, settings, pets, install and uninstall), not yet on a physical Ubuntu desktop.
 

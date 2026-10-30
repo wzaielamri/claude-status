@@ -33,11 +33,11 @@ cd talpy-den
 
 Then right-click your panel → **Add Widgets…**, search for **Talpy Den** and drag it onto the panel (or onto the desktop).
 
-You can add it more than once, e.g. on the panel and on each screen's desktop: the copies share one check and their settings, and only one of them notifies. On the desktop, the pets rest while a window covers the whole widget.
+You can add it more than once, e.g. on the panel and on each screen's desktop: the copies share one check and their settings, and only one of them notifies (one with a popup, when there is one). On the desktop, the pets rest while a window covers the whole widget.
 
 Each [release](https://github.com/wzaielamri/talpy-den/releases) also has the Plasma widget as a `.plasmoid` file and the GNOME extension as a `.zip`, for installing without the repository (its notes say how), and the VS Code extension as a `.vsix`. `./install.sh` is still the easiest way: it also adds the status-line snippet.
 
-For VS Code, [Talpy Den for VS Code](../vscode/) is an extension of its own, installed from the same [releases](https://github.com/wzaielamri/talpy-den/releases/latest) (a `.vsix`). It brings its own copy of the backend, so it doesn't need the Plasma widget, and it works alongside it.
+For VS Code, [Talpy Den for VS Code](vscode.md) is an extension of its own, installed from the same [releases](https://github.com/wzaielamri/talpy-den/releases/latest) (a `.vsix`). It brings its own copy of the backend, so it doesn't need the Plasma widget, and it works alongside it.
 
 `install.sh` does two things:
 

@@ -3,7 +3,7 @@
 ```
 ~/.claude/statusline.sh ──(snippet)──▶ ~/.cache/talpy-den/statusline/<profile>/<session>.json
 <profile>/sessions/<pid>.json ─┐
-<profile>/jobs/<id>/state.json ┼─▶ package/contents/code/talpy_den.py ──JSON──▶ QML widget (when a chat changes, else every 2–20 s)
+<profile>/jobs/<id>/state.json ┼─▶ package/contents/code/talpy_den.py ──JSON──▶ Plasma, GNOME, VS Code (when a chat changes, else every 2–20 s)
 <profile>/projects/**/*.jsonl ─┘
 <profile>/sessions/ + ~/.cache/talpy-den/live/ ──▶ live.py --wait (inotify) ──▶ "check now" + each step (live mode)
 ```

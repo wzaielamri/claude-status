@@ -4,7 +4,7 @@
 
 | Where | What it does |
 |---|---|
-| Panel icon | Left-click opens the popup, middle-click refreshes. Right-click: *Refresh*, *Show Hidden Chats Again*, *Go to the Chat That Needs You* (when one does), *Open Usage Page on claude.ai*, the *Default Account* (with two accounts or more), and the settings. |
+| Panel icon | Left-click opens the popup, middle-click refreshes. Right-click: *Refresh*, *Show Hidden Chats Again (N)* (and *… Plans …*, *… Memories …*, *… Projects Again (N)*, each while something of that kind is hidden), *Go to the Chat That Needs You* (when one does), *Open Usage Page on claude.ai*, the *Default Account* (with two accounts or more), and the settings. |
 | The popup's top row | The tabs, then Focus and Find a chat (on the first tab), SSH hosts, Refresh, and the gear: the settings (in the system tray, the tray's own heading has that button). |
 | The big Talpy | Click its headline (*… needs you*) to go to that chat. Click it to pet it, double-click to make it dance, drag it out of its burrow (it hangs on for a second). Double-click its stage a little away from it for a cookie: it runs after it as you drag the cookie around (let go and it floats down; pick it up again any time), and eats it. |
 | A chat's name | Jumps to the chat: its terminal tab, its VS Code window, or a terminal attached to the background job. |
@@ -12,30 +12,32 @@
 | **±3** next to a chat | Compares the files the chat changed in VS Code. |
 | An account's token line | Unfolds its last 14 days: tokens per day, chats, prompts, busiest folders and models. |
 | Talpy Den's keyboard shortcut | Goes to the chat that needs you, else opens the popup (set the key in the settings, on the Keyboard Shortcuts page). |
-| Hovering a chat | ■ stops or interrupts a chat (it asks first), － hides a finished one, and the share button shares a chat with your other accounts. |
+| Hovering a chat | ■ stops or interrupts a chat (it asks first; for a chat that keeps going, also whether to turn that off), × hides a finished one, the trash button deletes it to the Trash (it asks first), and the share button shares a chat with your other accounts. The buttons also show while the chat's name or one of them has the keyboard's focus (Tab gets there), and on a touch screen when you press and hold the row. |
 | A chat's pet | Opens its chat. |
 | The speech bubble with a plus next to an account (**New chat**) | A field for what Claude should do (optional), then the account's recent folders and **Choose folder…** (an SSH host's: its home folder instead). Click one for a new chat there: in a terminal, in VS Code (the switch at the top of the list) or, with a task and **In the background**, as a background chat. |
-| *Recent chats* | Unfolds the account's older conversations; click one to reopen it, in a terminal or in VS Code (the switch at the top of the list). |
-| *Plans* | Unfolds the account's plans: click one to open it. Hovering one: ▶ carries it out in a new chat, ◀ goes back to the chat that made it, and the share button shares it with your other accounts. |
-| **plan ↗** next to a chat | Opens the plan that chat wrote, to read. |
+| *Recent chats* | Unfolds the account's older conversations; click one to reopen it, in a terminal or in VS Code (the switch at the top of the list). Hovering one, the trash button deletes it (it asks first). |
+| *Plans* | Unfolds the account's plans: click one to open it. Hovering one: ▶ carries it out in a new chat, ◀ goes back to the chat that made it, the share button shares it with your other accounts, × hides it and the trash button deletes it (it asks first). |
+| **Plan ↗** next to a chat | Opens the plan that chat wrote, to read. |
 | **✎** next to it, or in a plan's row | Opens the plan's Markdown file to change it (your text editor; VS Code if the settings open plans there). |
-| **↩ send to Claude** next to a chat | You changed its plan: sends your changes to the chat, which revises the plan. |
-| *Memories* | Unfolds the account's `CLAUDE.md` and what Claude remembers: click one to read it, ✎ to change it. |
+| **↩ Send to Claude** next to a chat | You changed its plan: sends your changes to the chat, which revises the plan. |
+| *Memories* | Unfolds the account's `CLAUDE.md` and what Claude remembers: click one to read it, ✎ to change it, × to hide it, the trash button to delete it (it asks first; not `CLAUDE.md`). |
 | **Continue on …** under a chat | A usage limit stopped it: continues it on that account, which has room left. |
-| **Go on at …** under a chat | A usage limit stopped it: it goes on by itself in the background once the limit resets (click again to cancel). In *Recent chats*, its **limit** tag does the same. |
+| **Go on at …** under a chat | A usage limit stopped it: it goes on by itself in the background once the limit resets (click again to cancel). In *Recent chats*, its **Limit** tag does the same. |
 | **☆** next to a chat, a recent chat or a plan | Stars it: the account lists it under *Recent chats → ★ Starred* or *Plans → ★ Starred*, however old it is. **★** unstars it. |
-| **Keep going** under a chat | The same, and again after every later limit, until it's done (in *Recent chats*: **↻**). Click **↻ keeps going** to stop that. |
-| A queued task under an account | Starts it now, or cancels it. |
-| **⚠ same files** next to a chat | Goes to the other chat that changes the same files. |
+| **Keep going** under a chat | The same, and again after every later limit, until it's done (in *Recent chats*: **↻**). Click **↻ Keeps going** to stop that. |
+| A queued task under an account | Starts it now, or cancels it (it asks first when it has text you wrote). |
+| **⚠ Same files** next to a chat | Goes to the other chat that changes the same files. |
 | Filter button at the top (**Focus**) | Shows only what needs you, the chats that finished a turn you haven't looked at yet and one line for each chat at work; **Show everything** goes back. |
 | Microphone in the chat pane (**Dictate**) | Records your reply and writes it into the box (click again to stop); the first time, it offers to set dictation up. |
 | Magnifier at the top | Finds a chat by the words in its name, folder or your prompts, and project folders, plans and memories with those words. |
-| Server button at the top | Picks the SSH hosts to show. |
+| SSH hosts button at the top | Picks the SSH hosts to show. |
+| The eye button next to an SSH host's name | Shows that host's hidden chats, plans, memories or projects again. |
+| A project in the **Projects** tab | × hides it from the tab (its chats, plans and memories stay in their lists); right-click → *Show Hidden Projects Again (N)* brings it back. |
 | **Log in…** at an account | An account that isn't logged in (a new one, or one you logged out of): a terminal opens with Claude's own login. |
 
 ## Settings
 
-Right-click the widget → **Configure Talpy Den…**
+Right-click Talpy Den's icon → **Configure Talpy Den…**, or the gear at the end of the popup's top row.
 
 | Setting | Default | |
 |---|---|---|
@@ -44,12 +46,14 @@ Right-click the widget → **Configure Talpy Den…**
 | Extra config dirs | – | Claude config folders besides `~/.claude` and `~/.claude-*` |
 | Chats | click opens the pane | A click on a chat opens it beside the popup (off: in its terminal or VS Code tab) |
 | Answer permission prompts from Talpy Den | off | The hook that lets rows, the pane and notifications answer permission prompts and Claude's questions (see [Features](features.md)); changes Claude's settings at once |
+| Keyboard answers | off | Two global shortcuts that answer the chat that has waited longest for a permission, from anywhere: **Meta+Alt+Y** allows it once (a plan: approves it), **Meta+Alt+N** denies it (a plan: keeps planning). They take *Answer permission prompts from Talpy Den*; pick other keys in System Settings → Shortcuts → Talpy Den |
 | Live mode | off | A hook that notes each step of each chat as it happens (Claude doesn't wait for it), so rows, the pane and the line under the big Talpy follow every tool call; changes Claude's settings at once |
 | Notify | both on | When a chat needs input, and when it finishes a turn… |
 | …if the turn took at least | 30 s | …that ran at least this long |
 | While you're away | on, 5 min | Once the screen has been locked this long, one notification sums it all up when you're back |
 | Phone | off | Meanwhile, send chats that need you (and, if you like, ones that finish) to your phone with KDE Connect: every paired phone that's reachable, or the one you pick; *Send a test* tries it |
-| Sound | on, 70% | Sounds for needs input / finished / failed: from your sound theme, a file, or none |
+| Sound | on, 70% | Sounds for needs input / finished / failed or stopped (a usage limit or an expired login stopped a chat): from your sound theme, a file, or none |
+| Usage cap | off (90% when on) | Once an account's 5-hour or weekly window reaches it, the account's chats at work on this computer are stopped, once in that window (in tmux and VS Code's Claude the turn is interrupted and the chat stays open); queued tasks wait for the reset, and chats that keep going go on then. Chats you start or answer yourself afterwards aren't stopped again |
 | Keep finished background jobs | 24 h | 0 hides them right away |
 | Recent chats per account | 5 | 0 hides the list |
 | Check SSH hosts every | 30 s | |
@@ -65,6 +69,8 @@ Right-click the widget → **Configure Talpy Den…**
 | Monday recap | on | On Mondays, sum up the last 7 days in a notification (it opens the Recap) |
 | Dictation language | auto | The language you dictate in (`en`, `de`, `fr`…), or auto to let whisper tell; below it, set up dictation, download, delete or pick a speech model, or remove faster-whisper |
 | Recap amounts in | US dollars | The Recap tab's amounts: US dollars (Claude's API prices), or another currency at the European Central Bank's rate of the day |
+| Keep a history beyond Claude's 30 days | on | The Recap's **Overall** keeps the numbers of chats Claude Code has deleted. Unticking it asks first when the history holds such chats, since their numbers go for good; **Delete Saved History…** starts it again |
+| Suggest rules for the permission prompts you answered | on | The Permissions tab offers rules that would have let those prompts through, each with **Allow…**; off, it only counts the prompts |
 
 ## Accounts
 
@@ -85,4 +91,4 @@ Chats aren't copied between accounts: to move a chat to another account, share i
 
 **The icon** shows one number, the most urgent: red for chats that need you, else green for chats that finished since you last opened the popup (turns as long as the "finished" notifications ask for). While a chat works, Talpy glances around; hovering the icon lists every count.
 
-**In the system tray (Plasma):** Talpy Den can sit in the system tray as well as (or instead of) on a panel: right-click the tray's arrow → **Configure System Tray…** → **Entries** → **Talpy Den**. It's off until you switch it on. *Shown when relevant* shows it while a chat runs; clicking it opens the same popup. With two Talpy Den widgets, only one of them (the one running longest) sends notifications and sounds, and they share their settings: a change in one shows in the other within a few seconds, and a new one starts with what the others use.
+**In the system tray (Plasma):** Talpy Den can sit in the system tray as well as (or instead of) on a panel: right-click the tray's arrow → **Configure System Tray…** → **Entries** → **Talpy Den**. It's off until you switch it on. *Shown when relevant* shows it while a chat runs; clicking it opens the same popup. With two Talpy Den widgets or more (say one in the panel and one on the desktop), only one of them sends notifications and sounds: a copy with a popup (in a panel or the tray), the one running longest, so what a notification opens shows where you can see it; a copy shown in place on the desktop notifies only when no copy with a popup runs, and a lone copy always does. They share their settings: a change in one shows in the other within a few seconds, and a new one starts with what the others use.
