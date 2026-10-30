@@ -103,8 +103,8 @@ export async function openChangesLink(uri: vscode.Uri, log: vscode.LogOutputChan
   const file = manifestOf(uri);
   const comparison = file ? readComparison(file) : null;
   if (!comparison) {
-    log.warn(`Ignored a link that isn't a comparison of the Talpy Den widget: ${uri.toString()}`);
-    void vscode.window.showErrorMessage("Talpy Den: that link doesn't name one of the widget's comparisons (they're kept for a day).");
+    log.warn(`Ignored a link that isn't a comparison of Talpy Den's: ${uri.toString()}`);
+    void vscode.window.showErrorMessage("Talpy Den: that link doesn't name one of Talpy Den's comparisons (they're kept for a day).");
     return;
   }
   const error = await openComparison(comparison);

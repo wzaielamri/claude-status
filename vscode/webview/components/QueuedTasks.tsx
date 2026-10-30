@@ -17,7 +17,7 @@ export function QueuedTasks({ group }: { group: Group }) {
         const what = queuedWhat(t);
         const folder = (t.host ? `${t.host}:` : "") + (t.folder || "~");
         const how = t.chat
-          ? `The chat goes on in the background in ${folder}, at ${startText(t.startAt, view.now)}, telling Claude that the limit has reset. A session that still has it open (in a terminal, or in the background) ends first; if it went on before then, nothing happens.`
+          ? `The chat goes on in the background in ${folder}, at ${startText(t.startAt, view.now)}, telling Claude that the limit has reset. A Claude that still has it open (in a terminal, or in the background) quits first; if it went on before then, nothing happens.`
           : t.scheduled
             ? `Starts in the background in ${folder}, at ${startText(t.startAt, view.now)}: the time you picked.`
             : `Waits for the usage limit, then starts in the background in ${folder}, at ${startText(t.startAt, view.now)}.`;

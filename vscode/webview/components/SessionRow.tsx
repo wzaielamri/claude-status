@@ -276,7 +276,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
                   : `${handover.title}'s plan usage isn't known here.`) +
                 (s.pid !== null
                   ? s.kind === "bg"
-                    ? ` This background session is stopped first (claude stop); then the chat is shared with ${handover.title} and reopens there in a terminal.`
+                    ? ` This background chat is stopped first (claude stop); then the chat is shared with ${handover.title} and reopens there in a terminal.`
                     : ` Claude here quits first (its terminal stays open); then the chat is shared with ${handover.title} and reopens there in a terminal.`
                   : ` The chat is shared with ${handover.title} and reopens there in a terminal.`)
               }

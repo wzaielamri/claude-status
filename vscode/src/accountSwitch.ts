@@ -98,7 +98,7 @@ export class AccountSwitch implements vscode.Disposable {
     }
     const on = groups.find((g) => g.vscodeHere);
     this.item.text = `$(account) Claude: ${on ? on.name : "?"}`;
-    this.item.tooltip = `Claude Code on ${host} runs on ${on ? on.title : "an account the widget can't tell"}. Click to switch.`;
+    this.item.tooltip = `Claude Code on ${host} runs on ${on ? on.title : "an account Talpy Den can't tell"}. Click to switch.`;
     this.item.show();
   }
 

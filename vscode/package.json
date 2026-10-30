@@ -453,7 +453,7 @@
           ],
           "enumDescriptions": [
             "Open chats in VS Code's terminal (on the right machine: here, or the host this window is connected to).",
-            "Open chats in your desktop's terminal app, like the Plasma and GNOME widgets do."
+            "Open chats in your desktop's terminal app, as Talpy Den does on Plasma and GNOME."
           ],
           "default": "vscode",
           "markdownDescription": "Where chats open when you click them.",
@@ -476,7 +476,7 @@
         "talpyDen.notifyWaiting": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Notify when a chat needs your input. (If the Plasma or GNOME widget runs too, turn this off in one of them.)",
+          "markdownDescription": "Notify when a chat needs your input. (If Talpy Den runs on Plasma or GNOME too, turn this off in one of them.)",
           "order": 10
         },
         "talpyDen.notifyDone": {
@@ -522,7 +522,7 @@
         "talpyDen.soundFailed": {
           "type": "string",
           "default": "dialog-error",
-          "markdownDescription": "Sound when a chat fails.",
+          "markdownDescription": "Sound when a chat fails, or a usage limit or an expired login stops it.",
           "order": 17
         },
         "talpyDen.awayDigest": {
@@ -650,19 +650,20 @@
         "talpyDen.recapHistory": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Claude Code deletes chats after 30 days (its `cleanupPeriodDays` setting). The Recap tab's **Overall** keeps their numbers past that, in `~/.cache/talpy-den`: times, tokens, costs, folders and chat names. Off, it keeps only what Claude still has. One choice for the widget and this extension. **Talpy Den: Delete the Recap's Saved History…** deletes it.",
+          "scope": "machine",
+          "markdownDescription": "Claude Code deletes chats after 30 days (its `cleanupPeriodDays` setting). The Recap tab's **Overall** keeps their numbers past that, in `~/.cache/talpy-den`: times, tokens, costs, folders and chat names. Off, it keeps only what Claude still has. One choice for Talpy Den here and on Plasma or GNOME. **Talpy Den: Delete the Recap's Saved History…** deletes it.",
           "order": 36
         },
         "talpyDen.mondayRecap": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "On Mondays (from 9 o'clock, or the first time VS Code runs after that), a notification sums up the last 7 days; **Open the Recap** shows them. It comes once a week, here or in the Plasma widget.",
+          "markdownDescription": "On Mondays (from 9 o'clock, or the first time VS Code runs after that), a notification sums up the last 7 days; **Open the Recap** shows them. It comes once a week, here or on Plasma.",
           "order": 37
         },
         "talpyDen.recapRules": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "The Recap tab suggests rules that would have let the permission prompts you answered go without asking, each with an **Allow…** button. Off, it only counts the prompts, and there's nothing to allow by mistake. Either way it lists the permissions you gave, to revoke them.",
+          "markdownDescription": "The Permissions tab suggests rules that would have let the permission prompts you answered go without asking, each with an **Allow…** button. Off, it only counts the prompts, and there's nothing to allow by mistake. Either way it lists the permissions you gave, to revoke them.",
           "order": 37
         },
         "talpyDen.newChatMode": {

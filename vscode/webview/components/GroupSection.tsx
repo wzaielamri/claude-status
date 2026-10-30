@@ -202,7 +202,7 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
                 : p.state === "done"
                   ? `Shared chat, last used on ${p.profile}.\nIt's listed once, under the account it's used on. Click to go to it.`
                   : `Shared chat, open on ${p.profile}.\nIt's listed once, under the account it's used on. Click to go to it.`) +
-              (p.stoppedHere ? "\nIts background session on this account was stopped." : "")
+              (p.stoppedHere ? "\nIts background chat on this account was stopped." : "")
             }
             onClick={() => post({ type: "open", chat: sharedRef(p, host) })}
           >

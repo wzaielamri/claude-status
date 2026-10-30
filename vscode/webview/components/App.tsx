@@ -173,7 +173,7 @@ export function App() {
               </p>
               <p class="muted">
                 {editorTab
-                  ? "Chats on other machines: add SSH hosts with the hosts button above."
+                  ? "Chats on other machines: add SSH hosts with the SSH hosts button above."
                   : "Chats on other machines: add SSH hosts from the view's title bar."}
               </p>
             </div>

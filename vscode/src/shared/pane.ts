@@ -117,7 +117,7 @@ export function attachedTag(attached: Session["attached"]): { tag: string; title
 export function whereTag(where: ChatWhere, terminalApp = ""): { tag: string; title: string } {
   switch (where) {
     case "background":
-      return { tag: "Background", title: "A background session: Claude's background service runs it, with no terminal of its own. Open its window to see it in a terminal (claude attach)." };
+      return { tag: "Background", title: "A background chat: Claude's background service runs it, with no terminal of its own. Open its window to see it in a terminal (claude attach)." };
     case "closed":
       return { tag: "Not open", title: "No terminal or panel has it open: a reply goes on with it in the background." };
     case "claude":

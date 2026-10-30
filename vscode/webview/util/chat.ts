@@ -87,15 +87,15 @@ export function openHint(s: Session, host?: string, inCode = false): string {
   if (s.kind === "chat" && inCode) return host ? `Reopen this chat in a Claude Code panel (VS Code connected to ${host})` : "Reopen this chat in a Claude Code panel";
   if (host) {
     if (s.entrypoint === "claude-vscode" && !s.openCommand) return `Show this conversation in VS Code (connected to ${host})`;
-    if (!s.openCommand) return `Switch to the terminal with the ssh session to ${host}`;
+    if (!s.openCommand) return `Switch to the terminal with the ssh connection to ${host}`;
     if (s.kind === "chat") return `Reopen this chat on ${host} in a terminal (ssh)`;
-    return `Open this background session on ${host} in a terminal (ssh)`;
+    return `Open this background chat on ${host} in a terminal (ssh)`;
   }
   if (s.entrypoint === "claude-vscode") return "Open this conversation in VS Code";
   if (s.kind === "chat") return "Reopen this chat in a terminal (claude --resume)";
-  if (isBackground(s) && s.pid === null) return "Reopen this background session in a terminal";
-  if (isBackground(s)) return "Show this background session in a terminal";
-  return "Switch to the terminal running this session";
+  if (isBackground(s) && s.pid === null) return "Reopen this background chat in a terminal";
+  if (isBackground(s)) return "Show this background chat in a terminal";
+  return "Switch to the terminal running this chat";
 }
 
 export function sharedTagTitle(s: Session): string {
@@ -103,7 +103,7 @@ export function sharedTagTitle(s: Session): string {
   if (!info) return "";
   const profiles = (info.profiles ?? []).join(" + ");
   const stopped = info.stoppedCopies?.length
-    ? `\nIts background session on ${info.stoppedCopies.join(", ")} was stopped; ${info.stoppedCopies.join(", ")} shows a link to this ${info.forkOf ? "copy" : "chat"}.`
+    ? `\nIts background chat on ${info.stoppedCopies.join(", ")} was stopped; ${info.stoppedCopies.join(", ")} shows a link to this ${info.forkOf ? "copy" : "chat"}.`
     : "";
   if (info.forkOf)
     return (
@@ -112,7 +112,7 @@ export function sharedTagTitle(s: Session): string {
       stopped
     );
   return (
-    `Shared chat\nThis chat is shared between the ${profiles} profiles: it continues on whichever account you open it with. Only one session can have it open at a time.` +
+    `Shared chat\nThis chat is shared between the ${profiles} profiles: it continues on whichever account you open it with. Only one Claude can have it open at a time.` +
     (s.kind === "chat" ? `\nListed here because it was used on ${s.profile} last.` : "") +
     (info.openIn ? `\nOpen in ${info.openIn} right now.` : "") +
     stopped

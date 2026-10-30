@@ -163,7 +163,7 @@ export function activate(context: vscode.ExtensionContext): void {
           // a plan or a subagent's run, in the Markdown preview
           const file = markdownLinkFile(uri, undefined, extraConfigDirs());
           if (!file) {
-            log.warn(`Ignored a link that isn't a plan or a run of the Talpy Den widget: ${uri.toString()}`);
+            log.warn(`Ignored a link that isn't a plan or a run of Talpy Den's: ${uri.toString()}`);
             return;
           }
           const error = await openAgentRunFile(file);

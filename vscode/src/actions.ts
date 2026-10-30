@@ -1024,7 +1024,7 @@ export class Actions {
       next.setHours(next.getHours() + 1, 0, 0, 0);
       const clock = await vscode.window.showInputBox({
         title: `Start it later: ${day.label}, at…`,
-        prompt: "The time it starts, e.g. 14:30. It starts in the background then (or as soon as VS Code or the widget runs again).",
+        prompt: "The time it starts, e.g. 14:30. It starts in the background then (or as soon as VS Code or Talpy Den runs again).",
         value: day.day === 0 && next.getDate() === new Date().getDate() ? `${String(next.getHours()).padStart(2, "0")}:00` : "09:00",
         validateInput: (v) => (laterAt(day.day, v, new Date()) ? null : "A time still to come, e.g. 14:30"),
       });
