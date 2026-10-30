@@ -173,19 +173,21 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
         this.shownTab = null;
         break;
       case "open":
-        // (a click on a chat: its tab, unless clicks open the chat itself)
-        if (chat && this.panes && settings.clickOpensPane()) this.panes.open(chat, "chat");
+        // (a click on a chat: its tab, unless clicks open the chat itself; a made-up one: neither)
+        if (chat && this.panes && settings.clickOpensPane()) {
+          if (!this.actions.demoOnly()) this.panes.open(chat, "chat");
+        }
         else if (chat) void this.actions.open(chat);
         break;
       case "openPane":
-        if (chat && this.panes) this.panes.open(chat, m.tab === "review" ? "review" : "chat");
+        if (chat && this.panes && !this.actions.demoOnly()) this.panes.open(chat, m.tab === "review" ? "review" : "chat");
         break;
       case "openWindow":
         if (chat) void this.actions.open(chat);
         break;
       case "answerPermission":
         // (to the prompt the row showed: one the chat asks after it isn't answered)
-        if (chat && this.panes && isDecision(m.decision))
+        if (chat && this.panes && isDecision(m.decision) && !this.actions.demoOnly())
           void this.panes.answer(chat, m.decision, askShownOf(m.shown), typeof m.note === "string" ? m.note : "", answersOf(m.answers) ?? undefined);
         break;
       case "openInClaudeCode":
@@ -294,7 +296,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
       case "startQueued": {
         // (a task of this computer's queue, as the extension knows it)
         const t = this.dash.state().status?.queue?.find((q) => q.id === m.id);
-        if (t) void this.dash.startQueued(t);
+        if (t && !this.actions.demoOnly()) void this.dash.startQueued(t);
         break;
       }
       case "openOverlap": {

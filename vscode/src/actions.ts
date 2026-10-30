@@ -139,7 +139,10 @@ export class Actions {
     return answer.ok;
   }
 
-  private demoOnly(): boolean {
+  private unsentTask = ""; // New Chat…'s task until the chat starts with it
+
+  // (also for what the view's tabs do with a chat: its tab, an answer, a queued task)
+  demoOnly(): boolean {
     if (!this.dash.demo) return false;
     void vscode.window.showInformationMessage("Demo mode: these chats are made up. Run “Talpy Den: Toggle Demo Data” to go back.");
     return true;
@@ -1005,12 +1008,16 @@ export class Actions {
     }
     const opts = chatOptionArgs();
     if (pick.start === "task") {
+      // (kept when you click elsewhere, and offered again when a later question was cancelled)
       const text = await vscode.window.showInputBox({
         title: `New chat on ${where}`,
         prompt: "What should Claude do? The chat starts with it.",
         placeHolder: "e.g. Fix the flaky test in tests/test_jump.py",
+        value: this.unsentTask,
+        ignoreFocusOut: true,
       });
       if (!text?.trim()) return;
+      this.unsentTask = text.trim();
       return this.newChat(group.id, host, undefined, text.trim(), first);
     }
     if (pick.start === "panel") return this.panelChat(group, hasTask ? await this.taskText(task ?? "", plan, host) : undefined);
@@ -1076,6 +1083,7 @@ export class Actions {
       if (!typedPath) return;
       folder = typedPath;
     }
+    if (task && task === this.unsentTask) this.unsentTask = ""; // (every question answered: it goes)
     const taskArgs = [...(task ? ["--prompt", task] : []), ...(plan ? ["--plan", plan.slug, "--plan-profile", plan.profileDir] : [])];
     if (pick.start === "queue") {
       const reset = limitReset(group, Date.now());

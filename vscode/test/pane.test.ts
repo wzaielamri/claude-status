@@ -145,7 +145,7 @@ test("a click on a chat opens its tab, unless clicks open the chat itself; answe
   const state = waitingState("hook");
   const calls: { name: string; args: unknown[] }[] = [];
   const record = (name: string) => (...args: unknown[]) => void calls.push({ name, args });
-  const actions = new Proxy({}, { get: (_t, name: string) => record(name) });
+  const actions = new Proxy({}, { get: (_t, name: string) => (name === "demoOnly" ? () => false : record(name)) });
   const dash = { opened() {}, onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false, state: () => state, setVisible() {} };
   const host = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, actions as never);
   host.panes = { open: record("panes.open"), answer: record("panes.answer") } as never;
