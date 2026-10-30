@@ -1550,6 +1550,16 @@ class PaneMarkdownTests(unittest.TestCase):
                          ["https://en.wikipedia.org/wiki/C_(programming_language)", "https://a.b/c"])
         self.assertIn("</a> and <a", html)
 
+    def test_a_bare_address_keeps_its_parentheses(self):
+        html = markdown('Md.toHtml("see https://en.wikipedia.org/wiki/Rust_(programming_language) now, or https://a.b/c).", style)')
+        self.assertEqual(re.findall(r'href="([^"]*)"', html),
+                         ["https://en.wikipedia.org/wiki/Rust_(programming_language)", "https://a.b/c"])
+        self.assertIn("</a> now", html)
+
+    def test_a_heading_keeps_a_hash_at_its_end(self):
+        texts = markdown('["## Notes on C#", "### F#", "# Title ##", "## Issue #42", "# x #"].map(t => Md.blocks(t)[0].text)')
+        self.assertEqual(texts, ["Notes on C#", "F#", "Title", "Issue #42", "x"])
+
     def test_blocks(self):
         text = ("# Title\n\nSome **bold**, *it*, snake_case_name and `code`.\n\n## Steps\n\n1. one\n2. two\n"
                 "   - nested\n\n```python\nprint(1)\n```\n\n> quoted\n\n---\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
