@@ -302,7 +302,8 @@ KCM.SimpleKCM {
                         visible: card.asking
                         type: page.confirm.startsWith("remove:") ? Kirigami.MessageType.Warning : Kirigami.MessageType.Information
                         text: page.confirm.startsWith("remove:")
-                              ? i18n("Remove %1? It logs out, then moves %2 to the Trash with its chats, history and settings (restore it from there if you change your mind). Chats shared with your other accounts stay on them.", card.account.label, card.account.folder)
+                              ? (page.host ? i18n("Remove %1 on %3? It logs out, then moves %2 to the Trash of %3 with its chats, history and settings (restore it from there if you change your mind). Chats shared with your other accounts stay on them.", card.account.label, card.account.folder, page.host)
+                                           : i18n("Remove %1? It logs out, then moves %2 to the Trash with its chats, history and settings (restore it from there if you change your mind). Chats shared with your other accounts stay on them.", card.account.label, card.account.folder))
                               : i18n("Log out of %1? Claude deletes its login; its chats and history stay, and Log in… signs it in again (also with another account).", card.account.label)
                         actions: [
                             Kirigami.Action {

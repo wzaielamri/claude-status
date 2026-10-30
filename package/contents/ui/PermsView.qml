@@ -249,6 +249,7 @@ PlasmaComponents3.ScrollView {
                                 PlasmaComponents3.Button {
                                     icon.name: "edit-delete-remove"
                                     text: i18n("Revoke")
+                                    enabled: root.ruleBusy === ""   // (one settings write at a time)
                                     onClicked: {
                                         view.confirmGrant = ""
                                         root.revokeGrant(grantRow.grant, origin.host)
@@ -427,6 +428,7 @@ PlasmaComponents3.ScrollView {
                                 PlasmaComponents3.Button {
                                     icon.name: "dialog-ok-apply"
                                     text: i18n("Allow")
+                                    enabled: root.ruleBusy === ""   // (one settings write at a time)
                                     onClicked: {
                                         view.confirmRule = ""
                                         root.changeRule(ruleRow.rule, true, origin.host)

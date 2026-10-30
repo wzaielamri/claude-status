@@ -2197,7 +2197,7 @@ Window {
                             ConfirmLine {
                                 visible: pane.undoAsk === fileItem.file.path
                                 Layout.fillWidth: true
-                                text: fileItem.file.created ? i18n("Remove %1? The chat made it.", fileItem.file.label)
+                                text: fileItem.file.created ? i18n("Delete %1 for good? The chat made it; what you changed in it since is lost too.", fileItem.file.label)
                                                             : i18n("Put %1 back as it was before this chat? Later changes to it are lost too.", fileItem.file.label)
                                 confirmText: i18n("Undo")
                                 onConfirmed: pane.undo(fileItem.file.path)
