@@ -50,6 +50,17 @@ export function iconButton(icon, onClick, styleClass = 'claude-icon-button') {
     return b;
 }
 
+// Buttons shown only while the pointer is over their line (they keep their
+// place, so nothing moves)
+export function showOnHover(line, buttons) {
+    const sync = () => {
+        for (const b of buttons)
+            b.opacity = line.hover ? 255 : 0;
+    };
+    line.connect('notify::hover', sync);
+    sync();
+}
+
 export function textButton(text, onClick, styleClass = 'claude-text-button', iconName = '') {
     const content = box('claude-button-box');
     if (iconName)

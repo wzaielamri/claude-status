@@ -57,7 +57,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._timers = {};
         // Popup state kept by row key (rows are rebuilt with new data)
         this.ui = {expandedAgents: {}, expandedAgent: {}, expandedRecent: {}, expandedPeek: {}, expandedStats: {}, stopConfirm: '',
-            stopConfirmBusy: false, shareConfirm: null, openMenu: null, tab: 'chats'};
+            stopConfirmBusy: false, shareConfirm: null, deleteAsk: null, openMenu: null, tab: 'chats'};
         // The Recap tab's days and what week.py said of them (it runs only
         // while that tab is open: setTab, loadWeek)
         // (span: day, week or all; open: the day or project whose chats are unfolded)
@@ -516,6 +516,69 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this.runHelper(['--dismiss', sessionId]);
     }
 
+    // The menu's Show Hidden Chats Again: its answer says how many
+    async showHiddenChats() {
+        const result = await this._helper('jump.py', ['--undismiss-all', ...this._configDirArgs]);
+        if (this._destroyed)
+            return;
+        if (result.ok)
+            this._showInfo(result.message);
+        else
+            this._showError(result.message);
+        this.refresh();
+    }
+
+    // Delete… asks first (ui.deleteAsk, shown under the chat's line: {key: the
+    // line's key, id, profileDir, host, busy: being looked at, question,
+    // message: why it can't}), with what goes to the Trash and on which
+    // accounts (jump.py --delete-chat ID --describe; an SSH host's: remote.py
+    // --delete-chat HOST ID PROFILE, to that host's Trash)
+    _deleteArgs(a) {
+        return a.host ? ['--delete-chat', a.host, a.id, ...a.profileDir ? [a.profileDir] : []]
+            : ['--delete-chat', a.id, ...a.profileDir ? ['--profile', a.profileDir] : []];
+    }
+
+    async askDelete(rowKey, id, profileDir, host = '') {
+        if (this.ui.deleteAsk?.key === rowKey) {   // (again: the question goes)
+            this.cancelDelete();
+            return;
+        }
+        const a = {key: rowKey, id, profileDir: profileDir || '', host, busy: true, question: '', message: ''};
+        this.ui.deleteAsk = a;
+        this.rerender();
+        const result = await this._helper(host ? 'remote.py' : 'jump.py',
+            [...this._deleteArgs(a), '--describe', ...host ? [] : this._configDirArgs]);
+        if (this._destroyed || this.ui.deleteAsk !== a)
+            return;   // (cancelled, or another one asked meanwhile)
+        this.ui.deleteAsk = {...a, busy: false, question: result.ok ? result.question || result.message || '' : '',
+            message: result.ok ? '' : result.message || "It can't be deleted."};
+        this.rerender();
+    }
+
+    cancelDelete() {
+        this.ui.deleteAsk = null;
+        this.rerender();
+    }
+
+    async confirmDelete() {
+        const a = this.ui.deleteAsk;
+        this.cancelDelete();
+        const result = await this._helper(a.host ? 'remote.py' : 'jump.py',
+            [...this._deleteArgs(a), ...a.host ? [] : this._configDirArgs]);
+        if (this._destroyed)
+            return;
+        if (result.ok) {
+            this._actionError = '';
+            this._showInfo(result.message);   // (Moved to the Trash)
+        } else {
+            this._showError(result.message);
+        }
+        if (a.host)
+            this.pollHost(a.host);
+        else
+            this.refresh();
+    }
+
     // vscode: in VS Code's Claude extension instead of a terminal
     async newChat(profile, folder, vscode = false) {
         this.ui.openMenu = null;
@@ -779,6 +842,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this._actionError = '';
             if (kind === 'open')
                 this.menu.close();
+            else if (kind === 'show')
+                this._showInfo(result.message);   // (Showing 2 hidden chats again)
         } else {
             this._showError(kind === 'open' ? L.fmt("Couldn't open the chat: %1", result.message)
                 : kind === 'stop' ? L.fmt("Couldn't stop the chat: %1", result.message) : result.message);
@@ -837,7 +902,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
     }
 
     remoteUndismissAll(host) {
-        this._remoteAction('dismiss', host, ['--undismiss-all', host]);
+        this._remoteAction('show', host, ['--undismiss-all', host]);
     }
 
     // ---------------------------------------------------------------- shared chats
@@ -1002,8 +1067,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
         popup.add_child(this._scroll);
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this._undismissItem = this.menu.addAction('Show removed chats again',
-            () => this.runHelper(['--undismiss-all']), 'view-reveal-symbolic');
+        this._undismissItem = this.menu.addAction('Show Hidden Chats Again',
+            () => this.showHiddenChats(), 'view-reveal-symbolic');
         this.menu.addAction('Open usage page on claude.ai', () => {
             Gio.AppInfo.launch_default_for_uri(USAGE_PAGE, global.create_app_launch_context(0, -1));
         }, 'web-browser-symbolic');
@@ -1024,6 +1089,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
                     this._digest = null;   // you've seen it
                 this.ui.openMenu = null;
                 this.ui.stopConfirm = '';
+                this.ui.deleteAsk = null;
             }
             this._headerSpark.setMoving(open);
             this._pets.setActive(open && this.ui.tab === 'chats');
@@ -1241,7 +1307,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._summary.text = this._pets.heroShown && chats ? '' : L.summaryText(c);   // the big Talpy's headline says it
         const hosts = this.shownHosts;
         this._hostsCount.text = hosts.length > 0 ? String(hosts.length) : '';
-        this._undismissItem.label.text = L.fmt('Show removed chats again (%1)', this._status?.dismissed || 0);
+        this._undismissItem.label.text = L.fmt('Show Hidden Chats Again (%1)', this._status?.dismissed || 0);
         this._undismissItem.visible = (this._status?.dismissed || 0) > 0;
 
         this._messages.destroy_all_children();

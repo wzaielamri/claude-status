@@ -344,6 +344,16 @@ export function openHint(session, remoteHost) {
     return 'Switch to the terminal running this chat';
 }
 
+// The tooltips of a finished chat's × (Hide this chat: where it comes back)
+// and its Delete… (Plasma's words)
+export function hideHint(host) {
+    return `Only hides it here; nothing is deleted. It comes back if the chat runs again. ${host
+        ? fmt("The eye button next to %1's name brings it back.", host)
+        : 'Show Hidden Chats Again, at the bottom of this menu, brings it back.'}`;
+}
+
+export const DELETE_HINT = "Moves it to the Trash, on every account it's shared with, with its subagents and checkpoints; the Recap keeps its numbers. It asks first.";
+
 // A chat with a process of its own can be stopped, whatever it's doing: in a
 // terminal its claude quits (the chat is kept), in VS Code its tab shows it as
 // interrupted and goes on with the next message (talpy_den.py: stopping

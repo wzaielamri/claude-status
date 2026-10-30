@@ -264,6 +264,12 @@ test('stopping: background sessions, and chats with a process; interrupting in t
     eq(L.stopTip(session('a', 'idle', {entrypoint: 'claude-vscode'}))[0], 'Stop this chat');
 });
 
+test("hiding and deleting a finished chat: where it comes back, what Delete… does", () => {
+    eq(L.hideHint(''), 'Only hides it here; nothing is deleted. It comes back if the chat runs again. Show Hidden Chats Again, at the bottom of this menu, brings it back.');
+    eq(L.hideHint('lab').endsWith("The eye button next to lab's name brings it back."), true, "a host's: its eye button");
+    eq(L.DELETE_HINT.endsWith('It asks first.'), true);
+});
+
 test('pets: stage order and keys', () => {
     const g = group([session('a', 'done'), session('b', 'waiting'), session('c', 'working', {chatId: 'C'})]);
     eq(L.stageChats(g, '').map(c => c.key), ['/b', '/C', '/a']);

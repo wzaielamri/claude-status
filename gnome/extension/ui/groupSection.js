@@ -9,8 +9,8 @@ import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import * as L from '../logic.js';
-import {buildSessionRow, buildKeepOnly, buildShareMenu} from './sessionRow.js';
-import {box, column, iconButton, label, link, meter, paragraph, scaleFactor, separator, tag, textButton, usageMeter} from './widgets.js';
+import {buildDeleteAsk, buildSessionRow, buildKeepOnly, buildShareMenu} from './sessionRow.js';
+import {box, column, iconButton, label, link, meter, paragraph, scaleFactor, separator, showOnHover, tag, textButton, usageMeter} from './widgets.js';
 
 // accounts: how many its machine has (with two or more, the default one is marked)
 export function buildGroupSection(ctx, group, {last = false, remoteHost = '', accounts = 1} = {}) {
@@ -338,23 +338,31 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
         'claude-small claude-dim claude-side');
     when.clutter_text.ellipsize = 1;   // Pango.EllipsizeMode.START
     line.add_child(when);
+    const hoverButtons = [];
     if (ctx.canShareChats && !remoteHost && ctx.shareAccounts.length >= 2) {
         const share = iconButton('emblem-shared-symbolic', () => ctx.toggleShareMenu(rowKey, {
             chatId: chat.sessionId, name: chat.name, profileDir: chat.profileDir, shared: chat.shared,
         }));
         ctx.tips.add(share, ['Continue on another account',
             'Share this chat with your other accounts and pick it up there, or keep it on one account only.']);
-        share.opacity = 0;
-        line.connect('notify::hover', () => {
-            share.opacity = line.hover ? 255 : 0;
-        });
+        hoverButtons.push(share);
         line.add_child(share);
     }
+    // to the Trash, after a question (under the line)
+    const asksDelete = ctx.ui.deleteAsk?.key === rowKey;
+    const del = iconButton('user-trash-symbolic', () => ctx.askDelete(rowKey, chat.sessionId, chat.profileDir, remoteHost));
+    ctx.tips.add(del, ['Delete this chat…', L.DELETE_HINT]);
+    if (!asksDelete)
+        hoverButtons.push(del);
+    line.add_child(del);
+    showOnHover(line, hoverButtons);
     wrap.add_child(line);
     if (ctx.ui.openMenu?.type === 'share' && ctx.ui.openMenu.key === rowKey)
         wrap.add_child(buildShareMenu(ctx, ctx.ui.openMenu.chat, rowKey));
     if (ctx.ui.shareConfirm?.key === rowKey)
         wrap.add_child(buildKeepOnly(ctx));
+    if (asksDelete)
+        wrap.add_child(buildDeleteAsk(ctx));
     return wrap;
 }
 
@@ -384,7 +392,7 @@ export function buildHostSection(ctx, host) {
                 : L.fmt('updated %1 ago', L.duration(ctx.now - info.updatedAt)), 'claude-small claude-dim'));
     if (info.result && (info.result.dismissed || 0) > 0) {
         head.add_child(tips.add(iconButton('view-reveal-symbolic', () => ctx.remoteUndismissAll(host)),
-            L.fmt('Show removed chats again (%1)', info.result.dismissed)));
+            L.fmt('Show Hidden Chats Again (%1)', info.result.dismissed)));
     }
     head.add_child(tips.add(iconButton('view-refresh-symbolic', () => ctx.pollHost(host)),
         [L.fmt('Refresh %1', host), L.fmt("Checked every %1 seconds while it's shown.", ctx.remotePollSeconds)]));

@@ -9,7 +9,7 @@ import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import * as L from '../logic.js';
-import {box, column, dot, iconButton, label, link, meter, nameLine, paragraph, tag, textButton} from './widgets.js';
+import {box, column, dot, iconButton, label, link, meter, nameLine, paragraph, showOnHover, tag, textButton} from './widgets.js';
 
 export function buildSessionRow(ctx, session, {showProfile = false, remoteHost = ''} = {}) {
     const s = session;
@@ -120,14 +120,23 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
         hoverButtons.push(share);
         end.add_child(share);
     }
+    const asksDelete = ctx.ui.deleteAsk?.key === rowKey;
+    if (s.state === 'done' && (s.chatId || s.sessionId)) {
+        // Delete a finished chat: to the Trash, after a question (under the row)
+        const del = iconButton('user-trash-symbolic',
+            () => ctx.askDelete(rowKey, s.chatId || s.sessionId, s.profileDir, remoteHost));
+        tips.add(del, ['Delete this chat…', L.DELETE_HINT]);
+        if (!asksDelete)
+            hoverButtons.push(del);
+        end.add_child(del);
+    }
     if (s.state === 'done') {
-        // Remove a finished session from the list (nothing is deleted)
-        const remove = iconButton('window-close-symbolic',   // (an ×, as Breeze draws Plasma's)
+        // Hide a finished chat here (nothing is deleted)
+        const hide = iconButton('window-close-symbolic',   // (an ×, as Breeze draws Plasma's)
             () => (remoteHost ? ctx.remoteDismiss(remoteHost, s.sessionId) : ctx.dismissSession(s.sessionId)));
-        tips.add(remove, ['Remove from the list',
-            'Only hides it here; nothing is deleted. It comes back if the chat runs again, or with “Show removed chats again” at the bottom of this menu.']);
-        hoverButtons.push(remove);
-        end.add_child(remove);
+        tips.add(hide, ['Hide this chat', L.hideHint(remoteHost)]);
+        hoverButtons.push(hide);
+        end.add_child(hide);
     }
     if (canStop) {
         const stop = iconButton('media-playback-stop-symbolic',
@@ -137,12 +146,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
             hoverButtons.push(stop);
         end.add_child(stop);
     }
-    const syncHover = () => {
-        for (const b of hoverButtons)
-            b.opacity = row.hover ? 255 : 0;
-    };
-    row.connect('notify::hover', syncHover);
-    syncHover();
+    showOnHover(row, hoverButtons);
     body.add_child(nameLine(name, tags, end));
 
     // Second line: folder, model, context fill
@@ -193,6 +197,8 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
         body.add_child(buildShareMenu(ctx, ctx.ui.openMenu.chat, rowKey));
     if (s.key !== '' && ctx.ui.shareConfirm?.key === rowKey)
         body.add_child(buildKeepOnly(ctx));
+    if (asksDelete)
+        body.add_child(buildDeleteAsk(ctx));
 
     if (confirmingStop && canStop) {
         // stopped only if it's as you were told: an idle one that got busy isn't
@@ -361,6 +367,27 @@ export function confirmBox(text, buttons) {
     const row = box('claude-confirm-buttons');
     for (const [title, icon, onClick] of buttons)
         row.add_child(textButton(title, onClick, 'claude-text-button claude-confirm-button', icon));
+    c.add_child(row);
+    return c;
+}
+
+// Under a chat's line once its Delete… was clicked (ctx.ui.deleteAsk): what
+// goes to the Trash and on which accounts (jump.py --describe), with Delete
+// and Cancel; or why it can't be deleted (open in Claude, gone)
+export function buildDeleteAsk(ctx) {
+    const a = ctx.ui.deleteAsk;
+    if (a.busy)
+        return label('Looking at what it would delete…', 'claude-small claude-dim');
+    if (a.question) {
+        return confirmBox(a.question, [
+            ['Delete', '', () => ctx.confirmDelete()],
+            ['Cancel', '', () => ctx.cancelDelete()],
+        ]);
+    }
+    const c = column('claude-confirm', {x_expand: true});
+    c.add_child(paragraph(a.message, 'claude-small claude-fg-bad'));
+    const row = box('claude-confirm-buttons');
+    row.add_child(textButton('OK', () => ctx.cancelDelete(), 'claude-text-button claude-confirm-button'));
     c.add_child(row);
     return c;
 }
