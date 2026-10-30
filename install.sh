@@ -187,7 +187,7 @@ apply_statusline() {
     mv -f "$new" "$target"
     echo "Patched $statusline (backup next to it)."
   elif has_snippet "$statusline"; then
-    echo "Skipped $statusline; its widget snippet stays as it was."
+    echo "Skipped $statusline; its Talpy Den snippet stays as it was."
   else
     echo "Skipped $statusline; plan-usage bars stay empty until the snippet is added."
   fi

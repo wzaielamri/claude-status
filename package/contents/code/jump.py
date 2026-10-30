@@ -2369,7 +2369,7 @@ USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile P
          "       jump.py --resume|--continue|--unshare SESSION_ID --profile PROFILE\n"
          "       jump.py --resume SESSION_ID [--profile PROFILE] --print-command   (the command that reopens it)\n"
          "       jump.py --continue SESSION_ID --profile PROFILE [--end-first] [--print-command]\n"
-         "               (share it and reopen it there, or print the command; --end-first: quit an idle session first)\n"
+         "               (share it and reopen it there, or print the command; --end-first: quit an idle Claude that has it open first)\n"
          "       jump.py --open-plan|--edit-plan|--share-plan|--unshare-plan SLUG [--profile PROFILE] [--to PROFILE]\n"
          "       jump.py --remote-edit HOST PATH   (a file of an SSH host, in VS Code)\n"
          "       jump.py --open-memory|--edit-memory PATH\n"
