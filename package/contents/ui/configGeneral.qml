@@ -152,6 +152,7 @@ KCM.SimpleKCM {
     property var history: null        // {keep, since, deletedChats, sizeKB}
     property string historyMessage: ""
     property bool forgetAsking: false
+    property bool historyOffAsking: false   // (off forgets the chats Claude deleted: asked first)
 
     Exec {
         id: historyHelper
@@ -934,8 +935,36 @@ KCM.SimpleKCM {
             enabled: page.history !== null
             checked: page.history ? page.history.keep : true
             onToggled: {
-                page.runHistory(["--history", checked ? "on" : "off"])
+                if (!checked && page.history && page.history.deletedChats > 0)
+                    page.historyOffAsking = true   // (the numbers of chats Claude deleted go: asked first)
+                else
+                    page.runHistory(["--history", checked ? "on" : "off"])
                 checked = Qt.binding(() => page.history ? page.history.keep : true)   // (it shows what the Recap keeps)
+            }
+        }
+
+        RowLayout {
+            visible: page.historyOffAsking
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label {
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 14
+                wrapMode: Text.Wrap
+                text: i18np("Stop keeping the history? The Recap forgets the numbers of the %1 chat Claude has deleted, for good.",
+                            "Stop keeping the history? The Recap forgets the numbers of the %1 chats Claude has deleted, for good.",
+                            page.history ? page.history.deletedChats : 0)
+            }
+            QQC2.Button {
+                icon.name: "edit-delete"
+                text: i18n("Stop Keeping It")
+                onClicked: {
+                    page.historyOffAsking = false
+                    page.runHistory(["--history", "off"])
+                }
+            }
+            QQC2.Button {
+                text: i18n("Cancel")
+                onClicked: page.historyOffAsking = false
             }
         }
 
