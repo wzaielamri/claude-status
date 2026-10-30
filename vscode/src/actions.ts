@@ -813,7 +813,8 @@ export class Actions {
         return;
       }
       qp.busy = true;
-      const hosts = this.dash.shownHosts();
+      // (the hosts whose last check answered: one out of reach would hold up every answer, as in the Recap)
+      const hosts = this.dash.answeringHosts();
       const found = await Promise.all([
         this.backend.find(query, undefined, configDirArgs()),
         ...hosts.map((h) => this.backend.find(query, h)),
