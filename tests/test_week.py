@@ -1150,6 +1150,31 @@ class OutputTests(Home):
             answer = json.loads(text[text.rfind("\n" + cs.REMOTE_MARK) + 1 + len(cs.REMOTE_MARK):])
             self.assertEqual(list(answer["chats"]), chats, (since, until, now))
 
+    def test_the_monday_recap_counts_the_ssh_hosts_shown(self):
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+        self.write(Transcript().prompt(self.t0).reply(self.t0 + 1000, "a").duration(self.t0 + 2000, 2000))
+        saved = dict(os.environ)
+        self.addCleanup(lambda: (os.environ.clear(), os.environ.update(saved)))
+        os.environ["HOME"], os.environ["XDG_CACHE_HOME"] = str(self.home), str(self.cache_root)
+        real_time = week.time.time
+        week.time.time = lambda: self.now / 1000
+        self.addCleanup(setattr, week.time, "time", real_time)
+
+        def host(name, back, span, since, until):  # (the same chats, as a host's: remote.py would run week.py --data there)
+            cache = week.load_cache(cs.cache_dir(self.home))
+            return {"host": name, "chats": week.chats_between(cache, self.profiles(), since, until, self.home), "accounts": []}
+
+        def monday(*args):
+            out = io.StringIO()
+            with mock.patch.object(week, "monday_due", return_value="2026-W45"), \
+                    mock.patch.object(week, "host_chats", side_effect=host), redirect_stdout(out):
+                week.main(["--monday-recap", *args])
+            return json.loads(out.getvalue())
+        self.assertEqual(monday()["chats"], 1)
+        self.assertEqual(monday("--host", "lab")["chats"], 2)
+
     def test_a_hidden_project_is_left_out_of_the_projects_tab(self):
         import io
         from contextlib import redirect_stdout

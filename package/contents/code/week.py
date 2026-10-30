@@ -25,7 +25,7 @@ off: then it keeps only what the transcripts still have.
                   not, or delete it (the cache starts again from the
                   transcripts Claude still has)
     --account ID  one account's chats (an id of talpy_den.py's groups)
-    --host HOST   an SSH host's chats too: remote.py runs this file there
+    --host HOST   an SSH host's chats too (also in --monday-recap): remote.py runs this file there
                   (python3 -I - with talpy_den.py loaded first) with
     --data        that host's chats of those days, for the computer asking
                   (--since MS --until MS --now MS: of those times, by the
@@ -2554,9 +2554,15 @@ def main(argv=None):
             cache = updated_cache(cache_root, profiles, now_ms)
             first_ms = first_activity(cache)
             days = span_days("week", 0, now_ms, first_ms)
-            chats = chats_between(cache, profiles, span_since("week", 0, now_ms, first_ms), days[-1][2], home)
+            since, until = span_since("week", 0, now_ms, first_ms), days[-1][2]
+            chats = chats_between(cache, profiles, since, until, home)
             _, accounts = account_ids(profiles)
-            result = dict(monday_recap([{"host": "", "chats": chats, "accounts": accounts}], now_ms, home), ok=True, due=True, week=week)
+            sources = [{"host": "", "chats": chats, "accounts": accounts}]
+            if hosts:  # (the SSH hosts shown: as the Recap it opens counts them)
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=min(8, len(hosts))) as pool:
+                    sources += list(pool.map(lambda h: host_chats(h, 0, "week", since, until), hosts))
+            result = dict(monday_recap(sources, now_ms, home), ok=True, due=True, week=week)
         except Exception as exc:
             result = {"ok": False, "due": False, "error": "{}: {}".format(type(exc).__name__, exc)}
         return emit(result)
