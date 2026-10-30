@@ -1407,7 +1407,7 @@ class RelayTests(PaneFixture):
         groups = json.loads(shared.read_text())["hooks"]["PermissionRequest"]
         hook = self.home / ".local/share/talpy-den/permission-hook.py"
         self.assertEqual(groups[0], mine)
-        self.assertEqual(groups[1]["hooks"][0], {"type": "command", "command": f"exec python3 -I {hook}",
+        self.assertEqual(groups[1]["hooks"][0], {"type": "command", "command": f"[ -f {hook} ] || exit 0; exec python3 -I {hook}",
                                                  "timeout": pane.HOOK_TIMEOUT_S})
         self.assertEqual(hook.read_text(), (CODE / "permission_hook.py").read_text())
         self.assertTrue(self.cli("--relay", "status")["on"])
@@ -1433,13 +1433,32 @@ class RelayTests(PaneFixture):
         groups = json.loads(settings.read_text())["hooks"]["PermissionRequest"]
         hook = pane.hook_path(self.home, "relay")
         self.assertEqual(groups, [mine, {"matcher": "*", "hooks": [
-            {"type": "command", "command": f"exec python3 -I {hook}", "timeout": pane.HOOK_TIMEOUT_S}]}])
+            {"type": "command", "command": f"[ -f {hook} ] || exit 0; exec python3 -I {hook}", "timeout": pane.HOOK_TIMEOUT_S}]}])
         self.assertEqual(pane.relay(self.home, [], True)[1],
                          "Permission prompts can be answered from the widget (they could already)")
         # off takes an older one out too
         write(settings, {"hooks": {"PermissionRequest": [mine, {"matcher": "*", "hooks": [{"type": "command", "command": older[1]}]}]}})
         pane.relay(self.home, [], False)
         self.assertEqual(json.loads(settings.read_text())["hooks"]["PermissionRequest"], [mine])
+
+    def test_a_hook_whose_copy_is_gone_leaves_the_prompt_to_claude(self):
+        # (its folder cleaned up by hand: no answer, status 0; python3 would end with 2, a refusal)
+        command = pane.hook_command(self.home / "gone dir/permission-hook.py")
+        r = subprocess.run(["sh", "-c", command], input=b"{}", capture_output=True, timeout=30)
+        self.assertEqual((r.returncode, r.stdout), (0, b""))
+        # settings an older version wrote get it, at the next status check
+        settings = self.home / ".claude-work/settings.json"
+        older = f"exec python3 -I {pane.hook_path(self.home, 'relay')}"
+        mine = {"matcher": "Bash", "hooks": [{"type": "command", "command": "mine"}]}
+        write(settings, {"model": "opus", "hooks": {"PermissionRequest": [mine, {"matcher": "*", "hooks": [
+            {"type": "command", "command": older, "timeout": pane.HOOK_TIMEOUT_S}]}]}})
+        self.assertEqual(cs.upgrade_hook_settings(self.home), 1)
+        data = json.loads(settings.read_text())
+        self.assertEqual((data["model"], data["hooks"]["PermissionRequest"]), ("opus", [mine, {"matcher": "*", "hooks": [
+            {"type": "command", "command": pane.hook_command(pane.hook_path(self.home, "relay")), "timeout": pane.HOOK_TIMEOUT_S}]}]))
+        before = settings.stat().st_mtime_ns
+        self.assertEqual(cs.upgrade_hook_settings(self.home), 0)  # (once)
+        self.assertEqual(settings.stat().st_mtime_ns, before)
 
     def test_a_folder_name_with_a_space(self):
         # The command Claude runs (sh -c) finds the hook, and the hook is
@@ -1451,8 +1470,9 @@ class RelayTests(PaneFixture):
         hooks = json.loads((self.home / ".claude-work/settings.json").read_text())["hooks"]
         relay = hooks["PermissionRequest"][0]["hooks"][0]["command"]
         live_hook = hooks["SessionStart"][0]["hooks"][0]["command"]
-        self.assertEqual(shlex.split(relay), ["exec", "python3", "-I", str(data / "talpy-den/permission-hook.py")])
-        self.assertEqual(shlex.split(live_hook), ["exec", "python3", "-I", "-S", str(data / "talpy-den/live-hook.py")])
+        relay_hook, live_copy = str(data / "talpy-den/permission-hook.py"), str(data / "talpy-den/live-hook.py")
+        self.assertEqual(shlex.split(relay), ["[", "-f", relay_hook, "]", "||", "exit", "0;", "exec", "python3", "-I", relay_hook])
+        self.assertEqual(shlex.split(live_hook), ["[", "-f", live_copy, "]", "||", "exit", "0;", "exec", "python3", "-I", "-S", live_copy])
         cache = Path(self.tmp.name) / "c"
         env = dict(os.environ, HOME=str(self.home), XDG_CACHE_HOME=str(cache), PATH=f"{Path(sys.executable).parent}:/usr/bin:/bin")
         event = {"session_id": SID, "hook_event_name": "UserPromptSubmit", "cwd": "/tmp"}

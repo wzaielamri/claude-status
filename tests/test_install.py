@@ -91,7 +91,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(text.count("# >>> talpy-den >>>"), 1)
         settings = (self.home / ".claude/settings.json").read_text()
         self.assertNotIn("claude-widget", settings)
-        self.assertEqual(settings.count("permission-hook.py"), 1)
+        self.assertEqual(settings.count("permission-hook.py"), 2)  # (one command: its check, then python3)
         self.assertIn(".local/share/talpy-den/permission-hook.py", settings)
         out = self.install("--uninstall")
         self.assertNotIn(">>>", script.read_text())

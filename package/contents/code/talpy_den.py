@@ -2546,6 +2546,7 @@ LIVE_FIELDS = ("state", "doing", "asks", "at", "turnAt", "steps", "agents", "sai
 # The hooks' copies (pane.py --relay/--live on) and the files they're copies of
 HOOK_SOURCES = {PERMISSION_HOOK_FILE: "permission_hook.py", LIVE_HOOK_FILE: "live_hook.py"}
 HOOK_REVISION = re.compile(rb"^HOOK_REVISION = ([0-9]+)", re.M)
+HOOK_GUARD = "] || exit 0;"  # (in the hooks' commands, once each: pane.hook_command)
 
 
 def hooks_dir(home):
@@ -2601,6 +2602,31 @@ def refresh_hooks(home, code_dir=None):
             except OSError:
                 pass
     return changed
+
+
+def upgrade_hook_settings(home, extra_dirs=()):
+    """Settings whose hook commands an older version wrote (with no check that
+    the hook's copy is there: pane.hook_command) get today's
+    (pane.upgrade_hooks). Looked for cheaply first: today's command names
+    its copy twice and HOOK_GUARD once."""
+    here = globals().get("__file__")
+    if not here or not os.path.isfile(here):
+        return 0  # (on an SSH host this file comes on stdin, without pane.py)
+    names = [n.encode() for n in HOOK_SOURCES]
+    for folder in [p.path for p in discover_profiles(home, extra_dirs)] + [home / ".claude"]:
+        try:
+            with open(folder / "settings.json", "rb") as f:
+                text = f.read()
+        except OSError:
+            continue
+        hooks = sum(text.count(n) for n in names)
+        if hooks and hooks != 2 * text.count(HOOK_GUARD.encode()):
+            code = str(Path(here).resolve().parent)
+            if code not in sys.path:
+                sys.path.insert(0, code)
+            import pane
+            return pane.upgrade_hooks(home, extra_dirs)
+    return 0
 
 
 def live_view(cache_root, sid, pid):
@@ -7941,8 +7967,9 @@ def main(argv=None):
             if remote:
                 result["host"] = os.uname().nodename
                 add_remote_commands(result, home, config_dirs, claude)
-            try:  # (a widget updated since the hooks went on: their copies too)
+            try:  # (a widget updated since the hooks went on: their copies too, and their commands)
                 refresh_hooks(home)
+                upgrade_hook_settings(home, config_dirs)
             except Exception as exc:
                 result["errors"].append(f"hooks: {exc}")
         except Exception as exc:  # the widget must always get parseable output

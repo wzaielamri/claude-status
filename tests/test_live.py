@@ -373,7 +373,7 @@ class LiveSwitchTests(Fixture):
         hook = self.home / ".local/share/talpy-den/live-hook.py"
         self.assertEqual(hook.read_text(), (CODE / "live_hook.py").read_text())
         self.assertEqual(sorted(hooks), sorted(set(pane.LIVE_EVENTS)))
-        mine = {"type": "command", "command": f"exec python3 -I -S {hook}", "async": True, "timeout": 10}
+        mine = {"type": "command", "command": f"[ -f {hook} ] || exit 0; exec python3 -I -S {hook}", "async": True, "timeout": 10}
         self.assertEqual(hooks["SessionStart"], [guard, {"hooks": [mine]}])
         self.assertEqual(hooks["PreToolUse"], [dict(guard, matcher="*"), {"matcher": "*", "hooks": [mine]}])
         self.assertEqual(len(hooks["PermissionRequest"]), 2)  # (the permission hook stays)
@@ -407,7 +407,7 @@ class LiveSwitchTests(Fixture):
         pane.live(self.home, [], True)
         hooks = json.loads(settings.read_text())["hooks"]
         self.assertEqual({e: [h["command"] for g in groups for h in g["hooks"]] for e, groups in hooks.items()},
-                         {e: ["exec " + older] for e in pane.LIVE_EVENTS})
+                         {e: [pane.hook_command(pane.hook_path(self.home, "live"), "live")] for e in pane.LIVE_EVENTS})
         pane.live(self.home, [], False)
         self.assertNotIn("hooks", json.loads(settings.read_text()))
 

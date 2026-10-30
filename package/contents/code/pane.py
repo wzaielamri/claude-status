@@ -1471,10 +1471,14 @@ def hook_command(path, kind="relay"):
     """The hook's command in settings.json. Claude runs it with sh -c: exec
     has the shell give way to the hook, so Claude is the hook's parent (dash,
     Debian's and Ubuntu's sh, would stay in between); the path is quoted (a
-    folder name may have a space). An entry written before (python3 … PATH,
-    no exec, no quotes) is still the hook's (is_ours): turning it on again
-    replaces it."""
-    return f"exec python3 {HOOKS[kind]['python']} {shlex.quote(str(path))}"
+    folder name may have a space). A copy that isn't there any more (its
+    folder cleaned up by hand) is no answer: the command ends with status 0
+    and Claude asks as it would without the hook (python3 would end with 2,
+    which Claude takes as a refusal). An entry written before (python3 …
+    PATH, no exec, no quotes, no check) is still the hook's (is_ours):
+    upgrade_hooks, or turning it on again, replaces it."""
+    path = shlex.quote(str(path))
+    return f"[ -f {path} {cs.HOOK_GUARD} exec python3 {HOOKS[kind]['python']} {path}"
 
 
 def settings_files(home, extra_dirs):
@@ -1535,6 +1539,37 @@ def hook_path(home, kind="relay"):
     return Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share") / "talpy-den" / HOOKS[kind]["file"]
 
 
+def write_settings(path, data):
+    """Write a settings.json (through a link, keeping its mode)."""
+    tmp = path.with_name(path.name + ".talpy-den.tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if path.exists():
+        shutil.copymode(path, tmp)
+    os.replace(tmp, path)
+
+
+def upgrade_hooks(home, extra_dirs=()):
+    """Settings that name a hook with the command an older version wrote get
+    today's (hook_command) in each of its events, as turning it on again
+    would do: how many files changed."""
+    changed = 0
+    for path in settings_files(home, extra_dirs):
+        data = cs.read_json(path)
+        if not isinstance(data, dict):
+            continue
+        hooks = data.get("hooks") if isinstance(data.get("hooks"), dict) else {}
+        before = json.dumps(data, sort_keys=True)
+        for kind in HOOKS:
+            command = hook_command(hook_path(home, kind), kind)
+            if any(is_ours(h, kind) and h.get("command") != command for event in HOOKS[kind]["events"]
+                   for g in hooks.get(event) or [] if isinstance(g, dict) for h in g.get("hooks") or []):
+                set_hook(data, command, True, kind)
+        if json.dumps(data, sort_keys=True) != before:
+            write_settings(path, data)
+            changed += 1
+    return changed
+
+
 def install_hook(home, extra_dirs, on, kind, source=None):
     """Put the hook in each profile's settings (on) or take it out: how many
     settings files changed (ValueError: one isn't JSON). source: the hook's
@@ -1561,11 +1596,7 @@ def install_hook(home, extra_dirs, on, kind, source=None):
         set_hook(data, hook_command(target, kind), on, kind)
         if json.dumps(data, sort_keys=True) == before:
             continue  # (as it was: the file isn't touched)
-        tmp = path.with_name(path.name + ".talpy-den.tmp")
-        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        if path.exists():
-            shutil.copymode(path, tmp)
-        os.replace(tmp, path)
+        write_settings(path, data)
         changed += 1
     if not on:
         try:
