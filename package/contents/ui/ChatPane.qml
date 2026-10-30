@@ -2229,57 +2229,56 @@ Window {
                             }
                         }
                     }
+                }
+            }
+            // Commit only these files, with a message from its name and recap
+            // (over the buttons that open them, not at the end of a long list, out of sight)
+            ColumnLayout {
+                visible: pane.tab === "review" && pane.commitOpen && pane.review !== null
+                Layout.fillWidth: true
 
-                    // Commit only these files, with a message from its name and recap
-                    ColumnLayout {
-                        visible: pane.commitOpen && pane.review !== null
+                PlasmaComponents3.Label {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: pane.review && pane.review.repos.length
+                          ? i18n("Commit only these files in %1 (yours that aren't this chat's stay as they are):", pane.review.repos.join(", "))
+                          : i18n("None of these files is in a git repository.")
+                    wrapMode: Text.Wrap
+                    font.pointSize: pane.pt
+                }
+                PlasmaComponents3.TextArea {
+                    id: commitText
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 6
+                    wrapMode: TextEdit.Wrap
+                    font.family: pane.monoFamily
+                    font.pointSize: pane.pt
+                    onTextChanged: if (activeFocus) pane.commitEdited = true
+                }
+                RowLayout {
+                    Item {
                         Layout.fillWidth: true
-                        Layout.topMargin: Kirigami.Units.largeSpacing
-
-                        PlasmaComponents3.Label {
-                            textFormat: Text.PlainText
-                            Layout.fillWidth: true
-                            text: pane.review && pane.review.repos.length
-                                  ? i18n("Commit only these files in %1 (yours that aren't this chat's stay as they are):", pane.review.repos.join(", "))
-                                  : i18n("None of these files is in a git repository.")
-                            wrapMode: Text.Wrap
-                            font.pointSize: pane.pt
-                        }
-                        PlasmaComponents3.TextArea {
-                            id: commitText
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: Kirigami.Units.gridUnit * 6
-                            wrapMode: TextEdit.Wrap
-                            font.family: pane.monoFamily
-                            font.pointSize: pane.pt
-                            onTextChanged: if (activeFocus) pane.commitEdited = true
-                        }
-                        RowLayout {
-                            Item {
-                                Layout.fillWidth: true
-                            }
-                            PlasmaComponents3.Button {
-                                text: i18n("Cancel")
-                                onClicked: pane.commitOpen = false
-                            }
-                            PlasmaComponents3.Button {
-                                enabled: commitText.text.trim() !== "" && pane.reviewIsThis && pane.review.repos.length > 0
-                                icon.name: "vcs-commit"
-                                text: i18n("Commit")
-                                onClicked: pane.run("commit", "--commit " + root.shellQuote(pane.chatId) + " --message "
-                                                    + root.shellQuote(commitText.text) + pane.paneArgs())
-                            }
-                        }
                     }
-                    ConfirmLine {
-                        visible: pane.undoAsk === "*"
-                        Layout.fillWidth: true
-                        text: i18n("Put all of them back as they were before this chat? Files it made are removed; later changes to them are lost too.")
-                        confirmText: i18n("Undo all")
-                        onConfirmed: pane.undo("*")
-                        onCancelled: pane.undoAsk = ""
+                    PlasmaComponents3.Button {
+                        text: i18n("Cancel")
+                        onClicked: pane.commitOpen = false
+                    }
+                    PlasmaComponents3.Button {
+                        enabled: commitText.text.trim() !== "" && pane.reviewIsThis && pane.review.repos.length > 0
+                        icon.name: "vcs-commit"
+                        text: i18n("Commit")
+                        onClicked: pane.run("commit", "--commit " + root.shellQuote(pane.chatId) + " --message "
+                                            + root.shellQuote(commitText.text) + pane.paneArgs())
                     }
                 }
+            }
+            ConfirmLine {
+                visible: pane.tab === "review" && pane.undoAsk === "*"
+                Layout.fillWidth: true
+                text: i18n("Put all of them back as they were before this chat? Files it made are deleted for good; later changes to them are lost too.")
+                confirmText: i18n("Undo all")
+                onConfirmed: pane.undo("*")
+                onCancelled: pane.undoAsk = ""
             }
             RowLayout {
                 visible: pane.tab === "review"
