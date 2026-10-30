@@ -1188,3 +1188,7 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual((app["workedMs"], app["weekMs"], app["chatCount"]), (4200_000, 3600_000, 2))
         self.assertEqual([c["name"] for c in app["chats"]], ["fix it", "old one"])
         self.assertEqual(app["chats"][0]["cwd"], "/r/app/sub")
+        # a fork starts with a copy of the turns before it: counted once, as the Recap counts them
+        fork = chat("f" * 8, "/r/app", "fix it (fork)", chats[0]["turns"] + [[now - 60_000, now, 100_000, [], {}]])
+        app = week.projects(chats + [fork], now, Path("/home/x"))[0]
+        self.assertEqual((app["workedMs"], app["weekMs"]), (4300_000, 3700_000))

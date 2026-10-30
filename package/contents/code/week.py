@@ -2351,14 +2351,16 @@ PROJECT_CHATS = 40
 
 def projects(chats, now_ms, home):
     week_ago = now_ms - 7 * 86400_000
-    out = {}
+    out, seen = {}, set()
     for c in chats:
         folder = c.get("project") or c.get("folder") or ""
         if not folder:
             continue
         cost = sum(request_cost(key, t) for agg in c["hours"].values() for key, t in agg["t"].items())
-        worked = sum(t[2] for t in c["turns"])
-        recent = sum(t[2] for t in c["turns"] if t[1] >= week_ago)
+        # (a fork, or a chat continued in another folder, starts with a copy of the turns before: counted once, as recap does)
+        turns = [t for t in c["turns"] if first_time(seen, (c.get("host"), "turn", t[1], t[2]))]
+        worked = sum(t[2] for t in turns)
+        recent = sum(t[2] for t in turns if t[1] >= week_ago)
         last = max([t[1] for t in c["turns"]] + c["prompts"] + [0])
         if not last:
             continue
