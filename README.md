@@ -15,7 +15,7 @@ And Talpy, a pet that acts out what each chat is doing.
 [![Python 3.7+](https://img.shields.io/badge/python-3.7%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-<img src="docs/screenshots/popup-light.png" alt="The Talpy Den popup: the big Talpy says one chat needs you; below, each account shows its chats as pets, plan usage bars, token totals and its sessions" width="48%">&nbsp;<img src="docs/screenshots/popup-dark.png" alt="The same popup in a dark theme" width="48%">
+<img src="docs/screenshots/popup-light.png" alt="The Talpy Den popup: the big Talpy says one chat needs you; below, each account shows its chats as pets, plan usage bars, token totals and its chats" width="48%">&nbsp;<img src="docs/screenshots/popup-dark.png" alt="The same popup in a dark theme" width="48%">
 
 </div>
 
@@ -47,9 +47,9 @@ Then right-click your panel → **Add Widgets…** and add **Talpy Den**. It nee
 
 **GNOME Shell 49 or newer, or 43 and 44 (Debian 12):** the same `./install.sh` (in a GNOME session it installs the GNOME extension), then log out and back in. [What's different on GNOME](docs/gnome.md).
 
-**VS Code:** download `talpy-den-<version>.vsix` from the [latest release](https://github.com/wzaielamri/talpy-den/releases/latest), then `code --install-extension talpy-den-<version>.vsix`. It needs Python 3.7+ and works on its own or next to the widget, also in Remote-SSH windows: see [Talpy Den for VS Code](vscode/).
+**VS Code:** download `talpy-den-<version>.vsix` from the [latest release](https://github.com/wzaielamri/talpy-den/releases/latest), then `code --install-extension talpy-den-<version>.vsix`. It needs Python 3.7+ and works on its own or next to the Plasma widget, also in Remote-SSH windows: see [Talpy Den for VS Code](vscode/).
 
-Each release also has the widget as a `.plasmoid` and the GNOME extension as a `.zip`. To update: `git pull && ./install.sh` (VS Code: the newer release's `.vsix`).
+Each release also has the Plasma widget as a `.plasmoid` and the GNOME extension as a `.zip`. To update: `git pull && ./install.sh` (VS Code: the newer release's `.vsix`).
 
 ## Documentation
 
@@ -66,17 +66,17 @@ Each release also has the widget as a `.plasmoid` and the GNOME extension as a `
 
 ## About this project
 
-I built this widget to make my own day-to-day work with Claude Code easier. With several sessions running across different profiles and machines, I wanted one glance at the panel to tell me which sessions need me and how much of my plan I've used. I'm sharing it in case it's useful to others.
+I built Talpy Den to make my own day-to-day work with Claude Code easier. With several chats running across different profiles and machines, I wanted one glance at the panel to tell me which chats need me and how much of my plan I've used. I'm sharing it in case it's useful to others.
 
 ### Not affiliated with Anthropic
 
-This is an independent, personal project. It is not affiliated with, endorsed by, sponsored by or otherwise connected to Anthropic, PBC, and building it does not make me a representative of Anthropic in any way. "Claude" and "Claude Code" are trademarks of Anthropic, PBC; they appear here only to describe what the widget works with.
+This is an independent, personal project. It is not affiliated with, endorsed by, sponsored by or otherwise connected to Anthropic, PBC, and building it does not make me a representative of Anthropic in any way. "Claude" and "Claude Code" are trademarks of Anthropic, PBC; they appear here only to describe what Talpy Den works with.
 
-The widget only reads files that Claude Code writes on your own computer, and changes them only when you ask it to: when you share a chat between your accounts, add, remove or pick the default account, allow or revoke a permission, undo or commit a chat's changes from its review, or turn on live mode or answering permission prompts from the widget (a hook in Claude's settings). It does not call any Anthropic API itself, and it sends no data anywhere: plan usage that's old while a chat works (in VS Code's Claude Code panel, which runs no status line) is fetched by Claude Code's own `/usage` (`claude -p /usage`), logging in and out is Claude Code's own command, and dictation runs on your computer ([Privacy](docs/privacy.md) has the details). The *Open Usage Page on claude.ai* menu entry just opens that page in your browser.
+Talpy Den only reads files that Claude Code writes on your own computer, and changes them only when you ask it to: when you share a chat between your accounts, add, remove or pick the default account, allow or revoke a permission, undo or commit a chat's changes from its review, or turn on live mode or answering permission prompts from Talpy Den (a hook in Claude's settings). It does not call any Anthropic API itself, and it sends no data anywhere: plan usage that's old while a chat works (in VS Code's Claude Code panel, which runs no status line) is fetched by Claude Code's own `/usage` (`claude -p /usage`), logging in and out is Claude Code's own command, and dictation runs on your computer ([Privacy](docs/privacy.md) has the details). The *Open Usage Page on claude.ai* menu entry just opens that page in your browser.
 
 ### AI-assisted development
 
-The code, tests and documentation in this repository were largely generated with an AI coding assistant (Claude Code, using Anthropic's Claude models) under my direction. I defined what the widget should do, made the design decisions, and reviewed and tested the result on my own machine (Fedora, KDE Plasma 6).
+The code, tests and documentation in this repository were largely generated with an AI coding assistant (Claude Code, using Anthropic's Claude models) under my direction. I defined what Talpy Den should do, made the design decisions, and reviewed and tested the result on my own machine (Fedora, KDE Plasma 6).
 
 As with any open-source code, please read it before you run it. It is provided under the MIT License, "as is", without warranty of any kind.
 

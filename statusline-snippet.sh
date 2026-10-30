@@ -1,5 +1,5 @@
 # >>> talpy-den >>>
-# Snapshot for the Talpy Den widget (plan limits + context window).
+# Snapshot for Talpy Den (plan limits + context window).
 # Needs $input to hold the status-line JSON; silent and atomic, and it never
 # fails (not even under set -e), so it can't break the status line. Plain
 # POSIX sh, so it works in sh (dash), bash and

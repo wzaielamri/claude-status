@@ -3,11 +3,11 @@
 ## Requirements
 
 - **KDE Plasma 6** (6.0 or newer). Plasma 5 isn't supported: Kubuntu 24.04 LTS, for example, ships Plasma 5.27.
-- **Claude Code** (the `claude` command), signed in. The widget finds it on PATH, in `~/.local/bin` (Claude's installer) and npm's, bun's, Volta's, pnpm's or nvm's folders, or else on the PATH your login shell sets up.
+- **Claude Code** (the `claude` command), signed in. Talpy Den finds it on PATH, in `~/.local/bin` (Claude's installer) and npm's, bun's, Volta's, pnpm's or nvm's folders, or else on the PATH your login shell sets up.
 - **python3**, 3.7 or newer. Every Plasma 6 distribution already has it.
 - **jq**, for the status-line snippet that supplies plan usage and context.
 - Optional:
-  - **Konsole**, so that clicking a session switches to its tab. With other terminals the window is raised. New terminals open in your default terminal (System Settings → Default Applications).
+  - **Konsole**, so that clicking a chat switches to its tab. With other terminals the window is raised. New terminals open in your default terminal (System Settings → Default Applications).
   - **PipeWire** (`pw-play`) or PulseAudio (`paplay`) for sounds.
   - **kdialog** (usually installed with KDE) for *Choose folder…*; `zenity` works too.
   - **Okular**, to read plans, memories and subagent runs rendered. Without it they open as a page in your web browser.
@@ -35,14 +35,14 @@ Then right-click your panel → **Add Widgets…**, search for **Talpy Den** and
 
 You can add it more than once, e.g. on the panel and on each screen's desktop: the copies share one check and their settings, and only one of them notifies. On the desktop, the pets rest while a window covers the whole widget.
 
-Each [release](https://github.com/wzaielamri/talpy-den/releases) also has the widget as a `.plasmoid` file and the GNOME extension as a `.zip`, for installing without the repository (its notes say how), and the VS Code extension as a `.vsix`. `./install.sh` is still the easiest way: it also adds the status-line snippet.
+Each [release](https://github.com/wzaielamri/talpy-den/releases) also has the Plasma widget as a `.plasmoid` file and the GNOME extension as a `.zip`, for installing without the repository (its notes say how), and the VS Code extension as a `.vsix`. `./install.sh` is still the easiest way: it also adds the status-line snippet.
 
-For VS Code, [Talpy Den for VS Code](../vscode/) is an extension of its own, installed from the same [releases](https://github.com/wzaielamri/talpy-den/releases/latest) (a `.vsix`). It brings its own copy of the backend, so it doesn't need the widget, and it works alongside it.
+For VS Code, [Talpy Den for VS Code](../vscode/) is an extension of its own, installed from the same [releases](https://github.com/wzaielamri/talpy-den/releases/latest) (a `.vsix`). It brings its own copy of the backend, so it doesn't need the Plasma widget, and it works alongside it.
 
 `install.sh` does two things:
 
-1. It installs the widget for your user (into `~/.local/share/plasma/plasmoids/`) with `kpackagetool6`. So that the chat pane shows Talpy in the taskbar rather than Plasma's icon (it's a window of Plasma's shell), it adds a KWin window rule for it (*Talpy Den: Talpy as the chat pane's icon*, in System Settings → Window Rules) and a desktop file hidden from menus (`~/.local/share/applications/org.wzaielamri.talpyden.chat.desktop`).
-2. It adds a small snippet to the status-line script of each Claude profile (the script that `statusLine` in `~/.claude*/settings.json` runs). It shows the change and asks first (`--yes` skips the question), and keeps a backup next to the script. The snippet is plain POSIX sh, so it works in sh, bash and zsh scripts; running `./install.sh` again replaces an older copy. The snippet saves the status-line data (plan limits, context) for the widget. What your status line shows stays the same.
+1. It installs the Plasma widget for your user (into `~/.local/share/plasma/plasmoids/`) with `kpackagetool6`. So that the chat pane shows Talpy in the taskbar rather than Plasma's icon (it's a window of Plasma's shell), it adds a KWin window rule for it (*Talpy Den: Talpy as the chat pane's icon*, in System Settings → Window Rules) and a desktop file hidden from menus (`~/.local/share/applications/org.wzaielamri.talpyden.chat.desktop`).
+2. It adds a small snippet to the status-line script of each Claude profile (the script that `statusLine` in `~/.claude*/settings.json` runs). It shows the change and asks first (`--yes` skips the question), and keeps a backup next to the script. The snippet is plain POSIX sh, so it works in sh, bash and zsh scripts; running `./install.sh` again replaces an older copy. The snippet saves the status-line data (plan limits, context) for Talpy Den. What your status line shows stays the same.
 
 <details>
 <summary><b>No status line yet?</b></summary>
@@ -100,7 +100,7 @@ The VS Code extension doesn't update by itself: install the `.vsix` of a newer [
    ./install.sh --uninstall
    ```
 
-   This removes the widget and its window rule, and takes the snippet out of your status-line scripts (it shows the change and keeps a backup).
-3. Optionally delete the widget's cache, `rm -rf ~/.cache/talpy-den`, and its data, `rm -rf ~/.local/share/talpy-den`: the hooks' scripts and, if you set dictation up, its speech engine and models (about 600 MB, more with each bigger model). Keep both while the GNOME or VS Code extension still uses them.
+   This removes the Plasma widget and its window rule, and takes the snippet out of your status-line scripts (it shows the change and keeps a backup).
+3. Optionally delete Talpy Den's cache, `rm -rf ~/.cache/talpy-den`, and its data, `rm -rf ~/.local/share/talpy-den`: the hooks' scripts and, if you set dictation up, its speech engine and models (about 600 MB, more with each bigger model). Keep both while the GNOME or VS Code extension still uses them.
 
-Apart from what you change through it (the chats and plans you share, the accounts you add, permissions you allow or revoke, and the files a chat's review undoes or commits), the widget never changes Claude Code's own files, so nothing else is left behind. Accounts you added stay (they're Claude's folders now), and so do their `~/.local/bin/claude-NAME` commands: remove those on the Accounts page first if you like. Shared chats stay shared: use **Keep only on …** first if you want them back as normal chats (see [Sharing chats](sharing.md)).
+Apart from what you change through it (the chats and plans you share, the accounts you add, permissions you allow or revoke, and the files a chat's review undoes or commits), Talpy Den never changes Claude Code's own files, so nothing else is left behind. Accounts you added stay (they're Claude's folders now), and so do their `~/.local/bin/claude-NAME` commands: remove those on the Accounts page first if you like. Shared chats stay shared: use **Keep only on …** first if you want them back as normal chats (see [Sharing chats](sharing.md)).

@@ -25,7 +25,7 @@ npm run package                                 # build talpy-den-<version>.vsix
 ```
 
 ```
-package/                  the widget (what install.sh installs)
+package/                  the Plasma widget (what install.sh installs)
 ├── metadata.json
 └── contents/
     ├── ui/               QML: main.qml (data, actions), FullRepresentation.qml (popup), GroupSection.qml (account),
@@ -47,7 +47,7 @@ tools/                    render_popup.sh (offscreen screenshots), talpy_icons.m
 
 The tests build Claude Code's files (sessions, background jobs, transcripts, shared-chat links, a switched `~/.claude` link) in temporary folders. `tests/test_remote.py` drives the SSH code through a stand-in `ssh` that runs the command locally.
 
-**Releases:** the widget, the GNOME extension and the VS Code extension share one version. Raise it in `package/metadata.json`, `gnome/extension/metadata.json` and `vscode/package.json`, add a `## <version>` entry to `CHANGELOG.md` and `vscode/CHANGELOG.md`, commit, then push a tag (`git tag v<version> && git push origin main v<version>`). The release workflow checks, tests and builds all three and publishes them with those entries as the notes.
+**Releases:** the Plasma widget, the GNOME extension and the VS Code extension share one version. Raise it in `package/metadata.json`, `gnome/extension/metadata.json` and `vscode/package.json`, add a `## <version>` entry to `CHANGELOG.md` and `vscode/CHANGELOG.md`, commit, then push a tag (`git tag v<version> && git push origin main v<version>`). The release workflow checks, tests and builds all three and publishes them with those entries as the notes.
 
 **Nothing private:** `tools/check_public.py` refuses commits with tokens, keys, IP addresses, emails, home folders or anything naming the machine it runs on or its SSH hosts (CI runs it on every file and the whole history). Turn it on once per clone with `git config core.hooksPath .githooks`.
 
