@@ -966,7 +966,10 @@ PlasmoidItem {
         repeat: true
         triggeredOnStart: true
         running: root.notifier && Plasmoid.configuration.mondayRecap
+        // (the SSH hosts shown, as the Recap it opens counts them: the ones that answered their last check)
         onTriggered: mondayAsk.connectSource("python3 -I " + root.shellQuote(root.codeDir + "week.py") + " --monday-recap"
+                                             + root.shownHosts.filter(host => root.remote[host] && root.remote[host].result && !root.remote[host].error)
+                                                              .map(host => " --host " + root.shellQuote(host)).join("")
                                              + root.configDirArgs)
     }
     Exec {
@@ -976,8 +979,9 @@ PlasmoidItem {
             const r = root.helperResult(data)
             if (!r.ok || !r.due)
                 return
-            const h = ms => Math.round(ms / 3600000)
-            const lines = [i18n("Claude worked %1 h over %2 chats; you, %3 h and %4 prompts.", h(r.workedMs), r.chats, h(r.youMs), r.prompts)]
+            // (times as the Recap shows them: 20m, 3h 5m)
+            const lines = [i18n("Claude worked %1 over %2; you, %3 and %4.", root.duration(r.workedMs), i18np("%1 chat", "%1 chats", r.chats),
+                                root.duration(r.youMs), i18np("%1 prompt", "%1 prompts", r.prompts))]
             if (r.project)
                 lines.push(i18n("Most of it in %1.", r.project))
             if (r.workedBefore > 0) {
