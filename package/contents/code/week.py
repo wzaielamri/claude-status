@@ -1614,19 +1614,21 @@ def in_settings(data, kind, value):
     if kind == "dir":
         dirs = perms.get("additionalDirectories")
         return isinstance(dirs, list) and any(isinstance(d, str) and os.path.expanduser(d).rstrip("/") == value for d in dirs)
-    if kind == "edits":
-        return perms.get("defaultMode") in ("acceptEdits", "bypassPermissions", "dontAsk")
+    if kind == "edits":  # (not dontAsk: it refuses what isn't allowed, instead of asking)
+        return perms.get("defaultMode") in ("acceptEdits", "bypassPermissions")
     rules = perms.get("allow")
     return isinstance(rules, list) and value in rules
 
 
-def rule_state(kind, value, project, home, added):
+def rule_state(kind, value, project, home, added, accounts=None):
     """"added" (by this tab: it can be undone), "allowed" (your settings
-    already let it through) or "new"."""
+    already let it through) or "new". accounts: the profile folders whose
+    chats asked (Claude reads its own folder's settings.json only; None: any)."""
     rid = rule_id(kind, value, project)
     if any(a.get("id") == rid for a in added):
         return "added"
-    files = settings_paths(project) + [p.real / "settings.json" for p in cs.discover_profiles(home)]
+    files = settings_paths(project) + [p.real / "settings.json" for p in cs.discover_profiles(home)
+                                       if accounts is None or p.key in accounts]
     return "allowed" if any(in_settings(cs.read_json(f), kind, value) for f in files) else "new"
 
 
@@ -1672,15 +1674,18 @@ def permission_prompts(chats, lo, hi, home, added=()):
                 if rule is None:
                     continue
                 r = rules.setdefault(rule + (folder,), {"kind": rule[0], "value": rule[1], "project": folder,
-                                                        "count": 0, "waits": [], "example": tilde(what, home)[:120]})
+                                                        "count": 0, "waits": [], "example": tilde(what, home)[:120],
+                                                        "accounts": set()})
                 r["count"] += 1
+                r["accounts"].update(c.get("profiles") or ())
                 r["waits"].append([ts - wait, ts])
     for r in rules.values():
         r["waitMs"] = int(covered(r.pop("waits")))
     top = sorted(rules.values(), key=lambda r: (-r["count"], -r["waitMs"]))[:TOP_RULES]
     for r in top:
+        accounts = r.pop("accounts")
         r["id"] = rule_id(r["kind"], r["value"], r["project"])
-        r["state"] = rule_state(r["kind"], r["value"], r["project"], home, added)
+        r["state"] = rule_state(r["kind"], r["value"], r["project"], home, added, accounts or None)
         r["title"] = rule_title(r["kind"], r["value"], r["project"], home)
         r["change"] = rule_change(r["kind"], r["value"], r["project"], home)
     return {"answered": answered, "refused": refused, "waitMs": int(covered(waits)),

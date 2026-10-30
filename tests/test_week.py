@@ -802,6 +802,11 @@ class PromptTests(Projects):
 
     def test_a_rule_your_settings_have_already(self):
         self.asked()
+        # another account's settings don't count (Claude reads its own folder's), nor Don't ask mode (it refuses)
+        cs.write_json_atomic(self.home / ".claude-personal/settings.json", {"permissions": {"allow": ["Bash(git status *)"]}})
+        cs.write_json_atomic(self.settings, {"permissions": {"defaultMode": "dontAsk"}})
+        states = {r["value"]: r["state"] for r in self.recap()["prompts"]["rules"]}
+        self.assertEqual((states["Bash(git status *)"], states[str(self.app)]), ("new", "new"))
         cs.write_json_atomic(self.home / ".claude-work/settings.json", {"permissions": {"allow": ["Bash(git status *)"]}})
         states = {r["value"]: r["state"] for r in self.recap()["prompts"]["rules"]}
         self.assertEqual(states["Bash(git status *)"], "allowed")
