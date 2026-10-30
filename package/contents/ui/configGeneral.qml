@@ -200,9 +200,15 @@ KCM.SimpleKCM {
         }
     }
 
+    // The extra config dirs (as this page has them): this computer's hooks go in their settings too
+    function withConfigDirs(args) {
+        return args.indexOf("--host") >= 0 ? args
+               : args.concat(...cfg_extraConfigDirs.split(",").map(d => d.trim()).filter(d => d).map(d => ["--config-dir", d]))
+    }
+
     function runRelay(args) {
         const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'"
-        relayHelper.connectSource("python3 -I " + q(codeDir + "pane.py") + " --relay " + args.map(q).join(" ") + " # " + Date.now())
+        relayHelper.connectSource("python3 -I " + q(codeDir + "pane.py") + " --relay " + withConfigDirs(args).map(q).join(" ") + " # " + Date.now())
     }
 
     function setRelay(on) {
@@ -312,7 +318,7 @@ KCM.SimpleKCM {
 
     function runLive(args) {
         const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'"
-        liveHelper.connectSource("python3 -I " + q(codeDir + "pane.py") + " --live " + args.map(q).join(" ") + " # " + Date.now())
+        liveHelper.connectSource("python3 -I " + q(codeDir + "pane.py") + " --live " + withConfigDirs(args).map(q).join(" ") + " # " + Date.now())
     }
 
     function runHistory(args) {
