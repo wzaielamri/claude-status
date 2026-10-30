@@ -281,6 +281,20 @@ def reply_id(mid):
     return mid[-12:]
 
 
+def first_seen(counted, data, ts, kind, uid):
+    """Whether an entry (a compaction "k", a tool's result "r", by its id)
+    wasn't counted in another transcript yet, as replies are (a fork's or
+    a moved chat's copy of it isn't): noted with the replies of its hour."""
+    if not isinstance(uid, str) or not uid:
+        return True
+    key = kind + ":" + uid[:64]
+    if key in counted:
+        return False
+    counted.add(key)
+    hour_agg(data, ts)[1]["m"].append(key)
+    return True
+
+
 def scan(profiles, cache, now_ms, keep=True):
     """Read what the profiles' transcripts added since the last run into the
     cache (by path: {"ino", "offset", "chat", "sub", "state", "data"}).
@@ -382,9 +396,10 @@ def take_line(line, rec, counted):
     if e["type"] == "assistant":
         take_reply(e, ts, rec, counted)
     elif e["type"] == "user":
-        take_user(e, ts, rec, line)
+        take_user(e, ts, rec, line, counted)
     elif e.get("subtype") == "compact_boundary":
-        hour_agg(data, ts)[1]["k"] += 1
+        if first_seen(counted, data, ts, "k", e.get("uuid")):
+            hour_agg(data, ts)[1]["k"] += 1
     elif e.get("subtype") == "turn_duration" and not rec["sub"]:
         worked = cs.number(e.get("durationMs"))
         if worked is not None and worked >= 0:
@@ -734,7 +749,7 @@ def turn_tokens(state, key, vals):
 RESULT_FIELD = b'"type":"tool_result"'
 
 
-def take_user(e, ts, rec, line):
+def take_user(e, ts, rec, line, counted):
     state, data = rec["state"], rec["data"]
     msg = e.get("message") if isinstance(e.get("message"), dict) else {}
     content = msg.get("content")
@@ -754,11 +769,13 @@ def take_user(e, ts, rec, line):
             tool = state["tools"].pop(r.get("tool_use_id"), None) if isinstance(r.get("tool_use_id"), str) else None
             if tool is None:
                 continue
-            if yours and tool[1] not in USER_TOOLS:  # a permission prompt you answered
+            prompted = yours and tool[1] not in USER_TOOLS  # a permission prompt you answered
+            once = (prompted or large) and first_seen(counted, data, ts, "r", r["tool_use_id"])
+            if prompted and once:
                 reason = pd.get("reasonCode") if isinstance(pd.get("reasonCode"), str) else ""
                 hour_agg(data, ts)[1]["p"].append([ts, tool[1], tool[2], reason, max(0, ts - tool[0]),
                                                    1 if pd.get("decision") == "accept" else 0])
-            if large:
+            if large and once:
                 _, agg = hour_agg(data, ts)
                 k = tool[1] + "|" + tool[2]
                 g = agg["g"].setdefault(k, [0, 0])

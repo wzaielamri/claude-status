@@ -791,6 +791,23 @@ class PromptTests(Projects):
         self.assertEqual(p["rules"][0]["title"], "Let chats in app read ~/repos/lib")
         self.assertIn("additionalDirectories", p["rules"][0]["change"])
 
+    def test_a_forked_chat_counts_its_prompts_and_compactions_once(self):
+        t0 = self.t0
+        original = (Transcript(str(self.app)).prompt(t0)
+                    .reply(t0 + 1000, "a", tools=[("T1", "Bash", {"command": "git status"})])
+                    .result(t0 + 61_000, "T1", source="user_temporary")
+                    .reply(t0 + 62_000, "a2").compacted(t0 + 63_000).duration(t0 + 64_000, 4000))
+        self.write(original, "chat-a")
+        self.recap()
+        fork = Transcript(str(self.app))
+        fork.lines = [dict(e) for e in original.lines]  # (claude --resume --fork-session: a copy, then its own turns)
+        fork.prompt(t0 + 600_000).reply(t0 + 601_000, "b").duration(t0 + 602_000, 2000)
+        self.write(fork, "chat-b")
+        r = self.recap()
+        self.assertEqual((r["prompts"]["answered"], r["prompts"]["rules"][0]["count"], r["work"]["compactions"]), (1, 1, 1))
+        p = week.permissions(self.scan(), self.profiles(), self.now, self.home)
+        self.assertEqual(p["prompts"]["answered"], 1)
+
     def test_prompts_at_once_wait_once(self):
         t0, tr = self.t0, Transcript(str(self.app))
         tr.prompt(t0).reply(t0 + 1000, "a", tools=[("A", "Read", {"file_path": str(self.lib / "a")}),
