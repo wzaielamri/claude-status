@@ -447,7 +447,7 @@ class DefaultTests(Home):
         self.assertIn("// my editor", text)  # the rest of the file as it was
         self.assertEqual(cs.jsonc(text)["claudeCode.environmentVariables"],
                          [{"name": "CLAUDE_CONFIG_DIR", "value": str(self.home / ".claude")}])  # follows the link now
-        self.assertIn("plain claude run on it", message)
+        self.assertIn(": plain claude runs on it", message)
         # and back: VS Code follows the link, plain claude moves
         ok, message = accounts.make_default(self.home, [], ".claude-work")
         self.assertTrue(ok, message)

@@ -342,6 +342,7 @@ def list_accounts(home, extra, check=False):
         installed, vscode_on, _, chosen = cs.default_profile(home, profiles, REMOTE, cache_root)
     except Exception:  # VS Code's settings are only one of the reasons
         installed, vscode_on, chosen = False, None, cs.plain_profile(home, profiles)
+    vscode_here = not REMOTE or any(cs.is_dir(home / s) for s in cs.VSCODE_SERVERS.values())
     found = cs.cached_find_claude(home, cache_root, time.time())  # (a quick look: asks the shell at most hourly)
     claude = found if check else None
     statuses = {}
@@ -375,7 +376,8 @@ def list_accounts(home, extra, check=False):
             "method": status["method"] if status else None,
             "email": status["email"] if status else None,
             "chats": chats,
-            "vscode": vscode_on is not None and vscode_on.real == p.real,
+            # (on an SSH host, only where VS Code ever connected: vscode_state)
+            "vscode": vscode_here and vscode_on is not None and vscode_on.real == p.real,
             "default": chosen is not None and chosen.real == p.real,
             "commandName": name,
             "command": bool(name) and ours(bin_dir(home) / name),
@@ -795,7 +797,7 @@ def make_default(home, extra, key, vscode=True):
                               "start VS Code without it")
             elif moves_vscode:
                 done.append("VS Code's Claude (new chats there; a window's Claude Code panel once the window reloads)")
-    message = f"{profile.label} is the default account" + (f": {' and '.join(done)} run on it" if done
+    message = f"{profile.label} is the default account" + (f": {' and '.join(done)} run{'s' if len(done) == 1 else ''} on it" if done
                                                             else "" if failed else " already")
     return not (failed and not done), "; ".join([message, *failed, *notes])
 
