@@ -1522,15 +1522,17 @@ PlasmaComponents3.ScrollView {
                 sharing.said = result.saveToFile(path) ? i18n("Saved: %1", path) : i18n("Couldn't save it in %1", folder)
             }, Qt.size(1200, 630))
         }
+        // (by way of a file in Talpy Den's own cache folder, which only you can
+        // read, not /tmp: gone once it's on the clipboard)
         function copy() {
-            const path = localPath(StandardPaths.writableLocation(StandardPaths.TempLocation)) + "/" + fileName()
+            const path = localPath(StandardPaths.writableLocation(StandardPaths.GenericCacheLocation)) + "/talpy-den/" + fileName()
             shareCard.grabToImage(result => {
                 if (!result.saveToFile(path)) {
                     sharing.said = i18n("Couldn't copy it")
                     return
                 }
                 copier.connectSource("python3 -I " + root.shellQuote(root.codeDir + "jump.py") + " --copy-image " + root.shellQuote(path)
-                                     + " # " + Date.now())
+                                     + "; rm -f -- " + root.shellQuote(path) + " # " + Date.now())
             }, Qt.size(1200, 630))
         }
         Exec {
