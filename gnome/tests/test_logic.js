@@ -262,6 +262,10 @@ test('stopping: background sessions, and chats with a process; interrupting in t
     eq(L.stopQuestion(session('a', 'working', {entrypoint: 'claude-vscode'})).includes("as with VS Code's stop button"), true);
     eq(L.stopQuestion(session('a', 'working', {tmux: true})).startsWith('Interrupt “chat a”?'), true);
     eq(L.stopTip(session('a', 'idle', {entrypoint: 'claude-vscode'}))[0], 'Stop this chat');
+    // an answer that says more happened than asked is shown
+    eq(L.stopSaysMore("It hadn't quit after 5 s, so it was killed; the chat is kept"), true);
+    eq(L.stopSaysMore('Stopped (and 2 commands it was running ended)'), true);
+    eq(L.stopSaysMore('Stopped'), false);
 });
 
 test("hiding and deleting a finished chat: where it comes back, what Delete… does", () => {

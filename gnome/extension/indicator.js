@@ -57,7 +57,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._timers = {};
         // Popup state kept by row key (rows are rebuilt with new data)
         this.ui = {expandedAgents: {}, expandedAgent: {}, expandedRecent: {}, expandedPeek: {}, expandedStats: {}, stopConfirm: '',
-            stopConfirmBusy: false, shareConfirm: null, deleteAsk: null, openMenu: null, tab: 'chats'};
+            shareConfirm: null, deleteAsk: null, openMenu: null, tab: 'chats'};
         // The Recap tab's days and what week.py said of them (it runs only
         // while that tab is open: setTab, loadWeek)
         // (span: day, week or all; open: the day or project whose chats are unfolded)
@@ -488,6 +488,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             return;   // turned off meanwhile (e.g. the screen locked)
         if (!result.ok)
             this._showError(L.fmt("Couldn't stop the chat: %1", result.message));
+        else if (L.stopSaysMore(result.message))
+            this._showInfo(result.message);
         this.refresh();
     }
 
@@ -730,10 +732,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this.rerender();
     }
 
-    // busy: the chat wasn't idle when you were asked (stop it anyway)
-    setStopConfirm(rowKey, busy = false) {
+    setStopConfirm(rowKey) {
         this.ui.stopConfirm = rowKey;
-        this.ui.stopConfirmBusy = busy;
         this.rerender();
     }
 
@@ -842,8 +842,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this._actionError = '';
             if (kind === 'open')
                 this.menu.close();
-            else if (kind === 'show')
-                this._showInfo(result.message);   // (Showing 2 hidden chats again)
+            else if (kind === 'show' || (kind === 'stop' && L.stopSaysMore(result.message)))
+                this._showInfo(result.message);   // (Showing 2 hidden chats again; it was killed)
         } else {
             this._showError(kind === 'open' ? L.fmt("Couldn't open the chat: %1", result.message)
                 : kind === 'stop' ? L.fmt("Couldn't stop the chat: %1", result.message) : result.message);

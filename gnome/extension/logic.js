@@ -369,6 +369,13 @@ export function canInterrupt(session) {
         && session.reason !== 'background shell';
 }
 
+// A stop's answer that says more happened than you asked for (it hadn't quit
+// after a few seconds, so it was killed; the commands it was running ended):
+// shown, as Plasma does
+export function stopSaysMore(message) {
+    return /killed|ended/.test(message || '');
+}
+
 // The stop button's tooltip
 export function stopTip(session) {
     if (canInterrupt(session)) {

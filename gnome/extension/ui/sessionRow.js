@@ -140,7 +140,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     }
     if (canStop) {
         const stop = iconButton('media-playback-stop-symbolic',
-            () => ctx.setStopConfirm(confirmingStop ? '' : rowKey, s.state !== 'idle'));
+            () => ctx.setStopConfirm(confirmingStop ? '' : rowKey));
         tips.add(stop, L.stopTip(s));
         if (!confirmingStop)
             hoverButtons.push(stop);
@@ -201,10 +201,11 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
         body.add_child(buildDeleteAsk(ctx));
 
     if (confirmingStop && canStop) {
-        // stopped only if it's as you were told: an idle one that got busy isn't
-        const busy = ctx.ui.stopConfirmBusy;
         const buttons = [
             ['Stop', 'media-playback-stop-symbolic', () => {
+                // stopped only if it's as the question says when you click (it
+                // follows the chat): an idle one that got busy since isn't
+                const busy = s.state !== 'idle';
                 ctx.setStopConfirm('');
                 if (remoteHost && canEnd)
                     ctx.remoteEnd(remoteHost, s.sessionId, s.profileDir, busy);
