@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Claude Code's PermissionRequest hook for the Talpy Den widget, so a
-permission prompt can be answered from the widget (Allow once, Always
+"""Claude Code's PermissionRequest hook for Talpy Den, so a
+permission prompt can be answered from Talpy Den (Allow once, Always
 allow, Deny with a note) as well as in the chat; and Claude's questions
 (AskUserQuestion asks for a permission too: the answers go back in it).
 
 Claude runs it whenever a chat asks for a permission, side by side with its
 own dialog: whichever is answered first counts. It writes the request to
-~/.cache/talpy-den/permissions/<id>.json and waits for the widget's
+~/.cache/talpy-den/permissions/<id>.json and waits for Talpy Den's
 answer (<id>.answer.json, written by pane.py --answer). It ends without a
 word, so the dialog alone decides, once the chat stops waiting (you
 answered it there), when its Claude is gone, or when no dialog shows a few
 seconds after it started (a Claude that waits for hooks before it asks).
 
 It is copied to ~/.local/share/talpy-den/permission-hook.py and named
-in each Claude profile's settings.json by pane.py --relay on (Claude
-Status' setting "Answer permission prompts from the widget"); --relay off
+in each Claude profile's settings.json by pane.py --relay on (the
+setting "Answer permission prompts from Talpy Den"); --relay off
 takes it out again. Standard library only, and Python 3.7 (SSH hosts).
 """
 import json

@@ -32,11 +32,12 @@ As an editor tab (**Talpy Den: Open in Editor Tab**):
 
 ## Install
 
-Download `talpy-den-<version>.vsix` from the
-[latest release](https://github.com/wzaielamri/talpy-den/releases/latest),
-then run `code --install-extension talpy-den-<version>.vsix` (or Extensions
-view → **⋯** → **Install from VSIX…**). A downloaded extension doesn't update
-by itself: install a newer release the same way.
+Click **Install** on this page, or search for **Talpy Den** in VS Code's
+Extensions view. Or download `talpy-den-<version>.vsix` from the
+[latest release](https://github.com/wzaielamri/talpy-den/releases/latest)
+and run `code --install-extension talpy-den-<version>.vsix` (or Extensions
+view → **⋯** → **Install from VSIX…**); a downloaded extension doesn't update
+by itself, so install a newer release the same way.
 
 **Needs** Linux, VS Code 1.90 or newer, Python 3.7+ and Claude Code; for the
 plan usage bars, `jq` and a small status-line snippet (**Talpy Den: Set Up
