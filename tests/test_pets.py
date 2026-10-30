@@ -943,6 +943,7 @@ console.log(JSON.stringify({ on: game.on, eaten, said }));""")
         r = run_node(COOKIE_STAGE + """
 t.chase = () => 0;
 t.seeCookie = () => {};
+game.go = () => {};   // (a look cut short sends it after the cookie all the same: not here)
 run(5000);
 const floor = H - gu * 0.55 - 7 * unit, start = now;
 game.place(40, 45);
