@@ -2059,6 +2059,8 @@ PlasmoidItem {
             // the ones left on its clock (reviewPending)
             setRemote(host, { loading: false, ok: true, error: "", result: result, updatedAt: Date.now(),
                               login: false, loggedIn: !!answer.loggedIn, clockOffset: result === answer.result ? 0 : offset })
+            if (status)
+                startDueTasks(status.queue || [])   // (a reply waiting for the end of a turn there: it ended)
         } else {
             // keep the last answer to show (dimmed) with the error
             setRemote(host, { loading: false, ok: false, error: answer.error || answer.message || i18n("no answer"),
@@ -2846,24 +2848,37 @@ PlasmoidItem {
             return
         for (const t of queue) {
             if (t.afterTurn) {   // a reply for when the chat's turn ends: now it has (or the chat isn't listed)
-                const known = !t.host || (remote[t.host] && remote[t.host].result)
+                // (an SSH host's: by its last check, which worked; not while it waits for a usage limit)
+                const known = !t.host || (remote[t.host] && remote[t.host].result && !remote[t.host].error)
                 const s = known ? listedRow(t.chat, t.profile, t.host || "") : null
-                if (known && !t.error && !isStarting(t.id) && (!s || (s.state !== "working" && s.state !== "waiting")))
-                    startQueued(t)
+                if (known && !t.error && !isStarting(t.id) && !(t.startAt > Date.now())
+                        && (!s || (s.state !== "working" && s.state !== "waiting")))
+                    startOrWait(t)
                 continue
             }
             if (!t.due || isStarting(t.id))
                 continue
-            // (its account as its section shows it: with the newest plan usage
-            // of any machine it's on, withUsage, as the new-chat box queued it by)
-            const group = hostGroups(t.host || "").map(g => withUsage(g, t.host || ""))
-                .find(g => g.profileKeys.indexOf(t.profile) >= 0)
-            const reset = group ? limitReset(group, t.host || "") : null
-            if (reset)
-                runHelper("--requeue " + shellQuote(t.id) + " --at " + Math.round(reset.at + 60000))
-            else
-                startQueued(t)
+            startOrWait(t)
         }
+    }
+
+    // A task whose time came starts, unless its account is at its usage
+    // limit: then it waits on until a minute after that resets
+    function startOrWait(t) {
+        // (its account as its section shows it: with the newest plan usage
+        // of any machine it's on, withUsage, as the new-chat box queued it by)
+        const group = hostGroups(t.host || "").map(g => withUsage(g, t.host || ""))
+            .find(g => g.profileKeys.indexOf(t.profile) >= 0)
+        const reset = group ? limitReset(group, t.host || "") : null
+        if (!reset) {
+            startQueued(t)
+            return
+        }
+        const cmd = "python3 -I " + shellQuote(codeDir + "jump.py") + " --requeue " + shellQuote(t.id)
+                    + " --at " + Math.round(reset.at + 60000) + configDirArgs + " # " + Date.now()
+        if (t.afterTurn)
+            stopSays[cmd] = true   // (your reply: It waits for the usage limit: it starts at 14:31)
+        stopper.connectSource(cmd)
     }
 
     function startQueued(t) {
@@ -2902,6 +2917,12 @@ PlasmoidItem {
                 if (root.notifier && Plasmoid.configuration.notifyDone && !root.holdingBack())
                     root.notify("queued|" + t.id, null, "started", i18n("Started on %1: %2", t.account, what),
                                 result.message + (t.host ? " · " + t.host : ""), "media-playback-start", "")
+            } else if (!result.ok && t && t.afterTurn) {   // (your reply, as VS Code says it)
+                root.actionError = i18n("Couldn't send your reply to %1: %2", t.name || i18n("the chat"), result.message)
+                actionErrorTimer.restart()
+                if (root.notifier && !root.dashboardShown)
+                    root.notify("queued|" + t.id, null, "error", i18n("Couldn't send your reply to %1", t.name || i18n("the chat")),
+                                t.prompt + "\n" + result.message, "dialog-error", "")
             } else if (!result.ok && t) {
                 root.actionError = i18n("Couldn't start the queued task: %1", result.message)
                 actionErrorTimer.restart()
