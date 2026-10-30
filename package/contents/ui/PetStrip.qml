@@ -89,12 +89,14 @@ Item {
                                      : darkTheme ? "#6f7fd0" : "#5363b8"   // night
     // The light pulses while a chat needs you, the stars twinkle once all is
     // done: in steps with the pets' clock, 10 a second (each step redraws the
-    // whole window, which a smooth animation would do 60 times a second)
+    // whole window, which a smooth animation would do 60 times a second);
+    // with less motion (root.lessMotion) they keep still
     property real stageClock: 0
-    readonly property real glow: hero && playing && mood === "needs" ? 1.3 - 0.3 * Math.cos(stageClock / 1800 * 2 * Math.PI) : 1
+    readonly property bool pulsing: hero && playing && !root.lessMotion
+    readonly property real glow: pulsing && mood === "needs" ? 1.3 - 0.3 * Math.cos(stageClock / 1800 * 2 * Math.PI) : 1
     Connections {
         target: root
-        enabled: strip.hero && strip.playing && (strip.mood === "needs" || strip.mood === "done")
+        enabled: strip.pulsing && (strip.mood === "needs" || strip.mood === "done")
         function onPetFrame(now) {
             if (now - strip.stageClock >= 95)
                 strip.stageClock = now
@@ -324,7 +326,7 @@ Item {
             text: index % 3 === 0 ? "✦" : "·"
             font.pixelSize: strip.gu * (index % 3 === 0 ? 0.6 : 1)
             color: strip.darkTheme ? "#d4dbff" : "#5363b8"
-            opacity: strip.stageClock > 0 ? strip.twinkle(index, strip.stageClock) : 0.5
+            opacity: strip.stageClock > 0 && !root.lessMotion ? strip.twinkle(index, strip.stageClock) : 0.5
         }
     }
 

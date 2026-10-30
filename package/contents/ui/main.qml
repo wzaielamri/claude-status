@@ -214,7 +214,14 @@ PlasmoidItem {
     property var rowSpots: ({})
     property Item rowSpace: null
     property bool rowsPlaced: false   // laid out once since the popup showed: what's new from now on fades in
-    readonly property bool animateRows: Kirigami.Units.longDuration > 0 && dashboardShown && !coveredByWindow
+    readonly property bool animateRows: !lessMotion && dashboardShown && !coveredByWindow
+    // Plasma's animation speed set to instant: less motion, as a desktop that
+    // asks for it gets in VS Code too: the pets don't dig about (one whose
+    // spot moves is just there), are taken out of their burrow at once and
+    // don't swing in your hand, the big Talpy has a cookie where he stands,
+    // and his light and stars keep still (Pet.qml, PetStrip.qml). (Instant
+    // makes Kirigami's durations 1 ms, not 0: animations of 0 ms misfire.)
+    readonly property bool lessMotion: Kirigami.Units.longDuration <= 1
     onDashboardShownChanged: {
         rowSpots = ({})
         rowsPlaced = false

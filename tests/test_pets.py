@@ -1373,6 +1373,30 @@ class SeveralCopiesTests(unittest.TestCase):
         self.assertLessEqual(live_answers, live_runs)
         self.assertLessEqual(outputs, runs)
 
+    def test_less_motion_calms_the_pets_as_in_vscode(self):
+        # VS Code's pets keep still for a desktop that asks for less motion
+        # (prefers-reduced-motion); Plasma's, with its animation speed set to
+        # instant, dug about, hung on to the burrow and ran after a cookie.
+        # (Instant makes Kirigami's durations 1 ms: animateRows' > 0 never
+        # saw it either.)
+        vscode = ROOT.parent.parent / "vscode/webview/pets"
+        pet_ts, stage_ts = (vscode / "pet.ts").read_text(), (vscode / "stage.ts").read_text()
+        pet, strip = (ROOT / "ui/Pet.qml").read_text(), (ROOT / "ui/PetStrip.qml").read_text()
+        main = (ROOT / "ui/main.qml").read_text()
+        self.assertIn("readonly property bool lessMotion: Kirigami.Units.longDuration <= 1", main)
+        self.assertIn("animateRows: !lessMotion", main)
+        for ts, qml in (("travels: this.lone && !reducedMotion()", "travels: pet.lone && !root.lessMotion"),
+                        ("instant: () => reducedMotion()", "instant: () => root.lessMotion"),
+                        ("if (!reducedMotion() && this.talpy.tug(", "if (!root.lessMotion && talpy && talpy.tug(")):
+            self.assertIn(ts, pet_ts)
+            self.assertIn(qml, pet)
+        dig_ts = pet_ts[pet_ts.index("private digTo("):pet_ts.index('this.talpy.react(quick ? "scoot" : "dig")')]
+        dig = pet[pet.index("function digTo("):pet.index('react(quick ? "scoot" : "dig")')]
+        self.assertIn("if (reducedMotion()) {", dig_ts)
+        self.assertIn("if (root.lessMotion) {", dig)
+        self.assertIn("night && !reducedMotion()", stage_ts)
+        self.assertIn("!root.lessMotion ? strip.twinkle(", strip)
+
     def test_looping_animations_stop_under_a_window(self):
         # Every repeating timer and endless animation of the pets runs only
         # while it can be seen (playing), not just while the popup is open

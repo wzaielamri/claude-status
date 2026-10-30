@@ -74,7 +74,7 @@ Item {
     // spring and swings with how fast you move it (and wobbles back after)
     property real shownX: px
     Behavior on shownX {
-        enabled: pet.held
+        enabled: pet.held && !root.lessMotion
         SpringAnimation { spring: 5; damping: 0.32; epsilon: 0.2 }
     }
     readonly property real swing: held ? Math.max(-30, Math.min(30, (px - shownX) * 1.8 / unit)) : 0
@@ -82,8 +82,9 @@ Item {
     // upright once talpy.land() opens its burrow, 700 ms or more after it
     // lands, so the burrow never swings; what's left of the wobble then is
     // under a degree)
-    property real tilt: swing
+    property real tilt: root.lessMotion ? 0 : swing
     Behavior on tilt {
+        enabled: !root.lessMotion
         SpringAnimation { spring: 3; damping: 0.16; epsilon: 0.3 }
     }
     property bool upright: false
@@ -134,6 +135,11 @@ Item {
             return
         travelTo = clampX(x)
         if (Math.abs(travelTo - px) < bodyWidth * 0.3) {
+            travelTo = -1
+            return
+        }
+        if (root.lessMotion) {
+            px = travelTo   // (less motion: no digging, it's just there)
             travelTo = -1
             return
         }
@@ -302,9 +308,10 @@ Item {
 
     // You start to drag it: in its burrow it hangs on to the rim for a moment
     // (talpy.tug), stretching, then pops out into your hand; let go before
-    // that and it drops back in. Out of its burrow it's yours at once.
+    // that and it drops back in. Out of its burrow (or with less motion) it's
+    // yours at once.
     function pull() {
-        if (talpy && talpy.tug(ok => { if (ok && pet.tugging) pet.popOut() })) {
+        if (!root.lessMotion && talpy && talpy.tug(ok => { if (ok && pet.tugging) pet.popOut() })) {
             tugging = true
             tugToward(grab.lastAt)
             stride.stop()
@@ -457,7 +464,7 @@ Item {
             leaveHole: open => pet.leaveHole(open),
             fillHole: () => { if (leftHole.shown) closeHole.restart() },
             changed: () => pet.cookieChanged(),
-            instant: () => false
+            instant: () => root.lessMotion   // (no running about: he just has it)
         })
     }
 
@@ -689,7 +696,7 @@ Item {
             angle: pet.upright ? 0 : pet.tilt
         }
         playing: pet.playing
-        travels: pet.lone
+        travels: pet.lone && !root.lessMotion   // (no digging about with less motion)
         tint: pet.lone ? "transparent" : pet.tint
         // Both are films (TalpyView.qml), drawn live while you hold them and
         // until they've landed, and for a move too slow for a picture every
