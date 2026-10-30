@@ -920,12 +920,12 @@ PlasmoidItem {
                 label: i18n("Open")
                 onActivated: root.openFromNotification(notification, true)
             }
-            actions: [
-                NotificationAction {
-                    label: i18n("Open session")
-                    onActivated: root.openFromNotification(notification, false)
-                }
-            ]
+            // (one about no chat, as The default account didn't change, has only its click)
+            property QtObject openChat: NotificationAction {
+                label: i18n("Open chat")
+                onActivated: root.openFromNotification(notification, false)
+            }
+            actions: sessionId !== "" || host !== "" ? [openChat] : []
             onClosed: {
                 root.forgetNotification(notification)
                 notification.destroy()   // (QML's notifications don't delete themselves once closed: autoDelete false)
