@@ -307,7 +307,7 @@ function paintDay(area, now) {
         cr.fill();
     };
     cr.setSourceRGBA(...GRID);
-    for (const q of [0.25, 0.5, 0.75]) {
+    for (const q of L.weekQuarterMarks(d)) {   // (by the day's clock: a 25-hour day's are off the quarters)
         cr.rectangle(Math.round(w * q), 0, 1, h);
         cr.fill();
     }

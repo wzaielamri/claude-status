@@ -1356,6 +1356,16 @@ export function weekDayLabel(day) {
 }
 
 // "Sat 24": a timeline row's day
+// Where a day's row (start to end: its local midnights) has its 6, 12 and 18
+// o'clock lines, as parts of the row: by that day's own wall clock, so on a
+// day the clocks change (23 or 25 hours) they're where those hours were, as
+// everything else the row draws is
+export function weekQuarterMarks(d) {
+    const span = Math.max(1, d.end - d.start);
+    const day = new Date(d.start);
+    return [6, 12, 18].map(h => (new Date(day.getFullYear(), day.getMonth(), day.getDate(), h).getTime() - d.start) / span);
+}
+
 export function weekRowDay(day, weeks = false) {
     const d = dayDate(day);
     return weeks ? shortDay(day) : `${WEEKDAYS[d.getDay()]} ${d.getDate()}`;

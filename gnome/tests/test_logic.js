@@ -253,6 +253,28 @@ test("an account here and on an SSH host has its plan usage once", () => {
     eq(L.remoteGroups(['lab'], remote).map(g => g.limits.updatedAt), [10], 'as they are, without owners');
 });
 
+test("a Recap row's 6, 12 and 18 o'clock lines go by the day's own clock", () => {
+    const midnight = (y, m, d) => new Date(y, m, d).getTime();
+    const day = (y, m, d) => ({start: midnight(y, m, d), end: midnight(y, m, d + 1)});
+    // a day with no clock change: the quarters
+    const plain = day(2026, 6, 15);
+    if (plain.end - plain.start === 24 * 3600000)
+        eq(L.weekQuarterMarks(plain), [0.25, 0.5, 0.75]);
+    // a 25-hour row whose clock didn't move: 6 o'clock is 6 of its 25 hours in
+    eq(L.weekQuarterMarks({start: plain.start, end: plain.start + 25 * 3600000}).map(q => Math.round(q * 1000)), [240, 480, 720]);
+    // where this computer's clock changes this year (none in UTC), each line
+    // is where that hour was
+    for (let m = 0; m < 12; m++) {
+        for (let d = 1; d <= 31; d++) {
+            const r = day(2026, m, d);
+            if (new Date(r.start).getMonth() !== m || r.end - r.start === 24 * 3600000)
+                continue;
+            eq(L.weekQuarterMarks(r).map(q => r.start + q * (r.end - r.start)).map(ms => new Date(ms).getHours()), [6, 12, 18]);
+            eq(L.weekQuarterMarks(r).every((q, i) => Math.abs(q - (i + 1) / 4) > 0.01), true, 'off the quarters');
+        }
+    }
+});
+
 test('helper output', () => {
     eq(L.helperResult('{"ok": true, "message": "x"}', ''), {ok: true, message: 'x'});
     eq(L.helperResult('', 'Traceback\nValueError: no'), {ok: false, message: 'ValueError: no'});
