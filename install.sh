@@ -61,7 +61,7 @@ if [ "$target" = gnome ] && ! command -v gnome-extensions >/dev/null; then
   echo "gnome-extensions not found: the GNOME version needs GNOME Shell 43/44 or 49 or newer." >&2
   exit 1
 fi
-command -v python3 >/dev/null || echo "warning: python3 not found; the widget needs it to read Claude's files" >&2
+command -v python3 >/dev/null || echo "warning: python3 not found; Talpy Den needs it to read Claude's files" >&2
 
 confirm() {
   [ "$yes" = 1 ] && return 0
@@ -495,11 +495,11 @@ done
 if [ "$target" = plasma ]; then
   if [ "$(relay status)" = True ]; then
     relay on >/dev/null  # (its copy brought up to date)
-    echo "Permission prompts can be answered from the widget (the hook is up to date)."
-  elif confirm "Answer Claude's permission prompts from the widget too? (adds a hook to each Claude profile's settings.json; the widget's settings turn it off)"; then
+    echo "Permission prompts can be answered from Talpy Den (the hook is up to date)."
+  elif confirm "Answer Claude's permission prompts from Talpy Den too? (adds a hook to each Claude profile's settings.json; Talpy Den's settings turn it off)"; then
     relay on
   else
-    echo "Skipped the permission hook: the widget's settings can turn it on (Answer permission prompts from the widget)."
+    echo "Skipped the permission hook: Talpy Den's settings can turn it on (Answer permission prompts from Talpy Den)."
   fi
 fi
 
@@ -508,10 +508,10 @@ if [ "$target" = plasma ]; then
   if [ "$(live status)" = True ]; then
     live on >/dev/null  # (its copy brought up to date)
     echo "Live mode is on: chats show each step as it happens (the hook is up to date)."
-  elif confirm "Show each step of your chats as it happens (live mode)? (adds a hook to each Claude profile's settings.json that Claude doesn't wait for; the widget's settings turn it off)"; then
+  elif confirm "Show each step of your chats as it happens (live mode)? (adds a hook to each Claude profile's settings.json that Claude doesn't wait for; Talpy Den's settings turn it off)"; then
     live on
   else
-    echo "Skipped live mode: the widget's settings can turn it on (Live mode: show each step as it happens)."
+    echo "Skipped live mode: Talpy Den's settings can turn it on (Live mode: show each step as it happens)."
   fi
 fi
 

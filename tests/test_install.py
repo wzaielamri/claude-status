@@ -116,7 +116,7 @@ class InstallTests(unittest.TestCase):
     def test_the_permission_hook_with_plasma(self):
         self.statusline("~/.claude/statusline.sh", "#!/bin/sh\ninput=$(cat)\n")
         out = self.install()
-        self.assertIn("Permission prompts can be answered from the widget", out.stdout)
+        self.assertIn("Permission prompts can be answered from Talpy Den", out.stdout)
         settings = (self.home / ".claude/settings.json").read_text()
         self.assertIn(".local/share/talpy-den/permission-hook.py", settings)
         self.assertTrue((self.home / ".local/share/talpy-den/permission-hook.py").is_file())

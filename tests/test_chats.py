@@ -742,7 +742,7 @@ class RemoteModeTests(World):
         rows = {s["sessionId"]: s for s in work["sessions"]}
         cfg = shlex.quote(str(self.dir("work").resolve()))
         cd = f"cd {shlex.quote(str(folder))} 2>/dev/null; "
-        trust = "printf '%s\\n\\n' 'Claude will ask whether you trust ~/proj before it reopens this session."
+        trust = "printf '%s\\n\\n' 'Claude will ask whether you trust ~/proj before it reopens this chat."
         self.assertTrue(rows["j1"]["openCommand"].startswith(cd + trust), rows["j1"]["openCommand"])
         self.assertTrue(rows["j1"]["openCommand"].endswith(f"env -u CLAUDE_CODE_DISABLE_AGENT_VIEW CLAUDE_CONFIG_DIR={cfg} {claude} attach j1"))
         self.assertIsNone(rows["j1"]["stopCommand"])  # no process to stop

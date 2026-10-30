@@ -651,7 +651,7 @@ def jump_remote_vscode(host, session_id, folder=""):
     url = "vscode://anthropic.claude-code/open?" + link_query({"session": session_id})
     opener = shutil.which("xdg-open")
     if not opener:
-        return False, "xdg-open is missing; can't hand the session link to VS Code"
+        return False, "xdg-open is missing; can't hand the chat's link to VS Code"
     mains, caption = vscode_connected_to(host)
     if mains:
         raise_window(mains, caption, require=True, prefer=os.path.basename(folder.rstrip("/")))
@@ -704,11 +704,11 @@ def jump_remote_terminal(host, name="", vscode_terminal=None, folder=""):
             if score > best_score:
                 best, best_score = (k, session), score
     if best is None:
-        return False, (f"This session runs in a terminal on {host}, but no terminal here has an ssh connection "
+        return False, (f"This chat runs in a terminal on {host}, but no terminal here has an ssh connection "
                        f"to {host} (it may run in tmux or on another computer)")
     if not show_konsole_tab(*best):
         return False, f"Couldn't raise the terminal window ({raise_hint()})"
-    return True, f"Switched to the terminal with the ssh session to {host}"
+    return True, f"Switched to the terminal with the ssh connection to {host}"
 
 
 def jump_vscode(entry):
@@ -729,7 +729,7 @@ def open_in_vscode(entry, url):
     time.sleep(0.3)  # let VS Code see its window focused, so the link opens there
     opener = shutil.which("xdg-open")
     if not opener:
-        return False, "xdg-open is missing; can't hand the session link to VS Code"
+        return False, "xdg-open is missing; can't hand the chat's link to VS Code"
     subprocess.Popen([opener, url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)
     return True, ""
@@ -956,7 +956,7 @@ def jump(home, extra_dirs, session_id, profile_dir=None):
         chat_profile, path = find_chat(home, extra_dirs, session_id, profile_dir)
         if chat_profile is not None:
             return resume_chat(chat_profile, path, session_id, home)
-        return False, "That session isn't running any more"
+        return False, "That chat isn't running any more"
     if entry is not None and entry.get("kind") == "interactive":
         if entry.get("entrypoint") == "claude-vscode":
             return jump_vscode(entry)
@@ -964,7 +964,7 @@ def jump(home, extra_dirs, session_id, profile_dir=None):
     if job_id:
         name = (entry or {}).get("name") or (job or {}).get("name") or ""
         return jump_job(profile, job_id, job, name if isinstance(name, str) else "", home)
-    return False, "Don't know how to open this session"
+    return False, "Don't know how to open this chat"
 
 
 def stop(home, extra_dirs, session_id, profile_dir=None, busy=False):
@@ -973,11 +973,11 @@ def stop(home, extra_dirs, session_id, profile_dir=None, busy=False):
     the conversation is kept."""
     profile, entry, job, job_id = find_session(home, extra_dirs, session_id, profile_dir)
     if profile is None:
-        return False, "That session isn't running any more"
+        return False, "That chat isn't running any more"
     if not job_id:
         if entry is not None and entry.get("kind") == "interactive":
             return cs.stop_chat(entry, busy_ok=busy)
-        return False, "Only background sessions and chats with a process can be stopped here"
+        return False, "Only background chats and chats with a process can be stopped here"
     claude = claude_path(home)
     if not claude:
         return False, NO_CLAUDE
@@ -988,9 +988,9 @@ def interrupt(home, extra_dirs, session_id, profile_dir=None):
     """Interrupt a working chat in tmux (Ctrl+C in its pane); it stays open."""
     profile, entry, _job, job_id = find_session(home, extra_dirs, session_id, profile_dir)
     if profile is None or entry is None:
-        return False, "That session isn't running any more"
+        return False, "That chat isn't running any more"
     if job_id:
-        return False, "A background session can only be stopped"
+        return False, "A background chat can only be stopped"
     return cs.interrupt_chat(entry)
 
 
@@ -1310,7 +1310,7 @@ def queue_task(home, extra_dirs, dirname, folder, task, start_at, host="", accou
             return False, f"No Claude profile called {dirname}"
         folder = folder if folder and os.path.isdir(folder) else str(home)
         if not cs.folder_trusted(profile, folder, home):
-            return False, (f"Claude doesn't trust {cs.short_folder(folder, home)} yet, and a background session can't ask: "
+            return False, (f"Claude doesn't trust {cs.short_folder(folder, home)} yet, and a background chat can't ask: "
                            "start a chat there in a terminal once, or pick a project folder")
         if task.plan:
             path = cs.find_plan(profiles, task.plan, task.plan_profile)
@@ -1351,7 +1351,7 @@ def chat_goes_on_where(home, extra_dirs, chat_id, profile_dir, folder):
         folder = cs.chat_folder(path) or str(home)
     if not cs.folder_trusted(profile, folder, home):
         where = "your home folder" if Path(folder) == home else cs.short_folder(folder, home)
-        return None, (f"Claude doesn't trust {where}, and a background session can't ask: this chat can't go on "
+        return None, (f"Claude doesn't trust {where}, and a background chat can't ask: this chat can't go on "
                       "by itself there. Continue it in a terminal after the reset")
     return folder, None
 
@@ -2327,7 +2327,7 @@ def undismiss_all(home, extra_dirs, _session_id=None):
     count = len(cs.load_dismissed(cache_root))
     if count:
         cs.change_dismissed(cache_root, clear=True)
-    return True, f"Showing {count} removed chat{'s' if count != 1 else ''} again" if count else "No chat was removed"
+    return True, f"Showing {count} hidden chat{'s' if count != 1 else ''} again" if count else "No chat was hidden"
 
 
 USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile PROFILE] [--config-dir DIR]...\n"

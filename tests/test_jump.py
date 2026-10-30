@@ -497,7 +497,7 @@ class FindSessionTests(Fixture):
             for sid in ("busy", "vscode", "bgperm"):
                 jump.jump(self.home, [], sid)
         self.assertEqual(calls, [("terminal", "busy"), ("vscode", "vscode"), ("job", "job5")])
-        self.assertEqual(jump.jump(self.home, [], "nope"), (False, "That session isn't running any more"))
+        self.assertEqual(jump.jump(self.home, [], "nope"), (False, "That chat isn't running any more"))
 
 
 class StopTests(Fixture):
@@ -535,7 +535,7 @@ class StopTests(Fixture):
     def test_reports_claude_errors(self):
         (ok, msg), _ = self.run_stop("bgperm", returncode=1, stderr="No job matching 'job5'.\n")
         self.assertEqual((ok, msg), (False, "No job matching 'job5'."))
-        self.assertEqual(self.run_stop("nope")[0], (False, "That session isn't running any more"))
+        self.assertEqual(self.run_stop("nope")[0], (False, "That chat isn't running any more"))
 
 
 class ChatStopTests(Fixture):
@@ -560,7 +560,7 @@ class ChatStopTests(Fixture):
         proc = self.chat("idle-chat")
         self.assertEqual(jump.stop(self.home, [], "idle-chat", ".claude-work"), (True, "Stopped; the chat is kept"))
         self.assertEqual(proc.wait(timeout=5), -15)   # SIGTERM: Claude shuts down as when its terminal closes
-        self.assertEqual(jump.stop(self.home, [], "idle-chat"), (False, "That session isn't running any more"))
+        self.assertEqual(jump.stop(self.home, [], "idle-chat"), (False, "That chat isn't running any more"))
 
     def test_vscode_chat_gets_sigint(self):
         # VS Code's panel takes Claude's exit after SIGINT (code 0) like its own stop button
@@ -607,10 +607,10 @@ class ChatStopTests(Fixture):
     def test_profile_and_pid_reuse(self):
         proc = self.chat("mine")
         self.assertEqual(cs.stop_chat_by_id(self.home, [], "mine", ".claude-personal"),
-                         (False, "That session isn't running any more"))
+                         (False, "That chat isn't running any more"))
         # its pid now belongs to another process: the file's start time doesn't match
         write(self.home / f".claude-work/sessions/{proc.pid}.json", session("mine", pid=proc.pid, procStart="1"))
-        self.assertEqual(cs.stop_chat_by_id(self.home, [], "mine"), (False, "That session isn't running any more"))
+        self.assertEqual(cs.stop_chat_by_id(self.home, [], "mine"), (False, "That chat isn't running any more"))
         self.assertIsNone(proc.poll())
 
     @unittest.skipUnless(shutil.which("tmux"), "needs tmux")
@@ -833,7 +833,7 @@ class ResumeChatTests(Fixture):
 
     def test_only_on_the_profile_asked_for(self):
         (ok, msg), opened = self.opened("chatx", ".claude-work")
-        self.assertEqual((ok, msg, opened), (False, "That session isn't running any more", []))
+        self.assertEqual((ok, msg, opened), (False, "That chat isn't running any more", []))
 
     def test_explains_trust_question(self):
         cs.write_json_atomic(self.home / ".claude-personal/.claude.json", {"projects": {}})
@@ -889,9 +889,9 @@ class DismissHelperTests(unittest.TestCase):
             try:
                 self.assertTrue(jump.dismiss(Path(tmp), [], "abc")[0])
                 self.assertIn("abc", cs.load_dismissed(cs.cache_dir(Path(tmp))))
-                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "Showing 1 removed chat again")
+                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "Showing 1 hidden chat again")
                 self.assertEqual(cs.load_dismissed(cs.cache_dir(Path(tmp))), {})
-                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "No chat was removed")
+                self.assertEqual(jump.undismiss_all(Path(tmp), [])[1], "No chat was hidden")
             finally:
                 if old is None:
                     os.environ.pop("XDG_CACHE_HOME")
@@ -1173,7 +1173,7 @@ class SharedChatActionTests(unittest.TestCase):
         for action, args in ((jump.continue_on, (".claude-work",)), (jump.share, ()), (jump.unshare, (".claude",))):
             (ok, msg), opened = self.run_action(action, *args)
             self.assertFalse(ok)
-            self.assertIn("open in a session on main", msg)
+            self.assertIn("open on main", msg)
             self.assertEqual(opened, [])
         self.assertFalse(self.store.exists())
         self.assert_own(".claude")

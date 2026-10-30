@@ -2005,7 +2005,7 @@ class NewClaudeValuesTests(Fixture):
                                              "updatedAt": iso(self.now - 60)})
         errors = self.collect(with_tokens=False)["errors"]
         self.assertEqual(len(errors), 1, errors)
-        for part in ("Claude Code 2.1.401", 'session status "compacting"', 'session kind "headless"',
+        for part in ("Claude Code 2.1.401", 'chat status "compacting"', 'chat kind "headless"',
                      'job state "paused"', 'job tempo "dozing"', "may show the wrong state"):
             self.assertIn(part, errors[0])
 
@@ -2021,7 +2021,7 @@ class NewClaudeValuesTests(Fixture):
 
     def test_a_value_that_is_no_text_is_named_too(self):
         write(self.home / ".claude-work/sessions/44.json", session("odd", status=3))
-        self.assertIn('session status "3"', self.collect(with_tokens=False)["errors"][0])
+        self.assertIn('chat status "3"', self.collect(with_tokens=False)["errors"][0])
 
 
 class UsageFetchFixture(Fixture):

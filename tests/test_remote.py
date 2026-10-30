@@ -361,7 +361,7 @@ class ActionTests(FakeSSH):
         (self.fake_home / f".claude/sessions/{proc.pid}.json").write_text(json.dumps(
             {"pid": proc.pid, "procStart": cs.proc_start_time(proc.pid), "sessionId": "idle-there",
              "cwd": "/srv/x", "kind": "interactive", "status": "idle"}))
-        self.assertEqual(remote.end("lab", "idle-there", ".claude-work"), (False, "That session isn't running any more"))
+        self.assertEqual(remote.end("lab", "idle-there", ".claude-work"), (False, "That chat isn't running any more"))
         self.assertIsNone(proc.poll())
         self.assertEqual(remote.end("lab", "idle-there", ".claude"), (True, "Stopped; the chat is kept"))
         self.assertEqual(proc.wait(timeout=5), -15)
@@ -565,10 +565,10 @@ class SharingTests(TwoAccountHost):
         self.open_in_a_session()
         ok, message = remote.share("lab", self.CHAT)
         self.assertFalse(ok)
-        self.assertIn("It's open in a session on main", message)
+        self.assertIn("It's open on main", message)
         (ok, message, command), opened = self.continue_there(".claude-work")
         self.assertEqual((ok, command, opened), (False, None, []))
-        self.assertIn("It's open in a session on main", message)
+        self.assertIn("It's open on main", message)
         self.assertFalse(os.path.lexists(self.there))
         self.assertFalse(self.store.exists())
 
@@ -587,7 +587,7 @@ class SharingTests(TwoAccountHost):
         self.open_in_a_session()
         ok, message = remote.share("lab", self.CHAT)
         self.assertFalse(ok)
-        self.assertIn("It's open in a session on main", message)
+        self.assertIn("It's open on main", message)
 
 
 class HostNoiseTests(FakeSSH):

@@ -568,16 +568,16 @@ def answer_request(cache_root, request_id, decision, note="", answers=None):
 
 BUILTIN_COMMANDS = (
     ("add-dir", "Add a new working directory"), ("agents", "Manage subagents"), ("branch", "Branch the conversation here"),
-    ("btw", "Ask a quick side question without interrupting"), ("clear", "Start a new session with empty context"),
+    ("btw", "Ask a quick side question without interrupting"), ("clear", "Start a new chat with empty context"),
     ("compact", "Free up context by summarizing the conversation so far"), ("config", "Open settings"),
-    ("context", "Show how full the context is"), ("copy", "Copy Claude's last response"), ("cost", "Show what this session cost"),
+    ("context", "Show how full the context is"), ("copy", "Copy Claude's last response"), ("cost", "Show what this chat cost"),
     ("doctor", "Check Claude Code's installation"), ("effort", "Set the effort level"), ("export", "Export the conversation"),
-    ("fork", "Copy this conversation into a new background session"), ("goal", "Set a goal Claude checks before stopping"),
+    ("fork", "Copy this conversation into a new background chat"), ("goal", "Set a goal Claude checks before stopping"),
     ("help", "Show help and the commands"), ("hooks", "Show the hooks"), ("init", "Write a CLAUDE.md for this project"),
-    ("insights", "A report about your Claude Code sessions"), ("mcp", "Manage MCP servers"), ("memory", "Edit CLAUDE.md and memory"),
+    ("insights", "A report about your Claude Code chats"), ("mcp", "Manage MCP servers"), ("memory", "Edit CLAUDE.md and memory"),
     ("model", "Set the model"), ("permissions", "Manage what Claude may do without asking"),
-    ("plan", "Plan mode, or the session's plan"), ("pr-comments", "Get the comments of a pull request"),
-    ("recap", "A one-line recap of the session"), ("resume", "Resume another conversation"), ("review", "Review a pull request"),
+    ("plan", "Plan mode, or the chat's plan"), ("pr-comments", "Get the comments of a pull request"),
+    ("recap", "A one-line recap of the chat"), ("resume", "Resume another conversation"), ("review", "Review a pull request"),
     ("rewind", "Go back to an earlier point"), ("security-review", "Review the pending changes for security"),
     ("skills", "List the skills"), ("status", "Version, model, account and connections"),
     ("subtask", "Send a subagent off with your full context"), ("todos", "Show the task list"), ("usage", "Show plan usage"),
@@ -1035,7 +1035,7 @@ def send(home, extra_dirs, profile_key, chat_id, text, session_id=None, how="aut
     if entry is not None and entry.get("kind") == "bg":
         job_id = entry.get("jobId")
         if not cs.valid_id(job_id or ""):
-            return {"ok": False, "message": "It runs in a background session Talpy Den can't stop"}
+            return {"ok": False, "message": "It runs in a background chat Talpy Den can't stop"}
         runs_on = next((p for p in profiles if cs.matches_profile(p, profile_key)), profile)
         ok, message = cs.stop_background(runs_on, job_id, cs.read_job([runs_on], job_id), home, claude)
         if not ok:
@@ -1591,7 +1591,7 @@ def install_hook(home, extra_dirs, on, kind, source=None):
                 continue
             data = {}
         if not isinstance(data, dict):
-            raise ValueError(f"{cs.short_path(str(path), home)} isn't JSON the widget can change")
+            raise ValueError(f"{cs.short_path(str(path), home)} isn't JSON Talpy Den can change")
         before = json.dumps(data, sort_keys=True)
         set_hook(data, hook_command(target, kind), on, kind)
         if json.dumps(data, sort_keys=True) == before:
@@ -1615,7 +1615,7 @@ def relay(home, extra_dirs, on, source=None):
     except ValueError as exc:
         return False, str(exc)
     if on:
-        return True, "Permission prompts can be answered from the widget" + ("" if changed else " (they could already)")
+        return True, "Permission prompts can be answered from Talpy Den" + ("" if changed else " (they could already)")
     return True, "Permission prompts are answered in the chats only"
 
 

@@ -1739,7 +1739,7 @@ def allow_rule(home, cache_root, kind, value, project):
     path = settings_paths(project)[0]
     data = cs.read_json(path) if path.exists() else {}
     if not isinstance(data, dict):
-        return False, "%s isn't JSON the widget can change: leave it as it is" % tilde(path, home), None
+        return False, "%s isn't JSON Talpy Den can change: leave it as it is" % tilde(path, home), None
     perms = data.get("permissions")
     if perms is None:
         perms = data["permissions"] = {}
@@ -2025,7 +2025,7 @@ def revoke_rule(home, cache_root, profiles, rid):
         return undo_rule(home, cache_root, note["id"])
     data = cs.read_json(real)
     if not isinstance(data, dict):
-        return False, "%s isn't JSON the widget can change: leave it as it is" % g["where"]
+        return False, "%s isn't JSON Talpy Den can change: leave it as it is" % g["where"]
     kind, value = g["kind"], g["value"]
     if g["folder"] or value == "bypassPermissionsModeAccepted":  # (.claude.json: a folder's entry, or its warning)
         node = data if not g["folder"] else (data.get("projects") or {}).get(g["folder"])
@@ -2050,7 +2050,7 @@ def revoke_rule(home, cache_root, profiles, rid):
     else:
         perms = data.get("permissions")
         if not isinstance(perms, dict):
-            return False, "%s isn't JSON the widget can change: leave it as it is" % g["where"]
+            return False, "%s isn't JSON Talpy Den can change: leave it as it is" % g["where"]
         if kind == "mode":
             if perms.get("defaultMode") == value:
                 del perms["defaultMode"]

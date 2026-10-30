@@ -85,8 +85,8 @@ SESSION_KINDS = ("interactive", "bg")  # not the daemon's own processes
 # (unknown_values_text) instead of quietly showing chats wrong. (A new
 # waitingFor shows as it is, with the chat waiting: you'd see that.)
 KNOWN_VALUES = {
-    "session kind": ("interactive", "bg", "daemon", "daemon-worker"),
-    "session status": ("busy", "shell", "idle", "waiting"),
+    "chat kind": ("interactive", "bg", "daemon", "daemon-worker"),
+    "chat status": ("busy", "shell", "idle", "waiting"),
     "job state": ("working", "running", "blocked") + FINISHED_JOB_STATES,
     "job tempo": ("active", "blocked", "idle"),
 }
@@ -376,7 +376,7 @@ def note_unknown(ctx, record, job=False):
     if job:
         fields, version = [("job state", "state"), ("job tempo", "tempo")], record.get("cliVersion")
     else:
-        fields, version = [("session kind", "kind"), ("session status", "status")], record.get("version")
+        fields, version = [("chat kind", "kind"), ("chat status", "status")], record.get("version")
     for what, key in fields:
         value = record.get(key)
         if value is not None and value not in KNOWN_VALUES[what]:
@@ -5036,7 +5036,7 @@ def claude_command(profile, args, home=None, job=None, folder=None, claude="clau
                f"{' '.join(shlex.quote(a) for a in args)}")
     if isinstance(folder, str) and folder and not folder_trusted(profile, folder, home):
         # The question that comes up has "No, exit" preselected: say what it is
-        note = (f"Claude will ask whether you trust {short_folder(folder, home)} before it reopens this session. "
+        note = (f"Claude will ask whether you trust {short_folder(folder, home)} before it reopens this chat. "
                 "Choose \"Yes, I trust this folder\" to continue; \"No, exit\" (preselected) closes it.")
         command = f"printf '%s\\n\\n' {shlex.quote(note)}; {command}"
     return command
@@ -5252,7 +5252,7 @@ def start_background(profile, folder, prompt, home=None, claude="claude", wait=B
         return False, f"The folder {short_folder(folder, home)} isn't there", None
     if not folder_trusted(profile, folder, home):
         where = "your home folder" if Path(folder) == home else short_folder(folder, home)
-        return False, (f"Claude doesn't trust {where} yet, and a background session can't ask: start a chat there "
+        return False, (f"Claude doesn't trust {where} yet, and a background chat can't ask: start a chat there "
                        "in a terminal once (Claude asks whether you trust it), or pick a project folder"), None
     env = {k: v for k, v in os.environ.items() if k not in SESSION_ENV and k != NO_AGENT_VIEW}
     value = config_dir_value(profile, home, for_job=True)  # through the service's own name
@@ -5831,12 +5831,12 @@ def find_chat_entry(home, extra_dirs, session_id, profile_key=None):
 
 def stop_chat_by_id(home, extra_dirs, session_id, profile_key=None, busy_ok=False, wait=END_WAIT):
     entry = find_chat_entry(home, extra_dirs, session_id, profile_key)
-    return stop_chat(entry, busy_ok, wait) if entry else (False, "That session isn't running any more")
+    return stop_chat(entry, busy_ok, wait) if entry else (False, "That chat isn't running any more")
 
 
 def interrupt_chat_by_id(home, extra_dirs, session_id, profile_key=None):
     entry = find_chat_entry(home, extra_dirs, session_id, profile_key)
-    return interrupt_chat(entry) if entry else (False, "That session isn't running any more")
+    return interrupt_chat(entry) if entry else (False, "That chat isn't running any more")
 
 
 def stop_background(profile, job_id, job=None, home=None, claude=None):
@@ -5883,7 +5883,7 @@ def end_for_handover(home, profiles, chat_id, claude=None):
             return stop_background(runs_on, job_id, read_job([runs_on], job_id), home, claude)
         if entry.get("kind") == "interactive":
             return stop_chat(entry)
-        return False, "It's open in a session Talpy Den can't end"
+        return False, "It's open where Talpy Den can't end it"
     return True, "Nothing had it open"
 
 
@@ -7044,7 +7044,7 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
             try:
                 row = live_row(entry, profile, holder, home, ctx)
             except Exception as exc:
-                errors.append(f"{profile.label}: sessions: {exc}")
+                errors.append(f"{profile.label}: chats: {exc}")
                 continue
             if row is not None:
                 rows[profile.real].append(row)

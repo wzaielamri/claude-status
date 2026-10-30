@@ -499,7 +499,7 @@ def give_to(profiles, chat_id, name, root, end_first=False, home=None):
             return None, message
     busy = open_in(profiles, chat_id)
     if busy:
-        return None, f"It's open in a session on {busy}. A chat can be open in one session at a time: exit that one first."
+        return None, f"It's open on {busy}. A chat can be open in one place at a time: exit it there first."
     paths = [path for p in profiles for path in [cs.transcript_path(p, chat_id)] if path]
     if not paths:
         return None, "That chat has no transcript on this computer"
@@ -533,7 +533,7 @@ def share_with_all(profiles, chat_id, root, name=None):
     """Share a chat with every profile (from the copy of the profile `name`, if given)."""
     busy = open_in(profiles, chat_id)
     if busy:
-        return False, f"It's open in a session on {busy}. Exit that session first."
+        return False, f"It's open on {busy}. Exit it there first."
     ok, message = share(profiles, chat_id, profiles, root, named(profiles, name))
     if ok:
         share_chat_plan(profiles, chat_id, profiles)
@@ -547,7 +547,7 @@ def keep_only_on(profiles, chat_id, name, root):
         return False, f"No Claude profile called {name}"
     busy = open_in(profiles, chat_id)
     if busy:
-        return False, f"It's open in a session on {busy}. Exit that session first."
+        return False, f"It's open on {busy}. Exit it there first."
     return keep_only(profiles, chat_id, keep, root)
 
 

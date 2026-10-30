@@ -1402,7 +1402,7 @@ class RelayTests(PaneFixture):
             "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "guard"}]}],
             "PermissionRequest": [mine]}})
         (self.home / ".claude-work/settings.json").symlink_to(shared)
-        self.assertEqual(pane.relay(self.home, [], True), (True, "Permission prompts can be answered from the widget"))
+        self.assertEqual(pane.relay(self.home, [], True), (True, "Permission prompts can be answered from Talpy Den"))
         self.assertTrue((self.home / ".claude-work/settings.json").is_symlink())  # (written through the link)
         groups = json.loads(shared.read_text())["hooks"]["PermissionRequest"]
         hook = self.home / ".local/share/talpy-den/permission-hook.py"
@@ -1412,7 +1412,7 @@ class RelayTests(PaneFixture):
         self.assertEqual(hook.read_text(), (CODE / "permission_hook.py").read_text())
         self.assertTrue(self.cli("--relay", "status")["on"])
         self.assertEqual(pane.relay(self.home, [], True)[1],
-                         "Permission prompts can be answered from the widget (they could already)")
+                         "Permission prompts can be answered from Talpy Den (they could already)")
         pane.relay(self.home, [], False)
         data = json.loads(shared.read_text())
         self.assertEqual((data["hooks"]["PermissionRequest"], data["model"]), ([mine], "opus"))
@@ -1429,13 +1429,13 @@ class RelayTests(PaneFixture):
         write(settings, {"hooks": {"PermissionRequest": [mine] + [
             {"matcher": "*", "hooks": [{"type": "command", "command": c, "timeout": 86400}]} for c in older]}})
         self.assertTrue(self.cli("--relay", "status")["some"])
-        self.assertEqual(pane.relay(self.home, [], True), (True, "Permission prompts can be answered from the widget"))
+        self.assertEqual(pane.relay(self.home, [], True), (True, "Permission prompts can be answered from Talpy Den"))
         groups = json.loads(settings.read_text())["hooks"]["PermissionRequest"]
         hook = pane.hook_path(self.home, "relay")
         self.assertEqual(groups, [mine, {"matcher": "*", "hooks": [
             {"type": "command", "command": f"[ -f {hook} ] || exit 0; exec python3 -I {hook}", "timeout": pane.HOOK_TIMEOUT_S}]}])
         self.assertEqual(pane.relay(self.home, [], True)[1],
-                         "Permission prompts can be answered from the widget (they could already)")
+                         "Permission prompts can be answered from Talpy Den (they could already)")
         # off takes an older one out too
         write(settings, {"hooks": {"PermissionRequest": [mine, {"matcher": "*", "hooks": [{"type": "command", "command": older[1]}]}]}})
         pane.relay(self.home, [], False)

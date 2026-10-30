@@ -255,14 +255,14 @@ def explain(host, code, stderr):
     if "host key verification failed" in low or "no matching host key" in low:
         return f"{host}'s host key isn't known yet. Run ssh {host} once in a terminal to accept it."
     if "permission denied" in low or "too many authentication failures" in low:
-        return f"{host} refused the login. The widget can't type a password: load your key into the agent (ssh-add) or run ssh {host} once in a terminal."
+        return f"{host} refused the login. Talpy Den can't type a password: load your key into the agent (ssh-add) or run ssh {host} once in a terminal."
     if "could not resolve hostname" in low or "name or service not known" in low:
         return f"Can't find {host} (DNS). Are you on the right network or VPN?"
     if any(s in low for s in ("connection timed out", "operation timed out", "no route to host",
                               "network is unreachable", "connection refused", "connection closed by")):
         return f"Can't reach {host}: {last}"
     if code == 127 or "python3: command not found" in low or "python3: not found" in low:
-        return f"python3 isn't installed on {host}; the widget needs it there."
+        return f"python3 isn't installed on {host}; Talpy Den needs it there."
     return f"{host}: {last}" if last else f"{host}: ssh failed (exit {code})"
 
 
@@ -295,7 +295,7 @@ def status(host, done_hours=None, recent=None, tokens=True, usage_refresh=None):
                 "login": needs_login(r.stderr)}
     result = answer_after_mark(r.stdout)
     if result is None:
-        return {"ok": False, "host": host, "error": f"{host} sent an answer the widget can't read.", "elapsedMs": elapsed}
+        return {"ok": False, "host": host, "error": f"{host} sent an answer Talpy Den can't read.", "elapsedMs": elapsed}
     if not result.get("ok"):
         return {"ok": False, "host": host, "error": f"{host}: {result.get('error') or 'status failed'}", "elapsedMs": elapsed}
     return {"ok": True, "host": host, "result": result, "elapsedMs": elapsed, "loggedIn": logged_in(host)}
@@ -355,7 +355,7 @@ def host_answer(host, args, name="talpy_den.py"):
         return {**answer, "ok": bool(answer.get("ok")), "message": answer.get("message") or ""}
     ok, message = outcome(host, r)
     if ok:  # it ran, but didn't answer as the script does
-        return {"ok": False, "message": f"{host} sent an answer the widget can't read."}
+        return {"ok": False, "message": f"{host} sent an answer Talpy Den can't read."}
     return {"ok": False, "message": message}
 
 
@@ -406,7 +406,7 @@ def agent_run(host, chat_id, agent_id, profile=None, open_it=True):
         return False, explain(host, r.returncode, r.stderr), None
     answer = answer_after_mark(r.stdout)
     if answer is None:
-        return False, f"{host} sent an answer the widget can't read.", None
+        return False, f"{host} sent an answer Talpy Den can't read.", None
     if not answer.get("ok") or not isinstance(answer.get("markdown"), str):
         return False, f"{host}: {answer.get('message') or 'no such subagent'}", None
     path = jump.save_run(Path.home(), answer.get("title"), agent_id, answer["markdown"])
@@ -545,7 +545,7 @@ def put_text(host, text):
     if answer is not None and answer.get("path"):
         return {"ok": True, "message": "", "path": answer["path"]}
     ok, message = outcome(host, r)
-    return {"ok": False, "message": f"{host} sent an answer the widget can't read." if ok else message}
+    return {"ok": False, "message": f"{host} sent an answer Talpy Den can't read." if ok else message}
 
 
 # A picture pasted here for a task there goes to the host's pictures folder
@@ -599,7 +599,7 @@ def put_image(host, path):
     if answer is not None and answer.get("path"):
         return {"ok": True, "message": "", "path": answer["path"], "local": str(picture)}
     ok, message = outcome(host, r)
-    return {"ok": False, "message": f"{host} sent an answer the widget can't read." if ok else message}
+    return {"ok": False, "message": f"{host} sent an answer Talpy Den can't read." if ok else message}
 
 
 def continue_chat(host, profile, chat_id, folder="", text=""):
@@ -641,7 +641,7 @@ def open_remote(host, command):
     import jump
     line = " ".join(shlex.quote(a) for a in ["ssh", *ssh_options(batch=False), "-t", host, posix(command)])
     if not jump.open_terminal(str(Path.home()), line):
-        return False, "No terminal found to open the session in"
+        return False, "No terminal found to open the chat in"
     return True, f"Opened a terminal on {host}"
 
 
@@ -693,10 +693,10 @@ def login_here(host):
     host = check_host(host)
     d = control_dir()
     if d is None:
-        print("There's no private folder for the shared connection ($XDG_RUNTIME_DIR), so the widget can't keep a login.")
+        print("There's no private folder for the shared connection ($XDG_RUNTIME_DIR), so Talpy Den can't keep a login.")
         return 1
     print(f"Logging in to {host} for Talpy Den. Type what ssh asks for (password, passphrase, code):")
-    print("it goes to ssh only, the widget never sees it.\n")
+    print("it goes to ssh only, Talpy Den never sees it.\n")
     # The window closes once you're in, and what's left of its session gets
     # SIGHUP: the shared connection detaches from it, but the connection to a
     # jump host it goes through (ProxyJump) doesn't, and ended there (the
@@ -718,8 +718,8 @@ def login_here(host):
     marker = login_marker(host)
     marker.touch(mode=0o600)
     os.chmod(str(marker), 0o600)
-    print(f"\nLogged in. The widget checks {host} through this connection now. It closes {LOGIN_MINUTES} minutes "
-          "after the widget stops using it, when you log out, or when you disconnect.")
+    print(f"\nLogged in. Talpy Den checks {host} through this connection now. It closes {LOGIN_MINUTES} minutes "
+          "after Talpy Den stops using it, when you log out, or when you disconnect.")
     time.sleep(LOGIN_SHOWN)
     return 0
 

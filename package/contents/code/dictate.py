@@ -482,7 +482,7 @@ def delete_model(name):
     if path is None:
         return {"ok": False, "message": f"The {name} model isn't downloaded"}
     if not widgets(path):
-        return {"ok": False, "message": f"The {name} model isn't the widget's to delete: it's in {Path(path).parent}"}
+        return {"ok": False, "message": f"The {name} model isn't Talpy Den's to delete: it's in {Path(path).parent}"}
     with busy() as free:
         if not free:
             return {"ok": False, "message": "Dictation is being set up or a model downloaded: try again after"}
