@@ -2,6 +2,67 @@
 
 ## Unreleased
 
+- **Delete a chat, a plan or a memory, to the Trash:** the trash button
+  beside a line's × (a finished chat, a recent chat, a plan, a memory) asks
+  first, saying what goes and on which accounts (*Delete “Fix the build” on
+  work and personal? It goes to the Trash with its subagents and
+  checkpoints; the Recap keeps its numbers.*), then says *Moved to the
+  Trash*. A chat goes from every account it's shared with, with its
+  subagents and checkpoints, and not while Claude has it open (*It's open on
+  work. Exit it there first.*); the Recap keeps its numbers, and its star,
+  Hide, Keep going and queued go-ons forget it. A plan goes from every
+  account it's on; a memory goes with its own line in its folder's
+  `MEMORY.md`, the rest of the file kept as it was. An account's `CLAUDE.md`
+  and projects aren't deleted this way, and an SSH host's goes to that
+  host's Trash.
+- **Hide plans, memories and projects as you hide chats:** an × on their
+  line (*Hide this plan*, *Hide this memory*, *Hide this project*; a chat's
+  says *Hide this chat* instead of *Remove from the list*), and the view's
+  **⋯** menu and the Command Palette show each kind again: **Show Hidden
+  Chats Again**, **Show Hidden Plans Again**, **Show Hidden Memories
+  Again**, **Show Hidden Projects Again**, each only while something of that
+  kind is hidden; an SSH host's eye button offers its own. Plans carry a
+  task icon and memories their kind's, on the Projects tab's chips too.
+- **Stop asks about Keep going:** stopping a chat that keeps going says so
+  in its question (*It keeps going after usage limits.*) and offers
+  **Stop**, which leaves Keep going on for the next limit, and **Stop and
+  turn Keep going off**; the answer says what's left (*Stopped. It won't go
+  on by itself any more*).
+- **A chat goes on with its own model and effort, every time:** a chat that
+  goes on after a usage limit (Keep going, **Go on at …**, a queued go-on)
+  runs on the model of its last reply and the effort its tag shows, also
+  after the first go-on, and the answer says which (*Went on in the
+  background on work (Opus 5.5 · xhigh)*). A Claude Code panel chat goes on
+  in the permission mode its first prompt named, and one you interrupted
+  (Esc) is let go instead of started again.
+- **Chat, never session; Talpy Den, never "the widget":** every text says
+  chat (*Stop this background chat*, *Open this background chat on lab in a
+  terminal*, *Only one Claude can have it open at a time*), and Talpy Den
+  where it said the widget (an account Talpy Den can't tell, the settings'
+  notes about Plasma and GNOME); the Failed sound's setting says it also
+  plays when a usage limit or an expired login stops a chat, and the hint
+  for adding SSH hosts names the SSH hosts button.
+- **The Recap on a day the clocks change:** on a 23- or 25-hour day the Week
+  view draws that day's times by its own clock, under the same 0, 6, 12, 18
+  and 24 and quarter lines as the other days, instead of an hour off by
+  evening; pointing at it reads that clock too.
+- **Questions before what can't be undone:** cancelling a queued task you
+  wrote, or a reply waiting for a chat's turn to end, asks first (*Cancel
+  this task? It doesn't start, and what you wrote for it is gone.* **Cancel
+  it** / **Keep it**), its button a trash can instead of the × that hides a
+  chat; unticking `talpyDen.recapHistory` asks when the history holds chats
+  Claude has deleted (*Stop keeping the history? …*), only in the window
+  where you unticked it, and the setting shows the choice Talpy Den on
+  Plasma or GNOME made too; Review's **Undo** says a file the chat made is
+  deleted for good, with what you changed in it since.
+- **A short README:** the extension's page says what Talpy Den is, what it
+  does, how to install it and what it needs; the whole guide, with every
+  setting and command (`talpyDen.usageCap`, `newChatModel`, `newChatEffort`,
+  `newChatMode`, `diffSideBySide`, **Allow the Oldest Prompt** / **Deny the
+  Oldest Prompt** on Ctrl+Alt+Shift+Y / N, Hide, Delete… and Show Hidden …
+  Again), is the repository's [In VS
+  Code](https://github.com/wzaielamri/talpy-den/blob/main/docs/vscode.md)
+  page.
 - **A cookie for Talpy, and a tug of war for its burrow:** double-click the
   big Talpy's stage a little away from it and a cookie pops up there, mostly
   chocolate chip, now and then double chocolate, sprinkles, ginger, mint,
@@ -27,24 +88,23 @@
   or `/ultracode on`) says so after its model and effort, e.g. *Opus 5.5 ·
   xhigh · ultracode*, from the next prompt on, as Claude notes it in the
   chat.
-- **A gear for the settings, and the same buttons in the same order as the
-  widget:** the gear at the end of the view's title bar (and of the editor
+- **A gear for the settings, and the same buttons in the same order as on
+  Plasma:** the gear at the end of the view's title bar (and of the editor
   tab's header; **Talpy Den: Open Settings** in the Command Palette) opens
-  VS Code's Settings editor at Talpy Den's settings. The buttons go as in
-  the Plasma and GNOME widgets: Focus, Find a chat, SSH hosts, Refresh,
-  Settings. **Add Claude Account…** moved to the **⋯** menu, next to
-  **Claude Accounts…** and **Default Claude Account…**; the menu is in
-  three parts now: the view, plan usage, accounts.
+  VS Code's Settings editor at Talpy Den's settings. The buttons go as on
+  Plasma and GNOME: Focus, Find a chat, SSH hosts, Refresh, Settings. **Add
+  Claude Account…** moved to the **⋯** menu, next to **Claude Accounts…**
+  and **Default Claude Account…**; the menu is in three parts now: the view,
+  plan usage, accounts.
 - **A new chat is a speech bubble with a plus:** the **+** beside an
   account's name read as *add an account*; a bubble with a plus starts a
   new chat now, beside an account and on a project in the Projects tab.
   The **+** at the top of the view was **Add Account…**, which is in the
   **⋯** menu now; **Talpy Den: New Chat…** stays in the Command Palette.
-- **The chat tab's reply row as in the widget:** the microphone,
-  attaching files and the screenshot are icons now, a paperclip and a
-  camera for the two that were the text buttons *+* and *Screenshot…*;
-  while dictation records or writes it down, what it's doing shows beside
-  the microphone.
+- **The chat tab's reply row as on Plasma:** the microphone, attaching files
+  and the screenshot are icons now, a paperclip and a camera for the two
+  that were the text buttons *+* and *Screenshot…*; while dictation records
+  or writes it down, what it's doing shows beside the microphone.
 - **Refresh fetches the plan usage too:** an account's numbers came only
   with its chats' replies (and every 5 minutes while one of its chats
   worked in the Claude Code panel), so an account with no chat at work here
@@ -53,27 +113,30 @@
   (`claude -p /usage`: no tokens, no chat saved; at most once a minute),
   and the line under its bars says *Fetching the plan usage…* until the
   numbers are in.
-- **A background session shown in a terminal says so:** beside its
-  *Background* tag, in the list and in the chat tab: *Terminal* (its
-  tooltip names the terminal), *Tmux* or *VS Code terminal*, for `claude
-  attach` and for Claude Code's agent view. Where the terminal says its
-  tab's title (Konsole, tmux), the tag follows the session the title names.
+- **A background chat shown in a terminal says so:** beside its *Background*
+  tag, in the list and in the chat tab: *Terminal* (its tooltip names the
+  terminal), *Tmux* or *VS Code terminal*, for `claude attach` and for
+  Claude Code's agent view, in every terminal: the terminal counts for the
+  chat it was opened for, by its id. Where the terminal says its tab's title
+  (Konsole, Yakuake, tmux) and the title names another listed chat, the
+  agent view switched to that one, and the tag follows it (of several chats
+  with that name, only the one it was opened for counts).
 - **The chat tab's Chat tab is your messages and Claude's replies, and a
-  Steps tab has the rest:** **Chat** shows only what you and Claude say
-  (and what needs you: a permission, a question, a plan), with what it's
-  doing on the working line; **Steps** is what the Chat tab was, every tool
-  call too. The **Output** tab of a background session is gone: **Open its
-  window** shows any chat where it runs.
+  Steps tab has the rest:** **Chat** shows only what you and Claude say (and
+  what needs you: a permission, a question, a plan), with what it's doing on
+  the working line; **Steps** is what the Chat tab was, every tool call too.
+  The **Output** tab of a background chat is gone: **Open its window** shows
+  any chat where it runs.
 - **A tag says where a chat runs, in the list and in the chat tab:**
   *Terminal* (its tooltip names the terminal), *VS Code terminal*, *Tmux*,
-  *Claude Code panel*, *Background* or *Not open*, as in the widget.
+  *Claude Code panel*, *Background* or *Not open*, as on Plasma.
 - **A row's buttons are packed close:** narrow buttons side by side, and
   what's under them is cut right where they begin.
 - **The same words everywhere:** a chat in the Claude Code extension is in
-  its *Claude Code panel*, as in the widget (it was *Claude Code tab* here,
-  *VS Code* on its row), the switch for reopened chats too, and every tag
-  starts with a capital: *Auto mode*, *To review*, *Not tested*,
-  *Background*, *Default*…
+  its *Claude Code panel*, as on Plasma (it was *Claude Code tab* here, *VS
+  Code* on its row), the switch for reopened chats too, and every tag starts
+  with a capital: *Auto mode*, *To review*, *Not tested*, *Background*,
+  *Default*…
 - **What Claude tells you as it works shows in the chat tab:** with Claude
   Code showing thinking as updates, those words are kept as thinking in
   the transcript, and the tab left them out, in Chat and in Steps.
@@ -85,40 +148,108 @@
   chat's first prompt only, and the row looked for it in the chat's newest
   lines.
 - **Lists line up in columns:** recent chats, plans and memories end in a
-  folder column and a time column, so their tags, folders and times line
-  up, as in the widget.
+  folder column and a time column, so their tags, folders and times line up,
+  as on Plasma.
 - **Every account's usage bars are alike:** they start and end at the same
   place in every account, *resets in …* at the line's end in a column kept
   for it; an account with no reset time had longer bars.
-- **Removing a chat from the list is an ×,** as in the widget (it was a −).
+- **Hiding a chat is an ×,** as on Plasma (it was a −).
 - **The chat tab shows its chat's tags:** beside where it runs, what its
   row in the list says: *⇄ Shared* or *⇄ Shared copy*, its permission mode,
   *Plan ↗* (click: the plan) and its subagents.
 - **Inline code's ground ends with its last character:** in the chat tab
   it had room on each side that read as a space before a comma.
 - **The ticker is in the big Talpy's box:** what the working chats do right
-  now is the box's last line, under the counts, as in the widget; it was a
-  line under the box.
+  now is the box's last line, under the counts, as on Plasma; it was a line
+  under the box.
 - **Pets wait for one that leaves:** when a chat left the list, the pets
   beside it tunnelled over to their new spots at once, onto the one still
   waving and digging away, and a chat that got a pet's place dug up where
   another stood. They wait until it's gone now, then move up and the new
   one comes.
 - **Talpy thinks while a chat works:** the chat tab's working line had
-  Claude's orange ✻ turning. It's Talpy now, looking up at thought dots
-  that rise one after another, and the line is in the working color, as
-  in the widget.
+  Claude's orange ✻ turning. It's Talpy now, looking up at thought dots that
+  rise one after another, and the line is in the working color, as on
+  Plasma.
 - **The Projects tab starts folded, and a project's folder line fits:** the
   first three projects were open, and next to each project's numbers its
   folder and *last at work* line ran out of room in a narrow sidebar, cut
   right after the folder. Every project starts folded now, the numbers are
   a line of their own under the folder, and the arrow sits on the name.
-- **A pet you hold swings as in the widget:** one you held and swung kept
+- **A pet you hold swings as on Plasma:** one you held and swung kept
   swinging like a pendulum for seconds, its burrow swinging with it as it
-  dug in; its springs were only roughly the widget's. They're stepped as
-  Qt steps the widget's now (16 ms at a time, in the same order), so put
-  down, it wobbles back upright as in Plasma, a little, and stands upright
-  once its burrow opens: the burrow never swings.
+  dug in; its springs were only roughly Plasma's. They're stepped as Qt
+  steps Plasma's now (16 ms at a time, in the same order), so put down, it
+  wobbles back upright as in Plasma, a little, and stands upright once its
+  burrow opens: the burrow never swings.
+- **Replies reach the VS Code window that runs the chat:** a reply from a
+  chat's tab to a chat in a Claude Code panel (and one sent when the turn
+  ends) goes to the window that runs it, raised first, not whichever window
+  was used last; a plan's notification and the away summary open the chat's
+  tab when clicks open it, as every other notification does.
+- **Waiting replies go when they can:** a reply waiting for a chat's turn to
+  end, on an account at its usage limit, waits for the reset (*It waits for
+  the usage limit: it starts at 14:31*) as a queued task does, instead of
+  starting only to stop at once; cancelling it, or turning Keep going off
+  meanwhile, leaves the other alone and says so; Enter on an SSH host's chat
+  in a plain terminal copies the message here and opens its terminal instead
+  of saying the clipboard can't be used.
+- **Permission prompts without the hook:** a chat that made several calls at
+  once shows the request of the oldest one still open, the one Claude asks
+  about first, and a tmux chat whose prompt may be about another call than
+  the one shown (a subagent's, or one of several at once) gets no Allow /
+  Deny keys: you answer it in the chat. With the hook's folder cleaned up by
+  hand, Claude asks as it would without the hook instead of taking the
+  missing file as a refusal.
+- **A memory whose folder is gone still shows it:** a memory of a folder
+  that was renamed, moved or deleted shows that folder (the one its chats
+  ran in), marked *(not there any more)*.
+- **Forked chats count once:** a forked chat, or one continued in another
+  folder, counts the turns, permission prompts, large tool results and
+  compactions it copied once, in the Recap, the Permissions tab and the
+  Projects tab; a suggested rule shows *Allowed now* only when the folder's
+  settings or those of the accounts whose chats asked have it.
+- **The Monday recap counts what the Recap counts:** the SSH hosts whose
+  last check answered too, and it says its times as the Recap does (*Claude
+  worked 20m over 1 chat; you, 5m and 3 prompts.*) instead of *0 h over 1
+  chats*.
+- **Review keeps links and ignored files right:** **Undo** puts back the
+  file a link points to and leaves the link alone, **Commit** leaves out
+  files git ignores and says how many, *Reviewed ✓* goes by your mark, also
+  while the chat works, and the **Undo all** question and the commit box
+  open right above the buttons that open them.
+- **Small things that were off:** a plan's step with its commands in a
+  fenced code block shows them as a code block; a chat with ultracode on
+  keeps its *· ultracode* tag after a turn with big tool results; a chat
+  that went on after a turn broke off keeps its own name; a starred chat or
+  plan of an SSH host opens in a terminal like a recent one; an SSH host's
+  accounts tag *VS Code's Claude* only where VS Code ever connected to that
+  host; **Keep only on …** says the chat leaves the other accounts' lists
+  while the conversation stays, with **Keep Only on work** as its button; a
+  heading ending in `#` (*Notes on C#*) keeps it and a bare address with
+  parentheses links to the whole page; Chat ↔ Steps stays on the message you
+  were reading; a running background chat's reply hint says *Its background
+  chat stops, then goes on with your message*.
+- **The pets, steadier:** hiding the view while Talpy goes after a cookie no
+  longer hangs it; one grabbed again while it gets its bearings after a drop
+  stays in your hand; one interrupted while tunnelling pops up where it is;
+  petting the big Talpy while subagents work says how many (*Juggling 3
+  agents!*); the pets are painted again after the graphics lose their
+  pictures (a GPU reset, as after a suspend) or a zoom change; and the
+  little working Talpy in a chat's tab holds still while the tab is in the
+  background.
+- **Find a Chat, New Chat… and the rest:** **Find a Chat** searches the SSH
+  hosts whose last check answered, so one out of reach no longer leaves the
+  list empty for seconds at each word; **New Chat…** keeps the model, effort
+  and mode you pick where they count, and its task box stays open when you
+  click elsewhere and offers what you typed again after a later question was
+  cancelled; after Stop, Hide, Show again, Share and the like the list
+  checks again once a running check is done; the **+** (Attach) of an SSH
+  host's chat opens on this computer's files; Send Feedback to Claude shows
+  only on a plan's file on this computer; the microphone works in a Remote
+  window too; *Dictation is set up* no longer shows as an error; and in demo
+  mode a click on a made-up chat, its Allow / Deny or a queued task's Start
+  it now says the chats are made up.
 - **Plan usage keeps up with chats in Claude's VS Code panel:** the panel
   runs no status line, and Claude Code updates its own copy of the usage
   only when `/usage` runs, so an account used only there showed the same
@@ -194,26 +325,24 @@
   another account the default dropped that one from every list, with no
   word. It now says so instead, until that folder is in
   `talpyDen.extraConfigDirs`.
-- **An account reads as in the Plasma widget:** its token line gives
-  today's and the week's totals with their output (*Tokens today 378.3k
-  (12.0k out) · 7 days 502.9k (15.0k out)*); the week's two biggest
-  models, cut off mid-name in a narrow sidebar, are in its tooltip. How
-  old the plan usage is shows in a dim line under the bars (*Plan usage as
-  of 5m ago*, *…, on lab*), not as *usage updated …* at the right of the
-  heading. A chat's state words are colored only when it needs you or a
-  usage limit holds it (*Working* blue and *Done* green drowned out *Needs
-  input*); the dot carries every state's color. Removing a finished chat
-  from the list is a − (it was the × that also cancels a queued task and
-  hides a host). An account with nothing running reads *No chats running*
-  in the hero, and the files-changed tag reads *±3*, with *3 files
-  changed* over its list.
+- **An account reads as on Plasma:** its token line gives today's and the
+  week's totals with their output (*Tokens today 378.3k (12.0k out) · 7 days
+  502.9k (15.0k out)*); the week's two biggest models, cut off mid-name in a
+  narrow sidebar, are in its tooltip. How old the plan usage is shows in a
+  dim line under the bars (*Plan usage as of 5m ago*, *…, on lab*), not as
+  *usage updated …* at the right of the heading. A chat's state words are
+  colored only when it needs you or a usage limit holds it (*Working* blue
+  and *Done* green drowned out *Needs input*); the dot carries every state's
+  color. Removing a finished chat from the list is a − (it was the × that
+  also cancels a queued task and hides a host). An account with nothing
+  running reads *No chats running* in the hero, and the files-changed tag
+  reads *±3*, with *3 files changed* over its list.
 - **The focus view's Finished lines are the chats you haven't looked at
   yet:** they listed every chat whose turn ended in the last 15 minutes,
-  also ones you had opened and short turns, and left out failed ones. As
-  in the widget, they now list each chat whose turn (as long as the
-  finished notification asks) ended while its tab wasn't showing it,
-  failed ones too (*Failed: look at what happened*), until you open that
-  chat.
+  also ones you had opened and short turns, and left out failed ones. As on
+  Plasma, they now list each chat whose turn (as long as the finished
+  notification asks) ended while its tab wasn't showing it, failed ones too
+  (*Failed: look at what happened*), until you open that chat.
 - **The sidebar at its narrowest:** below about 330 px the Focus button
   was pushed off the right edge with no way to reach it, and around 220 px
   the Projects tab too. There the tabs you aren't on are icons now (named
@@ -232,25 +361,24 @@
   three times at once (over ssh for an SSH host's chat), once now. The
   Review's commit message box was unframed, read as plain text and had no
   focus ring; it's an input in the editor's font now. A JSON or YAML key,
-  and an HTML tag, in a diff is green as in the widget, not grey like a
-  comment.
+  and an HTML tag, in a diff is green as on Plasma, not grey like a comment.
 - **A chat's tab shows the newest reply as soon as you switch back:**
   nothing reads a hidden tab's conversation, and on showing it again the
   first read came only after up to 5 seconds (and moving focus between
   editors put it off again), so Claude's last reply was missing while the
   header already said the turn was done.
 - **Claude's replies show as Claude wrote them:** globs and arguments such
-  as `*.py and *.js`, `*args` or `**kwargs` lost their asterisks and
-  turned part of the reply italic or bold; a `\|` in a table split its
-  cell in two with the backslash showing; a code block under a numbered
-  step was shown and copied with the step's indentation on every line; a
-  numbered list with bullets under a step numbered the bullets too, and
-  the next step got a later number (*1. Step one, 2. detail, 3. detail, 4.
-  Step two*); and a link to a page with parentheses in its address
-  (Wikipedia's *C_(programming_language)*) opened a cut-off address and
-  left a stray `)` after its text. They show and copy as written now (the
-  bullets a list of their own under their step, as in the widget's pane,
-  the whole address the link), and a bare `https://` address is a link.
+  as `*.py and *.js`, `*args` or `**kwargs` lost their asterisks and turned
+  part of the reply italic or bold; a `\|` in a table split its cell in two
+  with the backslash showing; a code block under a numbered step was shown
+  and copied with the step's indentation on every line; a numbered list with
+  bullets under a step numbered the bullets too, and the next step got a
+  later number (*1. Step one, 2. detail, 3. detail, 4. Step two*); and a
+  link to a page with parentheses in its address (Wikipedia's
+  *C_(programming_language)*) opened a cut-off address and left a stray `)`
+  after its text. They show and copy as written now (the bullets a list of
+  their own under their step, as in Plasma's chat pane, the whole address
+  the link), and a bare `https://` address is a link.
 - **Back from Review or Output:** a chat tab showed the chat's beginning
   and stopped following new steps. It's at its end and follows it again if
   it was when you left, else where you were. *Show earlier* past the
@@ -282,39 +410,37 @@
   don't ask again*, so *Always allow* said *That answer isn't one of the
   choices it shows*. It picks that option now.
 - **Notifications about several chats offer only Open:** *Two chats change
-  the same files* showed the first chat's Allow once and Deny (or its
-  plan, or its question's options) when that chat was asking something, so
-  Allow approved a command the notification never named; and *the usage
-  limit reset* had a *Reply…* that went to the first chat it named only.
-  Both have just *Open* now, as in the widget. A chat open on two accounts
-  made two *same files* notifications; it makes one.
+  the same files* showed the first chat's Allow once and Deny (or its plan,
+  or its question's options) when that chat was asking something, so Allow
+  approved a command the notification never named; and *the usage limit
+  reset* had a *Reply…* that went to the first chat it named only. Both have
+  just *Open* now, as on Plasma. A chat open on two accounts made two *same
+  files* notifications; it makes one.
 - **A reply from a notification that isn't sent says so:** when the
   message typed into a notification's *Reply…* couldn't be sent, only the
   Talpy Den view said why, which usually isn't on screen then, and the
   text was gone. A notification says so now, and its *Open* shows the
   chat's tab with your message ready to send again.
-- **Live mode keeps every step of a chat that runs for days:** a new
-  session elsewhere removed the lock of a chat older than three days, so
-  two of its events could arrive at once and one was lost (a finished turn
-  could show as working). The hook you have updates itself at the next
-  check.
+- **Live mode keeps every step of a chat that runs for days:** a new chat
+  elsewhere removed the lock of a chat older than three days, so two of its
+  events could arrive at once and one was lost (a finished turn could show
+  as working). The hook you have updates itself at the next check.
 - **Dictation leaves nothing behind:** a recording that the chat tab
   cancelled while it was still starting is stopped as soon as it starts,
   and recordings left behind are removed after an hour.
-- **What you opened on a chat stays open when its session ends:** when a
-  background session finished, its row folded the details or the subagents
-  you had open, and faded in as if it were a new chat. They're kept by the
-  chat now.
+- **What you opened on a chat stays open when its Claude ends:** when a
+  background chat finished, its row folded the details or the subagents you
+  had open, and faded in as if it were a new chat. They're kept by the chat
+  now.
 - **Go on at … says the day:** a weekly limit that resets on another day
   read *Go on at 09:01*, as if it were today. The button, its tooltips, a
   recent chat's ⏱ tag and a queued chat's line say *tomorrow 09:01* or
   *Fri 30 Oct 09:01* now.
-- **A usage bar's forecast in the widget's words:** the red line under a
-  bar said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it
-  says how long before the reset it runs out now (*full in 1h 20m, 45m
-  before it resets*), and its tooltip gives your pace with one decimal,
-  the time it runs out, and no *about N% when it resets* for a full
-  window.
+- **A usage bar's forecast in Plasma's words:** the red line under a bar
+  said when the window resets (*full in 1h 20m (resets in 2h 5m)*); it says
+  how long before the reset it runs out now (*full in 1h 20m, 45m before it
+  resets*), and its tooltip gives your pace with one decimal, the time it
+  runs out, and no *about N% when it resets* for a full window.
 - **Remote-SSH windows:** plans, memories and subagent runs opened through
   an address the window doesn't serve, so *Couldn't open the plan* (or the
   memory, or the subagent's run) came instead, a plan of this computer
@@ -348,13 +474,13 @@
   reset time already past (*97% · resets 14:00*) and the old window's
   fill. It shows *0% · reset* now, as the usage bars do.
 - **The Recap's share card and dates:** the Overall share card's bars ran
-  from the newest week to the oldest, backwards against the Week card's,
-  and with more than about 30 weeks of history they ran off the card's
-  right edge; they show the last 20 weeks now, oldest first. *Everything
-  since …*, the price list's date and the exchange rate's read *24 Oct
-  2026*, not *24 October 2026*, as in the widget. *Open the Recap* from
-  the Monday notification no longer makes the next Talpy Den page that
-  loads (*Open in Editor* hours later, say) start on the Recap too.
+  from the newest week to the oldest, backwards against the Week card's, and
+  with more than about 30 weeks of history they ran off the card's right
+  edge; they show the last 20 weeks now, oldest first. *Everything since …*,
+  the price list's date and the exchange rate's read *24 Oct 2026*, not *24
+  October 2026*, as on Plasma. *Open the Recap* from the Monday notification
+  no longer makes the next Talpy Den page that loads (*Open in Editor* hours
+  later, say) start on the Recap too.
 - **The Recap, Permissions and Projects tabs:** a day's chats and a
   folder's chats open from the keyboard too (Tab to it, then Enter or
   Space). In *Chats it worked on most* the folder gives way before the
@@ -366,20 +492,20 @@
   0m*) beside a dot in that state's color, not a blue dot for all and the
   word *done*; and the tab no longer reads every chat every 10 minutes
   while the view is hidden.
-- **Pets:** when an account's last chat left, its stage folded away at
-  once with the pet frozen, and the pet waved and dug away later, beside
-  the next chat's pet; the stage stays open until the pet is gone now, as
-  in the widget. A chat that finished (or failed, or hit a limit) while
-  the view was hidden was acted out with its words when you next looked,
-  however long ago that was; now a pet acts out only what happened in the
-  last minute, and leaves older news be. After switching to another dark
-  theme (or another light one), the pets' words, z's and sparks kept the
-  old theme's color until the view reloaded; they follow it now.
+- **Pets:** when an account's last chat left, its stage folded away at once
+  with the pet frozen, and the pet waved and dug away later, beside the next
+  chat's pet; the stage stays open until the pet is gone now, as on Plasma.
+  A chat that finished (or failed, or hit a limit) while the view was hidden
+  was acted out with its words when you next looked, however long ago that
+  was; now a pet acts out only what happened in the last minute, and leaves
+  older news be. After switching to another dark theme (or another light
+  one), the pets' words, z's and sparks kept the old theme's color until the
+  view reloaded; they follow it now.
 - **A check that ended isn't waited for:** when a helper had answered but
   something it started still held its output, the view waited until that
   ended, then said the check took too long (and no other check of this
   computer started meanwhile).
-- **VS Code and the Plasma widget don't slow each other down:** each made
+- **VS Code and Talpy Den on Plasma don't slow each other down:** each made
   the other read its chats' transcripts again from the start, on every
   check, when they list different chats.
 
