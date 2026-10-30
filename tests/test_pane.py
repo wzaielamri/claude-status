@@ -1265,6 +1265,41 @@ class ReviewTests(PaneFixture):
         self.assertEqual((self.folder / "a.py").read_text(), "x = 1\ny = 2\n")
         self.assertEqual((self.folder / "other.py").read_text(), "mine, not the chat's\n")  # (not the chat's)
 
+    def test_undo_through_a_link_puts_back_the_file_it_points_to(self):
+        # (a dotfile kept elsewhere: the chat's Edit wrote through the link)
+        t = self.now - 50
+        real, link = self.home / "dotfiles/bashrc", self.folder / ".bashrc"
+        write(real, "alias ll='ls -l'\nexport EDITOR=vim\n")
+        link.symlink_to(real)
+        edited = tool_result("ln1", t + 1)
+        edited["toolUseResult"] = {"filePath": str(link), "originalFile": "alias ll='ls -l'\n", "structuredPatch": []}
+        with open(self.transcript, "a") as f:
+            f.write(lines(tool_use("ln1", "Edit", {"file_path": str(link), "old_string": "", "new_string": "x"}, t, "ln1"),
+                          edited))
+        self.assertEqual(pane.undo(self.home, [], SID, None, {str(link)}), (True, "Put back 1 file as before the chat"))
+        self.assertEqual((link.is_symlink(), real.read_text()), (True, "alias ll='ls -l'\n"))
+
+    @unittest.skipUnless(HAVE_GIT, "needs git")
+    def test_commit_leaves_out_files_git_ignores(self):
+        write(self.folder / ".gitignore", ".env\n")
+        self.git("add", ".gitignore")
+        self.git("commit", "-qm", "ignore")
+        env = self.folder / ".env"
+        t = self.now - 50
+        made = tool_result("e1", t + 1)
+        made["toolUseResult"] = {"type": "create", "filePath": str(env), "content": "TOKEN=x\n", "originalFile": None}
+        with open(self.transcript, "a") as f:
+            f.write(lines({"type": "file-history-delta", "trackingPath": str(env), "snapshotMessageId": "p",
+                           "backup": {"backupFileName": None, "version": 1}, "sessionId": SID},
+                          tool_use("e1", "Write", {"file_path": str(env), "content": "TOKEN=x\n"}, t, "e1"), made))
+        write(env, "TOKEN=x\n")
+        answer = self.cli("--commit", SID, "--message", "Set x to 3")
+        self.assertTrue(answer["ok"], answer)
+        self.assertRegex(answer["message"], r"^Committed 2 files in .*\) \(left out 1 file git ignores\)$")
+        self.assertEqual(self.git("show", "--name-only", "--format=", "HEAD").split(), ["a.py", "new.py"])
+        self.assertEqual(self.cli("--commit", SID, "--message", "Env", "--file", str(env)),
+                         {"ok": False, "message": "Nothing to commit: git ignores its file"})
+
     def test_without_git_it_reviews_but_doesnt_commit(self):
         with mock.patch.object(pane.shutil, "which", return_value=None):
             self.assertEqual([f["label"] for f in self.cli("--review", SID)["files"]], ["a.py", "new.py"])

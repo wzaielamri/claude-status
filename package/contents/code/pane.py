@@ -1108,14 +1108,15 @@ def read_bytes(path):
         return None
 
 
-def git(folder, *args, data=None, timeout=20):
+def git(folder, *args, data=None, timeout=20, literal=True):
     """(ok, stdout, stderr) of git in folder. Paths are names, not patterns
-    (else a chat's a[1].txt would take your a1.txt along)."""
+    (else a chat's a[1].txt would take your a1.txt along; literal=False for
+    a command that takes no patterns and refuses the option: check-ignore)."""
     if not shutil.which("git"):
         return False, "", "git isn't installed"
     try:
-        r = subprocess.run(["git", "--literal-pathspecs", "-C", folder, *args], input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           timeout=timeout)
+        r = subprocess.run(["git", *(["--literal-pathspecs"] if literal else []), "-C", folder, *args], input=data,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, "", str(exc)
     return r.returncode == 0, r.stdout.decode("utf-8", "replace"), r.stderr.decode("utf-8", "replace")
@@ -1343,29 +1344,32 @@ def undo(home, extra_dirs, chat_id, profile_key=None, wanted=()):
             unknown += 1
             continue
         current = read_bytes(full)
+        # (through a link, e.g. a dotfile kept elsewhere: the file it points
+        # to is the one the chat changed, and the link stays)
+        real = os.path.realpath(full)
         try:
             if original == b"" and created:
                 if current is not None:
-                    os.unlink(full)
+                    os.unlink(real)
                     done += 1
             elif current != original:
-                tmp = full + ".talpy-den-undo"
+                tmp = real + ".talpy-den-undo"
                 # (with your umask, not this run's private one: a file or
                 # folder it brings back is as you'd have made it)
                 mask = os.umask(USER_UMASK[0]) if USER_UMASK[0] is not None else None
                 try:
-                    os.makedirs(os.path.dirname(full), exist_ok=True)
+                    os.makedirs(os.path.dirname(real), exist_ok=True)
                     with open(tmp, "wb") as f:
                         f.write(original)
                 finally:
                     if mask is not None:
                         os.umask(mask)
                 if current is not None:
-                    shutil.copymode(full, tmp)
+                    shutil.copymode(real, tmp)
                 elif git_executable(full):  # (a script it removed runs again)
                     mode = os.stat(tmp).st_mode
                     os.chmod(tmp, mode | (mode & 0o444) >> 2)
-                os.replace(tmp, full)
+                os.replace(tmp, real)
                 done += 1
         except OSError as exc:
             failed.append(f"{cs.file_label(full, cwd, home)}: {exc.strerror or exc}")
@@ -1396,8 +1400,15 @@ def commit(home, extra_dirs, chat_id, message, profile_key=None, wanted=()):
             by_repo.setdefault(root, []).append(os.path.relpath(f["path"], root))
     if not by_repo:
         return False, "None of its files is in a git repository"
-    done = []
+    done, ignored = [], 0
     for root, paths in sorted(by_repo.items()):
+        # (git refuses to add a file it ignores, a .env say: those are left out)
+        _, out, _ = git(root, "check-ignore", "-z", "--stdin", data="\0".join(paths).encode(), literal=False)
+        left_out = set(out.split("\0")) - {""}
+        ignored += len(left_out)
+        paths[:] = [p for p in paths if p not in left_out]
+        if not paths:
+            continue
         ok, _, err = git(root, "add", "-A", "--", *paths)
         if not ok:
             return False, f"git add in {cs.short_path(root, home)}: {last_line(err)}"
@@ -1406,8 +1417,11 @@ def commit(home, extra_dirs, chat_id, message, profile_key=None, wanted=()):
             return False, f"git commit in {cs.short_path(root, home)}: {last_line(err or out)}"
         ok, head, _ = git(root, "rev-parse", "--short", "HEAD")
         done.append(f"{cs.short_path(root, home)} ({head.strip()})" if ok else cs.short_path(root, home))
+    if not done:
+        return False, "Nothing to commit: git ignores " + ("its file" if ignored == 1 else f"all {ignored} of its files")
     n = sum(len(p) for p in by_repo.values())
-    return True, f"Committed {n} file{'s' if n != 1 else ''} in " + ", ".join(done)
+    left = f" (left out {ignored} file{'s' if ignored != 1 else ''} git ignores)" if ignored else ""
+    return True, f"Committed {n} file{'s' if n != 1 else ''} in " + ", ".join(done) + left
 
 
 def last_line(text):
