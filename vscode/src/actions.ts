@@ -194,7 +194,7 @@ export class Actions {
     }
     // A command opens it: a background job attaches, a finished chat resumes
     if (chat.openCommand) {
-      await this.terminals.run(`${host ?? ""}|${chat.key}`, chat.name, chat.openCommand, this.place(host));
+      await this.terminals.run(`${host ?? ""}|${chat.key}`, chat.name, chat.openCommand, this.place(host), { chatOn: host });
       return;
     }
     // Not running, and no command for it (a chat the Recap names, an older
@@ -537,7 +537,7 @@ export class Actions {
       ? await this.backend.action("remote.py", [flag, host, id, ...(profile ? [profile] : []), ...print])
       : await this.backend.action("jump.py", [flag, id, ...(profile ? ["--profile", profile] : []), ...print, ...configDirArgs()]);
     if (this.report(answer, "Couldn't share it")) {
-      if (answer.command) await this.terminals.run(`${host ?? ""}|${id}|${pick.group?.shareProfile ?? ""}`, chat.name, answer.command, this.place(host));
+      if (answer.command) await this.terminals.run(`${host ?? ""}|${id}|${pick.group?.shareProfile ?? ""}`, chat.name, answer.command, this.place(host), { chatOn: host });
       else if (pick.kind2 !== "continue") this.dash.setActionInfo(answer.message);
     }
     this.refresh(host);
@@ -559,7 +559,7 @@ export class Actions {
       ? await this.backend.action("remote.py", ["--continue", host, id, profile, ...endFirst, ...print])
       : await this.backend.action("jump.py", ["--continue", id, "--profile", profile, ...endFirst, ...print, ...configDirArgs()]);
     if (this.report(answer, "Couldn't continue it there") && answer.command)
-      await this.terminals.run(`${host ?? ""}|${id}|${profile}`, chat.name, answer.command, this.place(host));
+      await this.terminals.run(`${host ?? ""}|${id}|${profile}`, chat.name, answer.command, this.place(host), { chatOn: host });
     this.refresh(host);
   }
 

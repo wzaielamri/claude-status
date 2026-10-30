@@ -39,6 +39,7 @@ export function posixCommand(command: string): string {
 }
 
 const JUST_STARTED_MS = 10000; // a second click this soon shows the terminal the first one opened
+const UNLISTED_MS = 120000; // ... a chat's on the window's host at most this long while its checks fail
 
 // Parent of a process here, from /proc (Linux); null when unknown
 export function parentPid(pid: number): number | null {
@@ -116,9 +117,12 @@ export class Terminals implements vscode.Disposable {
   private local = new WeakSet<vscode.Terminal>(); // the ones made here on this computer
   private byKey = new Map<string, vscode.Terminal>();
   private startedAt = new WeakMap<vscode.Terminal, number>();
+  private chatHost = new WeakMap<vscode.Terminal, string>(); // a chat's on the window's host: that host
   private subscription: vscode.Disposable;
 
-  constructor() {
+  // checkedSince: whether a check of the host that started at since or later
+  // has answered (the dashboard's)
+  constructor(private checkedSince: (host: string, since: number) => boolean = () => false) {
     this.subscription = vscode.window.onDidCloseTerminal((t) => {
       for (const [k, v] of this.byKey) if (v === t) this.byKey.delete(k);
     });
@@ -158,12 +162,21 @@ export class Terminals implements vscode.Disposable {
   // (a local terminal whose command hasn't finished: its shell has a child).
   // private: VS Code doesn't keep it (a login: its screen isn't saved for
   // restoring the terminal after a reload, nor the terminal restored).
-  async run(key: string, name: string, command: string, place: Place, opts: { private?: boolean } = {}): Promise<vscode.Terminal> {
+  // chatOn: the window's host, for a chat that runs there: the terminal
+  // counts as running it until that host's next check has answered (until
+  // then the chat's row doesn't say it runs, nor finds this terminal: a
+  // second click would start it again next to the first)
+  async run(key: string, name: string, command: string, place: Place, opts: { private?: boolean; chatOn?: string } = {}): Promise<vscode.Terminal> {
     const existing = this.byKey.get(key);
     if (existing && !existing.exitStatus) {
       // just opened (its command may not have started yet, and a host's can't
-      // be looked at), or here and still running its command
-      const fresh = Date.now() - (this.startedAt.get(existing) ?? 0) < JUST_STARTED_MS;
+      // be looked at), a chat on the window's host no check has listed yet
+      // (one that started once the chat had its time to start), or here and
+      // still running its command
+      const started = this.startedAt.get(existing) ?? 0;
+      const host = this.chatHost.get(existing);
+      const unlisted = !!host && Date.now() - started < UNLISTED_MS && !this.checkedSince(host, started + JUST_STARTED_MS);
+      const fresh = Date.now() - started < JUST_STARTED_MS || unlisted;
       const pid = fresh || !this.local.has(existing) ? undefined : await existing.processId;
       if (fresh || (pid && hasChildren(pid))) {
         existing.show();
@@ -183,6 +196,7 @@ export class Terminals implements vscode.Disposable {
     if (place.kind !== "windowHost") options.cwd = vscode.Uri.file(os.homedir());
     const t = vscode.window.createTerminal(options);
     if (place.kind !== "windowHost") this.local.add(t);
+    else if (opts.chatOn) this.chatHost.set(t, opts.chatOn);
     this.byKey.set(key, t);
     this.startedAt.set(t, Date.now());
     t.show();

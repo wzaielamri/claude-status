@@ -48,11 +48,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const log = vscode.window.createOutputChannel("Talpy Den", { log: true });
   void carryOverOldSettings(context, log);
   const backend = new Backend(context.extensionPath, settings.python);
-  const terminals = new Terminals();
   // Notifications open chats through the actions, which need the dashboard
   let actions: Actions | undefined;
   const notifier = new Notifier(backend, (chat) => void actions?.open(chat));
   const dash = new Dashboard(backend, notifier, log);
+  const terminals = new Terminals((host, since) => dash.hostCheckedSince(host, since));
   const statusBar = new StatusBar(); // (first: the main status bar item)
   const account = new AccountSwitch(dash, backend);
   const answerOldest = async (decision: "allow" | "deny"): Promise<void> => {

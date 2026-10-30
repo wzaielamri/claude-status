@@ -40,6 +40,7 @@ export class Dashboard implements vscode.Disposable {
   private localBusy = false;
   private hostBusy = new Set<string>();
   private hostAgain = new Set<string>(); // an action there while its check ran: checked again after it
+  private hostAnswered = new Map<string, number>(); // host -> when its last check that answered started
   private localTimer?: NodeJS.Timeout;
   private hostTimer?: NodeJS.Timeout;
   private retryTimer?: NodeJS.Timeout; // Python didn't work: try again (its own timer: polls mustn't cancel it)
@@ -373,6 +374,13 @@ export class Dashboard implements vscode.Disposable {
     void this.refresh();
   }
 
+  // Whether a check of host that started at since or later has answered:
+  // what runs there since then is in its rows (Terminals)
+  hostCheckedSince(host: string, since: number): boolean {
+    const asked = this.hostAnswered.get(host);
+    return asked !== undefined && asked >= since;
+  }
+
   // (changed: something was done there while a check ran, which may have
   // read it before: it checks again once that's done)
   async pollHost(host: string, changed = false): Promise<void> {
@@ -383,6 +391,7 @@ export class Dashboard implements vscode.Disposable {
     this.hostBusy.add(host);
     h.loading = true;
     this.emit();
+    const asked = Date.now();
     try {
       const answer = await this.backend.hostStatus(host, statusArgs());
       const now = this.hosts.get(host);
@@ -400,6 +409,7 @@ export class Dashboard implements vscode.Disposable {
         );
         const resets = this.tracker.resets("ssh:" + host, result.groups);
         Object.assign(now, { loading: false, ok: true, error: "", result, updatedAt: Date.now(), login: false, loggedIn: !!answer.loggedIn });
+        this.hostAnswered.set(host, asked);
         this.react(changes, resets);
       } else {
         // keep the last answer to show (dimmed) with the error
