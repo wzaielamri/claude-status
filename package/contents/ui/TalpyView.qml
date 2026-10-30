@@ -42,6 +42,7 @@ Item {
     property int shownSheet: 0
     property int wantedSheet: 0            // the film's front: it shows once its picture is painted
     signal travel(int ms)                  // it dug in: move it to its new spot within ms
+    signal travelStop()                    // (cut short on the way: it stops where it is)
     signal ready()                         // talpy exists
 
     width: box * 1.6
@@ -73,6 +74,7 @@ Item {
         talpy = new T.Talpy({ colors: colors(), theme: theme(), travels: travels, words: s => words[s] || s })
         talpy.facingLeft = facingLeft
         talpy.onTravel = ms => view.travel(ms)
+        talpy.onTravelStop = () => view.travelStop()
         talpy.tick(Date.now())
         // (pictures in between a frame apart)
         film = new F.Films(talpy, { sheets: sheets, frameMs: frameMs, maxFrames: maxFrames, tweenMs: tweenMs,

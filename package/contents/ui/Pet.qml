@@ -182,8 +182,8 @@ Item {
             return       // in your hand (put down, it digs back), or on its way out
         if (!strip.firstShown || arriving)
             px = homeX   // not seen yet, or still underground: it's just there
-        else
-            digTo(homeX, true)
+        else if (!lone)
+            digTo(homeX, true)   // (the big Talpy stays where he wandered to, as in VS Code and GNOME)
     }
     // The strip got narrower: back inside it
     onMaxXChanged: if (!held && px > maxX) digTo(maxX, true)
@@ -397,6 +397,8 @@ Item {
         }
         // (a cookie out: it stays out of its burrow and goes after it)
         const feel = talpy.land(fromHeight / unit, () => {
+            if (pet.held)
+                return   // picked up again before it was done (pickUp): nothing of landing happens in your hand
             pet.landing = false
             if (pet.game)
                 pet.game.landed()
@@ -704,6 +706,7 @@ Item {
         restMs: pet.lone ? 200 : 0
         smooth: true
         onReady: pet.start()
+        onTravelStop: stride.stop()
         onTravel: ms => {
             let to = pet.travelTo
             pet.travelTo = -1

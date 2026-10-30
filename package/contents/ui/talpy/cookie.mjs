@@ -264,6 +264,13 @@ export class CookieGame {
             this.holeLeft = false;
             this.host.fillHole();
         }
+        if (c && !c.held && c.vx === 0) {   // (a stage that got narrower brings it back in)
+            c.x = this.fit(c.x, c.y).x;
+        }
+        // a look at it (or a landing) cut short by something else: it goes after it all the same
+        const t = this.talpy;
+        if (c && !this.chasing && (this.state === 'spot' || this.state === 'held') && t.run === null && !t.held && !t.tugging)
+            this.go();
         if (this.chasing && c)
             this.follow(dt, c);
         this.host.changed();

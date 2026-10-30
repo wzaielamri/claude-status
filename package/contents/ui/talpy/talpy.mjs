@@ -8,6 +8,7 @@
 //   t.react('pet');                // an action now (see actions.mjs)
 //   t.tug(ok => ...);              // you pull at it: it holds on to its burrow, then comes out
 //   t.onTravel = ms => { ... };    // it dug in: move it to its new spot within ms
+//   t.onTravelStop = () => { ... }; // (optional) cut short under way: it stops where it is
 //   every frame: t.tick(Date.now()); then draw(ctx) in a 64 × 64 box, floor at y = 57
 //
 // Pulled at in its burrow (tug), it hangs on to the rim for a moment first;
@@ -304,6 +305,7 @@ export class Talpy {
         this.words = opts.words || (s => s);
         this.travels = !!opts.travels;    // may dig over to another spot (the host moves it: onTravel)
         this.onTravel = null;
+        this.onTravelStop = null;         // (a run cut short while it tunnels: the move stops too)
         this.facingLeft = false;
         // (part, left) => the open hole's side drawn by drawHoleSide on a sheet the
         // size of the canvas Talpy's drawn on, at the same transform; null: drawn
@@ -552,6 +554,9 @@ export class Talpy {
     cancel() {
         const r = this.run;
         this.run = null;
+        // (it pops up where it is, not gliding on to where the tunnel went)
+        if (r && r.i >= 0 && r.i < r.steps.length && r.steps[r.i].travel && this.onTravelStop)
+            this.onTravelStop();
         if (r && r.done)
             r.done(false);
     }

@@ -48,6 +48,7 @@ export class Pictures {
             s.key = '~';
             s.ready = false;
         }
+        this.waiting = this.coming = null;   // (a picture asked for before is drawn again, not waited for)
         this.liveAt = -1e9;
     }
 
