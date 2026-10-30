@@ -30,6 +30,9 @@ profiles:
     --share CHAT_ID [--profile PROFILE]   share it with every profile (from PROFILE's copy)
     --continue CHAT_ID --profile PROFILE  share it with PROFILE if needed; the command reopening it there
     --unshare CHAT_ID --profile PROFILE   keep it only on PROFILE
+    --delete-chat CHAT_ID | --delete-plan SLUG [--profile PROFILE] | --delete-memory KEY [--describe]
+                                          to the Trash (--describe: the question to ask first),
+                                          with accounts.py loaded too (remote.delete)
     [--config-dir DIR]... [--remote]      extra Claude config dirs; the JSON after a marker line
 """
 
@@ -570,8 +573,246 @@ def plan_sharing(profiles, slug, name, share_it, to=None):
     return share_plan(profiles, slug, into, source)
 
 
+# ---------------------------------------------------------------- deleting
+#
+# A chat, a plan or a memory can be deleted (jump.py --delete-chat,
+# --delete-plan, --delete-memory; on an SSH host remote.py runs this file's
+# main() there): it goes to the Trash (accounts.move_to_trash; the host's
+# Trash on a host), from every account that has it, after a question the
+# front ends ask with describe's words. Nothing is unlinked: another
+# account's link (a shared chat's transcript and folders, a plan) goes to the
+# Trash too. A chat a session has open isn't deleted.
+
+DELETE_KINDS = ("chat", "plan", "memory")
+MEMORY_KEY = re.compile(r"^(.+)/([A-Za-z0-9._-]+)/([^/]+)/memory$")  # <profile>/<project>/<name>/memory
+
+
+def spot(path):
+    """The directory entry path names, not followed if it's a link (entry()
+    follows it): (its folder's device and inode, its name)."""
+    folder = os.path.realpath(os.path.dirname(str(path)))
+    try:
+        st = os.stat(folder)
+    except OSError:
+        return folder, os.path.basename(str(path))
+    return st.st_dev, st.st_ino, os.path.basename(str(path))
+
+
+def and_list(names):
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def gather(pairs):
+    """[(profile, path)] → (the profiles' labels, the paths once each, as entries)."""
+    labels, paths, seen = [], [], set()
+    for p, path in pairs:
+        if p is not None and p.label not in labels:
+            labels.append(p.label)
+        if present(path) and spot(path) not in seen:
+            seen.add(spot(path))
+            paths.append(path)
+    return labels, paths
+
+
+def chat_to_delete(profiles, chat_id, name, root):
+    """The copy of a chat that goes (the one the profile name has, else the
+    only one), from every profile that shares it: (its accounts, the paths
+    to move to the Trash, its transcript), or (None, why not, None)."""
+    if not cs.valid_id(chat_id):
+        return None, f"Not a chat: {chat_id}", None
+    groups = copies(profiles, chat_id)
+    if not groups:
+        return None, "That chat isn't there any more", None
+    if name:
+        owner = named(profiles, name)
+        if owner is None:
+            return None, f"No Claude profile called {name}", None
+        chat = next((g for g in groups if any(p.real == owner.real for p, _ in g)), None)
+        if chat is None:
+            return None, f"{owner.label} doesn't have this chat", None
+    elif len(groups) > 1:
+        return None, "Several accounts have different chats with this id: say which account's goes", None
+    else:
+        chat = groups[0]
+    path = chat[0][1]
+    key = path.parent.name
+    if not PROJECT_KEY.match(key) or key in (".", ".."):
+        return None, f"Unexpected project folder {key}; left the chat as it is", None
+    sharers = [p for p, _ in chat]
+    pairs = list(chat) + [(p, in_profile(p, key, chat_id, part)) for p in sharers for part in FOLDERS]
+    store = store_paths(sharers, key, chat_id, root)
+    if store[TRANSCRIPT].is_file() and same(store[TRANSCRIPT], path):
+        pairs.append((None, store[TRANSCRIPT]))  # (the store's own link to it)
+    for part in FOLDERS:  # (what the profiles' links point to)
+        if any(in_profile(p, key, chat_id, part).is_symlink() for p in sharers) and store[part].is_dir():
+            pairs.append((None, store[part]))
+    labels, paths = gather(pairs)
+    return labels, paths, path
+
+
+def plan_to_delete(profiles, slug, name):
+    """A plan that goes (the profile name's, else the only one), from every
+    profile it's linked into: (its accounts, its paths, the file), or (None, why not, None)."""
+    if not cs.PLAN_SLUG.match(slug or ""):
+        return None, f"Not a plan name: {slug}", None
+    have = plan_copies(profiles, slug)
+    if not have:
+        return None, "That plan isn't there any more", None
+    if name:
+        owner = named(profiles, name)
+        if owner is None:
+            return None, f"No Claude profile called {name}", None
+        src = next((path for p, path in have if p.real == owner.real), None)
+        if src is None:
+            return None, f"{owner.label} doesn't have this plan", None
+    else:
+        src = have[0][1]
+        if not all(same(path, src) for _, path in have):
+            return None, "Several accounts have a different plan of that name: say which account's goes", None
+    labels, paths = gather((p, path) for p, path in have if same(path, src))
+    return labels, paths, src
+
+
+def memory_to_delete(profiles, key):
+    """A memory file, by the key the status lists it with: (its profile, its
+    path), or (None, why not). An account's CLAUDE.md isn't one."""
+    if (key or "").endswith("/CLAUDE.md/memory"):
+        return None, "CLAUDE.md, your instructions for every chat on the account, isn't deleted from here"
+    m = MEMORY_KEY.match(key or "")
+    if not m or m.group(2) in (".", "..") or m.group(3) in (".", "..", "MEMORY"):
+        return None, f"Not a memory: {key}"
+    p = next((q for q in profiles if q.key == m.group(1)), None)
+    if p is None:
+        return None, f"No Claude profile called {m.group(1)}"
+    path = p.path / "projects" / m.group(2) / "memory" / (m.group(3) + ".md")
+    if not path.is_file():
+        return None, "That memory isn't there any more"
+    return p, path
+
+
+def unindex_memory(path):
+    """Take the lines of the memory folder's MEMORY.md that link path's file
+    out (Claude reads that index in each new chat); every other byte stays.
+    Whether it changed."""
+    index = os.path.realpath(str(path.parent / "MEMORY.md"))
+    try:
+        with open(index, "rb") as f:
+            data = f.read()
+    except FileNotFoundError:
+        return False
+    link = re.compile(rb"\]\(\s*<?(?:\./)?" + re.escape(path.name.encode("utf-8")) + rb">?(?:\s+\"[^\"]*\")?\s*\)")
+    lines = data.splitlines(keepends=True)
+    kept = [line for line in lines if not link.search(line)]
+    if len(kept) == len(lines):
+        return False
+    tmp = os.path.join(os.path.dirname(index), f".MEMORY.md.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "wb") as f:
+            f.write(b"".join(kept))
+        shutil.copymode(index, tmp)
+        os.replace(tmp, index)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return True
+
+
+def recap_reads(home, profiles):
+    """The Recap reads what the transcripts added before one goes (week.py's
+    cache keeps what it read: the Recap keeps the chat's numbers)."""
+    try:
+        import week  # (not on an SSH host: there it reads them when the Recap asks)
+    except ImportError:
+        return
+    try:
+        cache_root = cs.cache_dir(home)
+        if week.cache_path(cache_root).is_file():
+            import time
+            week.updated_cache(cache_root, profiles, int(time.time() * 1000))
+    except Exception:  # (the Recap is no reason not to delete)
+        pass
+
+
+def to_trash(paths, home):
+    """Move the paths to the Trash, links first (a link to a folder that went
+    already would be one to nothing): (ok, message)."""
+    import accounts
+    for path in paths:
+        why = accounts.trash_problem(path, home)
+        if why:
+            return False, f"Nothing was deleted: {why}"
+    done = 0
+    try:
+        for path in sorted(paths, key=lambda path: not path.is_symlink()):
+            accounts.move_to_trash(path, home)
+            done += 1
+    except (OSError, ValueError, accounts.subprocess.SubprocessError) as exc:
+        return False, f"Couldn't finish: {exc}" + (f" ({done} of {len(paths)} moved to the Trash)" if done else "")
+    return True, "Moved to the Trash"
+
+
+def delete(profiles, kind, item, name, root, home, describe=False):
+    """Delete a chat, a plan or a memory (kind chat, plan, memory; name: the
+    profile whose copy), or (describe) say what would go: {"ok", "message",
+    and with describe "question", "name", "accounts", "open"}. The question
+    is the one to ask; "open" names the account a session has the chat open
+    on (it isn't deleted then: ok is false, the message says why)."""
+    if kind == "memory":
+        p, path = memory_to_delete(profiles, item)
+        if p is None:
+            return {"ok": False, "message": path}
+        title = cs.memory_head(path).get("name") or path.stem
+        folder = cs.memory_folder(path.parent.parent)[0]
+        question = (f"Delete the memory “{title}”? It goes to the Trash, and Claude stops reading it in new "
+                    f"chats in {cs.short_path(folder, home)}.")
+        labels, paths, busy = [p.label], [path], None
+    elif kind == "plan":
+        labels, paths, src = plan_to_delete(profiles, item, name)
+        if labels is None:
+            return {"ok": False, "message": paths}
+        title, busy = cs.plan_title(src) or item, None
+        question = f"Delete the plan “{title}” on {and_list(labels)}? It goes to the Trash."
+    else:
+        labels, paths, src = chat_to_delete(profiles, item, name, root)
+        if labels is None:
+            return {"ok": False, "message": paths}
+        try:
+            title = cs.read_chat_info(src, src.stat().st_size)[0] or item[:8]
+        except OSError:
+            title = item[:8]
+        busy = open_in(profiles, item)
+        question = (f"Delete “{title}” on {and_list(labels)}? It goes to the Trash with its subagents and "
+                    "checkpoints; the Recap keeps its numbers.")
+    why = f"It's open on {busy}. Exit it there first." if busy else ""
+    if describe:
+        return {"ok": not why, "message": why or question, "question": question, "name": title, "accounts": labels,
+                "open": busy or ""}
+    if why:
+        return {"ok": False, "message": why}
+    if kind == "chat":
+        recap_reads(home, profiles)
+    ok, message = to_trash(paths, home)
+    if ok and kind == "memory":
+        try:
+            unindex_memory(path)
+        except OSError as exc:
+            message += f", but MEMORY.md still names it ({exc.strerror or exc})"
+    if ok:
+        try:
+            cs.forget_deleted(cs.cache_dir(home), kind + "s" if kind != "memory" else "memories", item)
+        except OSError:
+            pass
+    return {"ok": ok, "message": message}
+
+
 USAGE = ("usage: sharing.py (--share CHAT_ID | --continue CHAT_ID [--end-first] | --unshare CHAT_ID) [--profile PROFILE]\n"
          "       sharing.py (--share-plan SLUG [--to PROFILE] | --unshare-plan SLUG) [--profile PROFILE]\n"
+         "       sharing.py (--delete-chat CHAT_ID | --delete-plan SLUG) [--profile PROFILE] [--describe]\n"
+         "       sharing.py --delete-memory KEY [--describe]\n"
          "                  [--config-dir DIR]... [--remote]   (--continue, --unshare and --unshare-plan need --profile)")
 
 
@@ -580,10 +821,14 @@ def main(argv=None):
     --continue, "command"."""
     args = sys.argv[1:] if argv is None else list(argv)
     action, chat_id, name, extra, remote, end_first, to = None, None, None, [], False, False, None
+    describe = False
     while args:
         arg = args.pop(0)
-        if arg in ("--share", "--continue", "--unshare", "--share-plan", "--unshare-plan") and args and action is None:
+        if arg in ("--share", "--continue", "--unshare", "--share-plan", "--unshare-plan", "--delete-chat",
+                   "--delete-plan", "--delete-memory") and args and action is None:
             action, chat_id = arg, args.pop(0)
+        elif arg == "--describe":
+            describe = True
         elif arg == "--profile" and args:
             name = args.pop(0)
         elif arg == "--to" and args:
@@ -596,9 +841,11 @@ def main(argv=None):
             remote = True
         else:
             sys.exit(USAGE)
-    if action is None or (action not in ("--share", "--share-plan") and not name):
+    deleting = action is not None and action.startswith("--delete-")
+    if action is None or (action not in ("--share", "--share-plan") and not deleting and not name) \
+            or (describe and not deleting):
         sys.exit(USAGE)
-    home, command = Path.home(), None
+    home, command, more = Path.home(), None, {}
     try:
         profiles, root = cs.discover_profiles(home, extra), store_root(home)
         if action == "--share":
@@ -607,6 +854,9 @@ def main(argv=None):
             ok, message = keep_only_on(profiles, chat_id, name, root)
         elif action in ("--share-plan", "--unshare-plan"):
             ok, message = plan_sharing(profiles, chat_id, name, action == "--share-plan", to)
+        elif deleting:
+            more = delete(profiles, action[len("--delete-"):], chat_id, name, root, home, describe)
+            ok, message = more.pop("ok"), more.pop("message")
         else:
             # A click: the login shell may be asked where claude is
             ok, message, command = continue_command(profiles, chat_id, name, root, home,
@@ -617,7 +867,7 @@ def main(argv=None):
         # Login scripts on the host may print things first: the JSON follows a marker
         sys.stdout.write("\n" + cs.REMOTE_MARK + " ")
     # ASCII: a lone surrogate in a name can't break the answer
-    json.dump({"ok": ok, "message": message, **({"command": command} if command else {})}, sys.stdout)
+    json.dump({"ok": ok, "message": message, **more, **({"command": command} if command else {})}, sys.stdout)
     sys.stdout.write("\n")
 
 

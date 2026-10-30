@@ -12,6 +12,9 @@
     python3 -I remote.py --hide HOST KIND ID        hide a chat, plan, memory or project of HOST (KIND
                                                     chats|plans|memories|projects; kept there)
     python3 -I remote.py --show-hidden HOST KIND    show HOST's hidden ones of KIND again
+    python3 -I remote.py --delete-chat HOST CHAT_ID [PROFILE] [--describe]   a chat of HOST to the Trash there
+    python3 -I remote.py --delete-plan HOST SLUG [PROFILE] [--describe]      (--describe: the question to ask
+    python3 -I remote.py --delete-memory HOST KEY [--describe]               first, and what goes)
     python3 -I remote.py --agent-run HOST CHAT_ID AGENT_ID [PROFILE] [--no-open]   a subagent's run there, as a Markdown file here
     python3 -I remote.py --share HOST CHAT_ID [PROFILE]    share a chat with every account there (from PROFILE's copy)
     python3 -I remote.py --continue HOST CHAT_ID PROFILE [--print-command]   share it with PROFILE there if needed,
@@ -231,17 +234,19 @@ def ssh(host, command, stdin=None, timeout=RUN_TIMEOUT):
                           text=True, errors="replace", timeout=timeout)
 
 
-def host_script(name="talpy_den.py"):
+def host_script(name="talpy_den.py", also=()):
     """What runs on a host, on python3's stdin: talpy_den.py, or another
     script of this folder that imports it (sharing.py), after talpy_den.py
-    loaded as that module."""
+    (and the scripts also, e.g. accounts.py) loaded as those modules."""
     status = (HERE / "talpy_den.py").read_text(encoding="utf-8")
     if name == "talpy_den.py":
         return status
-    return ("import sys, types\n"
-            "module = sys.modules['talpy_den'] = types.ModuleType('talpy_den')\n"
-            f"exec(compile({status!r}, 'talpy_den.py', 'exec'), module.__dict__)\n"
-            + (HERE / name).read_text(encoding="utf-8"))
+    script = "import sys, types\n"
+    for module in ("talpy_den.py", *also):
+        text = status if module == "talpy_den.py" else (HERE / module).read_text(encoding="utf-8")
+        script += (f"module = sys.modules[{module[:-3]!r}] = types.ModuleType({module[:-3]!r})\n"
+                   f"exec(compile({text!r}, {module!r}, 'exec'), module.__dict__)\n")
+    return script + (HERE / name).read_text(encoding="utf-8")
 
 
 def check_host(host):
@@ -332,7 +337,7 @@ def run(host, command, stdin=None):
     return outcome(host, r)
 
 
-def host_answer(host, args, name="talpy_den.py"):
+def host_answer(host, args, name="talpy_den.py", also=()):
     """Run a script of this folder on host with args (it goes to python3's
     stdin, as for --status): its answer, {"ok", "message", ...}. A long
     message for pane.py (--text) goes over first, into a file it reads there:
@@ -348,7 +353,7 @@ def host_answer(host, args, name="talpy_den.py"):
             args[i:i + 2] = ["--text-file", put["path"]]
     command = "python3 -I - --remote " + " ".join(shlex.quote(a) for a in args)
     try:
-        r = ssh(host, command, host_script(name))
+        r = ssh(host, command, host_script(name, also))
     except subprocess.TimeoutExpired:
         return {"ok": False, "message": f"{host} didn't answer within {RUN_TIMEOUT} s"}
     except OSError as exc:
@@ -385,6 +390,17 @@ def hide(host, kind, item_id=None):
     """Hide a chat, plan, memory or project in the host's lists (kept on the
     host, as its status leaves them out there), or show that kind again."""
     return run_status_script(host, ["--hide", kind, item_id] if item_id is not None else ["--show-hidden", kind])
+
+
+def delete(host, kind, item, profile=None, describe=False):
+    """Delete a chat, a plan or a memory of host (kind chat, plan, memory)
+    to the host's Trash, or (describe) say what would go (sharing.delete
+    there): its answer. Its stars and queued tasks, kept here, forget it."""
+    args = ["--delete-" + kind, item] + (["--profile", profile] if profile else []) + (["--describe"] if describe else [])
+    answer = host_answer(host, args, "sharing.py", also=("accounts.py",))
+    if answer["ok"] and not describe:
+        cs.forget_deleted(cs.cache_dir(Path.home()), {"chat": "chats", "plan": "plans"}.get(kind, "memories"), item, host)
+    return answer
 
 
 def end(host, session_id, profile=None, busy=False):
@@ -790,6 +806,10 @@ def main(argv=None):
         elif action == "--dismiss" and len(args) == 2:
             ok, message = dismiss(args[0], args[1])
             out = {"ok": ok, "message": message}
+        elif action in ("--delete-chat", "--delete-plan", "--delete-memory") and \
+                1 < len([a for a in args if a != "--describe"]) <= (2 if action == "--delete-memory" else 3):
+            out = delete(args[0], action[len("--delete-"):], *[a for a in args[1:] if a != "--describe"],
+                         describe="--describe" in args)
         elif action in ("--hide", "--show-hidden") and len(args) == (3 if action == "--hide" else 2):
             ok, message = hide(*args)
             out = {"ok": ok, "message": message}

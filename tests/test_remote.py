@@ -352,6 +352,29 @@ class ActionTests(FakeSSH):
         self.assertEqual(remote.dismiss("lab")[0], True)
         self.assertEqual(cs.load_dismissed(self.fake_home / ".cache/talpy-den"), {})
 
+    def test_delete_on_the_host_to_its_trash(self):
+        prof = self.fake_home / ".claude"
+        (prof / "projects/-p/chat9.jsonl").write_text(json.dumps({"type": "custom-title", "customTitle": "Old work"}) + "\n")
+        (prof / "projects/-p/chat9/subagents").mkdir(parents=True)
+        (prof / "plans").mkdir()
+        (prof / "plans/calm-red-owl.md").write_text("# Calm plan\n")
+        local = cs.cache_dir(Path.home())
+        cs.change_stars(local, "chats", "chat9", host="lab")  # (an SSH host's stars are kept here)
+        asked = remote.delete("lab", "chat", "chat9", describe=True)
+        self.assertEqual((asked["ok"], asked["accounts"], asked["question"]),
+                         (True, ["Remote Me"], "Delete “Old work” on Remote Me? It goes to the Trash with its subagents and "
+                                          "checkpoints; the Recap keeps its numbers."))
+        self.assertEqual(remote.delete("lab", "chat", "chat9")["message"], "Moved to the Trash")
+        trash = self.fake_home / ".local/share/Trash/files"
+        self.assertEqual(sorted(f.name for f in trash.iterdir()), ["chat9", "chat9.jsonl"])
+        self.assertFalse((prof / "projects/-p/chat9.jsonl").exists())
+        self.assertEqual(cs.load_stars(local)["chats"], [])
+        r = subprocess.run([sys.executable, "-I", str(CODE / "remote.py"), "--delete-plan", "lab", "calm-red-owl",
+                            ".claude", "--describe"], capture_output=True, text=True, env=os.environ)
+        self.assertEqual(json.loads(r.stdout)["question"], "Delete the plan “Calm plan” on Remote Me? It goes to the Trash.")
+        self.assertEqual(remote.delete("lab", "plan", "calm-red-owl", ".claude")["message"], "Moved to the Trash")
+        self.assertFalse(remote.delete("lab", "memory", ".claude/CLAUDE.md/memory")["ok"])
+
     def test_hide_on_the_host(self):
         # (kept on the host: its status leaves them out there)
         self.assertEqual(remote.hide("lab", "plans", "calm-red-owl"), (True, "Hid this plan"))

@@ -1935,3 +1935,119 @@ class HideTests(Fixture):
         self.assertEqual(self.run_jump("--dismiss", "dead")["message"], "Hid this chat")
         self.assertEqual(self.run_jump("--show-hidden", "chats")["message"], "Showing 2 hidden chats again")
         self.assertEqual(self.run_jump("--undismiss-all")["message"], "No chat was hidden")
+
+
+class DeleteTests(Fixture):
+    """Delete: a chat, a plan or a memory to the Trash, from every account that has it."""
+
+    def setUp(self):
+        super().setUp()
+        root = Path(self.tmp.name)
+        saved = {k: os.environ.get(k) for k in ("XDG_CACHE_HOME", "XDG_DATA_HOME")}
+        self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+                                 for k, v in saved.items()])
+        os.environ["XDG_CACHE_HOME"], os.environ["XDG_DATA_HOME"] = str(self.cache.parent), str(root / "data")
+        self.cache, self.trash = cs.cache_dir(self.home), root / "data/Trash"
+        self.w, self.p = self.home / ".claude-work", self.home / ".claude-personal"
+
+    def delete(self, kind, item, profile=None, describe=False):
+        ok, message, more = jump.delete_item(self.home, [], kind, item, profile, describe)
+        return dict(more, ok=ok, message=message)
+
+    def trashed(self):
+        return sorted(f.name for f in (self.trash / "files").iterdir()) if (self.trash / "files").is_dir() else []
+
+    def test_a_shared_chat_goes_from_every_account_with_its_folders(self):
+        t = self.now - 600
+        write(self.w / "projects/-p/chat9.jsonl", lines({"type": "custom-title", "customTitle": "Fix the build"},
+                                                         prompt("fix it", t), reply("Fixed.", t + 5)))
+        write(self.w / "projects/-p/chat9/subagents/agent-1.jsonl", "{}\n")
+        write(self.w / "file-history/chat9/abc@v1", "old\n")
+        write(self.w / "projects/-p/other.jsonl", lines(prompt("keep me", t)))
+        profiles = cs.discover_profiles(self.home)
+        root = sharing.store_root(self.home)
+        self.assertTrue(sharing.share(profiles, "chat9", [sharing.named(profiles, ".claude-personal")], root)[0])
+        self.assertTrue((self.p / "projects/-p/chat9").is_symlink())
+        # what the stars, Hide, Keep going and the queue had of it goes too
+        cs.change_stars(self.cache, "chats", "chat9")
+        cs.change_dismissed(self.cache, add="chat9")
+        cs.keep_chat(self.cache, ".claude-work", "chat9")
+        cs.change_queue(self.cache, add=cs.queue_entry(".claude-work", "/p", "", 1, chat="chat9"))
+        asked = self.delete("chat", "chat9", ".claude-personal", describe=True)
+        self.assertTrue(asked["ok"], asked)
+        self.assertEqual(sorted(asked["accounts"]), ["personal", "work"])
+        self.assertEqual(asked["question"], f"Delete “Fix the build” on {' and '.join(asked['accounts'])}? It goes to the "
+                                            "Trash with its subagents and checkpoints; the Recap keeps its numbers.")
+        self.assertEqual((asked["message"], asked["name"], asked["open"]), (asked["question"], "Fix the build", ""))
+        self.assertEqual(self.trashed(), [])  # (asking deletes nothing)
+        self.assertEqual(self.delete("chat", "chat9")["message"], "Moved to the Trash")
+        for prof in (self.w, self.p):
+            for part in ("projects/-p/chat9.jsonl", "projects/-p/chat9", "file-history/chat9"):
+                self.assertFalse(os.path.lexists(prof / part), prof / part)
+        self.assertFalse(os.path.lexists(root / "-p/chat9"))
+        self.assertTrue((self.w / "projects/-p/other.jsonl").is_file())
+        # in the Trash: each account's links and the store's folders, none lost
+        names = self.trashed()
+        self.assertEqual(names.count("chat9.jsonl") + sum(n.startswith("chat9.jsonl.") for n in names), 3)
+        self.assertIn("subagents", {f.name for d in (self.trash / "files").iterdir() if d.is_dir() and not d.is_symlink()
+                                    for f in d.iterdir()})
+        self.assertEqual(len(list((self.trash / "info").iterdir())), len(names))
+        self.assertEqual((cs.load_stars(self.cache)["chats"], cs.load_dismissed(self.cache), cs.load_keep(self.cache)["chats"],
+                          cs.load_queue(self.cache)), ([], {}, [], []))
+        self.assertEqual(self.delete("chat", "chat9")["message"], "That chat isn't there any more")
+
+    def test_a_chat_open_in_a_session_stays(self):
+        write(self.w / "projects/-tmp-proj-busy/busy.jsonl", lines(prompt("go", self.now - 60)))
+        asked = self.delete("chat", "busy", describe=True)
+        self.assertEqual((asked["ok"], asked["open"], asked["message"]),
+                         (False, "work", "It's open on work. Exit it there first."))
+        self.assertIn("“go”", asked["question"])
+        self.assertEqual(self.delete("chat", "busy"), {"ok": False, "message": "It's open on work. Exit it there first."})
+        self.assertTrue((self.w / "projects/-tmp-proj-busy/busy.jsonl").is_file())
+        self.assertEqual(self.trashed(), [])
+
+    def test_a_plan_from_every_account_its_linked_into(self):
+        write(self.w / "plans/calm-red-owl.md", "# Calm plan\n")
+        (self.p / "plans").mkdir(parents=True)
+        os.link(self.w / "plans/calm-red-owl.md", self.p / "plans/calm-red-owl.md")
+        write(self.home / ".claude/plans/calm-red-owl.md", "# Another plan of that name\n")
+        cs.change_stars(self.cache, "plans", "calm-red-owl")
+        cs.hide_item(self.cache, "plans", "calm-red-owl")
+        self.assertIn("say which account", self.delete("plan", "calm-red-owl")["message"])
+        asked = self.delete("plan", "calm-red-owl", ".claude-work", describe=True)
+        self.assertEqual(asked["question"], f"Delete the plan “Calm plan” on {' and '.join(asked['accounts'])}? It goes to the Trash.")
+        self.assertEqual(sorted(asked["accounts"]), ["personal", "work"])
+        self.assertEqual(self.delete("plan", "calm-red-owl", ".claude-work")["message"], "Moved to the Trash")
+        self.assertFalse((self.w / "plans/calm-red-owl.md").exists() or (self.p / "plans/calm-red-owl.md").exists())
+        self.assertEqual((self.home / ".claude/plans/calm-red-owl.md").read_text(), "# Another plan of that name\n")
+        self.assertEqual(self.trashed(), ["calm-red-owl.md", "calm-red-owl.md.2"])
+        self.assertEqual((cs.load_stars(self.cache)["plans"], cs.load_hidden(self.cache)["plans"]), ([], {}))
+
+    def test_a_memory_and_only_its_line_in_memory_md(self):
+        folder = self.home / "repos/app"
+        folder.mkdir(parents=True)
+        mem = self.w / "projects" / cs.mangle(str(folder)) / "memory"
+        index = (b"# Memories\r\n- [Batch releases](batch-releases.md) \xe2\x80\x94 tag at once\r\n"
+                 b"- [Other](other.md) \xe2\x80\x94 stays\n- [Batch again](./batch-releases.md)\n  not a link: batch-releases.md")
+        write(mem / "MEMORY.md", "")
+        (mem / "MEMORY.md").write_bytes(index)
+        (mem / "MEMORY.md").chmod(0o640)
+        write(mem / "batch-releases.md", "---\nname: Batch releases\ntype: feedback\n---\nOne tag.\n")
+        write(mem / "other.md", "---\nname: other\n---\n")
+        key = f".claude-work/{mem.parent.name}/batch-releases/memory"
+        cs.hide_item(self.cache, "memories", key)
+        asked = self.delete("memory", key, describe=True)
+        self.assertEqual(asked["question"], "Delete the memory “Batch releases”? It goes to the Trash, and Claude stops "
+                                            "reading it in new chats in ~/repos/app.")
+        self.assertEqual(self.delete("memory", key)["message"], "Moved to the Trash")
+        self.assertFalse((mem / "batch-releases.md").exists())
+        self.assertEqual((mem / "MEMORY.md").read_bytes(),
+                         b"# Memories\r\n- [Other](other.md) \xe2\x80\x94 stays\n  not a link: batch-releases.md")
+        self.assertEqual(stat.S_IMODE((mem / "MEMORY.md").stat().st_mode), 0o640)
+        self.assertEqual(self.trashed(), ["batch-releases.md"])
+        self.assertEqual(cs.load_hidden(self.cache)["memories"], {})
+        # the account's CLAUDE.md isn't deleted this way
+        write(self.w / "CLAUDE.md", "# Mine\n")
+        self.assertFalse(self.delete("memory", ".claude-work/CLAUDE.md/memory")["ok"])
+        self.assertFalse(self.delete("memory", ".claude-work/../memory")["ok"])
+        self.assertTrue((self.w / "CLAUDE.md").is_file())

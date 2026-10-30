@@ -17,6 +17,10 @@ a new chat (used by the Talpy Den widget).
     python3 -I jump.py --hide KIND ID            (hide a chat, a plan, a memory or a project: KIND
                                                   chats|plans|memories|projects, ID its id, slug, key or folder)
     python3 -I jump.py --show-hidden KIND        (show the hidden ones of KIND again)
+    python3 -I jump.py --delete-chat CHAT_ID | --delete-plan SLUG [--profile PROFILE] [--describe]
+    python3 -I jump.py --delete-memory KEY [--describe]
+                                                 (to the Trash, from every account that has it;
+                                                  --describe: the question to ask first, and what goes)
     python3 -I jump.py --resume SESSION_ID --profile PROFILE    (reopen a chat there)
     python3 -I jump.py --resume SESSION_ID --profile PROFILE --vscode   (in VS Code's Claude extension)
     python3 -I jump.py --resume SESSION_ID [--profile PROFILE] --print-command   (the command that reopens it)
@@ -2328,6 +2332,15 @@ def undismiss_all(home, extra_dirs, _session_id=None):
     return cs.show_hidden(cs.cache_dir(home), "chats")
 
 
+def delete_item(home, extra_dirs, kind, item, profile_dir=None, describe=False):
+    """Delete a chat, a plan or a memory (kind chat, plan, memory) to the
+    Trash, or (describe) say what would go (sharing.delete): (ok, message,
+    the rest of its answer)."""
+    answer = sharing.delete(cs.discover_profiles(home, extra_dirs), kind, item, profile_dir,
+                            sharing.store_root(home), home, describe)
+    return answer.pop("ok"), answer.pop("message"), answer
+
+
 USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile PROFILE] [--config-dir DIR]...\n"
          "       jump.py --save-settings JSON --by WIDGET [--unless-default]\n"
          "       jump.py --new-chat PROFILE_DIRNAME [--cwd FOLDER | --choose-folder] [--vscode | --bg]\n"
@@ -2353,6 +2366,8 @@ USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile P
          "       jump.py --unqueue|--start-queued TASK_ID\n"
          "       jump.py --star|--unstar CHAT_ID [--host HOST]   (starred: listed under the account's Starred)\n"
          "       jump.py --hide chats|plans|memories|projects ID | --show-hidden chats|plans|memories|projects\n"
+         "       jump.py --delete-chat CHAT_ID | --delete-plan SLUG [--profile PROFILE] [--describe]\n"
+         "       jump.py --delete-memory KEY [--describe]   (to the Trash; --describe: the question to ask first)\n"
          "       jump.py --star-plan|--unstar-plan SLUG [--host HOST]\n"
          "       jump.py --requeue TASK_ID --at MS   (it waits on until MS)\n"
          "       jump.py --share SESSION_ID\n"
@@ -2402,7 +2417,7 @@ def main(argv=None):
     agent_id, open_it, run_file, account, vscode_terminal = None, True, None, None, None
     task, background, end_first, to = Task(), False, False, None
     start_at, queue_host, account_title, scheduled, keep = None, "", "", False, False
-    feedback_plan, comments, extra_out, hide_kind = None, [], {}, None
+    feedback_plan, comments, extra_out, hide_kind, describe = None, [], {}, None, False
     while args:
         arg = args.pop(0)
         if arg == "--config-dir" and args:
@@ -2523,6 +2538,10 @@ def main(argv=None):
             action, hide_kind, session_id = arg, args.pop(0), args.pop(0)
         elif arg == "--show-hidden" and args:
             action, hide_kind, session_id = arg, args.pop(0), "-"
+        elif arg in ("--delete-chat", "--delete-plan", "--delete-memory") and args:
+            action, session_id = arg, args.pop(0)  # the chat, the plan's slug or the memory's key
+        elif arg == "--describe":
+            describe = True
         elif arg in ("--remote-vscode", "--remote-terminal", "--remote-new-vscode", "--remote-resume-vscode",
                      "--remote-edit") and args:
             action, remote_host = arg, args.pop(0)
@@ -2570,6 +2589,8 @@ def main(argv=None):
         sys.exit(USAGE)
     if not open_it and action is not show_agent_run:
         sys.exit(USAGE)
+    if describe and action not in ("--delete-chat", "--delete-plan", "--delete-memory"):
+        sys.exit(USAGE)
     command, comparison = None, None
     try:
         if action is send_plan_feedback:
@@ -2608,6 +2629,9 @@ def main(argv=None):
                                on=action.startswith("--star"))
         elif action in (open_plan, edit_plan, unshare_plan):
             ok, message = action(Path.home(), extra, session_id, profile_dir)
+        elif action in ("--delete-chat", "--delete-plan", "--delete-memory"):
+            ok, message, extra_out = delete_item(Path.home(), extra, action[len("--delete-"):], session_id, profile_dir,
+                                                 describe)
         elif action == "--hide":
             ok, message = cs.hide_item(cs.cache_dir(Path.home()), hide_kind, session_id)
         elif action == "--show-hidden":
