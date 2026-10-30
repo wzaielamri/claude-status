@@ -2262,19 +2262,51 @@ class TerminalTests(unittest.TestCase):
                 self.assertEqual(cs.terminal_name(10), want, names)
 
     def test_a_background_session_shown_in_a_terminal(self):
-        profile = mock.Mock(path=Path("/home/me/.claude"))
-        other = mock.Mock(path=Path("/home/me/.claude-work"))
-        with mock.patch.object(cs, "attach_clients", lambda: [(20, "0a1b2c3d", False), (30, "fix parser", False),
-                                                              (40, "Minor version tag", True)]), \
+        row = lambda job, name, profile=".claude": {"jobId": job, "sessionId": job + "-s", "chatId": job + "-s", "name": name,  # noqa: E731
+                                                    "profileDir": profile, "kind": "bg", "pid": 1}
+        a, b, c = row("0a1b2c3d", "fix parser"), row("eeeeeeee", "Minor version tag", ".claude-work"), row("ffffffff", "notes")
+        twin1, twin2 = row("11111111", "same name"), row("22222222", "same name")
+        rows = [a, b, c, twin1, twin2]
+        reals = {".claude": Path("/home/me/.claude"), ".claude-work": Path("/home/me/.claude-work")}
+
+        def shown(opened, title, here=Path("/home/me/.claude")):
+            with mock.patch.object(cs, "process_config_dir", lambda pid: here):
+                found = cs.shown_row(20, opened, title, rows, reals)
+            return found and found["jobId"]
+        # opened by id (claude attach <id>, or the agent view's CLAUDE_AGENTS_SELECT), any terminal, no readable title
+        self.assertEqual(shown("0a1b2c3d", ""), "0a1b2c3d")
+        self.assertEqual(shown("eeeeeeee-s", ""), "eeeeeeee")      # (by its session id)
+        # Konsole's own title ("%d : %n"), which names no chat: the one it was opened for
+        self.assertEqual(shown("0a1b2c3d", "talpy-den : claude"), "0a1b2c3d")
+        # the agent view switched to another chat: its title names it, whichever profile
+        self.assertEqual(shown("0a1b2c3d", "Minor version tag"), "eeeeeeee")
+        self.assertEqual(shown("", "notes"), "ffffffff")           # (a plain claude agent view)
+        # two chats of that name: the one it was opened for if it's one of them, else none
+        self.assertEqual(shown("22222222", "same name"), "22222222")
+        self.assertIsNone(shown("0a1b2c3d", "same name"))
+        # opened by name: on the profile it runs on only
+        self.assertEqual(shown("fix parser", ""), "0a1b2c3d")
+        self.assertIsNone(shown("fix parser", "", Path("/home/me/.claude-work")))
+        self.assertIsNone(shown("99999999", ""))
+        clients = [(20, "0a1b2c3d", "talpy-den : claude"), (30, "", "notes"), (40, "eeeeeeee", "")]
+        with mock.patch.object(cs, "tmux_socket", lambda pid: "/tmp/tmux-1/default" if pid == 40 else None), \
+                mock.patch.object(cs, "terminal_name", lambda pid: "VS Code" if pid == 30 else "Konsole"):
+            self.assertEqual(cs.attached_in(a, rows, clients, reals), {"in": "terminal", "app": "Konsole"})
+            self.assertEqual(cs.attached_in(c, rows, clients, reals), {"in": "vscode", "app": ""})
+            self.assertEqual(cs.attached_in(b, rows, clients, reals), {"in": "tmux", "app": ""})
+            self.assertIsNone(cs.attached_in(twin1, rows, clients, reals))
+
+    def test_the_row_of_a_session_attached_in_konsole_says_so(self):
+        # (Konsole's default tab title: the tag comes from the id it was opened with)
+        fx = Fixture()
+        fx.setUp()
+        self.addCleanup(fx.tearDown)
+        with mock.patch.object(cs, "attach_clients", lambda: [(20, "job3", "talpy-den : claude")]), \
                 mock.patch.object(cs, "tmux_socket", lambda pid: None), \
-                mock.patch.object(cs, "terminal_name", lambda pid: "VS Code" if pid == 30 else "Konsole"), \
-                mock.patch.object(cs, "process_config_dir", lambda pid: Path("/home/me/.claude")):  # (resolved, as it is)
-            self.assertEqual(cs.attached_in("0a1b2c3d", "", profile), {"in": "terminal", "app": "Konsole"})
-            self.assertEqual(cs.attached_in("ffffffff", "fix parser", profile), {"in": "vscode", "app": ""})   # (by its name)
-            self.assertIsNone(cs.attached_in("ffffffff", "fix parser", other), "a name on another profile")
-            # an agent view's tab titled with it: it shows it, whichever profile it's on
-            self.assertEqual(cs.attached_in("eeeeeeee", "Minor version tag", other), {"in": "terminal", "app": "Konsole"})
-            self.assertIsNone(cs.attached_in("ffffffff", "other", profile))
+                mock.patch.object(cs, "terminal_name", lambda pid: "Konsole"):
+            rows = {s["sessionId"]: s for g in fx.collect(with_tokens=False)["groups"] for s in g["sessions"]}
+        self.assertEqual(rows["bgworking"]["attached"], {"in": "terminal", "app": "Konsole"})
+        self.assertIsNone(rows["bgdone"]["attached"])
 
     def test_the_title_without_its_marks(self):
         self.assertEqual(cs.TITLE_MARKS.sub("", "🏠 ◐ Minor version 1.16.2 tag").strip(), "Minor version 1.16.2 tag")

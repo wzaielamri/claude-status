@@ -669,8 +669,6 @@ def live_row(entry, profile, holder, home, ctx):
     row["tmux"] = isinstance(entry.get("tmux"), str) and bool(entry["tmux"])
     if not row["tmux"] and row["entrypoint"] != "claude-vscode" and row["kind"] != "bg":
         row["terminalApp"] = terminal_name(row["pid"]) or None
-    if row["kind"] == "bg" and row["pid"]:
-        row["attached"] = attached_in(job_id, row["name"], profile)
     return finish_row(row, job, job_id, profile, ctx, alive=True)
 
 
@@ -5703,13 +5701,14 @@ _attaching = [0.0, []]   # (when looked for, [(pid, what it attaches to)]): once
 
 def attach_clients():
     """The terminals that show a background session on this machine: [(pid,
-    the session: its id or name, named by the terminal's tab title)], looked
-    for once a second at most. One shows it as `claude attach <id>`, which runs
-    on as the agent view (`claude agents`, the session it was opened for in
-    CLAUDE_AGENTS_SELECT), or as a plain `claude` with no session of its own
-    (the agent view too). An agent view can switch to another session: where
-    the terminal says its tab's title (Konsole, Yakuake, tmux), the session
-    named there is the one it shows (Claude Code titles the tab with it)."""
+    the session it was opened for: its id or name, or "", the title of its
+    tab, or "")], looked for once a second at most. One shows it as `claude
+    attach <id>`, which runs on as the agent view (`claude agents`, the
+    session it was opened for in CLAUDE_AGENTS_SELECT), or as a plain
+    `claude` with no session of its own (the agent view too). An agent view
+    can switch to another session: where the terminal says its tab's title
+    (Konsole, Yakuake, tmux), Claude Code titles the tab with that session's
+    name (shown_row)."""
     if time.monotonic() - _attaching[0] < 1:
         return _attaching[1]
     found = []
@@ -5734,10 +5733,8 @@ def attach_clients():
         else:
             continue
         title = tab_title(pid)
-        if title:
-            found.append((pid, title, True))
-        elif opened:
-            found.append((pid, opened, False))
+        if title or opened:
+            found.append((pid, opened, title))
     _attaching[0], _attaching[1] = time.monotonic(), found
     return found
 
@@ -5786,19 +5783,55 @@ def process_environ_value(pid, key):
     return next((e[len(prefix):].decode(errors="replace") for e in data.split(b"\0") if e.startswith(prefix)), "")
 
 
-def attached_in(job_id, name, profile):
-    """Where a background session is shown (attach_clients): {"in": "tmux",
+def shown_row(pid, opened, title, rows, reals):
+    """The background session (of rows) a terminal shows (attach_clients),
+    or None. The one it was opened for: by its id, else by its name on the
+    profile it runs on (reals: profile key -> its real folder). Its tab's
+    title says which one the agent view switched to, whichever profile, when
+    exactly one is called that; of several with that name, the one it was
+    opened for if it's one of them (else none: no guess); a title no session
+    has (the terminal's own, e.g. Konsole's "%d : %n") leaves the one it was
+    opened for."""
+    first = None
+    if opened:
+        found = [r for r in rows if opened in (r.get("jobId"), r.get("sessionId"), r.get("chatId"))]
+        if not found:
+            here = process_config_dir(pid)
+            found = [r for r in rows if r["name"] == opened and here is not None and reals.get(r["profileDir"]) == here]
+        first = found[0] if len(found) == 1 else None
+    named = [r for r in rows if title and r["name"] == title]
+    if len(named) == 1:
+        return named[0]
+    if named:
+        return first if any(r is first for r in named) else None
+    return first
+
+
+def attached_in(row, rows, clients, reals):
+    """Where a background session (row, one of rows) is shown: {"in": "tmux",
     "vscode" (a VS Code terminal) or "terminal", "app": the terminal's name or
-    ""}, or None: nowhere. By its id, or by its name: on its own profile, or
-    the one the tab's title says (the agent view shows it, whichever profile)."""
-    for pid, what, titled in attach_clients():
-        if what != job_id and not (name and what == name and (titled or process_config_dir(pid) == profile.path.resolve())):
+    ""}, or None: nowhere."""
+    for pid, opened, title in clients:
+        if shown_row(pid, opened, title, rows, reals) is not row:
             continue
         if tmux_socket(pid):
             return {"in": "tmux", "app": ""}
         app = terminal_name(pid)
         return {"in": "vscode", "app": ""} if app == "VS Code" else {"in": "terminal", "app": app}
     return None
+
+
+def note_attached(groups, profiles):
+    """Each running background session's "attached" (attached_in), once all
+    of them are listed: a tab's title is looked up among them all."""
+    rows = [s for g in groups for s in g["sessions"] if s.get("kind") == "bg"]
+    if not any(s["pid"] for s in rows):
+        return
+    clients = attach_clients()
+    reals = {p.key: p.real for p in profiles}
+    for s in rows:
+        if s["pid"] and clients:
+            s["attached"] = attached_in(s, rows, clients, reals)
 
 
 def interrupt_chat(entry):
@@ -7247,6 +7280,10 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
         place_chats(groups, ctx)
     except Exception as exc:
         errors.append(f"shared chats: {exc}")
+    try:
+        note_attached(groups, profiles)
+    except Exception as exc:
+        errors.append(f"background chats in terminals: {exc}")
     # Removed from the list by the user: hidden while finished; one that runs
     # again comes back (and is forgotten).
     dismissed = load_dismissed(cache_root)
