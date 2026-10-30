@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { ChatPanes } from "../src/chatPane";
 import { demoState } from "../src/shared/demo";
 import { chatRefOf } from "../src/shared/model";
-import { answersOf, chatWhere, oneChoice, picturesIn, queuedReply, reviewPending, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, whereTag, withoutPicture } from "../src/shared/pane";
+import { answersOf, chatWhere, oneChoice, picturesIn, queuedReply, reviewPending, reviewSeen, routeHint, shownAsk, testsText, textScale, TEXT_SCALES, whereTag, withoutPicture } from "../src/shared/pane";
 import type { ViewState } from "../src/shared/types";
 import { ViewHost } from "../src/view";
 import { clipboardWrites, overrides, recorded } from "./vscode-stub";
@@ -182,6 +182,10 @@ test("to review: finished, changed files after the first look, not marked since 
   assert.equal(reviewPending(item("b", NOW - 1), status, "gpu"), false);
   assert.equal(reviewPending(item("c", NOW - 20_000), status), true);
   assert.equal(reviewPending({ sessionId: "y", review: null }, status), false);
+  // the chat tab's Reviewed ✓: the mark itself, also while it works
+  assert.equal(reviewSeen(item("a", NOW - 1, "working"), status), true);
+  assert.equal(reviewSeen(item("x", NOW - 5_000, "working"), status), false);
+  assert.equal(reviewSeen(item("c", NOW - 20_000, "working"), status), false);
 });
 
 test("a chat waiting for a permission is told with its question, once more when the hook's request comes a poll late", async () => {
@@ -440,7 +444,7 @@ test("the reply box offers commands at the start and files after @, best first",
   assert.deepEqual(suggestFor("/comp", null).items, []);
 });
 
-test("the microphone: recorded, then written down; a missing model or setup is offered; Remote windows can't", async () => {
+test("the microphone: recorded, then written down; a missing model or setup is offered, and said when it's there", async () => {
   const calls: string[][] = [];
   let status: Record<string, unknown> = { ok: true, tool: "/usr/bin/whisper-cli", model: "/m.bin" };
   const backend = {
@@ -468,7 +472,7 @@ test("the microphone: recorded, then written down; a missing model or setup is o
   status = { ok: false, engine: null, tool: null, model: null, recorder: "pw-record", canSetup: true, setupMb: 612, missing: [] };
   assert.deepEqual(await say("toggle"), { type: "dictation", state: "", offerSetup: true, setupMb: 612 });
   calls.length = 0;
-  assert.deepEqual(await say("setup"), { type: "dictation", state: "", message: "" });
+  assert.deepEqual(await say("setup"), { type: "dictation", state: "", message: "", ok: true });
   assert.deepEqual(calls, [["--setup"]]);
   status = { ok: false, engine: null, tool: null, model: null, recorder: null, canSetup: true, missing: ["a recorder (pw-record, from PipeWire)"] };
   assert.equal(((await say("toggle")) as { message?: string }).message, "To dictate, install a recorder (pw-record, from PipeWire).");

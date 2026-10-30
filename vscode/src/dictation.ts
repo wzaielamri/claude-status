@@ -10,8 +10,8 @@ type Model = { name: string; mb: number; note: string; installed: boolean; delet
 type Item = vscode.QuickPickItem & { run?: string[]; busy?: string; model?: Model; ask?: string };
 
 export async function dictationModels(backend: Backend): Promise<void> {
-  if (vscode.env.remoteName) {
-    void vscode.window.showInformationMessage("Dictating works in a window that runs on this computer (not over Remote)");
+  if (vscode.env.uiKind === vscode.UIKind.Web) {
+    void vscode.window.showInformationMessage("Dictating works in VS Code on your computer, not in a browser");
     return;
   }
   const st = await backend.dictate(["--status"]);

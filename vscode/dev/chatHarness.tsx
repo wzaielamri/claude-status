@@ -51,6 +51,7 @@ const chat: PaneChat = {
     : null,
   changes: 2,
   reviewPending: false,
+  reviewed: true,
   review: { editedAt: now - 60_000, tests: { command: "npm test -- parser", ok: true, at: now - 30_000 } },
   queued: params.get("queued") === "1" ? { id: "q1", prompt: "Then update the changelog.", error: "" } : null,
   // ?where=background|closed|claude|vscode|terminal: where it runs (else tmux)

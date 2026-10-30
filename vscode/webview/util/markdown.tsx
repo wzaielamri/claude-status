@@ -7,7 +7,7 @@
 import type { ComponentChildren, JSX } from "preact";
 
 const FENCE = /^(\s*)(```+|~~~+)\s*([^\s`]*)/;
-const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+const HEADING = /^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/; // (a closing run of # only after a space: C# stays)
 const BULLET = /^(\s*)([-*+])\s+(.*)$/;
 const NUMBERED = /^(\s*)(\d{1,9})[.)]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
@@ -34,7 +34,7 @@ function emphasis(text: string, m: RegExpExecArray, end: number): boolean {
 export function inline(text: string, key = "i"): ComponentChildren[] {
   const out: ComponentChildren[] = [];
   const pattern =
-    /`([^`]+)`|\*\*(\S(?:.*?\S)?)\*\*|__(\S(?:.*?\S)?)__|\*([^*\s](?:[^*]*?[^*\s])?)\*|_([^_\s](?:[^_]*?[^_\s])?)_|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|~~(\S(?:.*?\S)?)~~|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|\\([\\`*_{}\[\]()#+\-.!|~<>])/g;
+    /`([^`]+)`|\*\*(\S(?:.*?\S)?)\*\*|__(\S(?:.*?\S)?)__|\*([^*\s](?:[^*]*?[^*\s])?)\*|_([^_\s](?:[^_]*?[^_\s])?)_|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|~~(\S(?:.*?\S)?)~~|(https?:\/\/(?:[^\s<>()]|\([^\s<>()]*\))*(?:[^\s<>().,;:!?'"]|\([^\s<>()]*\)))|\\([\\`*_{}\[\]()#+\-.!|~<>])/g;
   let last = 0;
   let n = 0;
   for (let m = pattern.exec(text); m; m = pattern.exec(text)) {

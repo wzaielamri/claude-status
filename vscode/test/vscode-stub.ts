@@ -170,8 +170,14 @@ export enum CommentMode {
 }
 
 export const clipboardWrites: string[] = [];
+export enum UIKind {
+  Desktop = 1,
+  Web = 2,
+}
+
 export const env = {
   remoteName: undefined as string | undefined,
+  uiKind: UIKind.Desktop,
   openExternal: async () => true,
   clipboard: { writeText: async (text: string) => void clipboardWrites.push(text), readText: async () => clipboardWrites.at(-1) ?? "" },
 };

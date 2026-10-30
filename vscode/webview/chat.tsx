@@ -109,6 +109,7 @@ function ChatApp() {
   const [commitText, setCommitText] = useState("");
   const [commitEdited, setCommitEdited] = useState(false);
   const [scale, setScale] = useState(config.scale ?? 1.15);
+  const [shown, setShown] = useState(true); // (the tab in front: its working Talpy moves only then)
   const list = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const reply = useRef<HTMLTextAreaElement>(null);
@@ -269,6 +270,7 @@ function ChatApp() {
       if (!m || typeof m !== "object") return;
       if (m.type === "chat") setChat(m.chat);
       else if (m.type === "textSize") setScale(m.scale);
+      else if (m.type === "visible") setShown(m.visible);
       else if (m.type === "diffLayout") setSplit(m.split);
       else if (m.type === "picked") attachPaths(m.paths);
       else if (m.type === "picture") {
@@ -302,7 +304,7 @@ function ChatApp() {
           });
           box?.focus();
         }
-        if (m.message) setInfo({ ok: false, message: m.message });
+        if (m.message) setInfo({ ok: !!m.ok, message: m.message }); // (set up, downloaded: not an error)
       }
       else if (m.type === "file") {
         const p = pending.current[m.id];
@@ -336,7 +338,7 @@ function ChatApp() {
         setReviewError(m.error);
       } else if (m.type === "result") {
         if (m.kind.startsWith("tab:")) {
-          setTab(m.kind.slice(4) as Tab);
+          showTab(m.kind.slice(4) as Tab);
           if (m.kind === "tab:review") setReviewAsked((n) => n + 1); // (compared again, also when it showed already)
           return;
         }
@@ -402,12 +404,41 @@ function ChatApp() {
     const el = list.current;
     if (el && follow.current) el.scrollTop = el.scrollHeight;
   }, [items, chat?.activity]);
+  // The list made shorter (a prompt to answer under it, the queued reply,
+  // what the reply box offers) or taller: still at its end if it was
+  useEffect(() => {
+    const el = list.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const watch = new ResizeObserver(() => {
+      if (follow.current) el.scrollTop = el.scrollHeight;
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [conversation]);
   // Back on the Chat or Steps tab (its list is made again), or from one to
-  // the other: at its end, following it, if it was when you left, else where you were
+  // the other: at its end, following it, if it was when you left, else on the
+  // message that was at its top (Steps has tool calls between them, so the
+  // same place in pixels is another part of the chat), else where you were
   const listTop = useRef(0);
+  const topItem = useRef<{ key: string; at: number } | null>(null);
+  const showTab = (t: Tab) => {
+    const el = list.current;
+    topItem.current = null;
+    if (el) {
+      const top = el.getBoundingClientRect().top;
+      const it = [...el.querySelectorAll<HTMLElement>("[data-key]")].find((m) => m.getBoundingClientRect().bottom > top);
+      if (it) topItem.current = { key: it.dataset.key ?? "", at: it.getBoundingClientRect().top - top };
+    }
+    setTab(t);
+  };
   useLayoutEffect(() => {
     const el = list.current;
-    if (conversation && el) el.scrollTop = follow.current ? el.scrollHeight : listTop.current;
+    if (!conversation || !el) return;
+    const was = topItem.current;
+    const it = was && !follow.current ? [...el.querySelectorAll<HTMLElement>("[data-key]")].find((m) => m.dataset.key === was.key) : undefined;
+    el.scrollTop = follow.current ? el.scrollHeight
+      : it && was ? el.scrollTop + it.getBoundingClientRect().top - el.getBoundingClientRect().top - was.at
+      : listTop.current;
   }, [tab]);
 
   const send = (how: "auto" | "background" | "copy" | "enter", afterTurn: boolean) => {
@@ -428,7 +459,7 @@ function ChatApp() {
   const activity = (chat?.activity ?? "").replace(/[….\s]+$/, "");
   const sums = (review?.files ?? []).reduce((a, f) => [a[0] + (f.added ?? 0), a[1] + (f.removed ?? 0)], [0, 0]);
   const tests = testsText(chat?.review ?? (review ? { editedAt: review.editedAt, tests: review.tests } : null));
-  const marked = !!chat && !chat.reviewPending && !!chat.review;
+  const marked = !!chat && chat.reviewed && !!chat.review;
 
   // The conversation, drawn again only when it or how it shows changes: not
   // for each key typed in the reply, a dictation's second or a chat's poll
@@ -438,12 +469,12 @@ function ChatApp() {
   const steps = useMemo(() => items.map((it, i) => {
     const gap = gapOf(it.kind, items[i - 1]?.kind);
     return it.kind === "you" ? (
-      <div key={it.key} class={`pane-item pane-you ${gap}`}>
+      <div key={it.key} data-key={it.key} class={`pane-item pane-you ${gap}`}>
         <span class="pane-gutter" aria-hidden="true">›</span>
         <div class="pane-you-text">{it.text}</div>
       </div>
     ) : it.kind === "claude" ? (
-      <div key={it.key} class={`pane-item pane-claude ${gap}`}>
+      <div key={it.key} data-key={it.key} class={`pane-item pane-claude ${gap}`}>
         <span class="pane-gutter" aria-hidden="true">
           <span class="pane-dot" />
         </span>
@@ -464,7 +495,7 @@ function ChatApp() {
         onSplit={sideBySide}
       />
     ) : (
-      <div key={it.key} class={`pane-item pane-note${it.error ? " bad" : ""} ${gap}`}>
+      <div key={it.key} data-key={it.key} class={`pane-item pane-note${it.error ? " bad" : ""} ${gap}`}>
         <span>{it.text}</span>
       </div>
     );
@@ -530,11 +561,11 @@ function ChatApp() {
       </div>
       <div class="pane-tabs" role="tablist">
         {(["chat", "steps"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => showTab(t)}>
             {t === "chat" ? "Chat" : "Steps"}
           </button>
         ))}
-        <button type="button" role="tab" aria-selected={tab === "review"} class={tab === "review" ? "on" : ""} onClick={() => setTab("review")}>
+        <button type="button" role="tab" aria-selected={tab === "review"} class={tab === "review" ? "on" : ""} onClick={() => showTab("review")}>
           {chat?.changes ? `Review ±${chat.changes}${chat.reviewPending ? " •" : ""}` : "Review"}
         </button>
       </div>
@@ -568,7 +599,7 @@ function ChatApp() {
             {chat?.state === "working" ? (
               <div class="pane-item pane-working">
                 <span class="pane-gutter">
-                  <TalpyIcon state="thinking" moving={true} />
+                  <TalpyIcon state="thinking" moving={shown} />
                 </span>
                 <span>{activity && !(tab === "steps" && last?.kind === "tool" && last.status === "open") ? activity : "Working"}…</span>
               </div>
@@ -686,7 +717,7 @@ function ChatApp() {
               <button type="button" class="btn secondary" onClick={() => setOfferModel("")}>Not now</button>
             </div>
           ) : null}
-          <div class="pane-hint">{chat ? routeHint(chat.route, chat.state !== "done" || !!chat.busy, "", chat.host) : ""}</div>
+          <div class="pane-hint">{chat ? routeHint(chat.route, chat.state !== "done" || !!chat.busy, chat.where === "background" ? "bg" : "", chat.host) : ""}</div>
           <div class="pane-buttons">
             {/* (icons, as in the widget; what dictation is doing shows beside the microphone) */}
             <button type="button" class={"icon-btn pane-mic" + (dictating === "recording" ? " on" : "")}
@@ -783,7 +814,7 @@ function ChatApp() {
                     </div>
                     {undoAsk === f.path ? (
                       <div class="confirm">
-                        <span>{f.created ? `Remove ${f.label}? The chat made it.` : `Put ${f.label} back as it was before this chat? Later changes to it are lost too.`}</span>
+                        <span>{f.created ? `Delete ${f.label} for good? The chat made it; what you changed in it since is lost too.` : `Put ${f.label} back as it was before this chat? Later changes to it are lost too.`}</span>
                         <button type="button" class="btn small" onClick={() => { setUndoAsk(""); post({ type: "undo", path: f.path }); }}>Undo</button>
                         <button type="button" class="btn secondary small" onClick={() => setUndoAsk("")}>Cancel</button>
                       </div>
@@ -799,38 +830,39 @@ function ChatApp() {
                 ))}
               </>
             )}
-            {commitOpen && review ? (
-              <div class="commit-box">
-                <div>
-                  {review.repos.length
-                    ? `Commit only these files in ${review.repos.join(", ")} (yours that aren't this chat's stay as they are):`
-                    : "None of these files is in a git repository."}
-                </div>
-                <textarea
-                  class="pane-reply mono"
-                  rows={6}
-                  value={commitText}
-                  onInput={(e) => {
-                    setCommitText((e.target as HTMLTextAreaElement).value);
-                    setCommitEdited(true);
-                  }}
-                />
-                <div class="pane-buttons">
-                  <button type="button" class="btn secondary" onClick={() => setCommitOpen(false)}>Cancel</button>
-                  <button type="button" class="btn" disabled={!commitText.trim() || !review.repos.length} onClick={() => post({ type: "commit", message: commitText })}>
-                    Commit
-                  </button>
-                </div>
-              </div>
-            ) : null}
-            {undoAsk === "*" ? (
-              <div class="confirm">
-                <span>Put all of them back as they were before this chat? Files it made are removed; later changes to them are lost too.</span>
-                <button type="button" class="btn small" onClick={() => { setUndoAsk(""); post({ type: "undo", path: "*" }); }}>Undo all</button>
-                <button type="button" class="btn secondary small" onClick={() => setUndoAsk("")}>Cancel</button>
-              </div>
-            ) : null}
           </div>
+          {/* (above the buttons that open them, not at the end of a list that may scroll) */}
+          {commitOpen && review ? (
+            <div class="commit-box">
+              <div>
+                {review.repos.length
+                  ? `Commit only these files in ${review.repos.join(", ")} (yours that aren't this chat's stay as they are):`
+                  : "None of these files is in a git repository."}
+              </div>
+              <textarea
+                class="pane-reply mono"
+                rows={6}
+                value={commitText}
+                onInput={(e) => {
+                  setCommitText((e.target as HTMLTextAreaElement).value);
+                  setCommitEdited(true);
+                }}
+              />
+              <div class="pane-buttons">
+                <button type="button" class="btn secondary" onClick={() => setCommitOpen(false)}>Cancel</button>
+                <button type="button" class="btn" disabled={!commitText.trim() || !review.repos.length} onClick={() => post({ type: "commit", message: commitText })}>
+                  Commit
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {undoAsk === "*" ? (
+            <div class="confirm">
+              <span>Put all of them back as they were before this chat? Files it made are deleted for good; later changes to them are lost too.</span>
+              <button type="button" class="btn small" onClick={() => { setUndoAsk(""); post({ type: "undo", path: "*" }); }}>Undo all</button>
+              <button type="button" class="btn secondary small" onClick={() => setUndoAsk("")}>Cancel</button>
+            </div>
+          ) : null}
           <div class="pane-buttons">
             <button type="button" class="btn secondary" onClick={() => { setReviewLoading(true); post({ type: "review" }); }}>Compare again</button>
             <span class="spacer" />

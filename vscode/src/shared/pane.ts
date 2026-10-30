@@ -77,6 +77,7 @@ export interface PaneChat {
   permission: PermissionAsk | null;
   changes: number; // files it changed
   reviewPending: boolean;
+  reviewed: boolean; // its changes since its last edit marked reviewed, whether it works now or not (the Reviewed ✓ button)
   review: Review | null;
   queued: { id: string; prompt: string; error: string } | null; // a reply waiting for its turn to end
   canMove: boolean; // runs in a terminal, on the account Claude Code is on: it can move to a Claude Code panel
@@ -147,7 +148,8 @@ export type PaneHostMessage =
   // one), offerSetup: nothing writes it down yet (setupMb: what setting up downloads); the tab asks
   // before either
   | { type: "dictation"; state: "" | "starting" | "recording" | "writing" | "model" | "setup"; text?: string; message?: string; offerModel?: boolean;
-      engine?: string; offerSetup?: boolean; setupMb?: number };
+      engine?: string; offerSetup?: boolean; setupMb?: number; ok?: boolean } // ok: message says it worked (set up, downloaded)
+  | { type: "visible"; visible: boolean }; // the tab shown or hidden (its working Talpy moves only while shown)
 
 // tab -> extension
 export type PaneMessage =
@@ -316,11 +318,22 @@ export function reviewPending(
   status: Status | null | undefined,
   host?: string,
 ): boolean {
+  if (!item.review?.editedAt || item.state === "working" || item.state === "waiting") return false;
+  return !reviewSeen(item, status, host);
+}
+
+// Its changes since its last edit marked reviewed (or older than what's to
+// review at all), whether it works now or not
+export function reviewSeen(
+  item: { review?: Review | null; chatId?: string; sessionId: string },
+  status: Status | null | undefined,
+  host?: string,
+): boolean {
   const edited = item.review?.editedAt;
-  if (!edited || item.state === "working" || item.state === "waiting") return false;
+  if (!edited) return true;
   const mark = status?.reviewed?.[reviewKey(item.chatId || item.sessionId, host)];
   const seen = mark === 0 ? 0 : Math.max(mark ?? 0, status?.reviewedSince ?? 0);
-  return seen < edited;
+  return seen >= edited;
 }
 
 // The reply waiting for a chat's turn to end (pane.py --send --after-turn)
@@ -352,7 +365,7 @@ export function routeHint(route: PaneChat["route"], hasProcess: boolean, kind: s
       return `Its terminal takes no text from outside: send it, and Claude there quits and the chat goes on in the background, or copy it and open its terminal.${where}`;
     default:
       return hasProcess && kind === "bg"
-        ? `Its background session stops, then goes on with your message.${where}`
+        ? `Its background chat stops, then goes on with your message.${where}`
         : `The chat goes on in the background with your message.${where}`;
   }
 }

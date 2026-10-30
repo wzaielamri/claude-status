@@ -18,7 +18,7 @@ import { openComparison } from "./changes";
 import { cacheDir, configDirArgs } from "./config";
 import type { Dashboard } from "./dashboard";
 import { chatRefOf, doingText, liveOf, petKeyOf, recentRef, stateText } from "./shared/model";
-import { answersOf, askShownOf, chatWhere, PICTURE_TYPES, queuedReply, reviewPending, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage } from "./shared/pane";
+import { answersOf, askShownOf, chatWhere, PICTURE_TYPES, queuedReply, reviewPending, reviewSeen, sameAsk, textScale, type PaneChat, type PaneHostMessage, type PaneMessage } from "./shared/pane";
 import type { Answers, AskShown, ChatRef, Decision, RecentChat, Session, ViewState } from "./shared/types";
 import { isDecision } from "./shared/types";
 import { localAncestors, type Terminals } from "./terminals";
@@ -262,6 +262,7 @@ class Pane implements vscode.Disposable {
       this.panel.onDidChangeViewState(() => {
         if (this.disposed || this.panel.visible === this.shown) return;
         this.shown = this.panel.visible;
+        this.post({ type: "visible", visible: this.shown });
         if (this.shown && this.ready) void this.load();
         this.schedule();
       }),
@@ -337,6 +338,7 @@ class Pane implements vscode.Disposable {
       permission: session?.state === "waiting" ? (session.permission ?? null) : null,
       changes: (session?.changes ?? recent?.changes)?.count ?? 0,
       reviewPending: item ? reviewPending(item, state.status, this.host || undefined) : false,
+      reviewed: item ? reviewSeen(item, state.status, this.host || undefined) : true,
       review: session?.review ?? recent?.review ?? null,
       queued: queued ? { id: queued.id, prompt: queued.prompt, error: queued.error } : null,
       canMove: !!session && this.owner.ext.actions.canMoveToClaudeCode(this.chat),
@@ -553,8 +555,8 @@ class Pane implements vscode.Disposable {
   }
 
   // The microphone: record, then whisper (whisper.cpp, or the faster-whisper dictate.py sets up)
-  // writes it down on this computer; only when this window runs here (else the microphone would be
-  // the remote's)
+  // writes it down on this computer (Talpy Den runs on your side, also in a Remote window); not in a
+  // browser, which runs no Python
   private recording = ""; // the recording's id while it records
   // Where dictating is: "starting" (--status, --start on their way: no second
   // recorder meanwhile), "recording", "writing" (--stop), "model", "setup"
@@ -563,8 +565,8 @@ class Pane implements vscode.Disposable {
   private async dictate(action: "toggle" | "cancel" | "getModel" | "setup"): Promise<void> {
     const { backend } = this.owner.ext;
     const tell = (m: Omit<Extract<PaneHostMessage, { type: "dictation" }>, "type">) => this.post({ type: "dictation", ...m });
-    if (vscode.env.remoteName) {
-      tell({ state: "", message: "Dictating works in a window that runs on this computer (not over Remote)" });
+    if (vscode.env.uiKind === vscode.UIKind.Web) {
+      tell({ state: "", message: "Dictating works in VS Code on your computer, not in a browser", ok: false });
       return;
     }
     if (action === "cancel") {
@@ -589,7 +591,7 @@ class Pane implements vscode.Disposable {
       tell({ state: this.dictation });
       const r = action === "getModel" ? await backend.dictate(["--get-model", "base"], 900000) : await backend.dictate(["--setup"], 3600000);
       this.dictation = "";
-      tell({ state: "", message: String(r.message ?? "") });
+      tell({ state: "", message: String(r.message ?? ""), ok: !!r.ok });
     } else if (this.dictation === "recording") {
       const id = this.recording;
       this.recording = "";
