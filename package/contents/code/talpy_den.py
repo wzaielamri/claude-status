@@ -4356,9 +4356,49 @@ def mangle(name):
     return re.sub(r"[^A-Za-z0-9]", "-", name)
 
 
+MEMORY_CWD_BYTES = 65536  # read of a transcript's first lines for the folder its chat ran in
+MEMORY_CWD_FILES = 3
+
+
+def memory_folder(project):
+    """(folder, gone) of the memories in a projects/<key> folder: the folder
+    it's for on disk (project_folder_of), else, when that was renamed, moved
+    or deleted (gone), the one a chat filed there ran in, as the first lines
+    of its transcript name it, else the key read back ("-" as "/")."""
+    folder = project_folder_of(project)
+    if folder:
+        return folder, False
+    try:
+        transcripts = sorted(project.glob("*.jsonl"))[:MEMORY_CWD_FILES]
+    except OSError:
+        transcripts = []
+    for path in transcripts:
+        try:
+            with open(path, "rb") as f:
+                read = 0
+                while read < MEMORY_CWD_BYTES:
+                    line = f.readline(MEMORY_CWD_BYTES - read)
+                    if not line:
+                        break
+                    read += len(line)
+                    if b'"cwd"' not in line:
+                        continue
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    cwd = e.get("cwd") if isinstance(e, dict) else None
+                    if isinstance(cwd, str) and cwd.startswith("/") and mangle(cwd) == project.name:
+                        return cwd, True
+        except OSError:
+            continue
+    return "/" + (project.name[1:] if project.name.startswith("-") else project.name).replace("-", "/"), True
+
+
 def account_memories(group, ctx, limit=MEMORIES_LISTED):
     """The memories of an account's profiles, newest first: [{"key", "name",
-    "description", "type", "path", "folder", "folderShort", "profileDir",
+    "description", "type", "path", "folder", "folderShort", "folderGone"
+    (that folder isn't there any more: memory_folder), "profileDir",
     "profile", "updatedAt"}]."""
     by_key = {p.key: p for p in ctx.profiles}
     found, seen = [], set()
@@ -4382,9 +4422,9 @@ def account_memories(group, ctx, limit=MEMORIES_LISTED):
     for t, p, f in found[:limit]:
         project = f.parent.parent
         if project not in folders:
-            folders[project] = project_folder_of(project)
+            folders[project] = memory_folder(project)
         head = memory_head(f)
-        folder = folders[project]
+        folder, gone = folders[project]
         out.append({
             "key": f"{p.key}/{project.name}/{f.stem}/memory",
             "name": clean_text(head.get("name") or f.stem, 120),
@@ -4393,6 +4433,7 @@ def account_memories(group, ctx, limit=MEMORIES_LISTED):
             "path": str(f),
             "folder": folder,
             "folderShort": short_path(folder, ctx.home) if folder else "",
+            "folderGone": gone,
             "profileDir": p.key,
             "profile": p.label,
             "updatedAt": int(t * 1000),
@@ -4419,7 +4460,7 @@ def account_instructions(group, ctx):
         out.append({
             "key": f"{p.key}/CLAUDE.md/memory", "name": "CLAUDE.md",
             "description": "Your instructions for every chat on this account" + (" (shared with other accounts)" if shared else ""),
-            "type": "account", "path": str(f), "folder": "", "folderShort": "", "profileDir": p.key,
+            "type": "account", "path": str(f), "folder": "", "folderShort": "", "folderGone": False, "profileDir": p.key,
             "profile": p.label, "updatedAt": int(st.st_mtime * 1000),
         })
     return out

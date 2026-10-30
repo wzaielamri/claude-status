@@ -1598,7 +1598,10 @@ class MemoryTests(Fixture):
         first = g["memories"][0]
         self.assertEqual((first["description"], first["type"], first["folder"], first["profileDir"]),
                          ('Tag "many" features at once', "feedback", str(folder), ".claude-work"))
-        self.assertEqual((g["memories"][1]["type"], g["memories"][2]["folder"]), ("", ""))
+        self.assertEqual((g["memories"][1]["type"], first["folderShort"], first["folderGone"]), ("", "~/repos/my_app.v2", False))
+        # a folder that isn't there any more: its name read back, and said so
+        self.assertEqual({k: g["memories"][2][k] for k in ("folder", "folderShort", "folderGone")},
+                         {"folder": "/gone/folder", "folderShort": "/gone/folder", "folderGone": True})
         # only memory files of a profile open
         profiles = cs.discover_profiles(self.home)
         self.assertEqual(cs.memory_file(profiles, str(mem / "plain.md")), (mem / "plain.md").resolve())
@@ -1609,6 +1612,23 @@ class MemoryTests(Fixture):
             self.assertEqual(jump.open_memory(self.home, [], str(mem / "plain.md"), edit=True), (True, ""))
             self.assertFalse(jump.open_memory(self.home, [], "/etc/passwd")[0])
         self.assertEqual((shown.call_count, edited.call_count), (1, 1))
+
+    def test_the_folder_of_a_renamed_repository_from_its_chats(self):
+        # (renamed or moved: the folder a chat filed there ran in, as its transcript says)
+        w = self.home / ".claude-work"
+        old = self.home / "repos/talpy-den.old"
+        project = w / "projects" / cs.mangle(str(old))
+        write(project / "memory/notes.md", "---\nname: notes\ntype: project\n---\n")
+        write(project / "0a1b2c3d.jsonl", lines({"type": "file-history-snapshot"},
+                                                 prompt("hi", self.now - 60, cwd=str(old / "sub")),  # (after a cd)
+                                                 prompt("hi", self.now - 60, cwd=str(old))))
+        listed = next(m for m in self.group(self.collect(with_tokens=False), "work")["memories"] if m["name"] == "notes")
+        self.assertEqual((listed["folder"], listed["folderShort"], listed["folderGone"]),
+                         (str(old), "~/repos/talpy-den.old", True))
+        # back where it was: found on disk
+        old.mkdir(parents=True)
+        listed = next(m for m in self.group(self.collect(with_tokens=False), "work")["memories"] if m["name"] == "notes")
+        self.assertEqual((listed["folder"], listed["folderGone"]), (str(old), False))
 
     def test_memories_open_with_projects_kept_elsewhere(self):
         # (projects/ linked to a folder on another disk: its memories are still the profile's)
