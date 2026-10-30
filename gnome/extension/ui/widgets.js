@@ -51,13 +51,19 @@ export function iconButton(icon, onClick, styleClass = 'claude-icon-button') {
 }
 
 // Buttons shown only while the pointer is over their line (they keep their
-// place, so nothing moves)
+// place, so nothing moves), or while one of them has the keyboard focus (Tab
+// doesn't land on a button you can't see)
 export function showOnHover(line, buttons) {
     const sync = () => {
+        const shown = line.hover || buttons.some(b => b.has_key_focus());
         for (const b of buttons)
-            b.opacity = line.hover ? 255 : 0;
+            b.opacity = shown ? 255 : 0;
     };
     line.connect('notify::hover', sync);
+    for (const b of buttons) {
+        b.connect('key-focus-in', sync);
+        b.connect('key-focus-out', sync);
+    }
     sync();
 }
 
