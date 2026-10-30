@@ -1,7 +1,8 @@
 """A row's buttons (HoverButtons.qml) show on hover, and also for the
 keyboard and a finger, which can't hover: while the line's name or one of its
 buttons has the keyboard's focus (Tab), and after a press and hold
-(TouchHold.qml). A mouse does what it did."""
+(TouchHold.qml). A mouse does what it did. They're made the first time they
+show, and kept: made with every line, they made a list slow to open."""
 import os
 import re
 import subprocess
@@ -22,6 +23,7 @@ Item {
     width: 400; height: 100
     property bool dashboardShown: true
     property string log: ""
+    property int made: 0   // (buttons made)
     function note(s) { log = log + s + " " }
     ColumnLayout {
         width: 400
@@ -46,8 +48,11 @@ Item {
                 lineHeight: 20
                 shown: lineHover.hovered || name.activeFocus || lineButtons.focused || lineButtons.held
                 onShownChanged: root.note(shown ? "shown" : "hidden")
-                PlasmaComponents3.ToolButton { text: "1"; Layout.preferredWidth: 30; onActiveFocusChanged: if (activeFocus) root.note("b1") }
-                PlasmaComponents3.ToolButton { text: "2"; Layout.preferredWidth: 30; onActiveFocusChanged: if (activeFocus) root.note("b2") }
+                RowLayout {
+                    spacing: 0
+                    PlasmaComponents3.ToolButton { text: "1"; Layout.preferredWidth: 30; onActiveFocusChanged: if (activeFocus) root.note("b1"); Component.onCompleted: root.made++ }
+                    PlasmaComponents3.ToolButton { text: "2"; Layout.preferredWidth: 30; onActiveFocusChanged: if (activeFocus) root.note("b2"); Component.onCompleted: root.made++ }
+                }
             }
         }
         PlasmaComponents3.Label { text: "after"; activeFocusOnTab: true; onActiveFocusChanged: if (activeFocus) root.note("after") }
@@ -64,8 +69,9 @@ app = QGuiApplication(sys.argv)
 view = QQuickView(); view.setSource(QUrl.fromLocalFile(sys.argv[1]))
 if view.status() != QQuickView.Ready:
     sys.exit(str([e.toString() for e in view.errors()]))
-view.show(); QTest.qWaitForWindowExposed(view); view.requestActivate(); QTest.qWait(100)
 r = view.rootObject()
+print(repr("made %d" % r.property("made")))
+view.show(); QTest.qWaitForWindowExposed(view); view.requestActivate(); QTest.qWait(100)
 QTest.mouseMove(view, QPoint(390, 90)); QTest.qWait(100)
 touch = QTest.createTouchDevice()
 name, beside = QPoint(20, 10), QPoint(250, 10)
@@ -80,6 +86,7 @@ steps = [lambda: QTest.keyClick(view, Qt.Key_Tab)] * 4 + [
     lambda: r.setProperty("dashboardShown", False), lambda: mouse_hold(name, 1200)]
 for step in steps:
     r.setProperty("log", ""); step(); QTest.qWait(300); print(repr(r.property("log").strip()))
+print(repr("made %d" % r.property("made")))
 """
 
 
@@ -93,6 +100,7 @@ class RowButtonsTests(unittest.TestCase):
                                  env=dict(os.environ, QT_QPA_PLATFORM="offscreen"))
         steps = [eval(line) for line in out.stdout.split("\n") if line]
         self.assertEqual(steps, [
+            "made 0",         # (none made before they show)
             "shown",          # Tab: on the name
             "b1", "b2",       # then on its buttons, which stay
             "hidden after",   # and past them
@@ -100,6 +108,7 @@ class RowButtonsTests(unittest.TestCase):
             "hidden", "shown",  # held again, beside it: gone; and back
             "hidden",         # the popup hides
             "shown click",    # a mouse on the name shows them (hover) and, held, still clicks
+            "made 2",         # (made once, then kept)
         ], out.stderr[-2000:])
 
     def test_every_line_with_buttons_shows_them_for_the_keyboard_and_a_finger(self):
@@ -114,6 +123,22 @@ class RowButtonsTests(unittest.TestCase):
                 label = rows[rows.index("id: %s\n" % name):rows.index("id: %s\n" % mouse)]
                 self.assertIn("activeFocusOnTab: true", label)
                 self.assertIn("Keys.onReturnPressed", label)
+
+    def test_what_a_line_rarely_needs_is_made_only_when_needed(self):
+        # Opening Recent chats, Plans or Memories made every line's buttons,
+        # Delete question, keep-only question, a plan's new-chat box and its
+        # tags' pane tooltips at once: 30-50 ms a line (2026-10-30)
+        ui = {name: (UI / name).read_text() for name in ("HoverButtons.qml", "DeleteAsk.qml", "KeepOnlyMessage.qml",
+                                                         "TipArea.qml", "GroupSection.qml", "SessionRow.qml")}
+        self.assertIn("default property Component buttons", ui["HoverButtons.qml"])
+        self.assertIn("active: hover.shown || hover.made", ui["HoverButtons.qml"])
+        self.assertRegex(ui["DeleteAsk.qml"], r"\nLoader \{[^}]*active: itemKey !== \"\" && asked\.key === itemKey")
+        self.assertRegex(ui["KeepOnlyMessage.qml"], r"\nLoader \{[^}]*active: shown")
+        self.assertIn("visible: false", ui["KeepOnlyMessage.qml"])   # (made hidden, then shown: it fades in)
+        self.assertIn("active: tip.inPane", ui["TipArea.qml"])
+        self.assertIn("sourceComponent: NewChatBox {\n                    visible: false", ui["GroupSection.qml"])
+        for name in ("GroupSection.qml", "SessionRow.qml"):
+            self.assertNotRegex(ui[name], r"KeepOnlyMessage \{[^}]*visible:", name)
 
 
 if __name__ == "__main__":

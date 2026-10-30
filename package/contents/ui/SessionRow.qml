@@ -566,148 +566,152 @@ RowLayout {
                 shown: row.buttonsShown
                 under: stateBox
 
-                PlasmaComponents3.ToolButton {
-                    // the other way to open it than a click on its name: its window, or the pane
-                    icon.name: Plasmoid.configuration.clickOpensPane ? "window" : "dialog-messages"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
+                RowLayout {   // (made the first time they show)
+                    spacing: 0
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: Plasmoid.configuration.clickOpensPane ? row.openHint : i18n("Open in the chat pane")
-                        subText: Plasmoid.configuration.clickOpensPane ? ""
-                                 : i18n("Beside the popup: its conversation, a box to reply, and what it changed.")
+                    PlasmaComponents3.ToolButton {
+                        // the other way to open it than a click on its name: its window, or the pane
+                        icon.name: Plasmoid.configuration.clickOpensPane ? "window" : "dialog-messages"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: Plasmoid.configuration.clickOpensPane ? row.open() : root.openPane(row.session, row.remoteHost, "chat")
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: Plasmoid.configuration.clickOpensPane ? row.openHint : i18n("Open in the chat pane")
+                            subText: Plasmoid.configuration.clickOpensPane ? ""
+                                     : i18n("Beside the popup: its conversation, a box to reply, and what it changed.")
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    // star it: once it isn't listed here any more, it stays under Recent chats → Starred
-                    // (a starred one has its ★ after its name)
-                    visible: !!(row.session.chatId || row.session.sessionId) && !row.session.starred
-                    icon.name: "non-starred-symbolic"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Star")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, true)
+                    PlasmaComponents3.ToolButton {
+                        // star it: once it isn't listed here any more, it stays under Recent chats → Starred
+                        // (a starred one has its ★ after its name)
+                        visible: !!(row.session.chatId || row.session.sessionId) && !row.session.starred
+                        icon.name: "non-starred-symbolic"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Star")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, true)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Star this chat")
-                        subText: i18n("Once it isn't listed here any more, a starred chat stays under Recent chats → Starred, however old it is.")
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Star this chat")
+                            subText: i18n("Once it isn't listed here any more, a starred chat stays under Recent chats → Starred, however old it is.")
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    // keep going until it's done: on by itself after each usage limit
-                    visible: row.kept === null && root.canKeepGoing(row.session, row.remoteHost)
-                    icon.name: "media-playlist-repeat"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Keep going after usage limits")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: root.keepGoing(row.session, true)
+                    PlasmaComponents3.ToolButton {
+                        // keep going until it's done: on by itself after each usage limit
+                        visible: row.kept === null && root.canKeepGoing(row.session, row.remoteHost)
+                        icon.name: "media-playlist-repeat"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Keep going after usage limits")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: root.keepGoing(row.session, true)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Keep going until it's done")
-                        subText: i18n("When a usage limit stops this chat, it goes on by itself in the background a minute after the limit resets, in the permission mode it had, and again after each later one, until a turn of it ends by itself. Claude here quits first then (its terminal stays open); open the chat from here to see it.")
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Keep going until it's done")
+                            subText: i18n("When a usage limit stops this chat, it goes on by itself in the background a minute after the limit resets, in the permission mode it had, and again after each later one, until a turn of it ends by itself. Claude here quits first then (its terminal stays open); open the chat from here to see it.")
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    id: shareButton
-                    visible: row.canShare
-                    icon.name: "document-share"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Share or continue on another account…")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: root.openShareMenu(shareButton, {
-                        chatId: row.session.chatId, name: row.session.name, profileDir: row.session.profileDir,
-                        shared: !!row.session.shared && !row.session.shared.forkOf, host: row.remoteHost
-                    }, row.rowKey)
+                    PlasmaComponents3.ToolButton {
+                        id: shareButton
+                        visible: row.canShare
+                        icon.name: "document-share"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Share or continue on another account…")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: root.openShareMenu(shareButton, {
+                            chatId: row.session.chatId, name: row.session.name, profileDir: row.session.profileDir,
+                            shared: !!row.session.shared && !row.session.shared.forkOf, host: row.remoteHost
+                        }, row.rowKey)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Continue on another account")
-                        subText: root.shareHint(row.remoteHost)
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Continue on another account")
+                            subText: root.shareHint(row.remoteHost)
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    // Delete a finished chat: to the Trash, after a question (DeleteAsk under the row)
-                    visible: row.session.state === "done" && !!(row.session.chatId || row.session.sessionId)
-                    icon.name: "user-trash"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Delete…")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: root.askDelete(row.rowKey, "chat", row.session.chatId || row.session.sessionId,
-                                              row.session.profileDir, row.remoteHost, "")
+                    PlasmaComponents3.ToolButton {
+                        // Delete a finished chat: to the Trash, after a question (DeleteAsk under the row)
+                        visible: row.session.state === "done" && !!(row.session.chatId || row.session.sessionId)
+                        icon.name: "user-trash"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Delete…")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: root.askDelete(row.rowKey, "chat", row.session.chatId || row.session.sessionId,
+                                                  row.session.profileDir, row.remoteHost, "")
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Delete this chat…")
-                        subText: root.deleteHint("chat")
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Delete this chat…")
+                            subText: root.deleteHint("chat")
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    // Hide a finished chat here (nothing is deleted)
-                    visible: row.session.state === "done"
-                    icon.name: "window-close"   // (an × in the text's color, as in VS Code and GNOME)
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Hide this chat")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: root.hideItem("chats", row.session.sessionId, row.remoteHost)
+                    PlasmaComponents3.ToolButton {
+                        // Hide a finished chat here (nothing is deleted)
+                        visible: row.session.state === "done"
+                        icon.name: "window-close"   // (an × in the text's color, as in VS Code and GNOME)
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Hide this chat")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: root.hideItem("chats", row.session.sessionId, row.remoteHost)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Hide this chat")
-                        subText: root.hideHint("chats", row.remoteHost)
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Hide this chat")
+                            subText: root.hideHint("chats", row.remoteHost)
+                        }
                     }
-                }
-                PlasmaComponents3.ToolButton {
-                    visible: row.canStop
-                    icon.name: "media-playback-stop"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
-                    Layout.preferredHeight: rowButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: rowButtons.buttonWidth
-                    Layout.alignment: Qt.AlignTop
-                    onClicked: root.stopConfirmSession = row.confirmingStop ? "" : row.rowKey
+                    PlasmaComponents3.ToolButton {
+                        visible: row.canStop
+                        icon.name: "media-playback-stop"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
+                        Layout.preferredHeight: rowButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: rowButtons.buttonWidth
+                        Layout.alignment: Qt.AlignTop
+                        onClicked: root.stopConfirmSession = row.confirmingStop ? "" : row.rowKey
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: row.stopTitle
-                        subText: row.stopTip
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: row.stopTitle
+                            subText: row.stopTip
+                        }
                     }
                 }
             }
@@ -1294,7 +1298,7 @@ RowLayout {
 
         KeepOnlyMessage {
             Layout.fillWidth: true
-            visible: row.confirmingKeepOnly
+            shown: row.confirmingKeepOnly
         }
 
         DeleteAsk {

@@ -11,13 +11,17 @@ import org.kde.kirigami as Kirigami
 // last in the line's RowLayout; its buttons take buttonSize. Not only on
 // hover: the line shows them too while one of them has the keyboard's focus
 // (focused: Tab, from the line's name), and after a press and hold with a
-// finger (held: TouchHold.qml) until the popup hides.
+// finger (held: TouchHold.qml) until the popup hides. The buttons are one
+// item (a RowLayout of them, spacing 0), made the first time they show and
+// kept then: made with every line, they made a list slow to open (each
+// button takes a millisecond or two to make, and most lines are never
+// hovered).
 Item {
     id: hover
 
     property bool shown: false
     readonly property bool focused: {
-        for (const button of row.children)
+        for (const button of row.item ? row.item.children : [])
             if (button.visualFocus)   // (by the keyboard: a click leaves them to the mouse)
                 return true
         return false
@@ -33,7 +37,8 @@ Item {
     }
     property Item under: null               // what stands at the line's end
     property real lineHeight: 0             // the line's (the buttons are centered on it, a little taller)
-    default property alias buttons: row.data
+    default property Component buttons
+    property bool made: false               // (they showed once: they're kept)
     readonly property real buttonSize: Math.round(Kirigami.Units.iconSizes.small * 1.375)   // (22 px high, 16 px icons: as in VS Code)
     readonly property real buttonWidth: Kirigami.Units.iconSizes.small + 4                  // (packed close: 2 px each side)
     // how much of the line's end they cover now (CoveredEnd.covered), and how
@@ -47,11 +52,13 @@ Item {
     implicitHeight: lineHeight > 0 ? lineHeight : row.implicitHeight
     z: 1
 
-    RowLayout {
+    Loader {
         id: row
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 0
+        active: hover.shown || hover.made
+        sourceComponent: hover.buttons
+        onLoaded: hover.made = true
         opacity: hover.shown ? 1 : 0
         visible: opacity > 0
         Behavior on opacity {

@@ -28,9 +28,18 @@ Item {
         id: hover
         enabled: tip.inPane
     }
-    PlasmaComponents3.ToolTip {
-        visible: tip.inPane && tip.active && hover.hovered && (tip.mainText !== "" || tip.subText !== "")
-        delay: Kirigami.Units.toolTipDelay
-        text: tip.subText ? tip.mainText + "\n" + tip.subText : tip.mainText
+    // (made only in the chat pane: in the popup it never shows, and one in
+    // each tag made the popup's lists slow to open)
+    Loader {
+        anchors.fill: parent
+        active: tip.inPane
+        sourceComponent: Item {
+            PlasmaComponents3.ToolTip {
+                parent: tip
+                visible: tip.inPane && tip.active && hover.hovered && (tip.mainText !== "" || tip.subText !== "")
+                delay: Kirigami.Units.toolTipDelay
+                text: tip.subText ? tip.mainText + "\n" + tip.subText : tip.mainText
+            }
+        }
     }
 }
