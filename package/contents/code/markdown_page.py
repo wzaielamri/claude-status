@@ -105,9 +105,9 @@ def cells(line):
 
 
 def render_list(items):
-    """HTML of list items [(indent, marker, text)], nested by their indent."""
+    """HTML of list items [(indent, marker, text, blocks: HTML under it)], nested by their indent."""
     out, stack = [], []  # stack: (indent, tag)
-    for indent, marker, text in items:
+    for indent, marker, text, blocks in items:
         tag = "ol" if marker[0].isdigit() else "ul"
         while stack and indent < stack[-1][0]:
             out.append(f"</li></{stack.pop()[1]}>")
@@ -125,9 +125,25 @@ def render_list(items):
             out.append(f'<li class="task">{box} {inline(task.group(2))}')
         else:
             out.append(f"<li>{inline(text)}")
+        out.extend(blocks)
     while stack:
         out.append(f"</li></{stack.pop()[1]}>")
     return "".join(out)
+
+
+def fenced(lines, i):
+    """(HTML of the fenced code block that starts at lines[i], the line after
+    it). A fence indented under a list item drops that much of each line."""
+    fence = FENCE.match(lines[i])
+    indent, mark, lang, code = len(fence.group(1)), fence.group(2), fence.group(3), []
+    i += 1
+    # (it ends at a line of its own mark alone: ```py inside a ``` block doesn't)
+    while i < len(lines) and not re.fullmatch(re.escape(mark[0]) + "{%d,}" % len(mark), lines[i].strip()):
+        line = lines[i]
+        code.append(line[min(indent, len(line) - len(line.lstrip(" "))):])
+        i += 1
+    cls = f' class="language-{html.escape(lang)}"' if lang else ""
+    return f"<pre><code{cls}>{html.escape(chr(10).join(code))}</code></pre>", i + 1
 
 
 def body(markdown):
@@ -142,18 +158,10 @@ def body(markdown):
 
     while i < len(lines):
         line = lines[i]
-        fence = FENCE.match(line)
-        if fence:
+        if FENCE.match(line):
             flush()
-            mark, lang, code = fence.group(2), fence.group(3), []
-            i += 1
-            # (it ends at a line of its own mark alone: ```py inside a ``` block doesn't)
-            while i < len(lines) and not re.fullmatch(re.escape(mark[0]) + "{%d,}" % len(mark), lines[i].strip()):
-                code.append(lines[i])
-                i += 1
-            i += 1
-            cls = f' class="language-{html.escape(lang)}"' if lang else ""
-            out.append(f"<pre><code{cls}>{html.escape(chr(10).join(code))}</code></pre>")
+            block, i = fenced(lines, i)
+            out.append(block)
             continue
         if not line.strip():
             flush()
@@ -199,7 +207,11 @@ def body(markdown):
             while i < len(lines):
                 m = LIST_ITEM.match(lines[i])
                 if m:
-                    items.append([len(m.group(1)), m.group(2), m.group(3)])
+                    items.append([len(m.group(1)), m.group(2), m.group(3), []])
+                elif items and lines[i].startswith(" ") and FENCE.match(lines[i]):  # code under the item
+                    block, i = fenced(lines, i)
+                    items[-1][3].append(block)
+                    continue
                 elif lines[i].strip() and items and lines[i].startswith(" "):
                     items[-1][2] += " " + lines[i].strip()  # the item goes on
                 else:

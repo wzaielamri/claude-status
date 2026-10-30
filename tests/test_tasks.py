@@ -1839,6 +1839,9 @@ class MarkdownTests(Fixture):
         self.assertIn("<ol>", page)
         self.assertIn("&lt;b&gt;code&lt;/b&gt;", page)
         self.assertIn("<ol><li>One</li>", mp.body("Steps:\n1. One\n2. Two"))
+        # a step's code block, fenced under it (as Claude's plans often have it)
+        self.assertEqual(mp.body("1. Run:\n   ```bash\n   npm test\n     --watch\n   ```\n2. Next"),
+                         '<ol><li>Run:<pre><code class="language-bash">npm test\n  --watch</code></pre></li><li>Next</li></ol>')
 
     def test_the_page_reads_as_markdown_means(self):
         import markdown_page as mp
