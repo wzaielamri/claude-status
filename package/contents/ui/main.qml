@@ -2907,6 +2907,7 @@ PlasmoidItem {
     function unqueue(t) {
         runHelper("--unqueue " + shellQuote(t.id))
     }
+    property string unqueueAsk: ""   // the queued task whose Cancel it asks first (what you wrote goes with it)
 
     property var queueRuns: ({})   // command -> the task it starts
 

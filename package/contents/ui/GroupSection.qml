@@ -423,20 +423,44 @@ ColumnLayout {
                     }
                 }
                 PlasmaComponents3.ToolButton {
+                    // (what you wrote for it is asked about first: it's gone with it)
+                    readonly property bool wrote: !queuedLine.task.chat || !!queuedLine.task.afterTurn
+                    readonly property bool kept: !!queuedLine.task.chat && !queuedLine.task.afterTurn && !queuedLine.task.host
+                                                 && root.keptChat(queuedLine.task.chat) !== null
                     icon.name: "edit-delete-remove"
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Cancel it")
                     Layout.preferredHeight: queuedName.implicitHeight
                     Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.unqueue(queuedLine.task)
+                    onClicked: {
+                        if (wrote)
+                            root.unqueueAsk = root.unqueueAsk === queuedLine.task.id ? "" : queuedLine.task.id
+                        else
+                            root.unqueue(queuedLine.task)
+                    }
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
                         anchors.fill: parent
                         mainText: i18n("Cancel it")
-                        subText: i18n("It doesn't start.")
+                        subText: i18n("It doesn't start.") + (parent.kept ? " " + i18n("It stops keeping going after usage limits too.") : "")
+                                 + (parent.wrote ? " " + i18n("It asks first: what you wrote for it is gone with it.") : "")
                     }
                 }
+            }
+            ConfirmLine {
+                visible: root.unqueueAsk !== "" && root.unqueueAsk === queuedLine.task.id
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                text: queuedLine.task.afterTurn ? i18n("Cancel your message to “%1”? It isn't sent, and its text is gone.", queuedLine.task.name || i18n("the chat"))
+                                                : i18n("Cancel this task? It doesn't start, and what you wrote for it is gone.")
+                confirmText: i18n("Cancel it")
+                cancelText: i18n("Keep it")
+                onConfirmed: {
+                    root.unqueueAsk = ""
+                    root.unqueue(queuedLine.task)
+                }
+                onCancelled: root.unqueueAsk = ""
             }
             PlasmaComponents3.Label {
                 textFormat: Text.PlainText
@@ -668,7 +692,9 @@ ColumnLayout {
                               : (recentLine.chat.stopped ? recentLine.chat.stopped.text : "")
                                 + (goOnAt > 0 ? "\n\n" + i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, once.", root.startText(goOnAt))
                                                 + (section.remoteHost ? "" : " " + i18n("↻ beside it: after later limits too, until it's done.")) : ""))
-                             + (goingOn ? "\n\n" + i18n("Click to cancel it.") : "")
+                             + (goingOn ? "\n\n" + i18n("Click to cancel it.")
+                                          + (root.keptChat(recentLine.chat.sessionId) !== null && !section.remoteHost
+                                             ? " " + i18n("It stops keeping going after usage limits too.") : "") : "")
                     onClicked: {
                         if (goingOn)
                             root.unqueue(goingOn)

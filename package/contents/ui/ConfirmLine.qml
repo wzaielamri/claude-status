@@ -9,6 +9,7 @@ RowLayout {
 
     property alias text: question.text
     property string confirmText: i18n("Yes")
+    property string cancelText: i18n("Cancel")
     signal confirmed()
     signal cancelled()
 
@@ -26,7 +27,7 @@ RowLayout {
         onClicked: confirm.confirmed()
     }
     PlasmaComponents3.Button {
-        text: i18n("Cancel")
+        text: confirm.cancelText
         onClicked: confirm.cancelled()
     }
 }
