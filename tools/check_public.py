@@ -36,7 +36,9 @@ BINARY_SUFFIXES = {".png", ".gif", ".jpg", ".jpeg", ".webp", ".ico", ".vsix", ".
 
 TOKENS = [
     ("Anthropic API key", r"sk-ant-[A-Za-z0-9_-]{16,}"),
-    ("API key (sk-)", r"\bsk-[A-Za-z0-9]{32,}"),
+    ("API key (sk-)", r"\bsk-(?!ant-)[A-Za-z0-9_-]{32,}"),  # (also OpenAI's sk-proj-…)
+    ("GitLab token", r"\bglpat-[A-Za-z0-9_-]{20,}"),
+    ("Hugging Face token", r"\bhf_[A-Za-z0-9]{30,}"),
     ("GitHub token", r"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})"),
     ("AWS access key", r"\bAKIA[0-9A-Z]{16}\b"),
     ("Google API key", r"\bAIza[0-9A-Za-z_-]{35}\b"),
@@ -48,6 +50,9 @@ TOKENS = [
 ]
 TOKEN_RES = [(name, re.compile(rx)) for name, rx in TOKENS]
 IPV4 = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")  # also at a sentence's end
+# (with :: and at least 3 groups, or all 8: not a time like 10:40:00, nor std::string)
+IPV6 = re.compile(r"(?<![\w:.])(?:(?:[0-9A-Fa-f]{1,4}:){1,6}:(?:[0-9A-Fa-f]{1,4}:){0,5}[0-9A-Fa-f]{1,4}"
+                  r"|::(?:[0-9A-Fa-f]{1,4}:){1,6}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4})(?![\w:])")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 HOME_PATH = re.compile(r"(?:/home|/Users|[A-Za-z]:\\+Users)[/\\]+([A-Za-z0-9._-]+)")
 EXAMPLE_USERS = {"alice", "bob", "carol", "user", "you", "me", "example", "someone", "tester", "u", "x"}
@@ -167,6 +172,10 @@ class Checker:
             if octets[0] == 127 or ip in ("0.0.0.0", "255.255.255.255") or ip.startswith(("192.0.2.", "198.51.100.", "203.0.113.")):
                 continue
             self.report(where, "IP address", ip)
+        for m in IPV6.finditer(line):
+            ip = m.group(0)
+            if len([g for g in ip.split(":") if g]) >= 3 and not ip.lower().startswith("2001:db8:"):  # (documentation's)
+                self.report(where, "IP address", ip)
         for m in EMAIL.finditer(line):
             if not self.email_ok(m.group(0)):
                 self.report(where, "email address", m.group(0))
