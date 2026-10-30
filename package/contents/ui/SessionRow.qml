@@ -173,6 +173,20 @@ RowLayout {
                                        : session.kind === "bg" ? i18n("Show this background session in a terminal")
                                        : i18n("Switch to the terminal running this session")
 
+    // Stop (the question's answer): only stopped if it's as the question
+    // says now (busy: working or waiting; an idle one that got busy isn't);
+    // keepOff: Keep going off for it too (jump.py --and-keep-off)
+    function stop(keepOff) {
+        root.stopConfirmSession = ""
+        const busy = session.state !== "idle"
+        if (remoteHost && canEnd)
+            root.remoteEnd(remoteHost, session.sessionId, session.profileDir, busy)
+        else if (remoteHost)
+            root.remoteStop(remoteHost, session.stopCommand)
+        else
+            root.stopSession(session.sessionId, session.profileDir, busy, keepOff && kept ? kept.chat : "")
+    }
+
     function open() {
         if (remoteHost)
             root.remoteShow(remoteHost, session)
@@ -674,10 +688,7 @@ RowLayout {
                     icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
-                    onClicked: {
-                        root.stopConfirmBusy = row.session.state !== "idle"
-                        root.stopConfirmSession = row.confirmingStop ? "" : row.rowKey
-                    }
+                    onClicked: root.stopConfirmSession = row.confirmingStop ? "" : row.rowKey
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
@@ -1301,7 +1312,8 @@ RowLayout {
                   ? i18n("Stop “%1”? It's working right now: the current step is interrupted and anything it started in the background stops too. The conversation is kept; claude attach resumes it.", root.escapeHtml(row.session.name))
                   : row.session.state === "waiting"
                   ? i18n("Stop “%1”? It's waiting for you. The conversation is kept; claude attach resumes it.", root.escapeHtml(row.session.name))
-                  : i18n("Stop “%1”? It's finished, so this only shuts down its idle process. The conversation is kept.", root.escapeHtml(row.session.name))) + "</span>"
+                  : i18n("Stop “%1”? It's finished, so this only shuts down its idle process. The conversation is kept.", root.escapeHtml(row.session.name)))
+                  + (row.kept ? "<br>" + i18n("It keeps going after usage limits.") : "") + "</span>"
             actions: [
                 Kirigami.Action {
                     text: i18n("Interrupt")
@@ -1318,17 +1330,14 @@ RowLayout {
                 Kirigami.Action {
                     text: i18n("Stop")
                     icon.name: "media-playback-stop"
-                    onTriggered: {
-                        root.stopConfirmSession = ""
-                        // only stopped if it's as you were told (an idle one that got busy isn't)
-                        const busy = root.stopConfirmBusy
-                        if (row.remoteHost && row.canEnd)
-                            root.remoteEnd(row.remoteHost, row.session.sessionId, row.session.profileDir, busy)
-                        else if (row.remoteHost)
-                            root.remoteStop(row.remoteHost, row.session.stopCommand)
-                        else
-                            root.stopSession(row.session.sessionId, row.session.profileDir, busy)
-                    }
+                    onTriggered: row.stop(false)
+                },
+                Kirigami.Action {
+                    // (Stop alone leaves Keep going on: it goes on after the next limit)
+                    text: i18n("Stop and turn Keep going off")
+                    icon.name: "media-playback-stop"
+                    visible: row.kept !== null && !row.remoteHost
+                    onTriggered: row.stop(true)
                 },
                 Kirigami.Action {
                     text: i18n("Cancel")

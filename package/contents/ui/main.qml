@@ -33,7 +33,6 @@ PlasmoidItem {
     property var expandedStats: ({})    // accounts showing their last days
     property var expandedRecent: ({})
     property string stopConfirmSession: ""
-    property bool stopConfirmBusy: false   // the chat wasn't idle when you were asked (stop it anyway)
     readonly property var emptyGroup: ({ id: "", name: "", title: "", plan: "", profiles: [], profileKeys: [],
                                          sessions: [], limits: null, tokens: null, projects: [], chatProfile: "",
                                          sharedHere: [], recent: [], plans: [] })
@@ -881,11 +880,12 @@ PlasmoidItem {
                 actionErrorTimer.restart()
             } else {
                 root.actionError = ""
-                if (result.message.indexOf("killed") >= 0 || result.message.indexOf("ended") >= 0) {
+                if (result.message.indexOf("killed") >= 0 || result.message.indexOf("ended") >= 0 || root.stopSays[source]) {
                     root.actionInfo = result.message   // more happened than you asked for: say so
                     actionInfoTimer.restart()
                 }
             }
+            delete root.stopSays[source]
             root.refresh()
         }
     }
@@ -2591,11 +2591,17 @@ PlasmoidItem {
         return profileDir ? " --profile " + shellQuote(profileDir) : ""
     }
 
-    // busy: you were told it's working or waiting (else only an idle one is stopped)
-    function stopSession(sessionId, profileDir, busy) {
-        stopper.connectSource("python3 -I " + shellQuote(codeDir + "jump.py") + " --stop " + shellQuote(sessionId)
-                              + profileArg(profileDir) + (busy ? " --busy" : "") + configDirArgs + " # " + Date.now())
+    // busy: you were told it's working or waiting (else only an idle one is stopped);
+    // keepOffChat: a chat that keeps going, to turn Keep going off for at once (once stopped)
+    function stopSession(sessionId, profileDir, busy, keepOffChat) {
+        const cmd = "python3 -I " + shellQuote(codeDir + "jump.py") + " --stop " + shellQuote(sessionId)
+                    + profileArg(profileDir) + (busy ? " --busy" : "")
+                    + (keepOffChat ? " --and-keep-off " + shellQuote(keepOffChat) : "") + configDirArgs + " # " + Date.now()
+        if (keepOffChat)
+            stopSays[cmd] = true   // (its answer says what's left: Stopped. It won't go on by itself any more)
+        stopper.connectSource(cmd)
     }
+    property var stopSays: ({})
 
     // Esc in the tmux pane of a working chat
     function interruptSession(sessionId, profileDir) {
