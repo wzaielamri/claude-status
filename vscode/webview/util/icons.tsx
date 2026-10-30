@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear";
+export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear" | "task" | "user" | "bookmark" | "note" | "trash";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -105,7 +105,25 @@ const shapes: Record<IconName, JSX.Element> = {
       <path d="M12 9.5v2.75c0 .7-.55 1.25-1.25 1.25h-7c-.7 0-1.25-.55-1.25-1.25v-7C2.5 4.55 3.05 4 3.75 4H6.5" />
     </>
   ),
+  // (a plan: a list with ticks, as Plasma's view-task)
+  task: <path d="M2.5 4.25l1.25 1.25 2-2.25M2.5 10.25l1.25 1.25 2-2.25M8 4.5h5.5M8 10.5h5.5" />,
+  user: (
+    <>
+      <circle cx="8" cy="5.25" r="2.75" />
+      <path d="M2.75 13.75c0-2.75 2.35-4.5 5.25-4.5s5.25 1.75 5.25 4.5" />
+    </>
+  ),
+  bookmark: <path d="M4.25 2.25h7.5v11.5L8 10.75l-3.75 3z" />,
+  note: <path d="M3.25 2.25h6.5l3 3v8.5h-9.5zM9.75 2.25v3h3M5.5 8.25h5M5.5 11h5" />,
+  trash: <path d="M2.75 4.25h10.5M6.25 4.25v-1.5h3.5v1.5M4 4.25l.75 9.25h6.5l.75-9.25M6.75 6.75v4.5M9.25 6.75v4.5" />,
 };
+
+// A memory's icon by its kind, as Plasma's: a note about you, feedback, a
+// project, a reference, the account's CLAUDE.md, else a note
+export function memoryIcon(type: string): IconName {
+  return type === "user" ? "user" : type === "feedback" ? "chat" : type === "project" ? "folder"
+    : type === "reference" ? "bookmark" : type === "account" ? "gear" : "note";
+}
 
 export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
   return (

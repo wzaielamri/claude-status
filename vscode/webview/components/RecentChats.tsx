@@ -16,7 +16,7 @@ import {
 import { reviewPending, testsText } from "../../src/shared/pane";
 import type { Group, RecentChat, ReopenIn } from "../../src/shared/types";
 import { post } from "../env";
-import { canShareRecent, groupKeyOf, recentRef, shareTitle } from "../util/chat";
+import { canShareRecent, deleteHint, groupKeyOf, recentRef, shareTitle } from "../util/chat";
 import { Icon } from "../util/icons";
 import { useStore } from "../util/store";
 import { toggleRecent, toggleStarred, uiState } from "../util/ui";
@@ -70,11 +70,13 @@ export function RecentChats({ group }: { group: Group }) {
         type="button"
         class="recent-toggle small"
         aria-expanded={open}
-        title="This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in a Claude Code panel (the switch at the top of the list)."
+        title={view.settings.clickOpensPane !== false
+          ? "This account's latest chats that aren't listed above, and the ones you starred. Click one to open it in a tab; its reopen button (on hover) reopens it in a terminal or in a Claude Code panel (the switch at the top of the list)."
+          : "This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in a Claude Code panel (the switch at the top of the list)."}
         onClick={() => toggleRecent(key)}
       >
         <Icon name="chevron" class={open ? "open" : ""} />
-        Recent chats ({items.length})
+        {items.length || !starred.length ? `Recent chats (${items.length})` : `Recent chats: ★ Starred (${starred.length})`}
       </button>
       {open ? (
         <>
@@ -115,13 +117,16 @@ export function RecentChats({ group }: { group: Group }) {
     const toReview = reviewPending({ ...c, chatId: c.sessionId, state: "done" }, view.status, group.host);
     const tests = testsText(c.review);
     return (
-      <li key={c.key} class={"recent-item" + (canOpen ? "" : " unavailable")}>
+      <li key={c.key} class={"recent-item" + (canOpen || paneFirst ? "" : " unavailable")}>
         <button
           type="button"
           class="link recent-name"
-          aria-disabled={!canOpen}
+          aria-disabled={!canOpen && !paneFirst}
           title={
-            `${c.name}\n${reopen}` +
+            `${c.name}\n` +
+            (paneFirst
+              ? "Click to open it in a tab: its conversation, a box to reply, and what it changed." + (canOpen ? `\nThe reopen button (on hover): ${reopen}` : "")
+              : reopen) +
             (c.cwd ? `\nFolder: ${group.host ? `${group.host}:` : ""}${c.cwd}` : "") +
             (c.shared ? `\nShared between accounts; last used on ${c.profile}.` : "") +
             (c.stopped ? `\n\n${stopText(c.stopped)}` : "") +
@@ -131,15 +136,6 @@ export function RecentChats({ group }: { group: Group }) {
         >
           {c.name}
         </button>
-        {toReview ? (
-          <Tag
-            text="To review"
-            active
-            title="It changed files. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed."
-            onClick={() => post({ type: "openPane", chat, tab: "review" })}
-          />
-        ) : null}
-        {toReview && tests ? <Tag text={tests.text} title={tests.title} active={tests.ok === true} warning={tests.ok === false} /> : null}
         {c.shared ? (
           <span class="muted" title="Shared between accounts">
             ⇄
@@ -175,6 +171,15 @@ export function RecentChats({ group }: { group: Group }) {
             onClick={() => post({ type: "queueContinue", chat, keep: true })}
           />
         ) : null}
+        {toReview ? (
+          <Tag
+            text="To review"
+            active
+            title="It changed files. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed."
+            onClick={() => post({ type: "openPane", chat, tab: "review" })}
+          />
+        ) : null}
+        {toReview && tests ? <Tag text={tests.text} title={tests.title} active={tests.ok === true} warning={tests.ok === false} /> : null}
         {c.starred ? (
           <button type="button" class="star-mark" title="Starred: it stays listed under Starred, however old it is. Click to unstar it." onClick={() => post({ type: "star", chat, on: false })}>
             ★
@@ -202,6 +207,8 @@ export function RecentChats({ group }: { group: Group }) {
               onClick={() => post({ type: "share", chat })}
             />
           ) : null}
+          <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
+            onClick={() => post({ type: "delete", kind: "chat", chat })} />
         </div>
       </li>
     );

@@ -98,7 +98,22 @@
       },
       {
         "command": "talpyDen.showRemoved",
-        "title": "Show Removed Chats Again",
+        "title": "Show Hidden Chats Again",
+        "category": "Talpy Den"
+      },
+      {
+        "command": "talpyDen.showHiddenPlans",
+        "title": "Show Hidden Plans Again",
+        "category": "Talpy Den"
+      },
+      {
+        "command": "talpyDen.showHiddenMemories",
+        "title": "Show Hidden Memories Again",
+        "category": "Talpy Den"
+      },
+      {
+        "command": "talpyDen.showHiddenProjects",
+        "title": "Show Hidden Projects Again",
         "category": "Talpy Den"
       },
       {
@@ -243,8 +258,23 @@
         },
         {
           "command": "talpyDen.showRemoved",
-          "when": "view == talpyDen.view",
+          "when": "view == talpyDen.view && talpyDen.hidden.chats",
           "group": "1_view@2"
+        },
+        {
+          "command": "talpyDen.showHiddenPlans",
+          "when": "view == talpyDen.view && talpyDen.hidden.plans",
+          "group": "1_view@3"
+        },
+        {
+          "command": "talpyDen.showHiddenMemories",
+          "when": "view == talpyDen.view && talpyDen.hidden.memories",
+          "group": "1_view@4"
+        },
+        {
+          "command": "talpyDen.showHiddenProjects",
+          "when": "view == talpyDen.view && talpyDen.hidden.projects",
+          "group": "1_view@5"
         },
         {
           "command": "talpyDen.setupUsageBars",
@@ -301,6 +331,22 @@
         {
           "command": "talpyDen.planComment.delete",
           "when": "false"
+        },
+        {
+          "command": "talpyDen.showRemoved",
+          "when": "talpyDen.hidden.chats"
+        },
+        {
+          "command": "talpyDen.showHiddenPlans",
+          "when": "talpyDen.hidden.plans"
+        },
+        {
+          "command": "talpyDen.showHiddenMemories",
+          "when": "talpyDen.hidden.memories"
+        },
+        {
+          "command": "talpyDen.showHiddenProjects",
+          "when": "talpyDen.hidden.projects"
         }
       ]
     },

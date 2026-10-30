@@ -20,7 +20,7 @@ import { Dashboard } from "./dashboard";
 import { carryOverSettings, settingNames } from "./legacySettings";
 import { Notifier } from "./notify";
 import { PlanReview, planFileOf } from "./planReview";
-import { allGroups, countStates } from "./shared/model";
+import { allGroups, countStates, hiddenCount, type HiddenKind } from "./shared/model";
 import { StatusBar } from "./statusBar";
 import { registerPreview, setUpUsageBars } from "./statusline";
 import { terminalLinkOf, Terminals } from "./terminals";
@@ -89,6 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const mondayFirst = setTimeout(() => void mondayRecap(), 60000);
   context.subscriptions.push({ dispose: () => (clearInterval(mondayTimer), clearTimeout(mondayFirst)) });
   const a = actions;
+  const hiddenShown = new Map<HiddenKind, number>(); // (what the context keys say)
   const review = new PlanReview(extraConfigDirs);
   a.planReview = review;
   // (Send Feedback's button: plans in ~/.claude* and in talpyDen.extraConfigDirs' folders)
@@ -134,6 +135,12 @@ export function activate(context: vscode.ExtensionContext): void {
       statusBar.update(state);
       account.update(state);
       view.setBadge(countStates(allGroups(state.status, state.hosts)).waiting);
+      // (Show Hidden … Again shows only when something of that kind is hidden here or on a host shown)
+      for (const kind of ["chats", "plans", "memories", "projects"] as HiddenKind[]) {
+        const n = hiddenCount(state.status, kind) + state.hosts.reduce((sum, h) => sum + hiddenCount(h.result, kind), 0);
+        if (n !== hiddenShown.get(kind)) void vscode.commands.executeCommand("setContext", `talpyDen.hidden.${kind}`, n > 0);
+        hiddenShown.set(kind, n);
+      }
     }),
     review,
     vscode.commands.registerCommand("talpyDen.planComment.add", (reply: vscode.CommentReply) => review.add(reply)),
@@ -178,7 +185,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("talpyDen.openInEditor", () => view.openInEditor()),
     vscode.commands.registerCommand("talpyDen.newChat", () => a.newChat()),
     vscode.commands.registerCommand("talpyDen.findChat", () => a.findChat()),
-    vscode.commands.registerCommand("talpyDen.showRemoved", () => a.showRemoved()),
+    vscode.commands.registerCommand("talpyDen.showRemoved", () => a.showHidden("chats")),
+    vscode.commands.registerCommand("talpyDen.showHiddenPlans", () => a.showHidden("plans")),
+    vscode.commands.registerCommand("talpyDen.showHiddenMemories", () => a.showHidden("memories")),
+    vscode.commands.registerCommand("talpyDen.showHiddenProjects", () => a.showHidden("projects")),
     vscode.commands.registerCommand("talpyDen.setupUsageBars", () => setUpUsageBars(context.extensionUri)),
     vscode.commands.registerCommand("talpyDen.removeUsageBars", () => setUpUsageBars(context.extensionUri, true)),
     vscode.commands.registerCommand("talpyDen.openUsagePage", () =>

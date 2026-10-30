@@ -7,23 +7,21 @@
 
 import { useEffect, useState } from "preact/hooks";
 import type { ProjectRow, ProjectsData, Session } from "../../src/shared/types";
-import { doingText, duration, stateText } from "../../src/shared/model";
-import { hoursText } from "../../src/shared/week";
+import { doingText, duration, petKeyOf, stateText } from "../../src/shared/model";
+import { currencyOf, hoursText, moneyText } from "../../src/shared/week";
 import { post } from "../env";
-import { chatRefOf } from "../util/chat";
-import { Icon } from "../util/icons";
+import { pets } from "../pets";
+import { chatRefOf, hideHint } from "../util/chat";
+import { Icon, memoryIcon } from "../util/icons";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
 import { projectsAnswer, viewState } from "../util/stores";
 
 const under = (folder: string | undefined | null, path: string) => !!folder && (folder === path || folder.startsWith(path + "/"));
 
+// (as the Recap tab says it: €12.34, <$0.01)
 function money(usd: number, cur: ProjectsData["currency"]): string {
-  const v = (usd || 0) * (cur?.rate || 1);
-  const code = cur?.code ?? "USD";
-  const whole = v >= 100 || ["JPY", "KRW", "HUF", "ISK", "IDR"].includes(code);
-  const n = v.toLocaleString(undefined, { maximumFractionDigits: whole ? 0 : 2, minimumFractionDigits: whole ? 0 : 2 });
-  return code === "USD" ? `$${n}` : `${n} ${code}`;
+  return moneyText(usd, currencyOf({ currency: cur ? { ...cur, date: cur.date ?? "", error: cur.error ?? "" } : undefined }));
 }
 
 export function ProjectsView() {
@@ -65,6 +63,10 @@ export function ProjectsView() {
                 onClick={() => post({ type: "newChatIn", path: p.path, profileDir: p.chats[0]?.profileDir ?? "" })}>
                 <Icon name="newChat" />
               </button>
+              <button type="button" class="icon-btn project-hide" title={`Hide this project\n${hideHint("projects")}`} aria-label="Hide this project"
+                onClick={() => post({ type: "hide", kind: "projects", id: p.path })}>
+                <Icon name="close" />
+              </button>
             </div>
             {unfolded ? <ProjectDetails p={p} groups={groups} now={now} cur={answer.data?.currency} /> : null}
           </section>
@@ -89,8 +91,9 @@ function ProjectDetails({ p, groups, now, cur }: { p: ProjectRow; groups: NonNul
         // (what a working chat does, as in the focus view; else how it stands, as its row says)
         const doing = s.state === "working" ? doingText(s, null) : "";
         return (
-          <button key={s.key} type="button" class="focus-line" onClick={() => post({ type: "open", chat: chatRefOf(s) })}>
-            <span class="pet-bar" aria-hidden="true" />
+          <button key={s.key} type="button" class="focus-line" title={`${s.name}\n${doing || stateText(s, now)}\nClick to open this chat`}
+            onClick={() => post({ type: "open", chat: chatRefOf(s) })}>
+            <span class="pet-bar" style={{ background: pets.petColor(petKeyOf(s)) || "transparent" }} aria-hidden="true" />
             <span class={`focus-dot st-${s.state}`} aria-hidden="true" />
             <span class="focus-name">{s.name}</span>
             <span class="focus-what">{doing || stateText(s, now)}</span>
@@ -116,11 +119,13 @@ function ProjectDetails({ p, groups, now, cur }: { p: ProjectRow; groups: NonNul
         <div class="project-files">
           {plans.slice(0, 4).map(({ x, g }) => (
             <button key={x.key} type="button" class="chip" title={x.title} onClick={() => post({ type: "openPlan", groupId: g.id, plan: x.key })}>
+              <Icon name="task" />
               {x.title}
             </button>
           ))}
           {memories.slice(0, 4).map(({ m, g }) => (
             <button key={m.key} type="button" class="chip" title={m.description ?? m.name} onClick={() => post({ type: "openMemory", groupId: g.id, memory: m.key })}>
+              <Icon name={memoryIcon(m.type)} />
               {m.name}
             </button>
           ))}

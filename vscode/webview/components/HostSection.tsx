@@ -1,4 +1,4 @@
-import { duration } from "../../src/shared/model";
+import { duration, hiddenCount } from "../../src/shared/model";
 import type { Group, HostState } from "../../src/shared/types";
 import { post } from "../env";
 import { groupKeyOf } from "../util/chat";
@@ -24,7 +24,7 @@ export function HostSection({ host: h, groups }: { host: HostState; groups: Grou
         : now - h.updatedAt < 60000
           ? "updated just now"
           : `updated ${duration(now - h.updatedAt)} ago`;
-  const dismissed = result?.dismissed ?? 0;
+  const hidden = (["chats", "plans", "memories", "projects"] as const).reduce((n, kind) => n + hiddenCount(result, kind), 0);
 
   return (
     <section class={"host" + (stale ? " stale" : "")} aria-label={`SSH host ${h.name}`}>
@@ -42,11 +42,12 @@ export function HostSection({ host: h, groups }: { host: HostState; groups: Grou
         <span class="spacer" />
         {h.loading ? <span class="spinner" role="status" aria-label={`Checking ${h.name}…`} /> : null}
         {updated ? <span class="host-updated small muted">{updated}</span> : null}
-        {dismissed > 0 ? (
+        {hidden > 0 ? (
           <IconButton
             icon="eye"
-            label={`Show removed chats again (${dismissed})`}
-            onClick={() => post({ type: "showRemoved", host: h.name })}
+            label="Show hidden ones again…"
+            title={`Show hidden ones again: the chats, plans or memories of ${h.name} you hid (${hidden})`}
+            onClick={() => post({ type: "showHidden", host: h.name })}
           />
         ) : null}
         {h.loggedIn ? (

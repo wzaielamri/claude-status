@@ -1,8 +1,8 @@
 import { ago } from "../../src/shared/model";
 import type { Group } from "../../src/shared/types";
 import { post } from "../env";
-import { groupKeyOf } from "../util/chat";
-import { Icon } from "../util/icons";
+import { deleteHint, groupKeyOf, hideHint } from "../util/chat";
+import { Icon, memoryIcon } from "../util/icons";
 import { useStore } from "../util/store";
 import { toggleMemories, uiState } from "../util/ui";
 import { useView } from "./context";
@@ -40,6 +40,7 @@ export function MemoriesList({ group }: { group: Group }) {
         <ul class="recent-list">
           {memories.map((m) => (
             <li key={m.key} class={"recent-item" + (elsewhere ? " unavailable" : "")}>
+              <Icon name={memoryIcon(m.type)} class="line-icon" />
               <button
                 type="button"
                 class="link recent-name"
@@ -48,29 +49,36 @@ export function MemoriesList({ group }: { group: Group }) {
                   `${m.name}\n` +
                   (m.description ? `${m.description}\n` : "") +
                   (m.type ? `\nKind: ${m.type}` : "") +
-                  (m.folder ? `\nFolder: ${host ? `${host}:` : ""}${m.folder}` : "") +
+                  (m.folder ? `\nFolder: ${host ? `${host}:` : ""}${m.folder}${m.folderGone ? " (not there any more)" : ""}` : "") +
                   (elsewhere ? `\n\nOpen it from a VS Code window connected to ${host}.` : "\n\nClick to read it.")
                 }
                 onClick={() => !elsewhere && post(ref(m.key))}
               >
                 {m.description || m.name}
               </button>
-              {m.folderShort || m.type === "account" ? (
-                <Elided text={m.folderShort || "every folder"} class="recent-folder small muted" title={m.folder} />
+              {m.folderShort || m.folder || m.type === "account" ? (
+                <Elided text={m.folderShort || m.folder || "every folder"} class="recent-folder small muted"
+                  title={m.folderGone ? `${m.folder} (not there any more)` : m.folder} />
               ) : (
                 <span class="recent-folder" />
               )}
               <span class="recent-ago small muted nowrap">{ago(view.now - m.updatedAt)}</span>
-              {elsewhere ? null : (
-                <div class="row-actions">
+              <div class="row-actions">
+                {elsewhere ? null : (
                   <IconButton
                     icon="edit"
                     label="Edit this memory"
                     title="Edit this memory: its file opens in an editor tab. What you change there is what Claude remembers; it reads it in new chats in that folder."
                     onClick={() => post(ref(m.key, true))}
                   />
-                </div>
-              )}
+                )}
+                {m.type === "account" ? null : (
+                  <IconButton icon="trash" label="Delete this memory…" title={`Delete this memory…\n${deleteHint("memory")}`}
+                    onClick={() => post({ type: "delete", kind: "memory", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
+                )}
+                <IconButton icon="close" label="Hide this memory" title={`Hide this memory\n${hideHint("memories", host)}`}
+                  onClick={() => post({ type: "hide", kind: "memories", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
+              </div>
             </li>
           ))}
         </ul>

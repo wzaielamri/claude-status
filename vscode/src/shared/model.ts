@@ -905,6 +905,21 @@ export function findPlan(status: Status | null, hosts: HostState[], host: unknow
   return plan && group ? { plan, group: host ? { ...group, host: host as string } : group } : null;
 }
 
+// What Hide leaves out, kind by kind: [one, several, in a title]
+export type HiddenKind = "chats" | "plans" | "memories" | "projects";
+export const HIDDEN_NOUNS: Record<HiddenKind, [string, string, string]> = {
+  chats: ["chat", "chats", "Chats"],
+  plans: ["plan", "plans", "Plans"],
+  memories: ["memory", "memories", "Memories"],
+  projects: ["project", "projects", "Projects"],
+};
+
+// How many of a kind a machine's status says are hidden
+export function hiddenCount(status: Pick<Status, "dismissed" | "hiddenPlans" | "hiddenMemories" | "hiddenProjects"> | null | undefined, kind: HiddenKind): number {
+  if (!status) return 0;
+  return (kind === "chats" ? status.dismissed : kind === "plans" ? status.hiddenPlans : kind === "memories" ? status.hiddenMemories : status.hiddenProjects) ?? 0;
+}
+
 // One of an account's memories, by its key, as the extension knows it
 export function findMemory(status: Status | null, hosts: HostState[], host: unknown, groupId: unknown, key: unknown): { memory: Memory; group: Group } | null {
   if (typeof key !== "string" || !key || typeof groupId !== "string" || (host !== undefined && host !== null && typeof host !== "string")) return null;

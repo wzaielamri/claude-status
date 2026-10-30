@@ -31,7 +31,7 @@ import { attachedTag, chatWhere, reviewPending, shownAsk, testsText, whereTag } 
 import type { Group, Session } from "../../src/shared/types";
 import { post } from "../env";
 import { pets } from "../pets";
-import { canRemove, canShare, canStop, chatRefOf, isBackground, openHint, rowKeyOf, sharedTagTitle, shareTitle } from "../util/chat";
+import { canRemove, canShare, canStop, chatRefOf, deleteHint, hideHint, isBackground, openHint, rowKeyOf, sharedTagTitle, shareTitle } from "../util/chat";
 import { useStore } from "../util/store";
 import { useLiveView } from "../util/stores";
 import { toggleAgents, togglePeek, uiState } from "../util/ui";
@@ -99,7 +99,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
   const kept = host ? null : keptChat(view.status, s.chatId || s.sessionId);
   const canKeep = !host && !kept && s.state === "working" && s.entrypoint !== "claude-vscode";
   const ending =
-    (s.pid === null ? "" : s.kind === "bg" ? " This background session is stopped first (claude stop)." : " Claude here quits first (its terminal stays open).") +
+    (s.pid === null ? "" : s.kind === "bg" ? " This background chat is stopped first (claude stop)." : " Claude here quits first (its terminal stays open).") +
     " It goes on in the permission mode it had.";
   const resetsAt = s.stopped?.kind === "limit" && !s.stopped.over && s.stopped.resetsAt ? s.stopped.resetsAt : 0;
   // a click on its name opens its tab (else the chat itself)
@@ -375,12 +375,12 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
             />
           ) : null}
           {remove ? (
-            <IconButton
-              icon="close"
-              label="Remove from the list"
-              title="Remove from the list. Only hides it here; nothing is deleted. It comes back if the chat runs again, or with Show Removed Chats Again."
-              onClick={() => post({ type: "dismiss", chat })}
-            />
+            <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
+              onClick={() => post({ type: "delete", kind: "chat", chat })} />
+          ) : null}
+          {remove ? (
+            <IconButton icon="close" label="Hide this chat" title={`Hide this chat\n${hideHint("chats", host)}`}
+              onClick={() => post({ type: "dismiss", chat })} />
           ) : null}
           {stop ? (
             canEndChat(s) ? (
@@ -399,8 +399,8 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
             ) : (
               <IconButton
                 icon="stop"
-                label="Stop this background session…"
-                title="Stop this background session. Asks first; the conversation is kept and claude attach resumes it."
+                label="Stop this background chat…"
+                title="Stop this background chat. Asks first; the conversation is kept and claude attach resumes it."
                 onClick={() => post({ type: "stop", chat })}
               />
             )

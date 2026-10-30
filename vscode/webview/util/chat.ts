@@ -2,7 +2,7 @@
 // extension does the work (open, stop, share, menus); the webview only says
 // which chat, as a ChatRef.
 
-import { canEndChat, petKeyOf, shareAccounts } from "../../src/shared/model";
+import { canEndChat, HIDDEN_NOUNS, type HiddenKind, petKeyOf, shareAccounts } from "../../src/shared/model";
 import type { ChatRef, Group, RecentChat, Session, SharedPointer, Status } from "../../src/shared/types";
 import type { StageChat } from "../pets/api";
 
@@ -117,4 +117,18 @@ export function sharedTagTitle(s: Session): string {
     (info.openIn ? `\nOpen in ${info.openIn} right now.` : "") +
     stopped
   );
+}
+
+// Hide's tooltip, after its name: nothing is deleted, and what brings it back
+export function hideHint(kind: HiddenKind, host?: string): string {
+  const back = host ? `The eye button next to ${host}'s name brings it back.`
+    : `Show Hidden ${HIDDEN_NOUNS[kind][2]} Again (the view's ⋯ menu) brings it back.`;
+  return "Only hides it here; nothing is deleted. " + (kind === "chats" ? "It comes back if the chat runs again. " : "") + back;
+}
+
+// Delete…'s tooltip, after its name (as Plasma's)
+export function deleteHint(kind: "chat" | "plan" | "memory"): string {
+  return kind === "chat" ? "Moves it to the Trash, on every account it's shared with, with its subagents and checkpoints; the Recap keeps its numbers. It asks first."
+    : kind === "plan" ? "Moves its file to the Trash, on every account it's on. It asks first."
+    : "Moves its file to the Trash and takes its line out of MEMORY.md: Claude stops reading it in new chats in its folder. It asks first.";
 }

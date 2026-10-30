@@ -281,7 +281,7 @@ test("a host that didn't answer this time doesn't count; its clock is put right"
 });
 
 test("a host's memories come onto this computer's clock too, like its plans", () => {
-  const memory = { key: "m", name: "m", description: "", type: "", path: "/m.md", folder: "", folderShort: "", profileDir: ".claude", profile: "main", updatedAt: NOW - 60_000 };
+  const memory = { key: "m", name: "m", description: "", type: "", path: "/m.md", folder: "", folderShort: "", folderGone: false, profileDir: ".claude", profile: "main", updatedAt: NOW - 60_000 };
   const result = machine([account("work", 10, NOW, { memories: [memory] })]);
   const local = toLocalClock(result, 2 * 3600_000); // the host's clock is 2 hours behind
   assert.equal(local.groups[0].memories![0].updatedAt, NOW - 60_000 + 2 * 3600_000);

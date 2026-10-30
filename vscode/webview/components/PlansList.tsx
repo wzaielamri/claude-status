@@ -1,7 +1,7 @@
 import { ago, shareAccounts, machineStatus } from "../../src/shared/model";
 import type { Group, PlanItem } from "../../src/shared/types";
 import { post } from "../env";
-import { groupKeyOf } from "../util/chat";
+import { deleteHint, groupKeyOf, hideHint } from "../util/chat";
 import { Icon } from "../util/icons";
 import { useStore } from "../util/store";
 import { togglePlans, toggleStarred, uiState } from "../util/ui";
@@ -40,7 +40,7 @@ export function PlansList({ group }: { group: Group }) {
         onClick={() => togglePlans(key)}
       >
         <Icon name="chevron" class={open ? "open" : ""} />
-        Plans ({plans.length})
+        {plans.length || !starred.length ? `Plans (${plans.length})` : `Plans: ★ Starred (${starred.length})`}
       </button>
       {open && starred.length ? (
         <button
@@ -61,6 +61,7 @@ export function PlansList({ group }: { group: Group }) {
   function line(p: PlanItem) {
     return (
       <li key={p.key} class="recent-item">
+        <Icon name="task" class="line-icon" />
         <button
           type="button"
           class="link recent-name"
@@ -106,17 +107,6 @@ export function PlansList({ group }: { group: Group }) {
               onClick={() => post({ type: "star", ...ref(p.key), on: true })}
             />
           )}
-          {copy || !p.chatId || host ? null : (
-            <IconButton
-              icon="send"
-              label="Send your feedback to Claude"
-              title={
-                (p.edited ? "You changed this plan since Claude wrote it. " : "") +
-                "Send what you changed in it, and your comments on its lines (the + next to a line, in its file), to the chat that made it: Claude revises the plan, in plan mode."
-              }
-              onClick={() => post({ type: "sendPlanFeedback", ...ref(p.key) })}
-            />
-          )}
           {copy ? null : (
             <IconButton
               icon="edit"
@@ -125,20 +115,34 @@ export function PlansList({ group }: { group: Group }) {
               onClick={() => post({ type: "openPlan", ...ref(p.key), edit: true })}
             />
           )}
+          {copy || host ? null : (
+            <IconButton
+              icon="send"
+              label="Send your feedback to Claude"
+              disabled={!p.chatId}
+              title={
+                !p.chatId ? "The chat that made it isn't here any more, so there's no chat to send your feedback to."
+                  : (p.edited ? "You changed this plan since Claude wrote it. " : "") +
+                    "Send what you changed in it, and your comments on its lines (the + next to a line, in its file), to the chat that made it: Claude revises the plan, in plan mode."
+              }
+              onClick={() => post({ type: "sendPlanFeedback", ...ref(p.key) })}
+            />
+          )}
           <IconButton
             icon="play"
             label="Carry it out…"
             title="Carry it out in a new chat: the plan is the chat's first message, with what you add; in a terminal, in the background or in a Claude Code panel, in the plan's folder or another one."
             onClick={() => post({ type: "carryOutPlan", ...ref(p.key) })}
           />
-          {p.chatId ? (
-            <IconButton
-              icon="back"
-              label="Continue the chat that made it"
-              title="Continue the chat that made it, to change the plan with Claude: it comes up, or reopens (in a terminal or a Claude Code panel, as the switch of Recent chats says)."
-              onClick={() => post({ type: "continuePlanChat", ...ref(p.key) })}
-            />
-          ) : null}
+          <IconButton
+            icon="back"
+            label="Continue the chat that made it"
+            disabled={!p.chatId}
+            title={p.chatId
+              ? "Continue the chat that made it, to change the plan with Claude: it comes up, or reopens (in a terminal or a Claude Code panel, as the switch of Recent chats says)."
+              : "The chat that made it isn't here any more."}
+            onClick={() => post({ type: "continuePlanChat", ...ref(p.key) })}
+          />
           {share ? (
             <IconButton
               icon="share"
@@ -147,6 +151,10 @@ export function PlansList({ group }: { group: Group }) {
               onClick={() => post({ type: "sharePlan", ...ref(p.key) })}
             />
           ) : null}
+          <IconButton icon="trash" label="Delete this plan…" title={`Delete this plan…\n${deleteHint("plan")}`}
+            onClick={() => post({ type: "delete", kind: "plan", groupId: group.id, ...(host ? { host } : {}), id: p.key })} />
+          <IconButton icon="close" label="Hide this plan" title={`Hide this plan\n${hideHint("plans", host)}`}
+            onClick={() => post({ type: "hide", kind: "plans", groupId: group.id, ...(host ? { host } : {}), id: p.key })} />
         </div>
       </li>
     );

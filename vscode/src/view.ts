@@ -148,6 +148,12 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
   }
 
   // One of an account's plans the page names, as the extension knows it now
+  // The Projects tab's numbers (week.py --projects), to the view that shows it
+  private async sendProjects(webview: vscode.Webview): Promise<void> {
+    const { data, error } = await this.dash.projects();
+    void webview.postMessage({ type: "projects", data: data ?? null, error: error ?? "" } satisfies HostMessage);
+  }
+
   private planOf(m: { groupId?: unknown; host?: unknown; plan?: unknown }): { plan: PlanItem; group: Group } | null {
     const state = this.dash.state();
     return findPlan(state.status, state.hosts, m.host, m.groupId, m.plan);
@@ -197,6 +203,31 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
       case "dismiss":
         if (chat) void this.actions.dismiss(chat);
         break;
+      case "hide": {
+        // (a plan or memory by its key, as the extension knows it; a project by its folder: this computer's)
+        const state = this.dash.state();
+        const id = m.kind === "plans" ? this.planOf({ groupId: m.groupId, host: m.host, plan: m.id })?.plan.slug
+          : m.kind === "memories" ? findMemory(state.status, state.hosts, m.host, m.groupId, m.id)?.memory.key
+          : m.kind === "projects" && typeof m.id === "string" && m.id ? m.id : undefined;
+        if (!id) break;
+        void this.actions.hide(m.kind, id, m.kind === "projects" ? undefined : text(m.host)).then((ok) => {
+          if (ok && m.kind === "projects") return this.sendProjects(webview);
+        });
+        break;
+      }
+      case "delete": {
+        // (a chat, or an account's plan or memory: by its id, profile and machine)
+        const state = this.dash.state();
+        if (m.kind === "chat" && chat) void this.actions.delete("chat", chat.chatId || chat.sessionId, chat.profileDir, chat.host);
+        else if (m.kind === "plan") {
+          const found = this.planOf({ groupId: m.groupId, host: m.host, plan: m.id });
+          if (found) void this.actions.delete("plan", found.plan.slug, found.plan.profileDir, found.group.host);
+        } else if (m.kind === "memory") {
+          const found = findMemory(state.status, state.hosts, m.host, m.groupId, m.id);
+          if (found && found.memory.type !== "account") void this.actions.delete("memory", found.memory.key, "", found.group.host);
+        }
+        break;
+      }
       case "share":
         if (chat) void this.actions.share(chat);
         break;
@@ -319,7 +350,10 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
         }
         break;
       case "showRemoved":
-        void this.actions.showRemoved(text(m.host) ?? null);
+        void this.actions.showHidden("chats", text(m.host) ?? null);
+        break;
+      case "showHidden":
+        if (text(m.host)) void this.actions.showHiddenOn(m.host);
         break;
       case "hideHost":
         if (text(m.host)) void this.actions.hideHost(m.host);
@@ -351,9 +385,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
         break;
       }
       case "projects":
-        void this.dash.projects().then(({ data, error }) =>
-          webview.postMessage({ type: "projects", data: data ?? null, error: error ?? "" } satisfies HostMessage),
-        );
+        void this.sendProjects(webview);
         break;
       case "newChatIn": {
         // (a folder the projects list named, on an account of this computer's)

@@ -9,6 +9,7 @@ export function IconButton(props: {
   onClick: () => void;
   class?: string;
   children?: ComponentChildren;
+  disabled?: boolean; // (greyed out in its place, so every line's buttons stay in the same columns)
 }) {
   return (
     <button
@@ -16,6 +17,7 @@ export function IconButton(props: {
       class={"icon-btn" + (props.class ? " " + props.class : "")}
       title={props.title ?? props.label}
       aria-label={props.label}
+      disabled={props.disabled}
       onClick={(e) => {
         e.stopPropagation();
         props.onClick();

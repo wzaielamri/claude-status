@@ -32,6 +32,9 @@ import {
   cliInstalled,
   groupLabel,
   hasTurn,
+  HIDDEN_NOUNS,
+  hiddenCount,
+  type HiddenKind,
   machineStatus,
   nextChatIndex,
   reopensInClaudeCode,
@@ -391,28 +394,86 @@ export class Actions {
     const answer = chat.host
       ? await this.backend.action("remote.py", ["--dismiss", chat.host, chat.sessionId])
       : await this.backend.action("jump.py", ["--dismiss", chat.sessionId, ...configDirArgs()]);
-    this.report(answer, "Couldn't remove it");
+    this.report(answer, "Couldn't hide it");
     this.refresh(chat.host);
   }
 
-  async showRemoved(host?: string | null): Promise<void> {
+  // Hide a plan (its key), a memory (its key) or a project (its folder) here:
+  // nothing is deleted, Show Hidden … Again brings it back
+  async hide(kind: "plans" | "memories" | "projects", id: string, host?: string): Promise<boolean> {
+    if (this.demoOnly()) return false;
+    const answer = host
+      ? await this.backend.action("remote.py", ["--hide", host, kind, id])
+      : await this.backend.action("jump.py", ["--hide", kind, id]);
+    this.report(answer, "Couldn't hide it");
+    this.refresh(host);
+    return answer.ok;
+  }
+
+  // Show Hidden Chats/Plans/Memories/Projects Again: on this computer or an
+  // SSH host shown (asked when there are several with some hidden; host
+  // given: that one)
+  async showHidden(kind: HiddenKind, host?: string | null): Promise<void> {
     if (this.demoOnly()) return;
+    const noun = HIDDEN_NOUNS[kind];
     if (host === undefined) {
-      // From the command palette: where?
       const state = this.dash.state();
       const items = [
-        { label: "This computer", description: `${state.status?.dismissed ?? 0} removed`, host: null as string | null },
-        ...state.hosts.map((h) => ({ label: h.name, description: `${h.result?.dismissed ?? 0} removed`, host: h.name as string | null })),
-      ];
-      const pick = items.length > 1 ? await vscode.window.showQuickPick(items, { placeHolder: "Show removed chats again on…" }) : items[0];
+        { label: "This computer", n: hiddenCount(state.status, kind), host: null as string | null },
+        ...state.hosts.map((h) => ({ label: h.name, n: hiddenCount(h.result, kind), host: h.name as string | null })),
+      ].filter((i) => i.n > 0).map((i) => ({ ...i, description: `${i.n} hidden` }));
+      if (!items.length) {
+        this.dash.setActionInfo(`No ${noun[0]} was hidden`);
+        return;
+      }
+      const pick = items.length > 1 ? await vscode.window.showQuickPick(items, { placeHolder: `Show hidden ${noun[1]} again on…` }) : items[0];
       if (!pick) return;
       host = pick.host;
     }
-    const answer = host
-      ? await this.backend.action("remote.py", ["--undismiss-all", host])
-      : await this.backend.action("jump.py", ["--undismiss-all", ...configDirArgs()]);
+    const answer = kind === "chats"
+      ? host
+        ? await this.backend.action("remote.py", ["--undismiss-all", host])
+        : await this.backend.action("jump.py", ["--undismiss-all", ...configDirArgs()])
+      : host
+        ? await this.backend.action("remote.py", ["--show-hidden", host, kind])
+        : await this.backend.action("jump.py", ["--show-hidden", kind]);
     if (this.report(answer, "Couldn't show them again")) this.dash.setActionInfo(answer.message || "Shown again");
     this.refresh(host ?? undefined);
+  }
+
+  // An SSH host's eye button: the kinds it has hidden
+  async showHiddenOn(host: string): Promise<void> {
+    if (this.demoOnly()) return;
+    const result = this.dash.state().hosts.find((h) => h.name === host)?.result;
+    const items = (Object.keys(HIDDEN_NOUNS) as HiddenKind[]).map((kind) => ({ kind, n: hiddenCount(result, kind) }))
+      .filter((i) => i.n > 0).map((i) => ({ hidden: i.kind, label: `Show Hidden ${HIDDEN_NOUNS[i.kind][2]} Again (${i.n})` }));
+    if (!items.length) return this.dash.setActionInfo(`Nothing on ${host} is hidden`);
+    const pick = items.length > 1 ? await vscode.window.showQuickPick(items, { placeHolder: `Show hidden ones again on ${host}` }) : items[0];
+    if (pick) await this.showHidden(pick.hidden, host);
+  }
+
+  // Delete a chat, a plan or a memory to the Trash (an SSH host's to that
+  // host's), after a question that says what goes and on which accounts (the
+  // backend's --describe), or why it can't
+  async delete(kind: "chat" | "plan" | "memory", id: string, profileDir: string, host?: string): Promise<void> {
+    if (this.demoOnly()) return;
+    const args = (describe: boolean) => [
+      ...(host ? [`--delete-${kind}`, host, id, ...(profileDir && kind !== "memory" ? [profileDir] : [])]
+        : [`--delete-${kind}`, id, ...(profileDir && kind !== "memory" ? ["--profile", profileDir] : [])]),
+      ...(describe ? ["--describe"] : []),
+      ...(host ? [] : configDirArgs()),
+    ];
+    const run = (describe: boolean) => this.backend.action(host ? "remote.py" : "jump.py", args(describe));
+    const ask = (await run(true)) as Answer & { question?: string };
+    if (!ask.ok) {
+      void vscode.window.showWarningMessage(ask.message || "It can't be deleted");
+      return;
+    }
+    const ok = await vscode.window.showWarningMessage(ask.question || ask.message, { modal: true }, "Delete");
+    if (ok !== "Delete") return;
+    const answer = await run(false);
+    if (this.report(answer, "Couldn't delete it")) this.dash.setActionInfo(answer.message || "Moved to the Trash");
+    this.refresh(host);
   }
 
   private refresh(host?: string): void {

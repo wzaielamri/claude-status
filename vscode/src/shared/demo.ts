@@ -247,12 +247,12 @@ function personal(now: number, phase: number): Group {
       {
         key: "demo-mem-1", name: "test-command", description: "Run the tests with npm test -- --runInBand: the parallel run is flaky on this machine",
         type: "project", path: "/home/alice/.claude/projects/-home-alice-projects-webapp/memory/test-command.md",
-        folder: "/home/alice/projects/webapp", folderShort: "~/projects/webapp", profileDir: ".claude", profile: "personal", updatedAt: now - 4 * HOUR,
+        folder: "/home/alice/projects/webapp", folderShort: "~/projects/webapp", folderGone: false, profileDir: ".claude", profile: "personal", updatedAt: now - 4 * HOUR,
       },
       {
         key: "demo-mem-2", name: "short-commit-messages", description: "Commit messages: one short line in the present tense, no body",
         type: "feedback", path: "/home/alice/.claude/projects/-home-alice-projects-api-server/memory/short-commit-messages.md",
-        folder: "/home/alice/projects/api-server", folderShort: "~/projects/api-server", profileDir: ".claude", profile: "personal", updatedAt: now - 2 * 24 * HOUR,
+        folder: "/home/alice/projects/api-server", folderShort: "~/projects/api-server", folderGone: false, profileDir: ".claude", profile: "personal", updatedAt: now - 2 * 24 * HOUR,
       },
     ],
     homeChatCommand: "echo 'Demo mode'",

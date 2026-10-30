@@ -175,8 +175,9 @@ export interface Memory {
   description: string;
   type: string; // user, feedback, project, reference ("" when it doesn't say)
   path: string; // on the machine the account is on
-  folder: string; // the project folder it's for ("" when that's gone)
+  folder: string; // the project folder it's for (its chats' folder, read back, when that's gone)
   folderShort: string;
+  folderGone: boolean; // that folder isn't there any more (renamed, moved or deleted)
   profileDir: string;
   profile: string;
   updatedAt: number;
@@ -520,7 +521,10 @@ export interface Status {
   overall: string;
   counts: Counts;
   groups: Group[];
-  dismissed: number;
+  dismissed: number; // chats hidden (Hide this chat)
+  hiddenPlans?: number; // plans, memories and projects hidden (Hide this plan…), left out of their lists
+  hiddenMemories?: number;
+  hiddenProjects?: number;
   canShare: boolean;
   errors: string[];
   host?: string;
@@ -878,6 +882,8 @@ export type WebviewMessage =
   | { type: "setReopenIn"; where: ReopenIn }
   | { type: "stop"; chat: ChatRef }
   | { type: "dismiss"; chat: ChatRef }
+  | { type: "hide"; kind: "plans" | "memories" | "projects"; groupId?: string; host?: string; id: string } // id: the plan's or memory's key, a project's folder
+  | { type: "delete"; kind: "chat" | "plan" | "memory"; chat?: ChatRef; groupId?: string; host?: string; id?: string } // asks first (to the Trash)
   | { type: "share"; chat: ChatRef }
   | { type: "compareChanges"; chat: ChatRef; turn: boolean }
   | { type: "openAgentRun"; chat: ChatRef; agentId: string }
@@ -903,6 +909,7 @@ export type WebviewMessage =
   | { type: "login"; groupId: string; host?: string }
   | { type: "refresh"; host?: string }
   | { type: "showRemoved"; host?: string }
+  | { type: "showHidden"; host: string } // an SSH host's eye button: which kind to show again
   | { type: "hideHost"; host: string }
   | { type: "pickHosts" }
   | { type: "setupUsageBars" }
