@@ -158,8 +158,10 @@ class Pet {
 
         const s = stage.size;
         this.talpy = new Talpy({colors: this.lone ? LILAC : calmColors(this.tint), theme: stage.pets.theme,
-            travels: this.lone});
+            travels: this.lone && !stage.pets.reducedMotion});   // (with less motion asked for, no digging about)
         this.talpy.onTravel = ms => this._travel(ms);
+        // a run cut short while it tunnels (petted, a chat finished): it stops where it is
+        this.talpy.onTravelStop = () => this.actor.remove_transition('x');
         this.talpy.tick(Date.now());
         this.actor = new St.Widget({width: s.slot, height: s.canvasH + s.tag});
         // Talpy on its view, drawn from its sheets (Cairo surfaces): a chat's
@@ -396,6 +398,12 @@ class Pet {
             return;
         this.travelTo = this.clampX(x);
         if (Math.abs(this.travelTo - this.px) < this.stage.size.body * 0.3) {
+            this.travelTo = -1;
+            return;
+        }
+        if (this.stage.pets.reducedMotion) {
+            this.actor.remove_transition('x');
+            this.px = this.travelTo;   // no digging: it's just there
             this.travelTo = -1;
             return;
         }
@@ -949,9 +957,15 @@ class Stage {
         }
         if (!this.live)
             return;
-        if (this._heroMood === 'needs') {
+        const calm = this.pets.reducedMotion;   // (lit, but no pulsing or twinkling)
+        if (this._heroMood === 'needs' && calm) {
+            this.glow.opacity = 255;
+        } else if (this._heroMood === 'needs') {
             this.glow.ease({opacity: 255, duration: 900, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
                 repeatCount: -1, autoReverse: true});
+        } else if (this._heroMood === 'done' && calm) {
+            for (const star of this.stars)
+                star.opacity = 230;
         } else if (this._heroMood === 'done') {
             this.stars.forEach((star, i) => star.ease({opacity: 230, duration: 900 + 260 * i,
                 mode: Clutter.AnimationMode.EASE_IN_OUT_SINE, repeatCount: -1, autoReverse: true}));
@@ -1073,6 +1087,11 @@ export class Pets {
         this.mood = 'loading';
         this.accentRgb = [53, 132, 228];   // "working" blue (stylesheet.css)
         this._active = false;   // the popup shows the chats (setActive)
+        // Less motion asked for (Settings → Accessibility → Reduce Animation):
+        // the pets calm down, as VS Code's do: no wandering digs (a pet is just
+        // moved to its new spot), no twinkling stars or pulsing light
+        this._shellSettings = St.Settings.get();
+        this._motionChanged = this._shellSettings.connect('notify::enable-animations', () => this._calm());
         this._makeHero();
         // every size on the stages comes from the display's scale: a new
         // scale (a laptop docked, Settings' Scale) makes them anew
@@ -1087,6 +1106,18 @@ export class Pets {
         this.hero.actor.insert_child_below(talpy.actor, this.hero.bubble);
         talpy.sync();
         this._heroShown = null;   // (update() puts it in the popup)
+    }
+
+    get reducedMotion() {
+        return !this._shellSettings.enable_animations;
+    }
+
+    _calm() {
+        for (const stage of [this.hero, ...this._stages.values()]) {
+            for (const pet of stage.list.values())
+                pet.talpy.travels = pet.lone && !this.reducedMotion;
+            stage._animateLight();
+        }
     }
 
     _rescale() {
@@ -1196,6 +1227,7 @@ export class Pets {
 
     destroy() {
         this._themeContext.disconnect(this._scaleChanged);
+        this._shellSettings.disconnect(this._motionChanged);
         for (const stage of this._stages.values())
             stage.destroy();
         this._stages.clear();
