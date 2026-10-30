@@ -184,8 +184,14 @@ export class ChatPanes implements vscode.Disposable {
     if (r.ok && r.how === "ask" && how === "enter")
       return copy("Its terminal takes no text from outside, so your message is in the clipboard: paste it there");
     if (r.ok && r.how === "ask") return { ok: true, message: String(r.message ?? ""), ask: true };
-    if (r.ok && r.how === "vscode" && typeof r.link === "string" && r.link.startsWith("vscode://anthropic.claude-code/open?"))
-      await vscode.env.openExternal(vscode.Uri.parse(r.link));
+    if (r.ok && r.how === "vscode" && typeof r.link === "string" && r.link.startsWith("vscode://anthropic.claude-code/open?")) {
+      // (this computer's chat: in the VS Code window that runs it, raised first, not the one used last)
+      if (host) await vscode.env.openExternal(vscode.Uri.parse(r.link));
+      else {
+        const opened = await this.backend.action("jump.py", ["--vscode-link", sid || chatId, r.link, ...configDirArgs()]);
+        if (!opened.ok) return { ok: false, message: `Couldn't open the chat: ${opened.message}` };
+      }
+    }
     this.refresh(host);
     return { ok: !!r.ok, message: String(r.message ?? "") };
   }

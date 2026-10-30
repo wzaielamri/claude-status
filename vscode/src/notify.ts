@@ -111,7 +111,7 @@ export class Notifier implements vscode.Disposable {
           else if (choice === "Keep planning…") {
             const note = await vscode.window.showInputBox({ title: `Keep planning: ${n.session.name}`, prompt: "What should change in the plan? (optional)", ignoreFocusOut: true });
             if (note !== undefined) this.told(chat, await panes.answer(chat, "keep", shown, note.trim()));
-          } else if (choice === "Open") panes.open(chat, "chat");
+          } else if (choice === "Open") this.openChat(chat);
         });
         continue;
       }
@@ -220,13 +220,20 @@ export class Notifier implements vscode.Disposable {
     return answers;
   }
 
+  // A notification's Open: the chat's tab when clicks open it (as a row's
+  // click does), else the chat itself
+  private openChat(chat: ChatRef): void {
+    if (this.panes && settings.clickOpensPane()) this.panes.open(chat, "chat");
+    else this.open(chat);
+  }
+
   // What happened while you were away, in one notification
   digest(d: Digest, showView: () => void): void {
     if (!this.isLeader()) return;
     const action = d.first ? `Open ${d.first.session.name}` : "Show Chats";
     void vscode.window.showInformationMessage(d.message, action).then((choice) => {
       if (choice !== action) return;
-      if (d.first) this.open(chatRef(d.first.session, d.first.host));
+      if (d.first) this.openChat(chatRef(d.first.session, d.first.host));
       else showView();
     });
   }
