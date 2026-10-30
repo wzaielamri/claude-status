@@ -1,5 +1,7 @@
 // Notifications in GNOME's message tray: one per session row (a newer one
 // replaces it), and a "needs input" one is closed once you've answered.
+// They outlive a screen lock: the indicator made after it takes them over
+// (owner), and a click goes to that one.
 
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -13,6 +15,7 @@ export class Notifier {
         this._petsDir = petsDir;
         this._source = null;
         this._shown = new Map();   // row key -> {notification, kind}
+        this.owner = null;         // the indicator a click goes to (none while the screen is locked)
     }
 
     _icon(file) {
@@ -31,7 +34,8 @@ export class Notifier {
     }
 
     // n: {key, kind, title, body, icon, session, action (the button's label)};
-    // pose: show Talpy (the pet setting) in the matching pose instead of a plain icon
+    // pose: show Talpy (the pet setting) in the matching pose instead of a plain icon;
+    // onOpen(indicator): what a click does (one about no chat has no button)
     notify(n, pose, onOpen) {
         const old = this._shown.get(n.key);
         if (old)
@@ -48,8 +52,13 @@ export class Notifier {
             gicon: pose && poseFile ? this._icon(poseFile) : new Gio.ThemedIcon({name: n.icon}),
         });
         if (onOpen) {
-            notification.addAction(n.action || 'Open chat', onOpen);
-            notification.connect('activated', onOpen);
+            const open = () => {
+                if (this.owner)
+                    onOpen(this.owner);
+            };
+            if (n.session || n.action)
+                notification.addAction(n.action || 'Open chat', open);
+            notification.connect('activated', open);
         }
         notification.connect('destroy', () => {
             if (this._shown.get(n.key)?.notification === notification)

@@ -32,8 +32,9 @@ class TalpyDenIndicator extends PanelMenu.Button {
     // (GNOME Shell turns extensions off while it's locked): the summary of
     // what happened meanwhile goes out once the first checks are back.
     // tracker: the one from before the lock (what it saw of each chat), so the
-    // first checks tell what changed meanwhile
-    _init(extension, away = null, tracker = null) {
+    // first checks tell what changed meanwhile; notifier: its notifications,
+    // still in the tray (a chat's "needs your input" included)
+    _init(extension, away = null, tracker = null, notifier = null) {
         super._init(0.5, 'Talpy Den', false);
         this._extension = extension;
         this._settings = extension.getSettings();
@@ -42,7 +43,8 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._runner = new Runner(GLib.build_filenamev([extension.path, 'code']));
         this.petsDir = GLib.build_filenamev([extension.path, 'pets']);
         this.iconsDir = GLib.build_filenamev([extension.path, 'icons']);   // (the widget's own: build.sh)
-        this._notifier = new Notifier(this.petsDir);
+        this._notifier = notifier || new Notifier(this.petsDir);
+        this._notifier.owner = this;
         this._tracker = tracker || new L.Tracker();
         this.tips = new Tooltips();
 
@@ -107,9 +109,9 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._restartPollTimer();
         this._restartRemoteTimer();
         this._loadHosts();
+        for (const host of this.shownHosts)
+            this.pollHost(host);   // (now, not a check interval later)
         if (this._away) {
-            for (const host of this.shownHosts)
-                this.pollHost(host);
             // hosts that don't answer soon are left out
             this._later('awayDigest', 20000, () => this._sendAwayDigest());
         }
@@ -304,7 +306,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         for (const c of out.close)
             guard('closing a notification', () => this._notifier.close(c.key, c.kind));
         for (const n of summed ? [] : [...out.notify, ...noticed])
-            guard('a notification', () => this._notifier.notify(n, pose, () => this._openFromNotification(n)));
+            guard('a notification', () => this._notifier.notify(n, pose, ind => ind._openFromNotification(n)));
         guard('closing notifications', () => this._notifier.closeMissing(source, out.present));
         for (const event of [...out.pets, ...resets])
             guard(`the pets' "${event.kind}"`, () => this._pets.event(event));
@@ -408,7 +410,24 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._notifier.notify({key: 'away-digest', kind: 'digest', waiting: !!first, title: digest.title,
             body: digest.body, icon: first ? 'dialog-warning-symbolic' : 'emblem-ok-symbolic', session: null,
             action: first ? 'Open the chat that needs you' : 'Show chats'},
-        this._settings.get_boolean('show-pet'), () => (first ? this._openChat(first) : this.menu.open()));
+        this._settings.get_boolean('show-pet'), ind => (first ? ind._openChat(first) : ind.menu.open()));
+    }
+
+    // A click on a notification about no chat (an error): the popup, with
+    // the error line still there
+    showChats() {
+        this.setTab('chats');
+        this.menu.open();
+    }
+
+    // The notifications, kept while the screen is locked (extension.js): the
+    // indicator made after it takes them over, so they stay in the tray
+    releaseNotifier() {
+        const notifier = this._notifier;
+        this._notifier = null;
+        if (notifier)
+            notifier.owner = null;
+        return notifier;
     }
 
     _openFromNotification(n) {
@@ -473,7 +492,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         if (!this.menu.isOpen) {
             this._notifier.notify({key: 'jump-error', kind: 'error', title: "Couldn't open the chat",
                 body: result.message, icon: 'dialog-error-symbolic', session: null},
-            this._settings.get_boolean('show-pet'), null);
+            this._settings.get_boolean('show-pet'), ind => ind.showChats());
         }
     }
 
@@ -880,7 +899,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
             if (!this.menu.isOpen) {   // e.g. from a notification or the hotkey: say so
                 this._notifier.notify({key: 'remote-error', kind: 'error', title: L.fmt("That didn't work on %1", host),
                     body: this._actionError, icon: 'dialog-error-symbolic', session: null},
-                this._settings.get_boolean('show-pet'), null);
+                this._settings.get_boolean('show-pet'), ind => ind.showChats());
             }
         }
         if (kind !== 'open')
@@ -1421,7 +1440,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         for (const name of Object.keys(this._timers))
             this._clearTimer(name);
         this._runner.destroy();
-        this._notifier.destroy();
+        this._notifier?.destroy();
         this._pets.destroy();
         this.tips.destroy();
         super._onDestroy();

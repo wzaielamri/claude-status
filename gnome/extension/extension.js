@@ -7,7 +7,8 @@
 // then notes the time and what the dashboard showed, and the next enable()
 // (unlocked) hands that to the indicator for its "while you were away"
 // summary. What the indicator last saw of each chat (its tracker) is kept
-// too, so the first check after unlocking tells what changed meanwhile.
+// too, so the first check after unlocking tells what changed meanwhile, and
+// so are its notifications (its notifier), which stay in the tray.
 
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
@@ -24,10 +25,17 @@ export default class TalpyDenExtension extends Extension {
             this._raiser = new Raiser();
             const away = this._lockedAt ? {lockedAt: this._lockedAt, snapshot: this._lockedSnapshot} : null;
             const tracker = this._lockedTracker;
+            const notifier = this._lockedNotifier;
             this._lockedAt = null;
             this._lockedSnapshot = null;
             this._lockedTracker = null;
-            this._indicator = new Indicator(this, away, tracker);
+            this._lockedNotifier = null;
+            try {
+                this._indicator = new Indicator(this, away, tracker, notifier);
+            } catch (e) {
+                notifier?.destroy();
+                throw e;
+            }
             Main.panel.addToStatusArea(this.uuid, this._indicator);
             this._settings = this.getSettings();
             Main.wm.addKeybinding('next-chat-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
@@ -49,6 +57,10 @@ export default class TalpyDenExtension extends Extension {
         this._keybinding = false;
         this._settings = null;
         this._lockedTracker = Main.sessionMode.isLocked ? this._indicator?._tracker || null : null;
+        if (this._indicator || !Main.sessionMode.isLocked) {
+            this._lockedNotifier?.destroy();
+            this._lockedNotifier = Main.sessionMode.isLocked ? this._indicator.releaseNotifier() : null;
+        }
         if (Main.sessionMode.isLocked && this._indicator?._status) {
             try {
                 this._lockedSnapshot = awaySnapshot(this._indicator.allGroups);
