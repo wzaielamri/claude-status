@@ -80,7 +80,10 @@ class FakeEl {
   removeAttribute(k: string): void {
     delete this.attrs[k];
   }
-  addEventListener(): void {}
+  listeners: Record<string, (() => void)[]> = {};
+  addEventListener(kind: string, fn: () => void): void {
+    (this.listeners[kind] ??= []).push(fn);
+  }
   setPointerCapture(): void {}
   getBoundingClientRect() {
     return { left: 0, top: 0, width: 400, height: 80 };
@@ -110,6 +113,7 @@ function load() {
   const frames = { asked: 0 };
   const posted: Any[] = [];
   const css = { color: "rgb(204, 204, 204)" }; // the theme's text color
+  const micro = { queued: 0 }; // (more than 1000 in a row: endless, the page would hang)
   const sandbox: Record<string, unknown> = {
     document: {
       createElement: (tag: string) => new FakeEl(tag),
@@ -137,7 +141,9 @@ function load() {
     cancelAnimationFrame() {},
     getComputedStyle: () => ({ getPropertyValue: () => "", color: css.color }),
     devicePixelRatio: 2,
-    queueMicrotask,
+    queueMicrotask: (fn: () => void) => {
+      if (++micro.queued <= 1000) queueMicrotask(fn);
+    },
     performance,
     setTimeout: (fn: () => void, ms: number) => {
       const handle = setTimeout(fn, ms);
@@ -152,7 +158,7 @@ function load() {
   return {
     Stage: exports.Stage as Any, petFields: exports.petFields as Any, ACTIONS: exports.ACTIONS as Any,
     MOODS: exports.MOODS as Any, stageCallbacks: exports.stageCallbacks as Any, resize, intersect, frames, posted,
-    setDarkAll: exports.setDarkAll as Any, css, Spring: exports.Spring as Any,
+    setDarkAll: exports.setDarkAll as Any, css, Spring: exports.Spring as Any, micro,
   };
 }
 
@@ -297,6 +303,25 @@ test("a stage in view with pets keeps drawing them; a hidden one asks for no fra
   stage.destroy();
 });
 
+test("a stage hidden while Talpy goes after a cookie draws him once and lets the page go on", async () => {
+  const t = load();
+  const stage: Any = new t.Stage(new FakeEl("div"), true, "hero", { open() {} });
+  t.resize[0]([{ contentRect: { width: 400, height: 96 } }]);
+  t.intersect[0]([{ isIntersecting: true }]);
+  stage.update({
+    mood: "idle", headline: "", counts: { waiting: 0, working: 0, idle: 1, limit: 0, done: 0 }, highUsageText: "",
+    contextFullText: "", maxFiveHour: 0, agentsRunning: 0, waiting: null,
+  });
+  assert.ok(stage.pets[0].placeCookie(40, 30));
+  stage.loop();
+  await new Promise((done) => setTimeout(done, 0));
+  t.micro.queued = 0;
+  t.intersect[0]([{ isIntersecting: false }]); // the sidebar switched to Explorer
+  await new Promise((done) => setTimeout(done, 20));
+  assert.equal(t.micro.queued, 1, "it keeps drawing itself while hidden");
+  stage.destroy();
+});
+
 test("a pet whose chat left waves, digs away and is gone", () => {
   const { stage, pet } = leaving();
   assert.equal(pet.talpy.run.name, "leave");
@@ -342,6 +367,27 @@ test("a held pet whose chat left stays in your hand and goes once it is put down
   assert.ok(s.stage.pets.includes(pet), "gone before it got its bearings");
   wait(pet, 10000); // it lands, then digs away
   assert.ok(!s.stage.pets.includes(pet), "nothing sends it off once it is put down");
+  s.stage.destroy();
+});
+
+test("a pet grabbed again while it gets its bearings stays in your hand, whose chat left meanwhile too", () => {
+  const s = account();
+  s.give([chat("p/1")]);
+  s.lay();
+  s.show();
+  const pet = s.stage.petFor("p/1");
+  wait(pet, 3000);
+  pet.pickUp();
+  s.give([]); // its chat left
+  pet.lift = s.stage.gu * 6;
+  pet.drop();
+  pet.faller.step(1e15); // landed, dizzy
+  wait(pet, 400);
+  pet.pickUp(); // grabbed again before it was done
+  assert.equal(pet.landing, true);
+  wait(pet, 6000);
+  assert.ok(s.stage.pets.includes(pet), "it waved and sank out of your hand");
+  assert.equal(pet.talpy.held, true);
   s.stage.destroy();
 });
 
@@ -557,6 +603,21 @@ test("the open hole is drawn once and copied into each picture", () => {
     stage.render();
   }
   assert.deepEqual(pet.holes.map((c: Any) => c.drawn.length), drawnOnce, "the hole was drawn again");
+  stage.destroy();
+});
+
+test("the open hole is drawn again when the graphics lost its pictures", () => {
+  const { stage, lay, show, give } = account();
+  give([chat("p/1")]);
+  lay();
+  show();
+  const pet = stage.petFor("p/1");
+  stage.render();
+  for (const c of pet.holes) c.drawn = []; // (given back blank)
+  pet.holes[2].listeners.contextrestored[0]();
+  stage.render();
+  assert.ok(pet.holes.every((c: Any) => c.drawn.length > 10), "a hole's sheet stays blank");
+  assert.equal(pet.talpy.holeImage("front", true), pet.holes[3]);
   stage.destroy();
 });
 

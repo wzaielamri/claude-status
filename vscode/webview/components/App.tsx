@@ -1,4 +1,5 @@
 import {
+  agentsRunning,
   allGroups,
   countStates,
   firstWaiting,
@@ -102,6 +103,7 @@ export function App() {
     highUsageText: highUsageText(groups),
     contextFullText: contextFullText(groups, (key) => pets.petColor(key)),
     maxFiveHour: maxFiveHour(groups),
+    agentsRunning: agentsRunning(groups),
     waiting: waiting ? chatRefOf(waiting.session, waiting.group.host) : null,
   };
   const local = state.status ? state.status.groups : [];

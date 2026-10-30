@@ -12,6 +12,7 @@ import { pets } from "../webview/pets";
 import type { AccountInput, HeroInput, PetStage, StageChat } from "../webview/pets/api";
 import { demoState } from "../src/shared/demo";
 import {
+  agentsRunning,
   allGroups,
   countStates,
   firstWaiting,
@@ -62,6 +63,7 @@ function heroInput(state: ViewState, groups: Group[]): HeroInput {
     highUsageText: highUsageText(groups),
     contextFullText,
     maxFiveHour: maxFiveHour(groups),
+    agentsRunning: agentsRunning(groups),
     waiting: waiting ? ref(waiting.session, waiting.group.host) : null,
   };
 }

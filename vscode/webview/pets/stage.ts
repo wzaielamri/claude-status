@@ -120,6 +120,7 @@ export class Stage implements PetStage, Animator {
   private destroyed = false;
   private frame = 0;
   private renderQueued = false;
+  private rendering = false; // (hidden: what changes while it draws is in that drawing)
   private readonly tweens = new Set<Tween>();
   private starAnims: Animation[] = [];
   private hoverClientX = -1;
@@ -579,12 +580,14 @@ export class Stage implements PetStage, Animator {
   }
 
   // Something changed: draw it on the next frame (or right away while hidden,
-  // where nothing moves anyway)
+  // where nothing moves anyway; not again for a change made by that drawing
+  // itself, such as a cookie's game ticking on the paused clock, or it would
+  // draw again and again without ever letting the page do anything else)
   invalidate(): void {
     if (this.destroyed) return;
     if (this.live) {
       if (!this.frame) this.frame = requestAnimationFrame(this.loop);
-    } else if (!this.renderQueued) {
+    } else if (!this.renderQueued && !this.rendering) {
       this.renderQueued = true;
       queueMicrotask(() => {
         this.renderQueued = false;
@@ -605,8 +608,13 @@ export class Stage implements PetStage, Animator {
 
   private render(): void {
     if (this.width <= 0) return;
-    for (const p of this.pets) p.render();
-    this.renderBubble();
+    this.rendering = true;
+    try {
+      for (const p of this.pets) p.render();
+      this.renderBubble();
+    } finally {
+      this.rendering = false;
+    }
   }
 
   private renderBubble(): void {

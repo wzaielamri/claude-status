@@ -20,6 +20,7 @@ export interface HeroInput {
   highUsageText: string; // "work: 95% of the 5-hour limit!" or ""; said now and then
   contextFullText: string; // "fix parser: context 91% full" or ""; said now and then
   maxFiveHour: number; // highest 5-hour usage %: at 100 the hero is out of steam
+  agentsRunning: number; // agentsRunning(): the subagents at work (mood agents: "Juggling 3 agents!")
   waiting: ChatRef | null; // the chat that needs you (clicking the headline opens it)
 }
 

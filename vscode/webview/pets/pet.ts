@@ -189,6 +189,8 @@ export class Pet {
       travels: this.lone && !reducedMotion(), // (no digging about, then)
     });
     this.talpy.onTravel = (ms) => this.travel(ms);
+    // (cut short while it tunnels: it pops up where it is; talpy.d.mts doesn't name this hook yet)
+    (this.talpy as Talpy & { onTravelStop: (() => void) | null }).onTravelStop = () => this.stride.stop();
     this.talpy.tick(clock.now());
     this.lastMood = this.mood;
     this.talpy.setMood(this.lastMood);
@@ -234,10 +236,10 @@ export class Pet {
         : { frameMs: 33.3, maxFrames: 32, sheets: 32, tweenMs: 200, tweens: 5, smooth: true, clockMs: 1000 / 60 },
     );
     this.sheets = div("cs-pet-sheets");
-    this.view = document.createElement("canvas");
+    this.view = this.canvas();
     this.view.className = "cs-pet-sheet";
     this.sheets.append(this.view);
-    this.leftHole = document.createElement("canvas");
+    this.leftHole = this.canvas();
     this.leftHole.className = "cs-pet-hole";
     this.leftHole.hidden = true;
     this.grab = div("cs-pet-grab");
@@ -248,7 +250,7 @@ export class Pet {
       this.game = this.makeGame();
       this.cookieShadow = div("cs-cookie-shadow");
       this.cookieShadow.hidden = true;
-      this.cookie = document.createElement("canvas");
+      this.cookie = this.canvas();
       this.cookie.className = "cs-cookie";
       this.cookie.hidden = true;
     }
@@ -635,6 +637,7 @@ export class Pet {
     if (!this.leftHole.hidden) this.fill.run(this.leftOpen, 0, 350, ease.linear, () => (this.leftHole.hidden = true));
     // (a cookie out: it stays out of its burrow and goes after it)
     const feel = this.talpy.land(fromHeight / (this.stage.box / 64), () => {
+      if (this.held) return; // picked up again before it was done (pickUp): nothing of landing happens in your hand
       this.landing = false;
       if (this.destroyed) return;
       this.game?.landed();
@@ -651,7 +654,8 @@ export class Pet {
     const mood = this.mood;
     const waiting = this.stage.heroInput?.waiting?.name ?? "";
     if (mood === "needs" && waiting) return `${waiting} needs you!`;
-    if (mood === "agents") return "Juggling subagents!";
+    const agents = this.stage.heroInput?.agentsRunning ?? 0;
+    if (mood === "agents") return `Juggling ${agents} agent${agents === 1 ? "" : "s"}!`;
     if (mood === "working") return "Busy coding… thanks!";
     if (this.lone && !this.hadCookie && Math.random() < 0.25) return "Psst… double-click my stage for a cookie!";
     const lines = ["Hi!", "♥", "Ship it!", "All quiet here.", "Pet me more!"];
@@ -919,8 +923,10 @@ export class Pet {
       w = Math.round(s.canvasW * k),
       h = Math.round(s.canvasH * k);
     if (this.view.width !== w || this.view.height !== h) {
-      // (also when the zoom changes: every picture is drawn again)
+      // (also when the zoom changes: every picture is drawn again; a sheet
+      // not painted yet has no canvas)
       for (const canvas of [this.view, ...this.canvases]) {
+        if (!canvas) continue;
         canvas.width = w;
         canvas.height = h;
       }
@@ -933,7 +939,7 @@ export class Pet {
     for (const sheet of f.sheets) {
       if (!sheet.paint) continue;
       if (!this.canvases[sheet.index]) {
-        this.canvases[sheet.index] = document.createElement("canvas");
+        this.canvases[sheet.index] = this.canvas();
         this.canvases[sheet.index].width = w;
         this.canvases[sheet.index].height = h;
       }
@@ -943,6 +949,20 @@ export class Pet {
       painted = true;
     }
     return painted;
+  }
+
+  // A canvas of its own. One whose graphics were lost (the GPU reset, as after
+  // a suspend) comes back blank: then everything is painted again, the open
+  // hole's sheets too, as at a new size, so no picture copies a blank hole
+  private canvas(): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.addEventListener("contextrestored", () => {
+      this.view.width = 0;
+      this.leftDrawn = "";
+      this.drawn.cookieSize = "";
+      this.changed();
+    });
+    return c;
   }
 
   // A sheet cleared, its context at the box's transform
@@ -963,7 +983,7 @@ export class Pet {
   // this size, copied into each picture pixel for pixel
   private paintHoles(w: number, h: number): void {
     for (let i = 0; i < 4; i++) {
-      const c = this.holes[i] ?? (this.holes[i] = document.createElement("canvas"));
+      const c = this.holes[i] ?? (this.holes[i] = this.canvas());
       c.width = w;
       c.height = h;
       const ctx = this.begin(c);
