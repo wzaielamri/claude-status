@@ -2361,16 +2361,24 @@ def plan_view(inp):
 def pending_tool(path):
     """The newest tool call of a chat's last turn that has no result yet
     (the one a permission prompt is about while the chat waits), or None."""
+    calls = open_tools(path)
+    return calls[0] if calls else None
+
+
+def open_tools(path):
+    """The tool calls of a chat's last turn that have no result yet, newest
+    first (several when Claude made them in one reply: which of them a
+    permission prompt is about isn't written down)."""
     try:
         size = path.stat().st_size
         with open(path, "rb") as f:
             f.seek(max(0, size - PEEK_TAIL_BYTES))
             lines = f.read(min(size, PEEK_TAIL_BYTES)).split(b"\n")
     except (OSError, AttributeError):
-        return None
+        return []
     if size > PEEK_TAIL_BYTES:
         lines = lines[1:]
-    answered = set()
+    answered, calls = set(), []
     for line in reversed(lines):
         if not PEEK_LINE.search(line):
             continue
@@ -2383,13 +2391,11 @@ def pending_tool(path):
         _, blocks = blocks_of(e)
         if e["type"] == "user":
             if human_prompt(e) is not None:
-                return None
+                break
             answered.update(c.get("tool_use_id") for c in blocks if c.get("type") == "tool_result")
             continue
-        for c in reversed([c for c in blocks if c.get("type") == "tool_use"]):
-            if c.get("id") not in answered:
-                return c
-    return None
+        calls += [c for c in reversed(blocks) if c.get("type") == "tool_use" and c.get("id") not in answered]
+    return calls
 
 
 def tool_use_id(value):
@@ -2399,11 +2405,15 @@ def tool_use_id(value):
 
 def pending_permission(path, cwd):
     """permission_view of what a waiting chat asks, from its transcript, or
-    None; "toolUse": the id of the tool call it's about."""
-    use = pending_tool(path) if path is not None else None
-    if not use:
+    None; "toolUse": the id of the tool call it's about; "sure": whether
+    that's certain (the only call open, and not a subagent's: what one of
+    those asks is in its own transcript)."""
+    calls = open_tools(path) if path is not None else []
+    if not calls:
         return None
-    return dict(permission_view(use.get("name"), use.get("input"), cwd), toolUse=tool_use_id(use.get("id")))
+    use = calls[0]
+    return dict(permission_view(use.get("name"), use.get("input"), cwd), toolUse=tool_use_id(use.get("id")),
+                sure=len(calls) == 1 and use.get("name") not in SUBAGENT_TOOLS)
 
 
 def chat_tool_use(home, extra_dirs, session_id, profile_key=None):
@@ -2508,12 +2518,15 @@ def note_permissions(groups, ctx, requests):
             path = transcript_path(profile, s.get("chatId") or s["sessionId"]) if profile is not None else None
             view = pending_permission(path, s.get("cwd") or "")
             if view is not None and (wait != QUESTION_WAIT or view["tool"] == ASK_TOOL):
-                question = view["tool"] == ASK_TOOL
-                keys = s.get("tmux") and not question and view["tool"] != PLAN_TOOL   # (a plan's dialog differs by account)
+                question, sure = view["tool"] == ASK_TOOL, view.pop("sure", False)
+                # (not a plan: its dialog differs by account; nor a call that may not be the one asked
+                # about: the keys would answer whatever Claude shows)
+                keys = s.get("tmux") and not question and view["tool"] != PLAN_TOOL and sure
                 s["permission"] = dict(view, request=None, answer="keys" if keys else "", toolUse=view.get("toolUse"))
 
 
 QUESTION_WAIT = "input needed"  # (also an MCP server's question: only AskUserQuestion's count)
+SUBAGENT_TOOLS = ("Agent", "Task")  # (a subagent's call: "Task" in older Claude Code)
 PERMISSION_WAITS = ("permission prompt", QUESTION_WAIT)
 
 

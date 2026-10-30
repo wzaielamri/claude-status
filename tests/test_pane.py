@@ -595,6 +595,17 @@ class ToolUseTests(PaneFixture):
             cs.note_permissions([{"sessions": [row]}], mock.Mock(profiles=[]), {})
         self.assertIsNone(row["permission"]["toolUse"])
 
+    def test_no_keys_for_a_call_that_may_not_be_the_one_asked_about(self):
+        # two calls open (which one the prompt is about isn't written down), or
+        # a subagent's call (what it asks is in its own transcript): no keys
+        for calls in ([tool_use("toolu_1", "Bash", {"command": "rm -rf build"}, self.now - 4, "m1"),
+                       tool_use("toolu_2", "Bash", {"command": "git status"}, self.now - 4, "m1")],
+                      [tool_use("toolu_3", "Agent", {"description": "Tidy the repo", "prompt": "Tidy it"}, self.now - 4)]):
+            write(self.path, lines(prompt("deploy", self.now - 5), *calls))
+            permission = self.rows()["tmuxed"]["permission"]
+            self.assertEqual((permission["answer"], "sure" in permission), ("", False))
+        self.assertEqual([c["id"] for c in cs.open_tools(self.path)], ["toolu_3"])
+
     def keys(self, *args, meanwhile=None):
         """pane.py --keys tmuxed … with tmux stood in for: (its answer, the keys sent)."""
         sent = []
