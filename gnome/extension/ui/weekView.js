@@ -170,7 +170,7 @@ function chatLine(ctx, c, cur, where = null, sub = false) {
         x_expand: true, can_focus: opens, reactive: opens});
     button.connect('clicked', () => {
         if (opens)   // (its tooltip makes every row reactive)
-            ctx.jumpTo(c.chatId, c.profileDir);
+            ctx.openChatById(c.chatId, c.profileDir);
     });
     ctx.tips.add(button, c.host ? `${c.name} on ${c.host}: its row under ${c.host} opens it` : `Open “${c.name}”`);
     return button;

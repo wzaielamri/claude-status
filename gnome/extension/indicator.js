@@ -483,6 +483,31 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._jumped(await this._helper('jump.py', [sessionId, ...profile, ...this._configDirArgs]));
     }
 
+    // A chat by its id (the Recap's): its row if it's listed, else reopened
+    // where the Terminal | VS Code switch says, as a recent chat is (Plasma's
+    // openChatById)
+    openChatById(chatId, profileDir) {
+        let row = null, other = null;
+        for (const g of this.groups) {
+            for (const s of g.sessions) {
+                if (s.chatId !== chatId && s.sessionId !== chatId)
+                    continue;
+                if (!profileDir || g.profileKeys.includes(profileDir))
+                    row = row || s;
+                else
+                    other = other || s;
+            }
+        }
+        row = row || other;
+        const group = this.groupOfProfile(profileDir);
+        if (row)
+            this.jumpTo(row.sessionId, row.profileDir);
+        else if (group && this.openInVscode(group, ''))
+            this.resumeInVscode(chatId, profileDir);
+        else
+            this.jumpTo(chatId, profileDir);
+    }
+
     // busy: you were told it's working or waiting (else only an idle one is stopped)
     async stopSession(sessionId, profileDir, busy = false) {
         const profile = profileDir ? ['--profile', profileDir] : [];
