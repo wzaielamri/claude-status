@@ -409,7 +409,7 @@ Window {
     function followEnd() {
         list.contentY = Math.max(list.originY, list.originY + list.contentHeight - list.height)
     }
-    function scrolling() {   // (with the wheel, a drag, or its scroll bar)
+    function scrolling() {   // (a drag, or its scroll bar; the wheel: list's WheelHandler)
         return list.moving || scroll.PlasmaComponents3.ScrollBar.vertical.pressed
     }
     Timer {
@@ -1259,6 +1259,16 @@ Window {
                     }
                     onContentHeightChanged: pane.keepPlace()
                     onHeightChanged: pane.keepPlace()
+                    // (the wheel or a touchpad: the scroll view's Kirigami.WheelHandler moves
+                    // contentY itself, so the list isn't moving, but you scroll all the same;
+                    // this one only looks, the scroll view still scrolls)
+                    WheelHandler {
+                        blocking: false
+                        onWheel: {
+                            settle.stop()
+                            holdTop.stop()
+                        }
+                    }
 
                     // Ctrl+wheel: the text size
                     WheelHandler {
