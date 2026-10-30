@@ -1343,12 +1343,16 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this.groups.forEach((g, i) => {
             this._list.add_child(buildGroupSection(this, L.withUsage(g, '', owners), {last: i === this.groups.length - 1, accounts: this.groups.length}));
         });
+        // No account here, but SSH hosts shown: one quiet line where this
+        // computer's accounts go (a computer that only watches its hosts is fine)
+        if (this._status !== null && this.groups.length === 0 && hosts.length > 0)
+            this._list.add_child(label('No Claude Code config on this computer', 'claude-dim claude-indent'));
         for (const host of hosts)
             this._list.add_child(buildHostSection(this, host));
-        if (this._status !== null && this.groups.length === 0) {
+        if (this._status !== null && this.groups.length === 0 && hosts.length === 0) {
             const empty = column('claude-placeholder', {x_expand: true});
-            empty.add_child(label('No Claude Code config found', 'claude-group-title'));
-            empty.add_child(paragraph('Looked for ~/.claude and ~/.claude-*. Add other folders in the settings.', 'claude-dim'));
+            empty.add_child(label('No Claude Code chats yet', 'claude-group-title'));
+            empty.add_child(paragraph("Your Claude Code chats show up here once you start claude in a terminal or open Claude in VS Code. Talpy Den looks in ~/.claude and ~/.claude-*; other folders go in its settings (Extra config folders).", 'claude-dim'));
             this._list.add_child(empty);
         }
         this._pets.pruneStages();
