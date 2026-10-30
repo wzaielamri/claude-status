@@ -1342,6 +1342,27 @@ class SeveralCopiesTests(unittest.TestCase):
             self.assertEqual((outputs, runs), (2, 2), ask)
 
     @NEEDS_PLASMA5SUPPORT
+    def test_a_copy_with_a_popup_notifies(self):
+        # On the desktop and in a panel, the desktop copy here first sent the
+        # notifications: Open the Recap only switched the tab of the dashboard
+        # under your windows. Alone, a copy notifies whatever it is.
+        _, _, _, _, stderr = run_hub(
+            '  Component.onCompleted: {\n'
+            '    const seen = []\n'
+            '    Hub.want("desk", "status", t.command, 60000, true); Hub.placed("desk", false)\n'
+            '    seen.push(Hub.leaderId)\n'
+            '    Hub.want("panel", "status", t.command, 60000, true); Hub.placed("panel", true)\n'
+            '    seen.push(Hub.leaderId)\n'
+            '    Hub.want("tray", "status", t.command, 60000, true); Hub.placed("tray", true)\n'
+            '    Hub.want("desk2", "status", t.command, 60000, true); Hub.placed("desk2", false)\n'
+            '    seen.push(Hub.leaderId)\n'
+            '    Hub.drop("panel"); Hub.drop("tray"); Hub.placed("panel", true)\n'
+            '    seen.push(Hub.leaderId)\n'
+            '    console.warn("leaders " + seen.join(" "))\n'
+            '  }', 300)
+        self.assertIn("leaders desk panel panel desk", stderr, stderr[-2000:])
+
+    @NEEDS_PLASMA5SUPPORT
     def test_the_live_watcher_answers_once_a_run(self):
         # Started again the moment it answered, live.py's watcher got that
         # answer back from Plasma ~90 times in a row, each a status check

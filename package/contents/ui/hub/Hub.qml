@@ -11,12 +11,16 @@ import QtQuick
 QtObject {
     id: hub
 
-    // copy id -> {since, wants: {key: {command, interval, named}}}; key is
-    // what the command is to the copy ("status", "ssh:<host>")
+    // copy id -> {since, popup, wants: {key: {command, interval, named}}}; key
+    // is what the command is to the copy ("status", "ssh:<host>"); popup false:
+    // shown in place on the desktop, with no popup to open
     property var copies: ({})
     // The copy that sends the notifications and plays the sounds: the one
-    // here longest. Across programs (another plasmashell, a test window),
-    // talpy_den.py --instance still picks one (notifier in its answer).
+    // here longest, but one with a popup before one shown in place on the
+    // desktop (what a notification opens shows up there, not under your
+    // windows); a lone copy whatever it is. Across programs (another
+    // plasmashell, a test window), talpy_den.py --instance still picks one
+    // (notifier in its answer).
     property string leaderId: ""
     // The name these copies go by in talpy_den.py's election: the first
     // copy's, kept when that copy goes, so the others keep notifying
@@ -55,6 +59,16 @@ QtObject {
             Qt.callLater(() => hub.output(command, last.stdout, last.stderr))
         else
             run(command)
+    }
+
+    // Whether the copy has a popup (see copies); (a copy that's gone, or not
+    // here yet, isn't added: one being destroyed would stay here for good)
+    function placed(id, popup) {
+        const copy = copies[id]
+        if (!copy || copy.popup === popup)
+            return
+        copy.popup = popup
+        update()
     }
 
     function unwant(id, key) {
@@ -196,13 +210,15 @@ QtObject {
     }
 
     function update() {
-        let leader = "", since = 0, shortest = 0, step = 0
+        let leader = "", since = 0, popup = false, shortest = 0, step = 0
         const wanted = {}
         for (const id in copies) {
             const c = copies[id]
-            if (!leader || c.since < since || (c.since === since && id < leader)) {
+            const p = c.popup !== false   // (not known yet: as one with a popup)
+            if (!leader || (p && !popup) || (p === popup && (c.since < since || (c.since === since && id < leader)))) {
                 leader = id
                 since = c.since
+                popup = p
             }
             for (const key in c.wants) {
                 wanted[c.wants[key].command] = true

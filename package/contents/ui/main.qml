@@ -287,8 +287,12 @@ PlasmoidItem {
     // The dashboard is on screen: the popup is open, or it's shown in place
     // (on the desktop). There, opening a chat "closes the popup" too
     // (expanded false), though the dashboard stays: its pets froze.
-    readonly property bool dashboardShown: expanded || (Window.window !== null && fullRepresentationItem !== null
-                                                         && fullRepresentationItem.Window.window === Window.window)
+    readonly property bool dashboardShown: expanded || shownInPlace
+    // (the dashboard is drawn where the widget is, on the desktop: no popup to
+    // open, so with another copy that has one, that one notifies: hub/Hub.qml)
+    readonly property bool shownInPlace: Window.window !== null && fullRepresentationItem !== null
+                                         && fullRepresentationItem.Window.window === Window.window
+    onShownInPlaceChanged: Hub.placed(instanceId, !shownInPlace)
     // (with the mouse on it, it can be seen: a window over it would have the mouse)
     readonly property bool coveredByWindow: coverWatch.item !== null && coverWatch.item.covered && !mouseOnWidget.hovered
     HoverHandler {
@@ -399,7 +403,8 @@ PlasmoidItem {
     // ---------------------------------------------------------------- several widgets
     // This widget can run several times, e.g. on a panel, in the system tray
     // and on each screen's desktop. The copies share one check (hub/Hub.qml);
-    // the one here longest sends the notifications and sounds, and across
+    // the one here longest sends the notifications and sounds (one with a
+    // popup before one shown in place on the desktop), and across
     // programs talpy_den.py picks one (several widgets at once). Settings
     // are shared: a change is saved for the others at the next check, and the
     // others take it over at theirs (a new copy takes over what the others use).
@@ -1926,6 +1931,7 @@ PlasmoidItem {
     Component.onCompleted: {
         loadHosts()
         Hub.want(instanceId, "status", command, checkInterval, true)
+        Hub.placed(instanceId, !shownInPlace)
         Hub.wantLive(instanceId, liveCommand)
         wantHosts()
     }
