@@ -2308,7 +2308,8 @@ Window {
                     onClicked: pane.commitOpen = !pane.commitOpen
                 }
                 PlasmaComponents3.Button {
-                    readonly property bool marked: !!pane.row && !pane.reviewPending && !!pane.row.review
+                    // (by the mark itself: while the chat works it isn't "to review", nor reviewed)
+                    readonly property bool marked: !!pane.row && !!pane.row.review && root.reviewSeen(pane.row, pane.host)
                     icon.name: marked ? "checkmark" : "view-task"
                     text: marked ? i18n("Reviewed") : i18n("Mark reviewed")
                     checkable: false

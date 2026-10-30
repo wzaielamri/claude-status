@@ -3196,6 +3196,13 @@ PlasmoidItem {
     function reviewPending(s, host) {
         if (!s || !s.review || !s.review.editedAt || s.state === "working" || s.state === "waiting")
             return false
+        return !reviewSeen(s, host)
+    }
+    // Its changes since its last edit marked reviewed (or older than what's to
+    // review at all), whether it works now or not (the pane's Reviewed button)
+    function reviewSeen(s, host) {
+        if (!s || !s.review || !s.review.editedAt)
+            return true
         const marks = status && status.reviewed ? status.reviewed : {}
         const id = s.chatId || s.sessionId
         const mark = marks[host ? host + "|" + id : id]
@@ -3204,7 +3211,7 @@ PlasmoidItem {
         // chat's: pane.py marks it here. Its last edit is on the host's clock,
         // which toLocalClock leaves its review on: moved to ours here)
         const offset = host && remote[host] ? remote[host].clockOffset || 0 : 0
-        return seen < s.review.editedAt + offset
+        return seen >= s.review.editedAt + offset
     }
 
     // The message waiting to be sent when the chat's turn ends (pane.py --send --after-turn)
