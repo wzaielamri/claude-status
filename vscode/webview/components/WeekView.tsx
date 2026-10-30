@@ -23,6 +23,8 @@ import {
   whenText,
   workText,
   type Currency,
+  dayMoment,
+  dayPlace,
 } from "../../src/shared/week";
 import { post } from "../env";
 import { Icon } from "../util/icons";
@@ -252,9 +254,9 @@ function Timeline({ recap }: { recap: WeekRecap }) {
   const weeks = recap.span === "all"; // (a row per 7 days, with their numbers)
   const last = weeks ? 0 : recap.days.length - 1;
   const most = Math.max(1, ...recap.days.map((d) => Math.max(d.youMs, d.workedMs)));
-  const pct = (d: WeekDay, ms: number) => `${Math.max(0, Math.min(100, (100 * (ms - d.start)) / Math.max(1, d.end - d.start)))}%`;
-  const width = (d: WeekDay, a: number, b: number) =>
-    `max(1px, ${Math.max(0, (100 * (Math.min(b, d.end) - Math.max(a, d.start))) / Math.max(1, d.end - d.start))}%)`;
+  // (by the day's own wall clock: dayPlace)
+  const pct = (d: WeekDay, ms: number) => `${100 * dayPlace(d, ms)}%`;
+  const width = (d: WeekDay, a: number, b: number) => `max(1px, ${Math.max(0, 100 * (dayPlace(d, b) - dayPlace(d, a)))}%)`;
   const limits = recap.days.some((d) => d.limits?.length);
   return (
     <section class="week-section">
@@ -296,7 +298,7 @@ function Timeline({ recap }: { recap: WeekRecap }) {
                   const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
                   const x = Math.max(0, Math.min(box.width, e.clientX - box.left));
                   const span = d.end - d.start;
-                  setHover({ row: i, x, ms: d.start + (x / Math.max(1, box.width)) * span, px: span / Math.max(1, box.width) });
+                  setHover({ row: i, x, ms: dayMoment(d, x / Math.max(1, box.width)), px: span / Math.max(1, box.width) });
                 }}
                 onMouseLeave={() => setHover((h) => (h && h.row === i ? null : h))}
               >

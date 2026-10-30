@@ -52,6 +52,27 @@ export function moneyText(usd: number, cur: Currency = USD): string {
   return put(amount.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }));
 }
 
+// Where a moment is on its day's row, 0 to 1, by that day's own wall clock:
+// on a day the clock changes (23 or 25 hours long) 18:00 is still at 3/4,
+// under the 18 over the rows (the repeated hour drawn twice in one place, the
+// skipped one empty)
+export function dayPlace(d: Pick<WeekDay, "start" | "end">, ms: number): number {
+  if (ms <= d.start) return 0;
+  if (ms >= d.end) return 1;
+  const t = new Date(ms);
+  const s = new Date(d.start);
+  const days = Math.round((Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) - Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())) / 86400000);
+  const hours = days * 24 + t.getHours() + t.getMinutes() / 60 + t.getSeconds() / 3600 + t.getMilliseconds() / 3600000;
+  return Math.max(0, Math.min(1, hours / 24));
+}
+
+// The moment at a place on its day's row (dayPlace back)
+export function dayMoment(d: Pick<WeekDay, "start" | "end">, place: number): number {
+  const s = new Date(d.start);
+  const ms = new Date(s.getFullYear(), s.getMonth(), s.getDate(), 0, 0, 0, Math.round(place * 24 * 3600000)).getTime();
+  return Math.max(d.start, Math.min(d.end, ms));
+}
+
 // "24 Oct"
 export function shortDay(day: string): string {
   const d = localDate(day);

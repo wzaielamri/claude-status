@@ -326,3 +326,25 @@ test("the Recap's card is copied from a folder of its own, removed after; a fail
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("a day the clock changes on draws its times by its own clock: 18:00 under the 18 over the rows", async () => {
+  const { dayMoment, dayPlace } = await import("../src/shared/week");
+  const was = process.env.TZ;
+  try {
+    for (const [tz, y, m, d, hours] of [["Europe/Berlin", 2026, 9, 25, 25], ["Europe/Berlin", 2026, 2, 29, 23], ["America/New_York", 2026, 2, 8, 23], ["UTC", 2026, 9, 25, 24]] as const) {
+      process.env.TZ = tz;
+      const day = { start: new Date(y, m, d).getTime(), end: new Date(y, m, d + 1).getTime() };
+      assert.equal((day.end - day.start) / 3600000, hours, `${tz}: the day's length`);
+      for (const h of [6, 12, 18]) {
+        const at = new Date(y, m, d, h).getTime();
+        assert.equal(dayPlace(day, at), h / 24, `${tz}: ${h}:00`);
+        assert.equal(dayMoment(day, h / 24), at, `${tz}: back to ${h}:00`);
+      }
+      assert.equal(dayPlace(day, day.start), 0);
+      assert.equal(dayPlace(day, day.end), 1);
+    }
+  } finally {
+    if (was === undefined) delete process.env.TZ;
+    else process.env.TZ = was;
+  }
+});
