@@ -4008,9 +4008,14 @@ PlasmoidItem {
 
     // When a task picked for later starts (ms): on day at clock ("9", "930",
     // "9:30", "14:30"); 0 for no time, or one that has passed
-    function laterAt(day, clock) {
+    // (a time it can read: 24-hour, 14:30, 1430 or 14)
+    function laterClock(clock) {
         const m = /^(\d{1,2})(?::?(\d{2}))?$/.exec((clock || "").trim())
-        if (!m || +m[1] > 23 || +(m[2] || 0) > 59)
+        return m && +m[1] <= 23 && +(m[2] || 0) <= 59 ? m : null
+    }
+    function laterAt(day, clock) {
+        const m = laterClock(clock)
+        if (!m)
             return 0
         const d = new Date()
         d.setDate(d.getDate() + day)

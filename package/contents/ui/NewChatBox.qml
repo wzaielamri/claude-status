@@ -358,7 +358,9 @@ Rectangle {
                 visible: root.taskLater
                 Layout.fillWidth: true
                 text: box.laterAt ? i18n("in %1", root.duration(box.laterAt - root.now))
-                                  : root.taskLaterTime.trim() ? i18n("that time has passed") : i18n("e.g. 14:30")
+                      : !root.taskLaterTime.trim() ? i18n("e.g. 14:30")
+                      : root.laterClock(root.taskLaterTime) ? i18n("that time has passed")
+                      : i18n("not a time: 24-hour HH:MM, e.g. 14:30")
                 color: box.laterAt || !root.taskLaterTime.trim() ? Kirigami.Theme.textColor : Kirigami.Theme.negativeTextColor
                 opacity: box.laterAt ? 0.7 : 1
                 font: Kirigami.Theme.smallFont
