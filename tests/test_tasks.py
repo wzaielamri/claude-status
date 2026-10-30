@@ -2051,3 +2051,31 @@ class DeleteTests(Fixture):
         self.assertFalse(self.delete("memory", ".claude-work/CLAUDE.md/memory")["ok"])
         self.assertFalse(self.delete("memory", ".claude-work/../memory")["ok"])
         self.assertTrue((self.w / "CLAUDE.md").is_file())
+
+
+class StopKeepOffTests(Fixture):
+    """Stop and turn Keep going off (jump.py --stop ID --and-keep-off CHAT_ID): both, or neither."""
+
+    def test_stopped_and_let_go_under_the_lock(self):
+        cache = Path(self.tmp.name) / "cache/talpy-den"
+        saved = os.environ.get("XDG_CACHE_HOME")
+        os.environ["XDG_CACHE_HOME"] = str(cache.parent)
+        self.addCleanup(lambda: os.environ.pop("XDG_CACHE_HOME") if saved is None else os.environ.__setitem__("XDG_CACHE_HOME", saved))
+        cs.keep_chat(cache, ".claude-work", "kept1")
+        looked = []
+
+        def stopped(home, extra, session_id, profile_dir=None, busy=False):
+            # (meanwhile the copy that looks after kept chats can't take the lock: it skips)
+            looked.append(cs.change_keep(cache, lambda data: True, wait=False))
+            return True, "Stopped"
+        with mock.patch.object(jump, "stop", side_effect=stopped):
+            self.assertEqual(jump.stop_keep_off(self.home, [], "sess1", "kept1"),
+                             (True, "Stopped. It won't go on by itself any more"))
+        self.assertEqual((looked, cs.load_keep(cache)["chats"]), ([False], []))
+        # not stopped: Keep going stays on
+        cs.keep_chat(cache, ".claude-work", "kept1")
+        with mock.patch.object(jump, "stop", return_value=(False, "That chat isn't running any more")):
+            self.assertEqual(jump.stop_keep_off(self.home, [], "sess1", "kept1"), (False, "That chat isn't running any more"))
+        self.assertEqual([k["chat"] for k in cs.load_keep(cache)["chats"]], ["kept1"])
+        with self.assertRaises(SystemExit):
+            jump.main(["--keep-off", "kept1", "--and-keep-off", "kept1"])

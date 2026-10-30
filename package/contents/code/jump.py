@@ -3,7 +3,7 @@
 a new chat (used by the Talpy Den widget).
 
     python3 -I jump.py SESSION_ID [--config-dir DIR]...
-    python3 -I jump.py --stop SESSION_ID [--profile PROFILE] [--busy] [--config-dir DIR]...
+    python3 -I jump.py --stop SESSION_ID [--profile PROFILE] [--busy] [--and-keep-off CHAT_ID] [--config-dir DIR]...
     python3 -I jump.py --interrupt SESSION_ID [--profile PROFILE]   (Ctrl+C in its tmux pane)
     python3 -I jump.py --save-settings JSON --by WIDGET [--unless-default]   (settings the widgets share)
     python3 -I jump.py --new-chat PROFILE_DIRNAME [--cwd FOLDER] [--config-dir DIR]...
@@ -989,6 +989,26 @@ def stop(home, extra_dirs, session_id, profile_dir=None, busy=False):
     if not claude:
         return False, NO_CLAUDE
     return cs.stop_background(profile, job_id, job, home, claude)
+
+
+def stop_keep_off(home, extra_dirs, session_id, chat_id, profile_dir=None, busy=False):
+    """Stop a chat that keeps going (stop) and turn Keep going off for it
+    (keep_off), both under keep.json's lock: the copy that looks after the
+    chats that keep going can't queue it again in between, and Keep going
+    stays on when it wasn't stopped."""
+    done = {}
+
+    def change(data):
+        done["ok"], done["message"] = stop(home, extra_dirs, session_id, profile_dir, busy)
+        had = done["ok"] and any(k["chat"] == chat_id for k in data["chats"])
+        if had:
+            data["chats"] = [k for k in data["chats"] if k["chat"] != chat_id]
+        return had
+    cs.change_keep(cs.cache_dir(home), change)
+    if not done["ok"]:
+        return False, done["message"]
+    _, off = keep_off(home, extra_dirs, chat_id)  # (off already: what's still queued for it, in words)
+    return True, f"{done['message'].rstrip('.')}. {off}"
 
 
 def interrupt(home, extra_dirs, session_id, profile_dir=None):
@@ -2362,6 +2382,7 @@ USAGE = ("usage: jump.py [--stop [--busy] | --interrupt] SESSION_ID [--profile P
          "               [--host HOST] [--account TITLE] [--keep]\n"
          "               (go on with a chat a usage limit stopped, at MS; --keep: and after later limits, until it's done)\n"
          "       jump.py --keep-going CHAT_ID --profile PROFILE [--cwd FOLDER] [--name NAME] | --keep-off CHAT_ID\n"
+         "       jump.py --stop SESSION_ID [--profile PROFILE] [--busy] --and-keep-off CHAT_ID   (and Keep going off)\n"
          "               (a chat goes on by itself after each usage limit, until it's done)\n"
          "       jump.py --unqueue|--start-queued TASK_ID\n"
          "       jump.py --star|--unstar CHAT_ID [--host HOST]   (starred: listed under the account's Starred)\n"
@@ -2418,6 +2439,7 @@ def main(argv=None):
     task, background, end_first, to = Task(), False, False, None
     start_at, queue_host, account_title, scheduled, keep = None, "", "", False, False
     feedback_plan, comments, extra_out, hide_kind, describe = None, [], {}, None, False
+    keep_off_chat = None
     while args:
         arg = args.pop(0)
         if arg == "--config-dir" and args:
@@ -2485,6 +2507,8 @@ def main(argv=None):
             action = stop
         elif arg == "--busy":
             busy = True
+        elif arg == "--and-keep-off" and args:
+            keep_off_chat = args.pop(0)  # (with --stop: the chat that keeps going)
         elif arg == "--interrupt":
             action = interrupt
         elif arg == "--changes":
@@ -2591,6 +2615,8 @@ def main(argv=None):
         sys.exit(USAGE)
     if describe and action not in ("--delete-chat", "--delete-plan", "--delete-memory"):
         sys.exit(USAGE)
+    if keep_off_chat is not None and action is not stop:
+        sys.exit(USAGE)
     command, comparison = None, None
     try:
         if action is send_plan_feedback:
@@ -2650,6 +2676,8 @@ def main(argv=None):
             ok, message = resume_remote_vscode(remote_host, session_id, folder or "")
         elif action is resume and vscode:
             ok, message = resume_vscode(Path.home(), extra, session_id, profile_dir)
+        elif action is stop and keep_off_chat is not None:
+            ok, message = stop_keep_off(Path.home(), extra, session_id, keep_off_chat, profile_dir, busy)
         elif action is stop:
             ok, message = stop(Path.home(), extra, session_id, profile_dir, busy)
         elif action is send_to_phone:
