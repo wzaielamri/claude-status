@@ -3861,9 +3861,10 @@ def kept_chats(cache_root):
 def last_turn(path):
     """How a chat's newest turn (a prompt of yours or a reply; not tool
     results or notes) stands, from the end of its transcript: {"kind":
-    "prompt" (no reply yet), "reply", "limit", "login" (stopped_by) or "error"
-    (an API error that isn't a limit: the connection lost, say), "at",
-    "ended": whether the turn is over}, or None."""
+    "prompt" (no reply yet), "reply", "limit", "login" (stopped_by), "error"
+    (an API error that isn't a limit: the connection lost, say) or
+    "interrupted" (Claude's note that you interrupted it), "at", "ended":
+    whether the turn is over}, or None."""
     try:
         size = path.stat().st_size
     except (OSError, AttributeError):
@@ -3871,7 +3872,7 @@ def last_turn(path):
     nbytes = PEEK_TAIL_BYTES
     while True:
         turn = next((e for e in tail_entries(path, size, nbytes) if not e.get("isSidechain")
-                     and (e["type"] == "assistant" or human_prompt(e) is not None)), None)
+                     and (e["type"] == "assistant" or human_prompt(e) is not None or interrupted_note(e))), None)
         if turn is not None or nbytes >= size or nbytes >= PEEK_TAIL_MAX:
             break
         nbytes *= 4
@@ -3879,6 +3880,8 @@ def last_turn(path):
         return None
     at = to_ms(turn.get("timestamp")) or 0
     if turn["type"] != "assistant":
+        if human_prompt(turn) is None:  # (you pressed Esc: the turn is over, you took over)
+            return {"kind": "interrupted", "at": at, "ended": True}
         return {"kind": "prompt", "at": at, "ended": False}
     stop = stopped_by(turn)
     if stop is not None:
@@ -3887,6 +3890,13 @@ def last_turn(path):
     if turn.get("isApiErrorMessage") is True:
         return {"kind": "error", "at": at, "text": short_text(" ".join(message_text(msg).split()), 160), "ended": True}
     return {"kind": "reply", "at": at, "ended": msg.get("stop_reason") in TURN_ENDS}
+
+
+def interrupted_note(e):
+    """Is this entry Claude's note that you interrupted the turn ("[Request
+    interrupted by user]", "… for tool use]")?"""
+    return (e.get("type") == "user" and not e.get("isMeta")
+            and message_text(e.get("message")).lstrip().startswith("[Request interrupted"))
 
 
 def kept_step(k, turn, row, queued, limits, now_ms):
@@ -3906,7 +3916,9 @@ def kept_step(k, turn, row, queued, limits, now_ms):
 
     def go(start, why="", prompt=""):
         if in_tab:
-            k["note"] = "It's open in a Claude Code panel: it can't go on by itself while that's open"
+            k["note"] = ("It's open in a Claude Code panel: it can't go on by itself while that's open"
+                         if row.get("entrypoint") == "claude-vscode" else
+                         "It's open in a chat it was resumed in: it can't go on by itself while that one is open")
             return None
         return "go on", int(start), why, prompt
 
@@ -5241,17 +5253,33 @@ CONTINUE_PROMPT = "The usage limit has reset: go on where you stopped."
 GO_ON_MODES = ("default", "manual", "acceptEdits", "plan", "auto", "dontAsk")
 
 
-def go_on_options(profile, chat_id, mode):
+def go_on_options(profile, chat_id, mode, model=None, effort=None):
     """claude's options for going on with a chat in the background (claude
-    --bg --resume), whose permission mode is mode: that mode, so the
-    background session it becomes saves it and goes on in it each time it's
-    woken (with none, the first go-on keeps the chat's mode but the session
-    saves none, and the next wakes up in Claude's default one). None when a
-    background session of it is there already: Claude wakes that one with
-    the options it saved, and with any given here it would start a copy."""
-    if mode not in GO_ON_MODES or (profile.path / "jobs" / chat_id[:8]).exists():
+    --bg --resume), whose permission mode is mode, model and reasoning effort
+    model and effort (chat_model; None: not known): those, so the background
+    session it becomes saves them and goes on with them each time it's woken
+    (with none, the first go-on keeps the chat's mode but the session saves
+    none, and the next wakes up in Claude's default one, on whatever model
+    and effort the process that takes it has). None when a background
+    session of it is there already: Claude wakes that one with the options
+    it saved, and with any given here it would start a copy."""
+    if (profile.path / "jobs" / chat_id[:8]).exists():
         return []
-    return ["--permission-mode", mode]
+    return (["--permission-mode", mode] if mode in GO_ON_MODES else []) + chat_options(model, effort)
+
+
+def chat_model(home, profile, chat_id):
+    """(model, effort) of a chat as its newest status-line snapshot names them
+    (the model's id, e.g. "claude-opus-5-5", and its effort level, as its row
+    shows them: attach_snapshot), each None when not known."""
+    for _, path in snapshot_paths(cache_dir(home) / "statusline", profile, [chat_id]):
+        snap = read_json(path)
+        if isinstance(snap, dict):
+            part = lambda key: snap.get(key) if isinstance(snap.get(key), dict) else {}
+            model, effort = part("model").get("id"), part("effort").get("level")
+            return (model if isinstance(model, str) and MODEL_NAME.match(model) else None,
+                    effort if effort in EFFORT_LEVELS else None)
+    return None, None
 
 
 def continue_chat(home, extra_dirs, profile_key, chat_id, folder=None, text="", claude=None, prefix=(),
@@ -5259,8 +5287,8 @@ def continue_chat(home, extra_dirs, profile_key, chat_id, folder=None, text="", 
     """Go on with a chat a usage limit stopped, now that the limit has reset
     (a queued one: jump.py --start-queued; here or on an SSH host,
     --continue-chat): in the background on its account, with text (else
-    CONTINUE_PROMPT) as your next message, in its permission mode
-    (go_on_options). A session that has it open idle ends first
+    CONTINUE_PROMPT) as your next message, in its permission mode, on its
+    model and effort (go_on_options). A session that has it open idle ends first
     (end_for_handover), then claude --bg --resume goes on with the same
     chat. {"ok", "message", "id"}; ok with no message when it went on
     already (its newest turn isn't the limit's any more): nothing to do.
@@ -5276,6 +5304,8 @@ def continue_chat(home, extra_dirs, profile_key, chat_id, folder=None, text="", 
     peek = chat_peek(path) or {}
     if not force and (peek.get("stopped") or {}).get("kind") != "limit":
         return {"ok": True, "message": ""}
+    # (its newest entries name none: a chat in the Claude Code panel names it at its first prompt only)
+    mode = peek.get("mode") or scan_mode(path, file_size(path))
     if not (isinstance(folder, str) and os.path.isdir(folder)):
         folder = chat_folder(path) or str(home)
     claude = claude or find_claude(home, ask_shell=True)
@@ -5291,7 +5321,8 @@ def continue_chat(home, extra_dirs, profile_key, chat_id, folder=None, text="", 
     pictures = [] if (profile.path / "jobs" / chat_id[:8]).exists() else picture_options(home, text)
     ok, message, job = start_background(profile, folder, (text or "").strip() or CONTINUE_PROMPT, home, claude,
                                         prefix=prefix, resume=chat_id,
-                                        options=go_on_options(profile, chat_id, peek.get("mode")) + pictures)
+                                        options=go_on_options(profile, chat_id, mode, *chat_model(home, profile, chat_id))
+                                        + pictures)
     if ok:
         message = f"Went on in the background on {profile.label}" + (f" ({job})" if job else "")
     return {"ok": ok, "message": message, "id": job}

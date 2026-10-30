@@ -1121,6 +1121,32 @@ class ContinueAfterResetTests(TaskFixture):
         self.assertTrue(go_on()["ok"])
         self.assertEqual(self.calls()[-1]["argv"], ["--bg", "--resume", self.SID, cs.CONTINUE_PROMPT])
 
+    def test_it_goes_on_with_its_own_model_and_effort(self):
+        # as its status line last named them: its background session saves
+        # them, and every later wake goes on with them
+        self.stopped_chat()
+        write(cs.cache_dir(self.home) / "statusline/.claude-work" / f"{self.SID}.json",
+              {"session_id": self.SID, "model": {"id": "claude-opus-5-5", "display_name": "Opus 5.5"},
+               "effort": {"level": "xhigh"}})
+        self.assertTrue(cs.continue_chat(self.home, [], ".claude-work", self.SID, None, "", str(self.bin / "claude"))["ok"])
+        self.assertEqual(self.calls()[-1]["argv"], ["--bg", "--resume", self.SID, "--model", "claude-opus-5-5",
+                                                    "--effort", "xhigh", cs.CONTINUE_PROMPT])
+        self.assertEqual(cs.chat_model(self.home, self.profile, "e3de1242-0000-4000-8000-000000000000"), (None, None))
+
+    def test_a_panel_chat_goes_on_in_the_mode_its_first_prompt_named(self):
+        # (Claude Code's panel names it at the first prompt only; big tool results after it)
+        t = self.now - 120
+        big = {"type": "user", "timestamp": iso(t + 3),
+               "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t", "content": "x" * 100_000}]}}
+        write(self.home / f".claude-work/projects/-repos-app/{self.SID}.jsonl",
+              lines(prompt("fix it", t, cwd=str(self.folder), permissionMode="acceptEdits"), *[big] * 4,
+                    reply("Fixed.", t + 4), prompt("and the tests", t + 5, cwd=str(self.folder)),
+                    limit_error("You've hit your session limit", t + 6)))
+        self.assertIsNone(cs.chat_peek(self.home / f".claude-work/projects/-repos-app/{self.SID}.jsonl")["mode"])
+        self.assertTrue(cs.continue_chat(self.home, [], ".claude-work", self.SID, None, "", str(self.bin / "claude"))["ok"])
+        self.assertEqual(self.calls()[-1]["argv"], ["--bg", "--resume", self.SID, "--permission-mode", "acceptEdits",
+                                                    cs.CONTINUE_PROMPT])
+
     def test_a_message_naming_a_picture_can_open_it(self):
         # (a reply from the chat pane with a pasted picture, going on in the background)
         self.stopped_chat()
@@ -1310,6 +1336,9 @@ class KeepGoingTests(TaskFixture):
         tab = dict(k)
         self.assertIsNone(cs.kept_step(tab, limit, dict(row, entrypoint="claude-vscode"), False, limits, self.now_ms))
         self.assertIn("open in a Claude Code panel", tab["note"])
+        resumed = dict(k)
+        self.assertIsNone(cs.kept_step(resumed, limit, dict(row, sessionId="0a1b2c3d"), False, limits, self.now_ms))
+        self.assertEqual(resumed["note"], "It's open in a chat it was resumed in: it can't go on by itself while that one is open")
         login = dict(k)
         self.assertIsNone(cs.kept_step(login, dict(limit, kind="login"), None, False, limits, self.now_ms))
         self.assertIn("log in again", login["note"])
@@ -1321,6 +1350,21 @@ class KeepGoingTests(TaskFixture):
         open_turn = {"kind": "reply", "at": self.now_ms - cs.KEEP_TAKE_MS - 1000, "ended": False}
         self.assertIsNone(cs.kept_step(dict(k), dict(open_turn, at=self.now_ms - 1000), None, False, limits, self.now_ms))
         self.assertEqual(cs.kept_step(dict(k), open_turn, None, False, limits, self.now_ms)[2], "retry")
+
+    def test_a_chat_you_interrupted_is_let_go(self):
+        # (Esc while it works, then the chat closed: you took over)
+        note = "[Request interrupted by user for tool use]"
+        cut = tool_result("b", self.now - 589)
+        cut["message"]["content"][0]["content"] = note
+        self.say(tool_use("b", "Bash", {"command": "make"}, self.now - 590), cut,
+                 {"type": "user", "timestamp": iso(self.now - 589), "message": {"role": "user", "content": [{"type": "text", "text": note}]}})
+        self.assertEqual(cs.last_turn(self.path), {"kind": "interrupted", "at": int((self.now - 589) * 1000), "ended": True})
+        cs.keep_chat(self.cache_root(), ".claude-work", self.SID, "Fix it", str(self.folder), now_ms=self.now_ms - 700_000)
+        self.assertEqual(self.look(self.now_ms + cs.KEEP_TAKE_MS + 60_000), [])
+        self.assertEqual(self.kept(), [])
+        # a prompt after it: a turn of its own again
+        self.say(prompt("go on", self.now - 500))
+        self.assertEqual(cs.last_turn(self.path)["kind"], "prompt")
 
     def test_a_limit_with_no_known_reset_waits_longer_each_time(self):
         at = self.now_ms - 60_000
