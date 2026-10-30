@@ -146,7 +146,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
             hoverButtons.push(stop);
         end.add_child(stop);
     }
-    showOnHover(row, hoverButtons);
+    showOnHover(row, hoverButtons, [name]);
     body.add_child(nameLine(name, tags, end));
 
     // Second line: folder, model, context fill

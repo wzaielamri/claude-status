@@ -355,7 +355,7 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
     if (!asksDelete)
         hoverButtons.push(del);
     line.add_child(del);
-    showOnHover(line, hoverButtons);
+    showOnHover(line, hoverButtons, [name]);
     wrap.add_child(line);
     if (ctx.ui.openMenu?.type === 'share' && ctx.ui.openMenu.key === rowKey)
         wrap.add_child(buildShareMenu(ctx, ctx.ui.openMenu.chat, rowKey));
