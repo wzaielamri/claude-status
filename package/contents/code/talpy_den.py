@@ -2202,7 +2202,7 @@ class ChatCache:
 # A chat waiting for a permission shows what it asks (the command, the file
 # and the change) and, where the widget can answer, Allow once, Always allow
 # and Deny. Without the hook, what it asks comes from the transcript: its
-# newest tool call without a result (pending_tool), and a chat in tmux can be
+# oldest tool call without a result (pending_tool), and a chat in tmux can be
 # answered with keys (pane.py --keys). With the hook (permission_hook.py,
 # pane.py --relay on), each request is in the cache (permission_requests)
 # and the widget's answer goes back through it (pane.py --answer).
@@ -2357,16 +2357,22 @@ def plan_view(inp):
 
 
 def pending_tool(path):
-    """The newest tool call of a chat's last turn that has no result yet
-    (the one a permission prompt is about while the chat waits), or None."""
+    """The oldest tool call of a chat's last turn that has no result yet
+    (the one a permission prompt is about while the chat waits: open_tools),
+    or None."""
     calls = open_tools(path)
     return calls[0] if calls else None
 
 
 def open_tools(path):
-    """The tool calls of a chat's last turn that have no result yet, newest
+    """The tool calls of a chat's last turn that have no result yet, oldest
     first (several when Claude made them in one reply: which of them a
-    permission prompt is about isn't written down)."""
+    permission prompt is about isn't written down). Claude Code (2.1.314)
+    runs a reply's calls in their order, one that may change something only
+    once every call before it is done and alone (its tool queue's
+    canExecuteTool and processQueue); calls that only read (Read, Grep, …)
+    can run, and ask, together. So the oldest open call is the one that
+    asks, unless reads run side by side."""
     try:
         size = path.stat().st_size
         with open(path, "rb") as f:
@@ -2393,7 +2399,7 @@ def open_tools(path):
             answered.update(c.get("tool_use_id") for c in blocks if c.get("type") == "tool_result")
             continue
         calls += [c for c in reversed(blocks) if c.get("type") == "tool_use" and c.get("id") not in answered]
-    return calls
+    return calls[::-1]
 
 
 def tool_use_id(value):

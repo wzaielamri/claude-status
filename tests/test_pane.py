@@ -357,7 +357,7 @@ class ConversationTests(PaneFixture):
 
 
 class PermissionViewTests(PaneFixture):
-    def test_the_newest_call_without_a_result(self):
+    def test_the_oldest_call_without_a_result(self):
         t = self.now - 10
         self.chat(prompt("go", t),
                   tool_use("a", "Read", {"file_path": "/x"}, t + 1, "m1"),
@@ -367,6 +367,12 @@ class PermissionViewTests(PaneFixture):
         with open(self.transcript, "a") as f:
             f.write(json.dumps(tool_result("b", t + 3)) + "\n")
         self.assertIsNone(cs.pending_tool(self.transcript))
+        # two calls that change things, open: Claude runs (and asks about) the first one first
+        with open(self.transcript, "a") as f:
+            f.write(lines(tool_use("c", "Bash", {"command": "rm -rf dist"}, t + 4, "m2"),
+                          tool_use("d", "Bash", {"command": "npm publish"}, t + 4, "m2")))
+        self.assertEqual([c["id"] for c in cs.open_tools(self.transcript)], ["c", "d"])
+        self.assertEqual(cs.pending_permission(self.transcript, str(self.folder))["toolUse"], "c")
 
     def test_views(self):
         bash = cs.permission_view("Bash", {"command": "npm publish"}, str(self.folder),
