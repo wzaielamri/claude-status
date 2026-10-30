@@ -5,13 +5,12 @@ import org.kde.kirigami as Kirigami
 Kirigami.InlineMessage {
     type: Kirigami.MessageType.Warning
     // rich text (an InlineMessage always guesses), so the names are escaped
-    text: "<span>" + i18n("Keep “%1” only on %2? It leaves the chat lists of %3; the conversation stays on %2. It can't be open in a session meanwhile.",
+    text: "<span>" + i18n("Keep “%1” only on %2? It leaves the chat lists of %3; the conversation stays on %2. It can't be open in Claude meanwhile.",
                           root.escapeHtml(root.shareConfirm.name), root.escapeHtml(root.shareConfirm.account),
                           root.escapeHtml(root.shareConfirm.others)) + "</span>"
     actions: [
         Kirigami.Action {
             text: i18n("Keep only on %1", root.shareConfirm.account)
-            icon.name: "window-close"
             onTriggered: root.confirmKeepOnly()
         },
         Kirigami.Action {
