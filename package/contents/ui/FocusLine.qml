@@ -13,9 +13,10 @@ Item {
     property var item: null          // {key, session, host, account}
     property bool finished: false
     readonly property var s: item ? item.session : root.emptySession
+    readonly property string doing: finished ? "" : root.doingText(s, item ? item.host : "")
     readonly property string what: finished ? (s.reason === "failed" ? i18n("Failed: look at what happened")
                                                                       : i18n("Finished: results to look at"))
-                                            : root.doingText(s, item ? item.host : "") || root.stateText(s)
+                                            : doing || root.stateText(s)
 
     implicitHeight: row.implicitHeight + Kirigami.Units.smallSpacing
 
@@ -38,7 +39,10 @@ Item {
             Layout.preferredWidth: Kirigami.Units.smallSpacing * 2
             Layout.preferredHeight: Layout.preferredWidth
             radius: width / 2
-            color: line.finished ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.focusColor
+            // (as its row's: the projects tab lists every open chat, not only working ones)
+            color: line.finished ? Kirigami.Theme.positiveTextColor
+                 : line.s.reason === "failed" || (line.s.stopped && !line.s.stopped.over) ? Kirigami.Theme.negativeTextColor
+                 : root.stateColor(line.s.state)
         }
         PlasmaComponents3.Label {
             id: nameLabel
@@ -57,7 +61,7 @@ Item {
         }
         PlasmaComponents3.Label {
             textFormat: Text.PlainText
-            visible: !line.finished && line.s.since > 0
+            visible: line.doing !== "" && line.s.since > 0   // (the state's text says how long itself)
             text: root.duration(root.now - line.s.since)
             font: Kirigami.Theme.smallFont
             opacity: 0.6

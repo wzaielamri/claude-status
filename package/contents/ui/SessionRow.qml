@@ -426,6 +426,17 @@ RowLayout {
                                            + i18n("Click to %1 what each one is doing.", row.showAgents ? i18n("hide") : i18n("show"))
                             }
                             Tag {
+                                // another chat with a process changed some of the same files (talpy_den.py: note_overlaps)
+                                visible: !!row.session.overlaps && row.session.overlaps.length > 0
+                                text: i18nc("two chats changed the same files", "⚠ Same files")
+                                warning: true
+                                clickable: true
+                                onClicked: row.openOverlap()
+                                tooltipTitle: i18n("Another chat changes the same files")
+                                tooltip: row.session.overlaps ? root.overlapText(row.session.overlaps) + "\n\n"
+                                         + i18n("Two chats changing the same files can overwrite each other's work. Click to go to the other chat.") : ""
+                            }
+                            Tag {
                                 // plan mode, auto mode, …: how freely it may act
                                 visible: row.modeText !== ""
                                 text: row.modeText
@@ -466,17 +477,6 @@ RowLayout {
                                 tooltipTitle: i18n("Send your changes to Claude")
                                 tooltip: i18n("You changed this plan since Claude wrote it. Click to send what you changed (and notes you wrote into it) to this chat: Claude revises the plan, in plan mode.")
                                          + "\n\n" + i18n("In tmux it's typed in for you. Else it goes to the clipboard and the chat comes up: paste it there (if Claude asks whether to go ahead with the plan, choose to keep planning first). A chat that isn't open reopens in plan mode with it.")
-                            }
-                            Tag {
-                                // another chat with a process changed some of the same files (talpy_den.py: note_overlaps)
-                                visible: !!row.session.overlaps && row.session.overlaps.length > 0
-                                text: i18nc("two chats changed the same files", "⚠ Same files")
-                                warning: true
-                                clickable: true
-                                onClicked: row.openOverlap()
-                                tooltipTitle: i18n("Another chat changes the same files")
-                                tooltip: row.session.overlaps ? root.overlapText(row.session.overlaps) + "\n\n"
-                                         + i18n("Two chats changing the same files can overwrite each other's work. Click to go to the other chat.") : ""
                             }
                             Tag {
                                 visible: row.changes !== null

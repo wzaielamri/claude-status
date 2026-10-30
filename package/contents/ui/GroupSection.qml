@@ -555,7 +555,9 @@ ColumnLayout {
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
         icon.name: section.recentOpen ? "arrow-down" : "arrow-right"
-        text: i18n("Recent chats (%1)", section.recent.length)
+        // (none recent, only starred: named by what's in it)
+        text: section.recent.length > 0 || section.starred.length === 0 ? i18n("Recent chats (%1)", section.recent.length)
+              : i18nc("starred chats, how many", "Recent chats: ★ Starred (%1)", section.starred.length)
         font: Kirigami.Theme.smallFont
         onClicked: root.toggleRecent(section.groupKey, section.recentOpen)
 
@@ -563,7 +565,9 @@ ColumnLayout {
             textFormat: Text.PlainText
             anchors.fill: parent
             mainText: i18n("Recent chats")
-            subText: i18n("This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list).")
+            subText: Plasmoid.configuration.clickOpensPane
+                     ? i18n("This account's latest chats that aren't listed above, and the ones you starred. Click one to open it beside the popup; its reopen button (on hover) reopens it in a terminal or in VS Code (the switch at the top of the list).")
+                     : i18n("This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list).")
         }
     }
 
@@ -640,7 +644,7 @@ ColumnLayout {
                     textFormat: Text.PlainText
                     text: recentLine.chat.name
                     font.underline: recentMouse.containsMouse
-                    opacity: recentLine.canOpen ? 1 : 0.6
+                    opacity: recentLine.canOpen || Plasmoid.configuration.clickOpensPane ? 1 : 0.6
                     elide: Text.ElideRight
                     Layout.fillWidth: true
 
@@ -649,9 +653,13 @@ ColumnLayout {
                         width: recentName.contentWidth
                         height: parent.height
                         mainText: recentLine.chat.name
-                        subText: (recentLine.canOpen ? (recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
-                                                                              : root.terminalHint(section.remoteHost, true))
-                                                     : root.terminalHint(section.remoteHost, true) + "\n" + root.vscodeHint(section.group, section.remoteHost, true))
+                        subText: (Plasmoid.configuration.clickOpensPane
+                                  ? i18n("Click to open it beside the popup: its conversation, a box to reply, and what it changed.")
+                                    + (recentLine.canOpen ? "\n" + i18n("The reopen button (on hover): %1", recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
+                                                                                                                                 : root.terminalHint(section.remoteHost, true)) : "")
+                                  : recentLine.canOpen ? (recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
+                                                                                : root.terminalHint(section.remoteHost, true))
+                                  : root.terminalHint(section.remoteHost, true) + "\n" + root.vscodeHint(section.group, section.remoteHost, true))
                                  + (recentLine.chat.cwd ? "\n" + i18n("Folder: %1", (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd) : "")
                                  + (recentLine.chat.shared ? "\n" + i18n("Shared between accounts; last used on %1.", recentLine.chat.profile) : "")
                                  + (recentLine.chat.stopped ? "\n\n" + root.stopText(recentLine.chat.stopped) : "")
@@ -889,7 +897,8 @@ ColumnLayout {
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
         icon.name: section.plansOpen ? "arrow-down" : "arrow-right"
-        text: i18n("Plans (%1)", section.plans.length)
+        text: section.plans.length > 0 || section.starredPlans.length === 0 ? i18n("Plans (%1)", section.plans.length)
+              : i18nc("starred plans, how many", "Plans: ★ Starred (%1)", section.starredPlans.length)
         font: Kirigami.Theme.smallFont
         onClicked: root.togglePlans(section.groupKey, section.plansOpen)
 
