@@ -50,18 +50,19 @@ export function buildWeekView(ctx) {
     const period = box('claude-week-period', {x_expand: true});
     const day = week.span === 'day';
     const before = iconButton('go-previous-symbolic', () => ctx.setWeek({back: week.back + 1}));
+    ctx.tips.add(before, day ? 'The day before' : 'The week before');
+    // (after its tooltip, which makes it reactive: greyed out, it does nothing)
     before.reactive = before.can_focus = shown && week.back < recap.backMax;
     before.opacity = before.reactive ? 255 : 90;
     before.visible = week.span !== 'all';
-    ctx.tips.add(before, day ? 'The day before' : 'The week before');
     period.add_child(before);
     period.add_child(label(shown ? L.weekPeriodText({...recap, back: week.back}) : L.weekPeriodWaiting(week.span, week.back),
         'claude-week-span', {x_expand: true, x_align: Clutter.ActorAlign.CENTER}));
     const after = iconButton('go-next-symbolic', () => ctx.setWeek({back: week.back - 1}));
+    ctx.tips.add(after, day ? 'The day after' : 'The week after');
     after.reactive = after.can_focus = week.back > 0;
     after.opacity = after.reactive ? 255 : 90;
     after.visible = week.span !== 'all';
-    ctx.tips.add(after, day ? 'The day after' : 'The week after');
     period.add_child(after);
     view.add_child(period);
 

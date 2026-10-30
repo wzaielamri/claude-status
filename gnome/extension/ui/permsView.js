@@ -119,8 +119,8 @@ function buildPrompts(ctx, data, host) {
         } else if (r.state === 'added') {
             const undo = textButton('Undo', () => ctx.changeRule(r, false, host), 'claude-chip');
             undo.y_align = Clutter.ActorAlign.START;
-            undo.reactive = !week.ruleBusy;
             ctx.tips.add(undo, ['Take this rule back', 'You allowed it here: Undo removes it from the file it went into, as it was before.']);
+            undo.reactive = !week.ruleBusy;   // (after its tooltip, which makes it reactive: one change at a time)
             line.add_child(undo);
         } else if (week.asking !== L.permsKey(host, r.id)) {
             const allow = textButton('Allow…', () => ctx.permsAsk(L.permsKey(host, r.id)), 'claude-chip');
