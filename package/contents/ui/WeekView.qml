@@ -220,6 +220,23 @@ PlasmaComponents3.ScrollView {
         return parts.join(" · ")
     }
 
+    // Where ms is on its day's row, 0 to 1: by that day's own clock, as the
+    // hours over the rows say, so on a day the clock changes (23 or 25 hours)
+    // 18:00 is under the 18 too (its hour that comes twice is drawn twice in
+    // the same place, the one it skips not at all)
+    function dayPlace(day, ms) {
+        if (ms <= day.start)
+            return 0
+        if (ms >= day.end)
+            return 1
+        const t = new Date(ms)
+        return (t.getHours() + (t.getMinutes() + (t.getSeconds() + t.getMilliseconds() / 1000) / 60) / 60) / 24
+    }
+    // and back: the moment at that place of its row
+    function dayMoment(day, place) {
+        return new Date(day.start).setHours(0, 0, 0, Math.round(Math.max(0, Math.min(1, place)) * 86400000))
+    }
+
     // What went on at the moment the mouse points at, on its day's row
     function hoverText() {
         if (weeks)
@@ -703,16 +720,15 @@ PlasmaComponents3.ScrollView {
                         }
                         Item {
                             id: track
-                            readonly property real span: Math.max(1, dayRow.day.end - dayRow.day.start)
                             visible: !view.weeks
                             Layout.fillWidth: true
                             Layout.preferredHeight: view.youHeight + view.laneGap + view.workHeight + 2
 
                             function xOf(ms) {
-                                return Math.max(0, Math.min(width, (ms - dayRow.day.start) / span * width))
+                                return view.dayPlace(dayRow.day, ms) * width
                             }
 
-                            // the quarters of the day
+                            // the quarters of the day (6, 12 and 18 o'clock)
                             Repeater {
                                 model: 3
                                 delegate: Rectangle {
@@ -803,7 +819,7 @@ PlasmaComponents3.ScrollView {
                                 cursorShape: dayRow.day.chats.length ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onClicked: dayRow.toggle()
                                 onPositionChanged: mouse => view.hover = { row: dayRow.index, x: mouse.x,
-                                                                           ms: dayRow.day.start + mouse.x / Math.max(1, width) * track.span }
+                                                                           ms: view.dayMoment(dayRow.day, mouse.x / Math.max(1, width)) }
                                 onExited: {
                                     if (view.hover && view.hover.row === dayRow.index)
                                         view.hover = null

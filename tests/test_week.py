@@ -676,6 +676,52 @@ class LocalHourTests(Home):
         self.assertEqual(sorted(got["c"]["hours"]), ["100", "100.5", "99.75"])   # (not 101: it starts after)
 
 
+class WeekRowClockTests(unittest.TestCase):
+    """The Recap's Week view (WeekView.qml) places a time on its day's row by
+    that day's own clock, under the hours over the rows: on a day of 25 hours
+    (Berlin, Sun 25 Oct 2026) or 23 (New York, Sun 8 Mar 2026) 18:00 was
+    drawn at 17:15 or 18:45 of the other rows."""
+
+    def run_qml_functions(self, name, days, script):
+        import re
+        import shutil
+        import subprocess
+        if not shutil.which("node"):
+            self.skipTest("node isn't installed")
+        qml = (ROOT / "package/contents/ui/WeekView.qml").read_text()
+        functions = "".join(re.search(r"\n    (function %s\(.*?\n    \})\n" % f, qml, re.S).group(1) + "\n"
+                            for f in ("dayPlace", "dayMoment"))
+        with time_zone(self, name):
+            spans = [(d, start, end) for d, start, end in week.span_days("week", 0, days[1]) if d == days[0]]
+        out = subprocess.run(["node", "-e", functions + "const day = " + json.dumps({"start": spans[0][1], "end": spans[0][2]})
+                              + ";\n" + script], capture_output=True, text=True, timeout=60, env=dict(os.environ, TZ=name))
+        if out.returncode:
+            raise AssertionError(out.stderr)
+        return day_hours(spans[0]), json.loads(out.stdout)
+
+    def test_a_day_the_clock_changes_has_its_times_under_its_hours(self):
+        for name, day, hours in (("Europe/Berlin", "2026-10-25", 25), ("Europe/Berlin", "2026-03-29", 23),
+                                 ("America/New_York", "2026-03-08", 23), ("UTC", "2026-10-25", 24)):
+            with time_zone(self, name):
+                y, m, d = map(int, day.split("-"))
+                at = {h: int(datetime(y, m, d, h).timestamp() * 1000) for h in (0, 1, 6, 12, 18)}
+                now = int(datetime(y, m, d + 2, 12).timestamp() * 1000)
+            with self.subTest(name=name, day=day):
+                length, places = self.run_qml_functions(name, (day, now), "console.log(JSON.stringify({"
+                    "at: " + json.dumps(at) + ", place: Object.fromEntries(Object.entries(" + json.dumps(at)
+                    + ").map(([h, ms]) => [h, dayPlace(day, ms)])), back: [6, 12, 18].map(h => dayMoment(day, h / 24)),"
+                    " ends: [dayPlace(day, day.start - 1), dayPlace(day, day.end), dayMoment(day, 0), dayMoment(day, 1)]}))")
+                self.assertEqual(length, hours)
+                self.assertEqual({int(h): round(p * 24, 6) for h, p in places["place"].items()}, {0: 0, 1: 1, 6: 6, 12: 12, 18: 18})
+                self.assertEqual(places["back"], [at[6], at[12], at[18]])
+                self.assertEqual(places["ends"][:2], [0, 1])
+                self.assertEqual(places["ends"][2:], [at[0], at[0] + hours * week.HOUR_MS])
+
+
+def day_hours(span):
+    return (span[2] - span[1]) / week.HOUR_MS
+
+
 class SpendTests(Home):
     def test_the_costliest_turns_and_cold_resumes(self):
         t0, hour = self.t0, 3600_000
