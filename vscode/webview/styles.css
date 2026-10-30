@@ -3714,3 +3714,7 @@ body.vscode-high-contrast-light .pane {
 .project-head .project-hide:focus-visible {
   visibility: visible;
 }
+
+.queued-item > .queued-ask {
+  flex-basis: 100%;
+}
