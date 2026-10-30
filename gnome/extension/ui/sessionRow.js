@@ -411,7 +411,7 @@ export function buildShareMenu(ctx, chat, rowKey) {
     } else {
         for (const g of ctx.shareAccounts) {
             menu.add_child(textButton(L.fmt('Keep only on %1…', g.title), () => ctx.askKeepOnly(rowKey, chat, g),
-                'claude-menu-item', 'window-close-symbolic'));
+                'claude-menu-item', 'go-next-symbolic'));
         }
     }
     return menu;
@@ -422,7 +422,7 @@ export function buildKeepOnly(ctx) {
     const c = ctx.ui.shareConfirm;
     return confirmBox(L.fmt("Keep “%1” only on %2? It leaves the chat lists of %3; the conversation stays on %2. It can't be open in Claude meanwhile.",
         c.name, c.account, c.others), [
-        [L.fmt('Keep only on %1', c.account), 'window-close-symbolic', () => ctx.confirmKeepOnly()],
+        [L.fmt('Keep only on %1', c.account), '', () => ctx.confirmKeepOnly()],   // (no ×: it doesn't close the question)
         ['Cancel', '', () => ctx.cancelKeepOnly()],
     ]);
 }
