@@ -1157,6 +1157,26 @@ class ContinueAfterResetTests(TaskFixture):
                                                     "--effort", "xhigh", cs.CONTINUE_PROMPT])
         self.assertEqual(cs.chat_model(self.home, self.profile, "e3de1242-0000-4000-8000-000000000000"), (None, None))
 
+    def test_a_background_chat_of_it_wakes_on_the_model_and_effort_it_last_ran_on(self):
+        # (its job saved no model or effort, or others: changed there, as /model and /effort in it would)
+        self.stopped_chat(dict(reply("On it.", self.now - 100), message=dict(reply("On it.", self.now - 100)["message"],
+                                                                                 model="claude-opus-5-5")))
+        write(cs.cache_dir(self.home) / "statusline/.claude-work" / f"{self.SID}.json",
+              {"session_id": self.SID, "model": {"id": "claude-haiku-5-5"}, "effort": {"level": "xhigh"}})
+        state = self.home / f".claude-work/jobs/{self.SID[:8]}/state.json"
+        write(state, {"sessionId": self.SID, "name": "Fix it", "respawnFlags": ["--permission-mode", "auto", "--effort", "low"]})
+        answer = cs.continue_chat(self.home, [], ".claude-work", self.SID, None, "", str(self.bin / "claude"), force=True)
+        self.assertEqual(answer["message"], "Went on in the background on work (Opus 5.5 · xhigh)")
+        self.assertEqual(self.calls()[-1]["argv"], ["--bg", "--resume", self.SID, cs.CONTINUE_PROMPT])  # (no copy)
+        self.assertEqual(json.loads(state.read_text()), {"sessionId": self.SID, "name": "Fix it", "respawnFlags": [
+            "--permission-mode", "auto", "--model", "claude-opus-5-5", "--effort", "xhigh"]})
+        # a record of another shape is left as it is, and the answer says so
+        write(state, {"sessionId": self.SID, "respawnFlags": "--model opus"})
+        answer = cs.continue_chat(self.home, [], ".claude-work", self.SID, None, "", str(self.bin / "claude"), force=True)
+        self.assertEqual(answer["message"], "Went on in the background on work (1a2b3c4d), "
+                                            "with the model and effort Claude saved for it")
+        self.assertEqual(json.loads(state.read_text())["respawnFlags"], "--model opus")
+
     def test_a_panel_chat_goes_on_in_the_mode_its_first_prompt_named(self):
         # (Claude Code's panel names it at the first prompt only; big tool results after it)
         t = self.now - 120

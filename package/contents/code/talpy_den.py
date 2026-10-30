@@ -5332,18 +5332,76 @@ def go_on_options(profile, chat_id, mode, model=None, effort=None):
     return (["--permission-mode", mode] if mode in GO_ON_MODES else []) + chat_options(model, effort)
 
 
-def chat_model(home, profile, chat_id):
-    """(model, effort) of a chat as its newest status-line snapshot names them
-    (the model's id, e.g. "claude-opus-5-5", and its effort level, as its row
-    shows them: attach_snapshot), each None when not known."""
-    for _, path in snapshot_paths(cache_dir(home) / "statusline", profile, [chat_id]):
-        snap = read_json(path)
+def chat_model(home, profile, chat_id, path=None):
+    """(model, effort) a chat last ran on, each None when not known: the
+    model of its last reply (path: its transcript), e.g. "claude-opus-5-5",
+    as its newest status-line snapshot names it if that's the same model (it
+    may say which context window, [1m]); the effort as that snapshot names
+    it (where its row's tag takes it from: attach_snapshot)."""
+    model, effort = last_model(path) if path is not None else None, None
+    for _, snap_path in snapshot_paths(cache_dir(home) / "statusline", profile, [chat_id]):
+        snap = read_json(snap_path)
         if isinstance(snap, dict):
             part = lambda key: snap.get(key) if isinstance(snap.get(key), dict) else {}
-            model, effort = part("model").get("id"), part("effort").get("level")
-            return (model if isinstance(model, str) and MODEL_NAME.match(model) else None,
-                    effort if effort in EFFORT_LEVELS else None)
-    return None, None
+            named, effort = part("model").get("id"), part("effort").get("level")
+            if isinstance(named, str) and (model is None or named.split("[")[0] == model):
+                model = named
+            break
+    return (model if isinstance(model, str) and MODEL_NAME.match(model) else None,
+            effort if effort in EFFORT_LEVELS else None)
+
+
+def last_model(path):
+    """The model of a chat's last reply (not a stand-in like <synthetic>), or None."""
+    try:
+        size = path.stat().st_size
+    except (OSError, AttributeError):
+        return None
+    nbytes = PEEK_TAIL_BYTES
+    while True:
+        for e in tail_entries(path, size, nbytes):
+            msg = e.get("message") if isinstance(e.get("message"), dict) else {}
+            if e["type"] == "assistant" and not e.get("isSidechain") and model_label(msg.get("model")):
+                return msg["model"]
+        if nbytes >= size or nbytes >= PEEK_TAIL_MAX:
+            return None
+        nbytes *= 4
+
+
+def saved_options(state_path, chat_id, model, effort):
+    """Have a chat's background job (its state.json) wake on model and
+    effort: the --model and --effort pair in the options it saved
+    (respawnFlags) replaced, all else kept, as Claude does it itself on
+    /model and /effort in it. Only while it's settled (no process has it) and
+    in the shape it should have. Whether its options carry them now."""
+    import shutil
+    job = read_json(state_path)
+    flags = job.get("respawnFlags") if isinstance(job, dict) and job.get("sessionId") == chat_id else None
+    if not isinstance(flags, list) or not all(isinstance(f, str) for f in flags):
+        return False
+    new, skip = [], False
+    for f in flags:
+        if skip:
+            skip = False
+        elif f in (("--model",) if model else ()) + (("--effort",) if effort else ()):
+            skip = True
+        elif not ((model and f.startswith("--model=")) or (effort and f.startswith("--effort="))):
+            new.append(f)
+    new += chat_options(model, effort)
+    if new != flags:
+        tmp = state_path.with_name(f".{state_path.name}.{os.getpid()}.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(dict(job, respawnFlags=new), f)
+            shutil.copymode(state_path, tmp)
+            os.replace(tmp, state_path)
+        except OSError:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            return False
+    return True
 
 
 def continue_chat(home, extra_dirs, profile_key, chat_id, folder=None, text="", claude=None, prefix=(),
@@ -5382,13 +5440,20 @@ def continue_chat(home, extra_dirs, profile_key, chat_id, folder=None, text="", 
         time.sleep(0.2)
     # (a picture your message names can be opened, unless Claude wakes a
     # background session of it, with the options it saved)
-    pictures = [] if (profile.path / "jobs" / chat_id[:8]).exists() else picture_options(home, text)
+    model, effort = chat_model(home, profile, chat_id, path)
+    state = profile.path / "jobs" / chat_id[:8] / "state.json"
+    woken = (profile.path / "jobs" / chat_id[:8]).exists()
+    settled = not any(e.get("sessionId") == chat_id for e, _, _ in live_entries_all(profiles)) if woken else True
+    carried = not woken or not (model or effort) or (settled and saved_options(state, chat_id, model, effort))
+    pictures = [] if woken else picture_options(home, text)
     ok, message, job = start_background(profile, folder, (text or "").strip() or CONTINUE_PROMPT, home, claude,
                                         prefix=prefix, resume=chat_id,
-                                        options=go_on_options(profile, chat_id, mode, *chat_model(home, profile, chat_id))
-                                        + pictures)
+                                        options=go_on_options(profile, chat_id, mode, model, effort) + pictures)
     if ok:
-        message = f"Went on in the background on {profile.label}" + (f" ({job})" if job else "")
+        how = " · ".join(w for w in (model_label(model) if model else None, effort) if w) if carried else ""
+        message = f"Went on in the background on {profile.label}" + (f" ({how})" if how else f" ({job})" if job else "")
+        if not carried:
+            message += ", with the model and effort Claude saved for it"
     return {"ok": ok, "message": message, "id": job}
 
 
