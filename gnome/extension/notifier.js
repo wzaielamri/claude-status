@@ -39,8 +39,8 @@ export class Notifier {
         const source = this._getSource();
         const kind = n.kind === 'digest' ? (n.waiting ? 'waiting' : 'done') : n.kind;
         const poseFile = kind === 'done' && n.session && n.session.reason === 'failed' ? 'notify-sad.svg'
-            : {waiting: 'notify-oncall.svg', done: 'notify-trophy.svg', error: 'notify-error.svg', limit: 'notify-limit.svg',
-                login: 'notify-error.svg'}[kind];
+            : {waiting: 'notify-oncall.svg', done: 'notify-trophy.svg', reset: 'notify-trophy.svg', error: 'notify-error.svg',
+                limit: 'notify-limit.svg', login: 'notify-error.svg'}[kind];
         const notification = new MessageTray.Notification({
             source,
             title: n.title,

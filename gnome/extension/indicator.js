@@ -131,8 +131,9 @@ class TalpyDenIndicator extends PanelMenu.Button {
     }
 
     // Everything on the dashboard: this computer's accounts, then the hosts'
+    // (a host's copy of an account shown elsewhere too has its plan usage there: L.withUsage)
     get allGroups() {
-        return this.groups.concat(L.remoteGroups(this.shownHosts, this.remote));
+        return this.groups.concat(L.remoteGroups(this.shownHosts, this.remote, this.usageOwners));
     }
 
     get now() {
@@ -279,7 +280,9 @@ class TalpyDenIndicator extends PanelMenu.Button {
             notifyDone: this._settings.get_boolean('notify-done'),
             notifyDoneMinSeconds: this._settings.get_int('notify-done-min-seconds'),
         });
-        const resets = [...this._tracker.celebrateResets(source, groups), ...this._tracker.chatEvents(source, groups, host)];
+        const notices = [];   // (an account whose chats a usage limit stopped can go on now)
+        const resets = [...this._tracker.celebrateResets(source, groups), ...this._tracker.chatEvents(source, groups, host, notices)];
+        const noticed = this._settings.get_boolean('notify-done') ? notices : [];
         const pose = this._settings.get_boolean('show-pet');
         this._noteUnseen(source, out);
         // (after a lock as long as the summary asks for, the summary tells
@@ -300,13 +303,14 @@ class TalpyDenIndicator extends PanelMenu.Button {
         };
         for (const c of out.close)
             guard('closing a notification', () => this._notifier.close(c.key, c.kind));
-        for (const n of summed ? [] : out.notify)
+        for (const n of summed ? [] : [...out.notify, ...noticed])
             guard('a notification', () => this._notifier.notify(n, pose, () => this._openFromNotification(n)));
         guard('closing notifications', () => this._notifier.closeMissing(source, out.present));
         for (const event of [...out.pets, ...resets])
             guard(`the pets' "${event.kind}"`, () => this._pets.event(event));
-        if (out.sound && !summed)
-            guard('a sound', () => this._playSound(out.sound));
+        const sound = out.sound || (noticed.length ? 'done' : '');
+        if (sound && !summed)
+            guard('a sound', () => this._playSound(sound));
     }
 
     // Turns that ended while you weren't looking (as long as the "finished"

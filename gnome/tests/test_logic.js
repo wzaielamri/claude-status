@@ -209,6 +209,50 @@ test("a chat's own news: its limit reset, another chat changes its files", () =>
     eq(t.chatEvents('ssh:lab', files(both), 'lab'), [], 'once per pair');
 });
 
+test("an account whose chats a usage limit stopped can go on: one notification", () => {
+    const t = new L.Tracker();
+    const limited = over => [group(['a', 'b'].map(k => session(k, 'idle', {stopped: {kind: 'limit', over}})))];
+    const notices = [];
+    t.chatEvents('ssh:lab', limited(false), 'lab', notices);
+    t.chatEvents('ssh:lab', limited(true), 'lab', notices);
+    eq(notices.map(n => [n.key, n.kind, n.title, n.body, n.session.key, n.host]), [['ssh:lab|limit-reset:g', 'reset',
+        'lab: work: the usage limit reset', '2 chats can go on: chat a, chat b', 'a', 'lab']]);
+    const one = [];
+    const t2 = new L.Tracker();
+    t2.chatEvents('', [group([session('a', 'idle', {stopped: {kind: 'limit', over: false}})])], '', one);
+    t2.chatEvents('', [group([session('a', 'idle', {stopped: {kind: 'limit', over: true}})])], '', one);
+    eq(one.map(n => [n.key, n.title, n.body]), [['limit-reset:g', 'work: the usage limit reset', 'chat a can go on.']]);
+});
+
+test('what stopped a chat, on the line under its folder', () => {
+    const peek = {replyLine: 'done', reply: 'done'};
+    eq(L.peekLine(session('a', 'idle', {peek, stopped: {kind: 'login', text: 'Login expired'}})).text,
+        "Claude's login expired. Log in again (/login), then tell it to go on.");
+    eq(L.peekLine(session('a', 'idle', {peek, stopped: {kind: 'limit', text: 'resets 4am', over: true}})).text,
+        'The limit it hit has reset: open it and tell Claude to go on.');
+    eq(L.peekLine(session('a', 'idle', {peek, stopped: {kind: 'limit', text: 'resets 4am'}})),
+        {text: 'resets 4am', title: 'What stopped it', full: 'resets 4am'});
+    eq(L.peekLine(session('a', 'idle', {peek})).title, "Claude's last reply");
+});
+
+test("an SSH host's times on this computer's clock, its chats' stops too", () => {
+    const result = {generatedAt: 1000, groups: [group([session('a', 'idle', {since: 500,
+        stopped: {kind: 'limit', at: 600, resetsAt: 9000}})], {recent: [{lastActive: 100, stopped: {at: 50, resetsAt: 70}}]})]};
+    const local = L.toLocalClock(result, 3600000);
+    eq(local.groups[0].sessions[0].stopped, {kind: 'limit', at: 3600600, resetsAt: 3609000});
+    eq(local.groups[0].recent[0].stopped, {at: 3600050, resetsAt: 3600070});
+    eq(result.groups[0].sessions[0].stopped.resetsAt, 9000, 'a copy');
+});
+
+test("an account here and on an SSH host has its plan usage once", () => {
+    const limits = (at, pct) => ({updatedAt: at, windows: [{key: 'five_hour', label: '5h', pct}]});
+    const here = [group([], {limits: limits(20, 95)})];
+    const remote = {lab: {result: {groups: [group([], {limits: limits(10, 93)})]}, error: ''}};
+    const owners = L.usageOwners(here, [['lab', remote.lab.result.groups]]);
+    eq(L.remoteGroups(['lab'], remote, owners).map(g => [g.host, g.limits, g.limitsHidden]), [['lab', null, true]]);
+    eq(L.remoteGroups(['lab'], remote).map(g => g.limits.updatedAt), [10], 'as they are, without owners');
+});
+
 test('helper output', () => {
     eq(L.helperResult('{"ok": true, "message": "x"}', ''), {ok: true, message: 'x'});
     eq(L.helperResult('', 'Traceback\nValueError: no'), {ok: false, message: 'ValueError: no'});
@@ -396,10 +440,16 @@ test("a turn a usage limit or the login broke off isn't finished", () => {
     eq(out.close, [{key: '/c', kind: 'waiting'}]);
     eq(out.finished.map(f => [f.key, f.stop]), [['/b', 'limit'], ['/c', 'limit']]);
     eq(out.sound, 'failed');
-    // only one poll later: a limit that shows up after that is another turn's
+    // and a check or two later, within a minute (checks can come quickly): d's
+    // limit shows now, so it didn't finish either
     out = t.track('', at(T + 60000, [['a', 'idle', {stopped: limit}], ['b', 'idle', {stopped: limit}],
         ['c', 'idle', {stopped: limit}], ['d', 'idle', {stopped: limit}], ['e', 'idle', {stopped: login}]]),
     T + 64000, '', settings);
+    eq(out.notify.map(n => [n.key, n.kind]), [['/d', 'limit']]);
+    // a limit that shows up more than a minute after the turn ended is another turn's
+    t.track('', at(T, [['g', 'working']]), T + 70000, '', settings);
+    t.track('', at(T + 72000, [['g', 'idle']]), T + 72000, '', settings);
+    out = t.track('', at(T + 72000, [['g', 'idle', {stopped: limit}]]), T + 140000, '', settings);
     eq(out.notify, []);
     // a limit that has reset doesn't hold the turn back
     t.track('', at(T, [['f', 'working']]), T + 66000, '', settings);
@@ -423,13 +473,14 @@ test('while you were away', () => {
     const d = L.awayDigest(away, after, now, 5);
     eq(d.title, 'While you were away (1h 12m)');
     eq(d.body.split('\n'), ['Needs you: chat b (waiting 22m)', 'Finished: chat a, chat n, chat r (lab)', 'Failed: chat f',
-        '5h limit reset (work)']);
+        'Stopped: chat s', '5h limit reset (work)']);
     eq(d.first.key, '/b');
     eq(L.awayDigest(away, after, T + 4 * M, 5), null, 'not away long enough');
     eq(L.awayDigest(away, before, now, 5), null, 'nothing happened');
     const many = group(['w1', 'w2', 'w3', 'w4', 'w5'].map((k, i) => session(k, 'waiting', {since: now - (10 - i) * M})));
     eq(L.awayDigest(away, [many], now, 5).body.split('\n'), ['Needs you: chat w1 (waiting 10m)',
         'Needs you: chat w2 (waiting 9m)', 'Needs you: chat w3 (waiting 8m)', '+2 more need you']);
+    eq(L.awayDigest(away, [group(many.sessions.slice(1))], now, 5).body.split('\n')[3], '+1 more needs you');
     const stopped = group([session('a', 'idle', {stopped: {kind: 'limit', text: '…'}}),
         session('f', 'done', {reason: 'failed', stopped: {kind: 'limit', text: '…'}}),
         session('s', 'done', {reason: 'stopped', stopped: {kind: 'login', text: '…'}}),

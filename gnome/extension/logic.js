@@ -54,13 +54,15 @@ export function pollInterval(settingMs, idleMs, overallState, menuOpen) {
 // The accounts of the hosts that answered, each marked with its host. A
 // host whose last check failed still shows what it said before (dimmed), but
 // that doesn't count here: no badge or shortcut for a chat you can't reach.
-export function remoteGroups(shownHosts, remote) {
+// owners (usageOwners): an account's plan usage counts once, where it's
+// shown (withUsage), as in Plasma
+export function remoteGroups(shownHosts, remote, owners = null) {
     const out = [];
     for (const host of shownHosts) {
         const r = remote[host];
         if (r && r.result && !r.error) {
             for (const g of r.result.groups)
-                out.push(Object.assign({}, g, {host}));
+                out.push(Object.assign({}, owners ? withUsage(g, host, owners) : g, {host}));
         }
     }
     return out;
@@ -456,7 +458,7 @@ export class Tracker {
     constructor() {
         this.lastStates = {};
         this.turnStarts = {};
-        this.lastEnded = {};   // the turns that ended at the last poll, told as finished: {key: how long it took}
+        this.lastEnded = {};   // the turns that ended lately (a minute, while idle or done), told as finished: {key: {took, at}}
         this.primed = {};
         this.lastWaitingAlert = {};   // key -> {at, ask}: its last "needs input" alert, and what it asked (askId)
         this.lastWindows = {};
@@ -498,13 +500,17 @@ export class Tracker {
                 if (!primed)
                     continue;
                 const stop = stopOf(s);
-                if (stop && sid in ended) {
+                if (stop && sid in ended && nowMs - ended[sid].at < 60000) {
                     // Claude writes its transcript a moment after the turn ends, so
                     // the usage limit that ended it can show a poll later: it
                     // didn't finish after all
-                    this._turnEnded(out, sid, s, host, ended[sid], settings, sound);
+                    this._turnEnded(out, sid, s, host, ended[sid].took, settings, sound);
                     continue;
                 }
+                // (a check or two later too, with checks coming quickly: for a
+                // minute, while it stays idle or done)
+                if (sid in ended && (s.state === 'idle' || s.state === 'done') && nowMs - ended[sid].at < 60000)
+                    ends[sid] = ended[sid];
                 const alerted = this.lastWaitingAlert[sid];
                 const alert = () => {
                     this.lastWaitingAlert[sid] = {at: nowMs, ask: askId(s)};
@@ -537,7 +543,7 @@ export class Tracker {
                     const took = (s.since || nowMs) - (sid in startedAt ? startedAt[sid] : nowMs);
                     this._turnEnded(out, sid, s, host, took, settings, sound);
                     if (!stop)
-                        ends[sid] = took;
+                        ends[sid] = {took, at: nowMs};
                 }
             }
         }
@@ -614,18 +620,22 @@ export class Tracker {
 
     // A chat's own news, for its pet: the usage limit that stopped it reset
     // (it can go on), or it and another chat began changing the same files
-    // (the first check only learns)
-    chatEvents(source, groupList, host) {
+    // (the first check only learns). notices: an array that gets one
+    // notification per account whose stopped chats can go on now
+    chatEvents(source, groupList, host, notices = null) {
         const events = [];
         const stopsBefore = this.lastStops[source], overlapsBefore = this.lastOverlaps[source];
         const stops = {}, overlaps = {};
         for (const g of groupList) {
+            const freed = [];
             for (const s of g.sessions) {
                 const pk = petKeyOf(s, host);
                 if (s.stopped && s.stopped.kind === 'limit' && !(pk in stops)) {
                     stops[pk] = !!s.stopped.over;
-                    if (stopsBefore && stopsBefore[pk] === false && s.stopped.over)
+                    if (stopsBefore && stopsBefore[pk] === false && s.stopped.over) {
                         events.push({kind: 'reset', text: fmt('%1 can go on!', s.name), key: pk});
+                        freed.push(s);
+                    }
                 }
                 for (const o of s.overlaps || []) {
                     // (by chat: one listed twice, open on two accounts, is one chat)
@@ -637,6 +647,8 @@ export class Tracker {
                         events.push({kind: 'waiting', text: fmt('%1 and %2 change the same files!', s.name, o.name), key: pk});
                 }
             }
+            if (freed.length && notices)
+                notices.push(limitResetNotice(source, g, freed, host));
         }
         this.lastStops[source] = stops;
         this.lastOverlaps[source] = overlaps;
@@ -658,6 +670,18 @@ export class Tracker {
         this.lastWindows = next;
         return events;
     }
+}
+
+// "work: the usage limit reset / fix-parser can go on", for the chats of an
+// account a usage limit stopped (Plasma's trackLimitStops)
+function limitResetNotice(source, g, freed, host) {
+    const names = freed.slice(0, 4).map(s => s.name).join(', ') + (freed.length > 4 ? ` +${freed.length - 4}` : '');
+    return {
+        key: `${source ? `${source}|` : ''}limit-reset:${g.id}`, session: freed[0], kind: 'reset', host,
+        title: fmt('%1: the usage limit reset', host ? fmt('%1: %2', host, g.name) : g.name),
+        body: freed.length === 1 ? fmt('%1 can go on.', names) : fmt('%1 chats can go on: %2', freed.length, names),
+        icon: 'emblem-ok-symbolic',
+    };
 }
 
 // Which notification keys belong to a source: "" (this computer) has no
@@ -713,12 +737,18 @@ export function toLocalClock(result, offset) {
         for (const s of g.sessions || []) {
             shift(s, ['since', 'startedAt']);
             shift(s.peek, ['at']);
+            shift(s.peek && s.peek.recap, ['at']);
+            shift(s.stopped, ['at', 'resetsAt']);
+            shift(s.plan, ['updatedAt']);
             shift(s.stats, ['startedAt', 'lastAt']);
             for (const a of (s.agents && s.agents.tree) || [])
                 shift(a, ['started', 'updated']);
         }
-        for (const c of (g.recent || []).concat(g.sharedHere || [], g.starred || []))
+        for (const c of (g.recent || []).concat(g.sharedHere || [], g.starred || [])) {
             shift(c, ['lastActive', 'since']);
+            shift(c.recap, ['at']);
+            shift(c.stopped, ['at', 'resetsAt']);
+        }
         for (const plan of (g.plans || []).concat(g.starredPlans || []))
             shift(plan, ['updatedAt']);
         if (g.limits) {
@@ -902,9 +932,22 @@ export function peekLine(s) {
     }
     if (s.state === 'working')
         return activity ? {text: `▸ ${activity}`, title: 'Working on', full: activity} : null;
+    if (s.stopped) {
+        const text = stopText(s.stopped);
+        return {text, title: 'What stopped it', full: text};
+    }
     if (s.state === 'done' && s.detail)
         return {text: s.detail, title: 'Result', full: s.detail};
     return reply ? {text: reply, title: "Claude's last reply", full: peek.reply || peek.replyLine} : null;
+}
+
+// The line under a chat that a usage limit or an expired login stopped: what to do
+export function stopText(stopped) {
+    if (stopped.kind === 'login')
+        return "Claude's login expired. Log in again (/login), then tell it to go on.";
+    if (stopped.over)
+        return 'The limit it hit has reset: open it and tell Claude to go on.';
+    return stopped.text || '';
 }
 
 // Is there more to show when the peek line is clicked?
@@ -1104,7 +1147,7 @@ export function awaySnapshot(groups) {
 
 function nameList(names, max = 4) {
     const shown = names.slice(0, max).join(', ');
-    return names.length > max ? fmt('%1 +%2 more', shown, names.length - max) : shown;
+    return names.length > max ? fmt('%1 +%2', shown, names.length - max) : shown;
 }
 
 // One summary for when you come back: {title, body, first: the chat that
@@ -1116,7 +1159,7 @@ export function awayDigest(away, groups, now, minMinutes) {
         return null;
     const before = away.snapshot.sessions;
     const named = (s, host) => (host ? fmt('%1 (%2)', s.name, host) : s.name);
-    const finished = [], failed = [], limited = [], loggedOut = [], resets = [];
+    const finished = [], failed = [], stopped = [], limited = [], loggedOut = [], resets = [];
     for (const g of groups) {
         for (const s of g.sessions) {
             const prev = before[sessionKey(s, g.host)];
@@ -1124,10 +1167,10 @@ export function awayDigest(away, groups, now, minMinutes) {
             const ran = prev ? prev.state === 'working' || prev.state === 'waiting'
                 : (s.since || 0) >= away.lockedAt;   // a chat that came and finished meanwhile
             const stop = stopOf(s);
-            if (!ended || !ran || (s.reason === 'stopped' && !stop))
+            if (!ended || !ran)
                 continue;
-            (stop === 'limit' ? limited : stop === 'login' ? loggedOut : s.reason === 'failed' ? failed : finished)
-                .push(named(s, g.host));
+            (stop === 'limit' ? limited : stop === 'login' ? loggedOut : s.reason === 'failed' ? failed
+                : s.reason === 'stopped' ? stopped : finished).push(named(s, g.host));
         }
         for (const w of g.limits ? g.limits.windows : []) {
             const prev = away.snapshot.windows[`${g.host || ''}|${g.id}/${w.key}`];
@@ -1136,16 +1179,18 @@ export function awayDigest(away, groups, now, minMinutes) {
         }
     }
     const waiting = chatsNeedingYou(groups);
-    if (!waiting.length && !finished.length && !failed.length && !limited.length && !loggedOut.length)
+    if (!waiting.length && !finished.length && !failed.length && !stopped.length && !limited.length && !loggedOut.length)
         return null;
     const lines = waiting.slice(0, 3).map(c => fmt('Needs you: %1 (waiting %2)', named(c.session, c.host),
         duration(now - (c.session.since || now))));
     if (waiting.length > 3)
-        lines.push(fmt('+%1 more need you', waiting.length - 3));
+        lines.push(plural(waiting.length - 3, '+%1 more needs you', '+%1 more need you'));
     if (finished.length)
         lines.push(fmt('Finished: %1', nameList(finished)));
     if (failed.length)
         lines.push(fmt('Failed: %1', nameList(failed)));
+    if (stopped.length)
+        lines.push(fmt('Stopped: %1', nameList(stopped)));
     if (limited.length)
         lines.push(fmt('Hit the usage limit: %1', nameList(limited)));
     if (loggedOut.length)
