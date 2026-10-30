@@ -758,7 +758,7 @@ ColumnLayout {
                 HoverButtons {
                     id: recentButtons
                     lineHeight: recentName.implicitHeight
-                    shown: recentHover.hovered
+                    shown: recentHover.hovered || root.deleteAsk.key === recentLine.rowKey
                     under: recentEnd
 
                     PlasmaComponents3.ToolButton {
@@ -822,12 +822,35 @@ ColumnLayout {
                             subText: root.shareHint(section.remoteHost)
                         }
                     }
+                    PlasmaComponents3.ToolButton {
+                        // to the Trash, after a question (DeleteAsk under the line)
+                        icon.name: "user-trash"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Delete…")
+                        Layout.preferredHeight: recentButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: recentButtons.buttonWidth
+                        onClicked: root.askDelete(recentLine.rowKey, "chat", recentLine.chat.sessionId,
+                                                  recentLine.chat.profileDir, section.remoteHost, "")
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Delete this chat…")
+                            subText: root.deleteHint("chat")
+                        }
+                    }
                 }
             }
 
             KeepOnlyMessage {
                 Layout.fillWidth: true
                 visible: root.shareConfirm.key === recentLine.rowKey
+            }
+            DeleteAsk {
+                Layout.fillWidth: true
+                itemKey: recentLine.rowKey
             }
         }
     }
@@ -993,7 +1016,7 @@ ColumnLayout {
                 HoverButtons {
                     id: planButtons
                     lineHeight: planName.implicitHeight
-                    shown: planHover.hovered || root.planComposer === planLine.composerKey
+                    shown: planHover.hovered || root.planComposer === planLine.composerKey || root.deleteAsk.key === planLine.composerKey
                     under: planEnd
 
                     PlasmaComponents3.ToolButton {
@@ -1114,9 +1137,50 @@ ColumnLayout {
                             subText: i18n("A shared plan is one file on each account: a change shows on all of them. Sharing a chat shares its plan too.")
                         }
                     }
+                    PlasmaComponents3.ToolButton {
+                        // to the Trash, after a question (DeleteAsk under the line)
+                        icon.name: "user-trash"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Delete…")
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: planButtons.buttonWidth
+                        onClicked: root.askDelete(planLine.composerKey, "plan", planLine.plan.slug, planLine.plan.profileDir,
+                                                  section.remoteHost, "")
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Delete this plan…")
+                            subText: root.deleteHint("plan")
+                        }
+                    }
+                    PlasmaComponents3.ToolButton {
+                        // hide it here (nothing is deleted)
+                        icon.name: "window-close"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Hide this plan")
+                        Layout.preferredHeight: planButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: planButtons.buttonWidth
+                        onClicked: root.hideItem("plans", planLine.plan.slug, section.remoteHost)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Hide this plan")
+                            subText: root.hideHint("plans", section.remoteHost)
+                        }
+                    }
                 }
             }
 
+            DeleteAsk {
+                Layout.fillWidth: true
+                itemKey: planLine.composerKey
+            }
             NewChatBox {
                 visible: root.planComposer === planLine.composerKey
                 Layout.fillWidth: true
@@ -1148,115 +1212,167 @@ ColumnLayout {
 
     Repeater {
         model: section.memoriesOpen ? section.memories.length : 0
-        delegate: RowLayout {
+        delegate: ColumnLayout {
             id: memoryLine
 
             required property int index
             readonly property var memory: section.memories[index]
-                                          || ({ key: "", name: "", description: "", type: "", path: "", folder: "", folderShort: "", updatedAt: 0 })
+                                          || ({ key: "", name: "", description: "", type: "", path: "", folder: "", folderShort: "", updatedAt: 0, folderGone: false })
             // an SSH host's opens in VS Code (Remote-SSH), to change it
             readonly property bool canOpen: !section.remoteHost || root.vscodeInstalled
+            readonly property string itemKey: memory.key ? (section.remoteHost ? section.remoteHost + "|" : "") + memory.key : ""
 
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.gridUnit
             Layout.rightMargin: Kirigami.Units.smallSpacing
-            spacing: Kirigami.Units.smallSpacing
+            spacing: 0
 
             HoverHandler {
                 id: memoryHover
             }
 
-            Kirigami.Icon {
-                source: root.memoryIcon(memoryLine.memory.type)
-                Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                Layout.preferredHeight: Layout.preferredWidth
-                opacity: 0.7
-            }
-            PlasmaComponents3.Label {
-                id: memoryName
-                textFormat: Text.PlainText
-                text: memoryLine.memory.description || memoryLine.memory.name
-                font.underline: memoryMouse.containsMouse
-                opacity: memoryLine.canOpen ? 1 : 0.7
-                elide: Text.ElideRight
+            RowLayout {
                 Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
 
-                PlasmaCore.ToolTipArea {
+                Kirigami.Icon {
+                    source: root.memoryIcon(memoryLine.memory.type)
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                    Layout.preferredHeight: Layout.preferredWidth
+                    opacity: 0.7
+                }
+                PlasmaComponents3.Label {
+                    id: memoryName
                     textFormat: Text.PlainText
-                    width: memoryName.contentWidth
-                    height: parent.height
-                    mainText: memoryLine.memory.name
-                    subText: (memoryLine.memory.description ? memoryLine.memory.description + "\n\n" : "")
-                             + (memoryLine.memory.type ? i18n("Kind: %1", memoryLine.memory.type) + "\n" : "")
-                             + (memoryLine.memory.folder ? i18n("Folder: %1", (section.remoteHost ? section.remoteHost + ":" : "") + memoryLine.memory.folder) + "\n" : "")
-                             + (section.remoteHost ? (memoryLine.canOpen ? i18n("Click to open it on %1 in VS Code (Remote - SSH).", section.remoteHost) : "")
-                                                   : i18n("Click to read it, rendered."))
-
-                    MouseArea {
-                        id: memoryMouse
-                        anchors.fill: parent
-                        enabled: memoryLine.canOpen
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.openMemory(memoryLine.memory, section.remoteHost, false)
-                    }
-                }
-            }
-            // its folder and how long ago, at the line's end
-            CoveredEnd {
-                id: memoryEnd
-                covered: memoryButtons.covering
-                Layout.preferredWidth: section.endWidth
-                implicitHeight: memoryWhen.implicitHeight
-
-                RowLayout {
-                    width: memoryEnd.width
-                    spacing: Kirigami.Units.smallSpacing
-
-                    PlasmaComponents3.Label {
-                        id: memoryWhen
-                        Layout.preferredWidth: section.folderWidth
-                        horizontalAlignment: Text.AlignRight
-                        textFormat: Text.PlainText
-                        text: memoryLine.memory.folderShort || (memoryLine.memory.type === "account" ? i18n("every folder") : "")
-                        opacity: 0.6
-                        font: Kirigami.Theme.smallFont
-                        elide: Text.ElideMiddle
-                    }
-                    PlasmaComponents3.Label {
-                        Layout.preferredWidth: root.agoWidth
-                        horizontalAlignment: Text.AlignRight
-                        textFormat: Text.PlainText
-                        text: root.ago(root.now - memoryLine.memory.updatedAt)
-                        opacity: 0.6
-                        font: Kirigami.Theme.smallFont
-                    }
-                }
-            }
-            // on hover, over the line's end
-            HoverButtons {
-                id: memoryButtons
-                lineHeight: memoryName.implicitHeight
-                shown: memoryHover.hovered && !section.remoteHost
-                under: memoryEnd
-
-                PlasmaComponents3.ToolButton {
-                    icon.name: "document-edit"
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Edit this memory")
-                    Layout.preferredHeight: memoryButtons.buttonSize
-                    icon.width: Kirigami.Units.iconSizes.small
-                    icon.height: Kirigami.Units.iconSizes.small
-                    Layout.preferredWidth: memoryButtons.buttonWidth
-                    onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
+                    text: memoryLine.memory.description || memoryLine.memory.name
+                    font.underline: memoryMouse.containsMouse
+                    opacity: memoryLine.canOpen ? 1 : 0.7
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Edit this memory")
-                        subText: i18n("Opens its file in your text editor (VS Code, if the settings open plans there). What you change there is what Claude remembers; Claude reads it in new chats in that folder.")
+                        width: memoryName.contentWidth
+                        height: parent.height
+                        mainText: memoryLine.memory.name
+                        subText: (memoryLine.memory.description ? memoryLine.memory.description + "\n\n" : "")
+                                 + (memoryLine.memory.type ? i18n("Kind: %1", memoryLine.memory.type) + "\n" : "")
+                                 + (memoryLine.memory.folder ? (memoryLine.memory.folderGone ? i18n("Folder: %1 (not there any more)", (section.remoteHost ? section.remoteHost + ":" : "") + memoryLine.memory.folder)
+                                                                                             : i18n("Folder: %1", (section.remoteHost ? section.remoteHost + ":" : "") + memoryLine.memory.folder)) + "\n" : "")
+                                 + (section.remoteHost ? (memoryLine.canOpen ? i18n("Click to open its file on %1 in VS Code (Remote - SSH).", section.remoteHost)
+                                                                             : i18n("Needs VS Code (Remote - SSH) to open a memory on %1.", section.remoteHost))
+                                                       : i18n("Click to read it, rendered."))
+
+                        MouseArea {
+                            id: memoryMouse
+                            anchors.fill: parent
+                            enabled: memoryLine.canOpen
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.openMemory(memoryLine.memory, section.remoteHost, false)
+                        }
                     }
                 }
+                // its folder and how long ago, at the line's end
+                CoveredEnd {
+                    id: memoryEnd
+                    covered: memoryButtons.covering
+                    Layout.preferredWidth: section.endWidth
+                    implicitHeight: memoryWhen.implicitHeight
+
+                    RowLayout {
+                        width: memoryEnd.width
+                        spacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.Label {
+                            id: memoryWhen
+                            Layout.preferredWidth: section.folderWidth
+                            horizontalAlignment: Text.AlignRight
+                            textFormat: Text.PlainText
+                            text: memoryLine.memory.folderShort || (memoryLine.memory.type === "account" ? i18n("every folder") : "")
+                            opacity: 0.6
+                            font: Kirigami.Theme.smallFont
+                            elide: Text.ElideMiddle
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.preferredWidth: root.agoWidth
+                            horizontalAlignment: Text.AlignRight
+                            textFormat: Text.PlainText
+                            text: root.ago(root.now - memoryLine.memory.updatedAt)
+                            opacity: 0.6
+                            font: Kirigami.Theme.smallFont
+                        }
+                    }
+                }
+                // on hover, over the line's end
+                HoverButtons {
+                    id: memoryButtons
+                    lineHeight: memoryName.implicitHeight
+                    shown: memoryHover.hovered || (memoryLine.itemKey !== "" && root.deleteAsk.key === memoryLine.itemKey)
+                    under: memoryEnd
+
+                    PlasmaComponents3.ToolButton {
+                        visible: !section.remoteHost   // (an SSH host's opens to change it with a click: VS Code)
+                        icon.name: "document-edit"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Edit this memory")
+                        Layout.preferredHeight: memoryButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: memoryButtons.buttonWidth
+                        onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Edit this memory")
+                            subText: i18n("Opens its file in your text editor (VS Code, if the settings open plans there). What you change there is what Claude remembers; Claude reads it in new chats in that folder.")
+                        }
+                    }
+                    PlasmaComponents3.ToolButton {
+                        // to the Trash, after a question (DeleteAsk under the line); not the account's CLAUDE.md
+                        visible: memoryLine.memory.type !== "account"
+                        icon.name: "user-trash"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Delete…")
+                        Layout.preferredHeight: memoryButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: memoryButtons.buttonWidth
+                        onClicked: root.askDelete(memoryLine.itemKey, "memory", memoryLine.memory.key, "", section.remoteHost,
+                                                  memoryLine.memory.folderShort)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Delete this memory…")
+                            subText: root.deleteHint("memory")
+                        }
+                    }
+                    PlasmaComponents3.ToolButton {
+                        // hide it here (nothing is deleted)
+                        icon.name: "window-close"
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Hide this memory")
+                        Layout.preferredHeight: memoryButtons.buttonSize
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        Layout.preferredWidth: memoryButtons.buttonWidth
+                        onClicked: root.hideItem("memories", memoryLine.memory.key, section.remoteHost)
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Hide this memory")
+                            subText: root.hideHint("memories", section.remoteHost)
+                        }
+                    }
+                }
+            }
+
+            DeleteAsk {
+                Layout.fillWidth: true
+                itemKey: memoryLine.itemKey
             }
         }
     }

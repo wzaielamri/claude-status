@@ -111,7 +111,9 @@ RowLayout {
         NumberAnimation { target: slide; property: "x"; from: -Kirigami.Units.gridUnit; to: 0; duration: Kirigami.Units.longDuration * 2; easing.type: Easing.OutCubic }
     }
     readonly property bool confirmingStop: session.key !== "" && root.stopConfirmSession === rowKey
-    readonly property bool buttonsShown: rowHover.hovered || confirmingStop
+    // (a question gone with the chat it was about, stopped meanwhile, leaves no buttons up)
+    readonly property bool buttonsShown: rowHover.hovered || (confirmingStop && canStop)
+                                         || (session.key !== "" && root.deleteAsk.key === rowKey)
     // A finished chat can be shared, continued on another account or kept on
     // one (jump.py; on an SSH host, between its accounts: remote.py); not
     // while a session has it open.
@@ -622,24 +624,44 @@ RowLayout {
                     }
                 }
                 PlasmaComponents3.ToolButton {
-                    // Remove a finished session from the list (nothing is deleted)
-                    visible: row.session.state === "done"
-                    icon.name: "window-close"   // (an × in the text's color, as in VS Code and GNOME)
+                    // Delete a finished chat: to the Trash, after a question (DeleteAsk under the row)
+                    visible: row.session.state === "done" && !!(row.session.chatId || row.session.sessionId)
+                    icon.name: "user-trash"
                     display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Remove from list")
+                    text: i18n("Delete…")
                     Layout.preferredHeight: rowButtons.buttonSize
                     icon.width: Kirigami.Units.iconSizes.small
                     icon.height: Kirigami.Units.iconSizes.small
                     Layout.preferredWidth: rowButtons.buttonWidth
                     Layout.alignment: Qt.AlignTop
-                    onClicked: row.remoteHost ? root.remoteDismiss(row.remoteHost, row.session.sessionId)
-                                              : root.dismissSession(row.session.sessionId)
+                    onClicked: root.askDelete(row.rowKey, "chat", row.session.chatId || row.session.sessionId,
+                                              row.session.profileDir, row.remoteHost, "")
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
                         anchors.fill: parent
-                        mainText: i18n("Remove from the list")
-                        subText: i18n("Only hides it here; nothing is deleted. It comes back if the chat runs again, or via right-click → Show Removed Chats Again.")
+                        mainText: i18n("Delete this chat…")
+                        subText: root.deleteHint("chat")
+                    }
+                }
+                PlasmaComponents3.ToolButton {
+                    // Hide a finished chat here (nothing is deleted)
+                    visible: row.session.state === "done"
+                    icon.name: "window-close"   // (an × in the text's color, as in VS Code and GNOME)
+                    display: PlasmaComponents3.AbstractButton.IconOnly
+                    text: i18n("Hide this chat")
+                    Layout.preferredHeight: rowButtons.buttonSize
+                    icon.width: Kirigami.Units.iconSizes.small
+                    icon.height: Kirigami.Units.iconSizes.small
+                    Layout.preferredWidth: rowButtons.buttonWidth
+                    Layout.alignment: Qt.AlignTop
+                    onClicked: root.hideItem("chats", row.session.sessionId, row.remoteHost)
+
+                    PlasmaCore.ToolTipArea {
+                        textFormat: Text.PlainText
+                        anchors.fill: parent
+                        mainText: i18n("Hide this chat")
+                        subText: root.hideHint("chats", row.remoteHost)
                     }
                 }
                 PlasmaComponents3.ToolButton {
@@ -1249,6 +1271,11 @@ RowLayout {
         KeepOnlyMessage {
             Layout.fillWidth: true
             visible: row.confirmingKeepOnly
+        }
+
+        DeleteAsk {
+            Layout.fillWidth: true
+            itemKey: row.session.key !== "" ? row.rowKey : ""
         }
 
         Kirigami.InlineMessage {

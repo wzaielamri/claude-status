@@ -759,11 +759,30 @@ PlasmoidItem {
             icon.name: "view-refresh"
             onTriggered: root.refresh()
         },
+        // what you hid, kind by kind (each only when some are hidden)
         PlasmaCore.Action {
-            text: i18n("Show Removed Chats Again (%1)", root.status ? root.status.dismissed || 0 : 0)
+            text: root.showHiddenText("chats", root.hiddenCount("chats", ""))
             icon.name: "view-visible"
-            visible: root.status !== null && (root.status.dismissed || 0) > 0
-            onTriggered: root.runHelper("--undismiss-all")
+            visible: root.hiddenCount("chats", "") > 0
+            onTriggered: root.showHidden("chats", "")
+        },
+        PlasmaCore.Action {
+            text: root.showHiddenText("plans", root.hiddenCount("plans", ""))
+            icon.name: "view-visible"
+            visible: root.hiddenCount("plans", "") > 0
+            onTriggered: root.showHidden("plans", "")
+        },
+        PlasmaCore.Action {
+            text: root.showHiddenText("memories", root.hiddenCount("memories", ""))
+            icon.name: "view-visible"
+            visible: root.hiddenCount("memories", "") > 0
+            onTriggered: root.showHidden("memories", "")
+        },
+        PlasmaCore.Action {
+            text: root.showHiddenText("projects", root.hiddenCount("projects", ""))
+            icon.name: "view-visible"
+            visible: root.hiddenCount("projects", "") > 0
+            onTriggered: root.showHidden("projects", "")
         },
         PlasmaCore.Action {
             text: i18n("Go to the Chat That Needs You")
@@ -2222,14 +2241,6 @@ PlasmoidItem {
                                    + (profileDir ? " " + shellQuote(profileDir) : ""))
     }
 
-    function remoteDismiss(host, sessionId) {
-        remoteAction("dismiss", host, "--dismiss " + shellQuote(host) + " " + shellQuote(sessionId))
-    }
-
-    function remoteUndismissAll(host) {
-        remoteAction("dismiss", host, "--undismiss-all " + shellQuote(host))
-    }
-
     // ---------------------------------------------------------------- shared chats
     // Share a chat with your other accounts, continue it on one of them, or
     // keep it on one only: jump.py does it (sharing.py); on an SSH host,
@@ -2375,7 +2386,204 @@ PlasmoidItem {
     }
 
     function dismissSession(sessionId) {
-        runHelper("--dismiss " + shellQuote(sessionId))
+        hideItem("chats", sessionId, "")
+    }
+
+    // ---------------------------------------------------------------- hide and delete
+    // Hide (×): a chat, a plan, a memory or a project leaves its list here,
+    // nothing is deleted, and Show Hidden … Again brings that kind back
+    // (jump.py --hide / --show-hidden; an SSH host's on that host: remote.py).
+    // Delete… (the trash button, beside the ×): a chat, a plan or a memory
+    // goes to the Trash, after a question that says what goes (--describe).
+
+    readonly property var hiddenKinds: ["chats", "plans", "memories", "projects"]
+
+    // How many of a kind are hidden here (or on host): status.dismissed for chats
+    function hiddenCount(kind, host) {
+        const r = host ? (remote[host] || {}).result : status
+        if (!r)
+            return 0
+        return (kind === "chats" ? r.dismissed : kind === "plans" ? r.hiddenPlans
+                : kind === "memories" ? r.hiddenMemories : r.hiddenProjects) || 0
+    }
+
+    function showHiddenText(kind, count) {
+        return kind === "chats" ? i18n("Show Hidden Chats Again (%1)", count)
+             : kind === "plans" ? i18n("Show Hidden Plans Again (%1)", count)
+             : kind === "memories" ? i18n("Show Hidden Memories Again (%1)", count)
+             : i18n("Show Hidden Projects Again (%1)", count)
+    }
+
+    function hideItem(kind, id, host) {
+        hideRun(host ? "remote.py" : "jump.py", "--hide " + (host ? shellQuote(host) + " " : "") + kind + " " + shellQuote(id),
+                { kind: kind, host: host || "", say: false })
+    }
+
+    function showHidden(kind, host) {
+        hideRun(host ? "remote.py" : "jump.py", "--show-hidden " + (host ? shellQuote(host) + " " : "") + kind,
+                { kind: kind, host: host || "", say: true })
+    }
+
+    property var hideRuns: ({})   // command -> {kind, host, say: its answer is said}
+    function hideRun(script, args, what) {
+        const cmd = "python3 -I " + shellQuote(codeDir + script) + " " + args + (what.host ? "" : configDirArgs) + " # " + Date.now()
+        hideRuns[cmd] = what
+        hider.connectSource(cmd)
+    }
+
+    Exec {
+        id: hider
+        onNewData: (source, data) => {
+            disconnectSource(source)
+            const what = root.hideRuns[source] || { kind: "", host: "", say: false }
+            delete root.hideRuns[source]
+            const result = root.helperResult(data)
+            if (!result.ok) {
+                root.actionError = result.message
+                actionErrorTimer.restart()
+            } else {
+                root.actionError = ""
+                if (what.say) {   // (Showing 2 hidden plans again)
+                    root.actionInfo = result.message
+                    actionInfoTimer.restart()
+                }
+            }
+            if (what.host)
+                root.pollHost(what.host)
+            else
+                root.refresh()
+            if (what.kind === "projects" && !what.host)
+                root.loadProjects()
+        }
+    }
+
+    // The menu of an SSH host's hidden ones (its header's eye button)
+    PlasmaExtras.Menu {
+        id: hiddenMenu
+    }
+
+    Component {
+        id: hiddenItem
+        PlasmaExtras.MenuItem {
+            property string kind
+            property string host
+            icon: "view-visible"
+            onClicked: root.showHidden(kind, host)
+        }
+    }
+
+    property var hiddenItems: []
+
+    function openHiddenMenu(button, host) {
+        hiddenMenu.clearMenuItems()
+        const items = hiddenKinds.filter(k => hiddenCount(k, host) > 0)
+                                 .map(k => hiddenItem.createObject(hiddenMenu, { text: showHiddenText(k, hiddenCount(k, host)),
+                                                                                 kind: k, host: host }))
+        for (const item of items)
+            hiddenMenu.addMenuItem(item)
+        hiddenItems = items
+        hiddenMenu.visualParent = button
+        hiddenMenu.openRelative()
+    }
+
+    // The × and Delete… buttons' tooltips
+    function hideHint(kind, host) {
+        const back = host ? i18n("The eye button next to %1's name brings it back.", host)
+                   : kind === "chats" ? i18n("Right-click → Show Hidden Chats Again brings it back.")
+                   : kind === "plans" ? i18n("Right-click → Show Hidden Plans Again brings it back.")
+                   : kind === "memories" ? i18n("Right-click → Show Hidden Memories Again brings it back.")
+                   : i18n("Right-click → Show Hidden Projects Again brings it back.")
+        return i18n("Only hides it here; nothing is deleted.") + " "
+               + (kind === "chats" ? i18n("It comes back if the chat runs again.") + " " : "") + back
+    }
+    function deleteHint(kind) {
+        return kind === "chat" ? i18n("Moves it to the Trash, on every account it's shared with, with its subagents and checkpoints; the Recap keeps its numbers. It asks first.")
+             : kind === "plan" ? i18n("Moves its file to the Trash, on every account it's on. It asks first.")
+             : i18n("Moves its file to the Trash and takes its line out of MEMORY.md: Claude stops reading it in new chats in its folder. It asks first.")
+    }
+
+    // "a", "a and b", "a, b and c"
+    function andList(names) {
+        return names.length < 2 ? names.join("") : i18nc("the last two of a list", "%1 and %2",
+                                                         names.slice(0, -1).join(", "), names[names.length - 1])
+    }
+
+    // Delete… asks first (deleteAsk, shown under the item's line: DeleteAsk.qml):
+    // {key: the line's key, kind: chat | plan | memory, id, profileDir, host,
+    // folder: a memory's, busy: being looked at, question, message: why it can't}
+    readonly property var noDeleteAsk: ({ key: "", kind: "", id: "", profileDir: "", host: "", folder: "",
+                                          busy: false, question: "", message: "" })
+    property var deleteAsk: noDeleteAsk
+
+    // (jump.py --delete-chat ID --profile P; an SSH host's: remote.py --delete-chat HOST ID P)
+    function deleteArgs(kind, id, profileDir, host) {
+        return "--delete-" + kind + " " + (host ? shellQuote(host) + " " + shellQuote(id)
+                                                  + (profileDir && kind !== "memory" ? " " + shellQuote(profileDir) : "")
+                                                : shellQuote(id) + (kind !== "memory" ? profileArg(profileDir) : ""))
+    }
+
+    function askDelete(key, kind, id, profileDir, host, folder) {
+        if (deleteAsk.key === key) {   // (again: the question goes)
+            deleteAsk = noDeleteAsk
+            return
+        }
+        deleteAsk = { key: key, kind: kind, id: id, profileDir: profileDir || "", host: host || "", folder: folder || "",
+                      busy: true, question: "", message: "" }
+        deleteRun(deleteArgs(kind, id, profileDir, host) + " --describe", { key: key, host: host || "", describe: true })
+    }
+
+    function confirmDelete() {
+        const a = deleteAsk
+        deleteAsk = noDeleteAsk
+        deleteRun(deleteArgs(a.kind, a.id, a.profileDir, a.host), { key: a.key, host: a.host, describe: false })
+    }
+
+    property var deleteRuns: ({})   // command -> {key, host, describe}
+    function deleteRun(args, what) {
+        const cmd = "python3 -I " + shellQuote(codeDir + (what.host ? "remote.py" : "jump.py")) + " " + args
+                    + (what.host ? "" : configDirArgs) + " # " + Date.now()
+        deleteRuns[cmd] = what
+        deleter.connectSource(cmd)
+    }
+
+    Exec {
+        id: deleter
+        onNewData: (source, data) => {
+            disconnectSource(source)
+            const what = root.deleteRuns[source] || { key: "", host: "", describe: false }
+            delete root.deleteRuns[source]
+            const result = root.helperResult(data)
+            if (what.describe) {
+                const a = root.deleteAsk
+                if (a.key !== what.key)   // (cancelled, or another one asked meanwhile)
+                    return
+                const name = result.name || ""
+                const accounts = root.andList(result.accounts || [])
+                // (the backend's words, here to translate)
+                const question = !result.ok || !name ? result.question || ""
+                               : a.kind === "chat" && accounts
+                               ? i18n("Delete “%1” on %2? It goes to the Trash with its subagents and checkpoints; the Recap keeps its numbers.", name, accounts)
+                               : a.kind === "plan" && accounts ? i18n("Delete the plan “%1” on %2? It goes to the Trash.", name, accounts)
+                               : a.kind === "memory" && a.folder
+                               ? i18n("Delete the memory “%1”? It goes to the Trash, and Claude stops reading it in new chats in %2.", name, a.folder)
+                               : result.question || ""
+                root.deleteAsk = Object.assign({}, a, { busy: false, question: result.ok ? question : "",
+                                                        message: result.ok ? "" : result.message || i18n("It can't be deleted.") })
+                return
+            }
+            if (!result.ok) {
+                root.actionError = result.message
+                actionErrorTimer.restart()
+            } else {
+                root.actionError = ""
+                root.actionInfo = result.message   // (Moved to the Trash)
+                actionInfoTimer.restart()
+            }
+            if (what.host)
+                root.pollHost(what.host)
+            else
+                root.refresh()
+        }
     }
 
     // profileDir picks the right copy of a chat shared across profiles

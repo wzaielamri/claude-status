@@ -73,16 +73,20 @@ ColumnLayout {
             opacity: 0.6
             font: Kirigami.Theme.smallFont
         }
+        // what you hid on the host (its chats, plans, memories): a menu to show a kind again
         PlasmaComponents3.ToolButton {
+            id: hiddenButton
+            readonly property var kinds: hostSection.info.result ? root.hiddenKinds.filter(k => root.hiddenCount(k, hostSection.host) > 0) : []
             icon.name: "view-visible"
-            visible: !!hostSection.info.result && (hostSection.info.result.dismissed || 0) > 0
+            visible: kinds.length > 0
             display: PlasmaComponents3.AbstractButton.IconOnly
-            text: i18n("Show removed chats again")
-            onClicked: root.remoteUndismissAll(hostSection.host)
+            text: i18n("Show hidden ones again…")
+            onClicked: root.openHiddenMenu(hiddenButton, hostSection.host)
             PlasmaCore.ToolTipArea {
                 textFormat: Text.PlainText
                 anchors.fill: parent
-                mainText: i18n("Show removed chats again (%1)", hostSection.info.result ? hostSection.info.result.dismissed : 0)
+                mainText: i18n("Show hidden ones again")
+                subText: hiddenButton.kinds.map(k => root.showHiddenText(k, root.hiddenCount(k, hostSection.host))).join("\n")
             }
         }
         PlasmaComponents3.ToolButton {

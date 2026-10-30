@@ -120,6 +120,9 @@ PlasmaComponents3.ScrollView {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
 
+                    HoverHandler {
+                        id: cardHover
+                    }
                     Kirigami.Icon {
                         source: card.unfolded ? "go-down" : "go-next"
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
@@ -170,6 +173,25 @@ PlasmaComponents3.ScrollView {
                             anchors.fill: parent
                             mainText: i18n("New chat here")
                             subText: card.project.short
+                        }
+                    }
+                    // on hover: hide it here (nothing is deleted; its chats, plans and memories stay in their lists)
+                    PlasmaComponents3.ToolButton {
+                        Layout.alignment: Qt.AlignTop
+                        opacity: cardHover.hovered ? 1 : 0
+                        enabled: cardHover.hovered
+                        icon.name: "window-close"
+                        icon.width: Kirigami.Units.iconSizes.small
+                        icon.height: Kirigami.Units.iconSizes.small
+                        display: PlasmaComponents3.AbstractButton.IconOnly
+                        text: i18n("Hide this project")
+                        onClicked: root.hideItem("projects", card.project.path, "")
+
+                        PlasmaCore.ToolTipArea {
+                            textFormat: Text.PlainText
+                            anchors.fill: parent
+                            mainText: i18n("Hide this project")
+                            subText: root.hideHint("projects", "")
                         }
                     }
                     TapHandler {
