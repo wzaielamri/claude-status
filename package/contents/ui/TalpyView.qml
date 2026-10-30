@@ -13,7 +13,8 @@ import "talpy/films.mjs" as F
 // (a jump, popping out of its burrow) is drawn live. What flies about (dirt,
 // hearts, z's) has a canvas of its own over it, painted only while there is
 // any. The open hole is painted once on hidden sheets (half of what a picture
-// costs) and copied in.
+// costs) and copied in, once all four have their picture (till then, and
+// whenever one is painted again, Talpy draws his hole himself).
 // The canvas has room around the creature's box for what it throws and holds up.
 Item {
     id: view
@@ -83,6 +84,23 @@ Item {
         paintHoles()
         ready()
         frame(Date.now())
+    }
+    // (the window shown again, or its graphics made anew: what the canvases
+    // held may be gone, so the hole and the pictures are painted again)
+    Connections {
+        target: view.Window.window
+        function onVisibleChanged() {
+            if (view.talpy && view.Window.window.visible) {
+                view.paintHoles()
+                view.film.reset()
+            }
+        }
+        function onSceneGraphInitialized() {
+            if (view.talpy) {
+                view.paintHoles()
+                view.film.reset()
+            }
+        }
     }
     // (new colors, size or rate: the pictures are painted again)
     onTintChanged: if (talpy) { talpy.setColors(colors()); film.reset() }
@@ -157,17 +175,27 @@ Item {
             film.paint(film.sheets[index], ctx)
     }
 
-    // The open hole's back and front, turned right and left: painted once
-    // here (they aren't shown), copied into each picture pixel for pixel
+    // The open hole's back and front, turned right and left: painted on
+    // sheets of their own (they aren't shown), copied into each picture pixel
+    // for pixel. Painted again at a new size (a canvas resized is cleared);
+    // till all four have their picture, Talpy draws his hole himself (a sheet
+    // painted imperatively once, then cleared by a resize that came after,
+    // left every picture with no burrow for good)
     function paintHoles() {
+        if (!talpy)
+            return
         talpy.holeImage = null
         for (let i = 0; i < holes.count; i++) {
             const c = holes.itemAt(i)
-            if (!c || !c.available)
-                return   // (Talpy draws its hole itself meanwhile)
-            const ctx = c.getContext("2d")
-            begin(ctx)
-            T.drawHoleSide(ctx, i % 2 ? "front" : "back", i >= 2)
+            if (c)
+                c.repaint()
+        }
+    }
+    function holePainted() {
+        for (let i = 0; i < holes.count; i++) {
+            const c = holes.itemAt(i)
+            if (!c || !c.painted)
+                return
         }
         talpy.holeImage = (part, left) => holes.itemAt((left ? 2 : 0) + (part === "front" ? 1 : 0))
     }
@@ -176,11 +204,31 @@ Item {
         id: holes
         model: 4
         delegate: Canvas {
+            required property int index
+            property bool painted: false   // its picture is there (at its size now)
+            function repaint() {
+                painted = false
+                if (view.talpy)
+                    view.talpy.holeImage = null
+                requestPaint()
+            }
             width: view.width
             height: view.height
             visible: false
             renderStrategy: Canvas.Cooperative
-            onAvailableChanged: if (available && view.talpy) { view.paintHoles(); view.film.reset() }
+            onWidthChanged: repaint()
+            onHeightChanged: repaint()
+            onAvailableChanged: if (available) repaint()
+            onPaint: {
+                const ctx = getContext("2d")
+                view.begin(ctx)
+                T.drawHoleSide(ctx, index % 2 ? "front" : "back", index >= 2)
+            }
+            onPainted: {
+                painted = true
+                if (view.talpy)
+                    view.holePainted()
+            }
         }
     }
 
