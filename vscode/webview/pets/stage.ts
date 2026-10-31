@@ -32,6 +32,7 @@ export const allStages = new Set<Stage>();
 export const world = {
   dark: isDark(),
   playful: true, // Playful Talpy (setPlayfulAll)
+  playWanted: false, // Play with Talpy (playAll): the hero starts a game once his stage shows
   shownOnce: false, // pets have been on screen: from now on the hero digs its way up too
 };
 
@@ -43,6 +44,14 @@ export function setDarkAll(dark: boolean): void {
     s.root.classList.toggle("cs-dark", dark);
     s.themeChanged();
   }
+}
+
+// Play with Talpy (the view's menu): the hero starts a game now if his stage
+// shows, else once it does
+export function playAll(): void {
+  const hero = [...allStages].find((s) => s.hero && s.live && s.pets.length);
+  if (hero) hero.pets[0].wantsToPlay(true);
+  else world.playWanted = true;
 }
 
 // Playful Talpy on or off: every pet's Talpy picks from its calm moves, or all of them
@@ -236,7 +245,10 @@ export class Stage implements PetStage, Animator {
   // ------------------------------------------------------------ PetStage
 
   playfulChanged(): void {
-    for (const p of this.pets) p.talpy.setPlayful(world.playful);
+    for (const p of this.pets) {
+      p.talpy.setPlayful(world.playful);
+      if (!world.playful) p.stopGame();
+    }
   }
 
   update(input: HeroInput | AccountInput): void {

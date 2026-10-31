@@ -84,7 +84,7 @@ class HostTests(unittest.TestCase):
         line = pet[pet.index("function petLine()"):pet.index("function event(")]
         self.assertLess(line.index("Busy coding"), line.index("if (!root.playful)"))   # (what the chats do stays)
         self.assertLess(line.index("if (!root.playful)"), line.index("Ship it!"))
-        self.assertIn("if (!root.playful || game === null", pet)                        # no cookie
+        self.assertRegex(pet, r"function placeCookie\(x, y\) \{\n\s+if \(!root\.playful \|\|")      # no cookie
         self.assertRegex(pet, r"onLiveChanged: \{\n\s+if \([^{]*\|\| !root\.playful\)")   # no Hi! or holiday
         view = (UI / "TalpyView.qml").read_text()
         self.assertIn("playful: root.playful", view)
@@ -102,7 +102,7 @@ class HostTests(unittest.TestCase):
         pet = (ROOT / "vscode/webview/pets/pet.ts").read_text()
         self.assertIn("playful: world.playful", pet)
         self.assertIn("if (!world.playful) return \"\"", pet)
-        self.assertIn("if (!world.playful || !this.game", pet)
+        self.assertRegex(pet, r"placeCookie\(x: number, y: number\): boolean \{\n\s+if \(!world\.playful \|\|")
 
     def test_gnome_has_the_setting(self):
         schema = (ROOT / "gnome/extension/schemas/org.gnome.shell.extensions.talpy-den.gschema.xml").read_text()

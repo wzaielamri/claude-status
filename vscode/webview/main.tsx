@@ -23,6 +23,9 @@ window.addEventListener("message", (event: MessageEvent) => {
     case "petEvent":
       pets.dispatchPetEvent(msg.kind, msg.text, msg.key);
       break;
+    case "playWithTalpy":
+      pets.play();
+      break;
     case "visible":
       hostVisible.set(!!msg.visible);
       break;

@@ -297,6 +297,20 @@ PlasmoidItem {
     // covers it all (CoverWatch.qml), since every frame redraws the screen.
     // Playful Talpy (a setting): his tricks, props, jokes, cookies and games; off, he shows only what the chats do
     readonly property bool playful: Plasmoid.configuration.playful !== false
+    // A game with the big Talpy (Pet.qml): Play with Talpy asks for one (once his stage shows),
+    // a click outside his stage ends it (FullRepresentation.qml), and gameStage is that stage while it's on
+    property bool playWanted: false
+    property bool gameStopWanted: false
+    property Item gameStage: null
+    function playWithTalpy() {
+        if (!Plasmoid.configuration.showPet)
+            return
+        popupTab = "chats"
+        if (!expanded && !onDesktop)
+            expanded = true
+        playWanted = false
+        playWanted = true
+    }
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar && !inTray
     // The dashboard is on screen: the popup is open, or it's shown in place
     // (on the desktop). There, opening a chat "closes the popup" too
@@ -807,6 +821,13 @@ PlasmoidItem {
             icon.name: Icons.plasma.goTo
             visible: root.chatsNeedingYou().length > 0
             onTriggered: root.goToNextChat(root.chatsNeedingYou())
+        },
+        // a game with the big Talpy (as four quick clicks on him: for the keyboard and touch)
+        PlasmaCore.Action {
+            text: i18n("Play with Talpy")
+            icon.name: Icons.plasma.play
+            visible: Plasmoid.configuration.showPet && root.playful
+            onTriggered: root.playWithTalpy()
         },
         // Talpy plays (tricks, props, jokes, cookies, games), or only shows what the chats do
         PlasmaCore.Action {

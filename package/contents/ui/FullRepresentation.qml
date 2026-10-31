@@ -398,6 +398,25 @@ PlasmaExtras.Representation {
         }
     }
 
+    // While a game with the big Talpy is on, a click outside his stage ends it
+    // (and still does what it does)
+    Loader {
+        parent: full
+        anchors.fill: parent
+        z: 999
+        active: root.gameStage !== null
+        sourceComponent: MouseArea {
+            acceptedButtons: Qt.AllButtons
+            onPressed: mouse => {
+                const stage = root.gameStage
+                const p = stage ? mapToItem(stage, mouse.x, mouse.y) : null
+                if (!p || p.x < 0 || p.y < 0 || p.x >= stage.width || p.y >= stage.height)
+                    root.gameStopWanted = true
+                mouse.accepted = false
+            }
+        }
+    }
+
     // On the desktop, a right-click anywhere on it opens the widget's menu, as
     // on the panel icon (MenuCatcher.qml); over the whole page, its heading too
     Loader {

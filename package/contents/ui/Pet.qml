@@ -4,6 +4,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import "talpy/talpy.mjs" as T
 import "talpy/cookie.mjs" as C
+import "talpy/games.mjs" as G
 
 // One Talpy on the pet strip (PetStrip.qml). The creature itself (looks,
 // moods, what it does) is talpy/talpy.mjs, drawn by TalpyView.qml; this is
@@ -99,6 +100,11 @@ Item {
     property bool held: false
     property bool tugging: false        // you pull at it in its burrow: it hangs on (talpy.tug), then pops out
     property bool pushing: false        // you push it down into its burrow (talpy.push): it sinks with your hand
+    // A game with the big Talpy (talpy/games.mjs): four quick clicks on him, or
+    // Play with Talpy in the menu; ticked and its holes drawn only while it's on
+    property var playGame: null
+    property bool gameOn: false
+    property var gameHoles: []          // [{x, open}]: a copy of the game's, for the holes drawn
     property real pop: 1                // popping out into your hand: 0 in its burrow, 1 where you hold it
     property bool landing: false        // picked up, until it has landed and dug in: drawn live
     property bool arriving: false
@@ -180,7 +186,10 @@ Item {
         if (!talpy)
             return
         talpy.setMood(mood)
-        if (lastMood === "done" && mood !== "done" && !leaving)
+        if (gameOn && mood === "needs") {
+            stopGame()        // a chat needs you: it's over, and he says so
+            react("sign")
+        } else if (lastMood === "done" && mood !== "done" && !leaving)
             react("yawn")     // woken up by work
         lastMood = mood
     }
@@ -204,7 +213,7 @@ Item {
         }
     }
     onLiveChanged: {
-        if (!live || !lone || !talpy || cookieOn || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000
+        if (!live || !lone || !talpy || cookieOn || gameOn || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000
                 || !root.playful)
             return   // (what it missed meanwhile comes instead, see onPlayingChanged)
         const holiday = holidayGreeting()
@@ -220,6 +229,12 @@ Item {
     // Seen again: it acts out what happened meanwhile, if it's from the last
     // minute (older news is dropped)
     onPlayingChanged: {
+        if (!playing)
+            stopGame()
+        else if (lone && root.playWanted) {
+            root.playWanted = false
+            wantsToPlay(true)
+        }
         if (!playing || !missed)
             return
         const m = missed
@@ -248,6 +263,8 @@ Item {
     // Clicked: the lone Talpy gets petted, a chat's pet opens its chat
     function clicked() {
         if (lone) {
+            if (gameOn && playGame.hit())
+                return
             petIt()
             return
         }
@@ -282,8 +299,10 @@ Item {
         tickleTimer.restart()
         if (quickClicks >= 4) {
             quickClicks = 0
-            react("laugh")
-            say(i18n("Hehe, that tickles!"))
+            if (!wantsToPlay()) {
+                react("laugh")
+                say(i18n("Hehe, that tickles!"))
+            }
         } else if (quickClicks === 3) {
             react("shy")
             say(i18n("Aww, stop it…"))
@@ -294,7 +313,98 @@ Item {
         }
     }
 
+    // ------------------------------------------------------------ a game
+
+    // Four quick clicks (or Play with Talpy, fromMenu): he laughs, says
+    // "Let's play!" and a game starts; false: not now (Playful Talpy off, a
+    // cookie out, held…), the clicks only tickle. While a chat needs you he
+    // points at it instead; asleep, the menu wakes him (clicks only make him
+    // grumpy: petIt)
+    function wantsToPlay(fromMenu) {
+        if (!lone || !root.playful || !talpy || gameOn || cookieOn || held || tugging || pushing || leaving)
+            return false
+        if (mood === "needs") {
+            react("sign")
+            say(petLine())
+            return true
+        }
+        const go = () => {
+            say(i18n("Let's play!"))
+            react("laugh", ok => { if (ok) pet.startGame() })
+        }
+        if (mood === "done" && fromMenu)
+            react("yawn", ok => { if (ok) go() })
+        else
+            go()
+        return true
+    }
+
+    function startGame() {
+        if (gameOn || !playing || mood === "needs" || !root.playful || cookieOn || held || tugging || pushing)
+            return
+        stride.stop()
+        travelTo = -1
+        playGame = G.pickGame(talpy, {
+            stage: () => ({ width: strip.width, ground: pet.ground, unit: pet.unit, bodyWidth: pet.bodyWidth,
+                            bodyHeight: pet.bodyHeight, minX: pet.minX, maxX: pet.maxX }),
+            px: () => pet.px,
+            moveTo: x => { pet.px = x },
+            say: what => pet.say(what === "got" ? [i18n("You got me!"), i18n("Hehe, found me!"), i18n("Again!")][Math.floor(Math.random() * 3)]
+                                                : i18n("That was fun!")),
+            changed: () => pet.gameMoved()
+        })
+        playGame.start(talpy.now)
+    }
+
+    // Over at once: Esc, a click outside the stage, a chat that needs you, the stage out of sight
+    function stopGame() {
+        if (gameOn)
+            playGame.stop()
+    }
+
+    function gameMoved() {
+        gameOn = playGame.on
+        gameHoles = playGame.holes.map(h => ({ x: h.x, open: h.open }))
+        root.gameStage = gameOn ? strip : null
+    }
+
+    Connections {
+        target: root
+        enabled: pet.gameOn && pet.playing
+        function onPetFrame(now) {
+            pet.playGame.tick(now)
+        }
+    }
+    // (Play with Talpy, from the menu: once the stage shows; Esc and clicks outside it: over)
+    Connections {
+        target: root
+        enabled: pet.lone
+        function onPlayWantedChanged() {
+            if (root.playWanted && pet.playing) {
+                root.playWanted = false
+                pet.wantsToPlay(true)
+            }
+        }
+        function onGameStopWantedChanged() {
+            if (root.gameStopWanted) {
+                root.gameStopWanted = false
+                pet.stopGame()
+            }
+        }
+        function onPlayfulChanged() {
+            if (!root.playful)
+                pet.stopGame()
+        }
+    }
+    Shortcut {
+        sequences: [StandardKey.Cancel]
+        enabled: pet.gameOn
+        onActivated: pet.stopGame()
+    }
+
     function dance() {
+        if (gameOn)
+            return   // (the game's: its clicks are)
         if (cookieOn) {
             say(i18n("Cookie first!"))
             return
@@ -313,6 +423,7 @@ Item {
     // that and it drops back in. Out of its burrow (or with less motion) it's
     // yours at once.
     function pull() {
+        stopGame()
         if (!root.lessMotion && talpy && talpy.tug(ok => { if (ok && pet.tugging) pet.popOut() })) {
             tugging = true
             tugToward(grab.lastAt)
@@ -331,6 +442,7 @@ Item {
     // your hand goes, with a dirt puff; with less motion it's down at once.
     // False: it isn't in its burrow, and the drag picks it up as before.
     function push() {
+        stopGame()
         if (!talpy || !talpy.push())
             return false
         pushing = true
@@ -482,8 +594,8 @@ Item {
     function event(kind, text) {
         if (held || tugging || pushing || leaving)
             return   // (a reaction now would stop it digging away)
-        if (!playing || cookieOn) {
-            missed = { kind: kind, text: text, at: Date.now() }   // (acted out when it can be seen, or has its cookie)
+        if (!playing || cookieOn || gameOn) {
+            missed = { kind: kind, text: text, at: Date.now() }   // (acted out when it can be seen, has its cookie, or the game's over)
             return
         }
         const action = { done: Math.random() < 0.4 ? "yay" : "finished", failed: "failed", stopped: "shrug", limit: "battery", oops: "confused", reset: "charged" }[kind]
@@ -514,7 +626,7 @@ Item {
 
     // A double-click on the stage at (x, y): false if it's too close to it
     function placeCookie(x, y) {
-        if (!root.playful || game === null || !playing || !game.place(x, y))
+        if (!root.playful || gameOn || game === null || !playing || !game.place(x, y))
             return false
         hadCookie = true
         return true
@@ -535,6 +647,16 @@ Item {
         cookie.angle = c.angle
         cookie.sx = c.sx
         cookie.sy = c.sy
+    }
+
+    // The game's over: what happened meanwhile
+    onGameOnChanged: {
+        if (gameOn || !playing || !missed)
+            return
+        const m = missed
+        missed = null
+        if (fresh(m))
+            event(m.kind, m.text)
     }
 
     // Done with its cookie: what happened meanwhile
@@ -703,6 +825,30 @@ Item {
                 ctx.scale(-1, 1)
             }
             T.drawHole(ctx, open)
+        }
+    }
+
+    // A game's holes (talpy/games.mjs), under him: painted again only as they open or close
+    Repeater {
+        model: pet.gameOn ? 3 : 0
+        delegate: Canvas {
+            required property int index
+            readonly property var hole: pet.gameHoles[index] || ({ x: 0, open: 0 })
+            readonly property real open: hole.open
+            visible: open > 0.01 && !pet.departed
+            width: view.width
+            height: view.height
+            x: hole.x - view.boxX - pet.box / 2
+            y: pet.ground - view.floorY
+            renderStrategy: Canvas.Cooperative
+            onOpenChanged: requestPaint()
+            onPaint: {
+                const ctx = getContext("2d")
+                ctx.reset()
+                ctx.translate(view.boxX, view.boxY)
+                ctx.scale(pet.box / T.BOX, pet.box / T.BOX)
+                T.drawHole(ctx, open)
+            }
         }
     }
 

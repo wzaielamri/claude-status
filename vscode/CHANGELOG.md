@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Games with the big Talpy:** four quick clicks on him and he laughs,
+  says *Let's play!*, and a game starts (*Play with Talpy* in the view's
+  **⋯** menu too). Peekaboo holes: three holes open and he pops out of one
+  at random; click him before he ducks; he's quicker each round, then
+  dances and the holes close. 10 to 30 seconds; Esc, a click outside his
+  stage or a chat that needs you ends it at once. No scores; it ticks and
+  draws only while it runs.
 - **Push Talpy into his burrow:** a drag that starts downward while he's in
   his burrow pushes him in: he squashes and sinks as far as your hand goes;
   let go and he stays down a moment, then peeks out (*hey!*, or a giggle).

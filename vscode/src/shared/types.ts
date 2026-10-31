@@ -934,6 +934,7 @@ export type HostMessage =
   | { type: "state"; state: ViewState }
   | { type: "showTab"; tab: "chats" | "week" | "perms" } // (the Monday recap's Open the Recap)
   | { type: "petEvent"; kind: PetEventKind; text: string; key: string }
+  | { type: "playWithTalpy" } // a game with the big Talpy (now, or once his stage shows)
   | { type: "visible"; visible: boolean }
   | { type: "live"; live: Record<string, LiveView> }
   | { type: "week"; back: number; account: string; span: WeekSpan; recap: WeekRecap | null; error: string }

@@ -157,6 +157,12 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     this.broadcast({ type: "showTab", tab });
   }
 
+  // Play with Talpy (the view's ⋯ menu): a game with the big Talpy, in the
+  // view's page (shown first) and in an editor tab's
+  playWithTalpy(): void {
+    this.broadcast({ type: "playWithTalpy" });
+  }
+
   private broadcast(message: HostMessage): void {
     for (const w of this.webviews) void w.postMessage(message);
   }

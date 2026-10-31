@@ -70,6 +70,13 @@ class FakeEl {
     if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this);
     this.parent = null;
   }
+  after(...nodes: FakeEl[]): void {
+    const parent = this.parent;
+    if (!parent) return;
+    const at = parent.children.indexOf(this) + 1;
+    for (const n of nodes) n.parent = parent;
+    parent.children.splice(at, 0, ...nodes);
+  }
   replaceChildren(...nodes: FakeEl[]): void {
     this.children = [];
     this.append(...nodes);
@@ -118,6 +125,7 @@ function load() {
     document: {
       createElement: (tag: string) => new FakeEl(tag),
       addEventListener() {},
+      removeEventListener() {},
       visibilityState: "visible",
       body: new FakeEl("body"),
     },
@@ -359,6 +367,41 @@ test("a drag that starts downward pushes the hero into his burrow; sideways pull
   assert.equal(hero.pushing, false);
   assert.ok(hero.tugging || hero.held);
   g.listeners.pointerup[0](at(130, 45));
+  stage.destroy();
+});
+
+// A game with the hero (vendor/talpy/games.mjs): its three holes drawn under
+// him only while it's on; over at once when the stage hides or a chat needs you
+test("a game's holes show while it's on; the stage hidden or a chat that needs you ends it", () => {
+  const t = load();
+  const stage: Any = new t.Stage(new FakeEl("div"), true, "hero", { open() {} });
+  t.resize[0]([{ contentRect: { width: 400, height: 96 } }]);
+  t.intersect[0]([{ isIntersecting: true }]);
+  const input = (mood: string) => ({
+    mood, headline: "", counts: { waiting: mood === "needs" ? 1 : 0, working: 0, idle: 1, limit: 0, done: 0 }, highUsageText: "",
+    contextFullText: "", maxFiveHour: 0, agentsRunning: 0, waiting: null,
+  });
+  stage.update(input("idle"));
+  const hero = stage.pets[0];
+  hero.startGame();
+  assert.equal(hero.play.on, true);
+  stage.loop();
+  assert.equal(hero.playHoles.length, 3);
+  assert.ok(hero.playHoles.every((c: Any) => !c.hidden));
+  assert.equal(hero.talpy.brainOn, false); // (nothing of his own meanwhile)
+  t.intersect[0]([{ isIntersecting: false }]); // out of sight: over
+  assert.equal(hero.play.on, false);
+  assert.equal(hero.talpy.brainOn, true);
+  t.intersect[0]([{ isIntersecting: true }]);
+  stage.loop(); // (seen again: no holes left over)
+  assert.ok(hero.playHoles.every((c: Any) => c.hidden));
+  hero.startGame();
+  assert.equal(hero.play.on, true);
+  stage.update(input("needs")); // a chat needs you: over, and he shows his sign
+  assert.equal(hero.play.on, false);
+  assert.equal(hero.talpy.run?.name, "sign");
+  hero.startGame(); // (not while a chat needs you)
+  assert.equal(hero.play.on, false);
   stage.destroy();
 });
 

@@ -59,4 +59,6 @@ export interface PetsModule {
   setDark(dark: boolean): void;
   // Playful Talpy (talpyDen.playfulTalpy): off, the pets only show what the chats do
   setPlayful(on: boolean): void;
+  // Play with Talpy: a game with the hero (now, or once his stage shows)
+  play(): void;
 }
