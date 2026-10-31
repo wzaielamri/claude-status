@@ -8,11 +8,14 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import "hub"
 
-// The Recap tab (main.qml: loadWeek, week.py): your last 7 days with Claude.
-// How long you were at it and how long Claude worked, a day per row on a
-// timeline, what the same work would cost at API prices, where it went, and
-// what would make it use less of your plan (the rules of Claude Code's own
-// /usage). All of it read from the chat transcripts: no tokens, nothing sent.
+// The Recap tab (main.qml: loadWeek, week.py): your last 7 days with Claude,
+// as a story: the big picture (how long you were at it, how long Claude
+// worked, your prompts, its tokens, the API prices), what Claude did, when
+// (a day per row on a timeline, your plan's limits over the same days, the
+// day chat by chat), where (by project, the chats it worked on most), then
+// the money (at API prices, and what would make it use less of your plan:
+// the rules of Claude Code's own /usage). All of it read from the chat
+// transcripts: no tokens, nothing sent.
 PlasmaComponents3.ScrollView {
     id: view
 
@@ -184,18 +187,18 @@ PlasmaComponents3.ScrollView {
           tip: i18n("Claude's own count of its turns (its “Worked for …”), all chats added up: chats working at the same time each count. On the clock it worked %1, and it waited %2 for your answers.",
                     hours(sum.busyMs), hours(sum.waitMs)) + beforeText(previous ? previous.workedMs : 0, "time")
                + trendText("workedMs", "time") },
+        { label: i18n("Prompts"), key: "prompts", value: String(sum.prompts),
+          delta: deltaText(sum.prompts, previous ? previous.prompts : 0, "count"),
+          tip: i18np("In %1 chat", "In %1 chats", sum.chats) + " · " + i18np("%1 turn of Claude's", "%1 turns of Claude's", sum.turns)
+               + beforeText(previous ? previous.prompts : 0, "count") + trendText("prompts", "count") },
+        { label: i18n("Tokens"), key: "tokenTotal", value: tokens(sum.tokenTotal),
+          delta: deltaText(sum.tokenTotal, previous ? previous.tokenTotal : 0, "tokens"),
+          tip: tokenText() + beforeText(previous ? previous.tokenTotal : 0, "tokens") + trendText("tokenTotal", "tokens") },
         { label: i18n("At API prices"), key: "cost", value: money(sum.cost),
           delta: deltaText(sum.cost, previous ? previous.cost : 0, "money"),
           tip: i18n("What the same tokens would cost on Claude's API, at its list prices of %1. Your plan isn't billed this way: this is the value of what you used.",
                     recap.prices ? Qt.locale().toString(date(recap.prices.asOf), "d MMMM yyyy") : "")
-               + beforeText(previous ? previous.cost : 0, "money") + trendText("cost", "money") },
-        { label: i18n("Tokens"), key: "tokenTotal", value: tokens(sum.tokenTotal),
-          delta: deltaText(sum.tokenTotal, previous ? previous.tokenTotal : 0, "tokens"),
-          tip: tokenText() + beforeText(previous ? previous.tokenTotal : 0, "tokens") + trendText("tokenTotal", "tokens") },
-        { label: i18n("Prompts"), key: "prompts", value: String(sum.prompts),
-          delta: deltaText(sum.prompts, previous ? previous.prompts : 0, "count"),
-          tip: i18np("In %1 chat", "In %1 chats", sum.chats) + " · " + i18np("%1 turn of Claude's", "%1 turns of Claude's", sum.turns)
-               + beforeText(previous ? previous.prompts : 0, "count") + trendText("prompts", "count") }
+               + beforeText(previous ? previous.cost : 0, "money") + trendText("cost", "money") }
     ]
 
     // What the tokens were: all that Claude read and wrote, by kind
@@ -575,6 +578,32 @@ PlasmaComponents3.ScrollView {
             font: Kirigami.Theme.smallFont
             opacity: 0.7
             text: view.factsText()
+        }
+
+        // What Claude did: its tool calls, commands, edits, subagents
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: view.hasData && !!view.work && view.work.toolCalls > 0
+            spacing: Math.round(view.gu * 0.2)
+
+            SectionTitle {
+                text: i18n("What Claude did")
+            }
+            PlasmaComponents3.Label {
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: view.workText()
+            }
+            PlasmaComponents3.Label {
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                visible: !!view.work && view.work.tools.length > 0
+                wrapMode: Text.Wrap
+                font: Kirigami.Theme.smallFont
+                opacity: 0.7
+                text: !view.work ? "" : i18n("Its tools: %1", view.work.tools.map(t => t[0] + " " + view.count(t[1])).join(" · "))
+            }
         }
 
         // A day per row: when you were at it, when Claude worked, when it waited for you
@@ -1002,110 +1031,6 @@ PlasmaComponents3.ScrollView {
             }
         }
 
-        // The project folders Claude worked in most (a chat started in a
-        // subfolder of a repository counts for the repository): click one
-        // for its chats
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: view.hasData && view.projects.length > 0
-            spacing: Math.round(view.gu * 0.2)
-
-            SectionTitle {
-                text: i18n("Where Claude worked")
-            }
-            Repeater {
-                model: view.projects.length
-                delegate: ColumnLayout {
-                    id: projectRow
-                    required property int index
-                    readonly property var project: view.projects[index] || view.emptyProject
-                    readonly property string key: project.host + "|" + project.path
-                    readonly property bool open: view.openProject === key
-                    Layout.fillWidth: true
-                    spacing: 0
-
-                    Item {
-                        Layout.fillWidth: true
-                        implicitHeight: projectLine.implicitHeight
-
-                        RowLayout {
-                            id: projectLine
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: Kirigami.Units.smallSpacing
-
-                            Kirigami.Icon {
-                                Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                                Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                                source: projectRow.open ? "arrow-down" : (Qt.application.layoutDirection === Qt.RightToLeft ? "arrow-left" : "arrow-right")
-                                opacity: 0.6
-                            }
-                            PlasmaComponents3.Label {
-                                textFormat: Text.PlainText
-                                Layout.preferredWidth: view.gu * 6
-                                text: (projectRow.project.host ? projectRow.project.host + ": " : "") + projectRow.project.name
-                                elide: Text.ElideMiddle
-                                font.bold: projectRow.open
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: Math.round(view.gu * 0.4)
-
-                                Rectangle {
-                                    width: Math.max(2, parent.width * projectRow.project.workedMs / view.maxProject)
-                                    height: parent.height
-                                    radius: Math.min(2, height / 2)
-                                    color: view.workColor
-                                    opacity: 0.8
-                                }
-                            }
-                            PlasmaComponents3.Label {
-                                textFormat: Text.PlainText
-                                text: view.hours(projectRow.project.workedMs) + " · " + view.money(projectRow.project.cost)
-                                font: Kirigami.Theme.smallFont
-                                opacity: 0.8
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: view.openProject = projectRow.open ? "" : projectRow.key
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: (projectRow.project.host ? projectRow.project.host + ": " : "") + projectRow.project.path
-                                subText: i18n("Claude worked %1 · %2 at API prices", view.hours(projectRow.project.workedMs),
-                                              view.money(projectRow.project.cost))
-                                         + "\n" + i18np("%1 prompt", "%1 prompts", projectRow.project.prompts)
-                                         + " · " + i18np("%1 chat", "%1 chats", projectRow.project.chatCount)
-                            }
-                        }
-                    }
-                    Repeater {
-                        model: projectRow.open ? projectRow.project.chats.length : 0
-                        delegate: WeekChatLine {
-                            required property int index
-                            chat: projectRow.project.chats[index] || view.emptyChat
-                            where: ""
-                            indent: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-                            numbers: view.hours(chat.workedMs) + " · " + view.money(chat.cost)
-                        }
-                    }
-                    PlasmaComponents3.Label {
-                        textFormat: Text.PlainText
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
-                        visible: projectRow.open && projectRow.project.chatCount > projectRow.project.chats.length
-                        text: i18np("and %1 more chat", "and %1 more chats",
-                                    projectRow.project.chatCount - projectRow.project.chats.length)
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.6
-                    }
-                }
-            }
-        }
-
         // The day, chat by chat (week.py: day_lanes): when each chat worked,
         // waited for you (a permission, a question) or was paused (asleep, a
         // limit); between its turns it was your turn. A name opens its chat.
@@ -1223,6 +1148,118 @@ PlasmaComponents3.ScrollView {
             }
         }
 
+        // The project folders Claude worked in most (a chat started in a
+        // subfolder of a repository counts for the repository): click one
+        // to open it in the Projects tab (an SSH host's: for its chats here)
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: view.hasData && view.projects.length > 0
+            spacing: Math.round(view.gu * 0.2)
+
+            SectionTitle {
+                text: i18n("Where Claude worked")
+            }
+            Repeater {
+                model: view.projects.length
+                delegate: ColumnLayout {
+                    id: projectRow
+                    required property int index
+                    readonly property var project: view.projects[index] || view.emptyProject
+                    readonly property string key: project.host + "|" + project.path
+                    readonly property bool open: view.openProject === key
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Item {
+                        Layout.fillWidth: true
+                        implicitHeight: projectLine.implicitHeight
+
+                        RowLayout {
+                            id: projectLine
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            spacing: Kirigami.Units.smallSpacing
+
+                            Kirigami.Icon {
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                source: !projectRow.project.host ? "go-next"   // (to the Projects tab)
+                                        : projectRow.open ? "arrow-down" : (Qt.application.layoutDirection === Qt.RightToLeft ? "arrow-left" : "arrow-right")
+                                opacity: 0.6
+                            }
+                            PlasmaComponents3.Label {
+                                textFormat: Text.PlainText
+                                Layout.preferredWidth: view.gu * 6
+                                text: (projectRow.project.host ? projectRow.project.host + ": " : "") + projectRow.project.name
+                                elide: Text.ElideMiddle
+                                font.bold: projectRow.open
+                            }
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Math.round(view.gu * 0.4)
+
+                                Rectangle {
+                                    width: Math.max(2, parent.width * projectRow.project.workedMs / view.maxProject)
+                                    height: parent.height
+                                    radius: Math.min(2, height / 2)
+                                    color: view.workColor
+                                    opacity: 0.8
+                                }
+                            }
+                            PlasmaComponents3.Label {
+                                textFormat: Text.PlainText
+                                text: view.hours(projectRow.project.workedMs) + " · " + view.money(projectRow.project.cost)
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.8
+                            }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (projectRow.project.host)
+                                    view.openProject = projectRow.open ? "" : projectRow.key
+                                else
+                                    root.showProject(projectRow.project.path)
+                            }
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: (projectRow.project.host ? projectRow.project.host + ": " : "") + projectRow.project.path
+                                subText: i18n("Claude worked %1 · %2 at API prices", view.hours(projectRow.project.workedMs),
+                                              view.money(projectRow.project.cost))
+                                         + "\n" + i18np("%1 prompt", "%1 prompts", projectRow.project.prompts)
+                                         + " · " + i18np("%1 chat", "%1 chats", projectRow.project.chatCount)
+                                         + "\n\n" + (projectRow.project.host ? i18n("Click for its chats.")
+                                                                         : i18n("Click to open it in the Projects tab: its chats, plans and memories."))
+                            }
+                        }
+                    }
+                    Repeater {
+                        model: projectRow.open ? projectRow.project.chats.length : 0
+                        delegate: WeekChatLine {
+                            required property int index
+                            chat: projectRow.project.chats[index] || view.emptyChat
+                            where: ""
+                            indent: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                            numbers: view.hours(chat.workedMs) + " · " + view.money(chat.cost)
+                        }
+                    }
+                    PlasmaComponents3.Label {
+                        textFormat: Text.PlainText
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
+                        visible: projectRow.open && projectRow.project.chatCount > projectRow.project.chats.length
+                        text: i18np("and %1 more chat", "and %1 more chats",
+                                    projectRow.project.chatCount - projectRow.project.chats.length)
+                        font: Kirigami.Theme.smallFont
+                        opacity: 0.6
+                    }
+                }
+            }
+        }
+
         // The chats Claude worked on most: click one to bring it up
         ColumnLayout {
             Layout.fillWidth: true
@@ -1240,32 +1277,6 @@ PlasmaComponents3.ScrollView {
                     chat: view.chats[index] || view.emptyChat
                     numbers: view.hours(chat.workedMs) + " · " + view.money(chat.cost)
                 }
-            }
-        }
-
-        // What Claude did: its tool calls, commands, edits, subagents
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: view.hasData && !!view.work && view.work.toolCalls > 0
-            spacing: Math.round(view.gu * 0.2)
-
-            SectionTitle {
-                text: i18n("What Claude did")
-            }
-            PlasmaComponents3.Label {
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: view.workText()
-            }
-            PlasmaComponents3.Label {
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                visible: !!view.work && view.work.tools.length > 0
-                wrapMode: Text.Wrap
-                font: Kirigami.Theme.smallFont
-                opacity: 0.7
-                text: !view.work ? "" : i18n("Its tools: %1", view.work.tools.map(t => t[0] + " " + view.count(t[1])).join(" · "))
             }
         }
 
@@ -1332,58 +1343,8 @@ PlasmaComponents3.ScrollView {
             }
         }
 
-        // Where the money went: the turns that cost most, the chats, and
-        // coming back to chats whose cache had expired
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: view.hasData && !!view.spend && (view.spend.turns.length > 0 || view.spend.cold.count > 0)
-            spacing: 0
-
-            SectionTitle {
-                text: i18n("Turns that cost the most")
-                visible: !!view.spend && view.spend.turns.length > 0
-                Layout.bottomMargin: Math.round(view.gu * 0.2)
-            }
-            Repeater {
-                model: view.spend ? view.spend.turns.length : 0
-                delegate: WeekChatLine {
-                    required property int index
-                    chat: view.spend.turns[index] || view.emptyChat
-                    where: chat.startedAt ? view.whenText(chat.startedAt) : ""
-                    numbers: view.hours(chat.workedMs) + " · " + view.money(chat.cost)
-                }
-            }
-            PlasmaComponents3.Label {
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.topMargin: Math.round(view.gu * 0.2)
-                visible: !!view.spend && view.spend.chats.length > 0
-                wrapMode: Text.Wrap
-                font: Kirigami.Theme.smallFont
-                opacity: 0.7
-                text: !view.spend ? "" : i18n("Costliest chats: %1", view.spend.chats.map(c => c.name + " " + view.money(c.cost)).join(" · "))
-            }
-            PlasmaComponents3.Label {
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.topMargin: Math.round(view.gu * 0.2)
-                visible: !!view.spend && view.spend.cold.count > 0
-                wrapMode: Text.Wrap
-                font: Kirigami.Theme.smallFont
-                opacity: 0.7
-                text: {
-                    if (!view.spend || !view.spend.cold.count)
-                        return ""
-                    const cold = view.spend.cold
-                    return i18np("You came back to a chat after its cache had expired (an hour without a reply) once: writing its context again cost %2 more than reading it from the cache.",
-                                 "You came back to chats after their cache had expired (an hour without a reply) %1 times: writing their context again cost %2 more than reading it from the cache.",
-                                 cold.count, view.money(cold.cost))
-                           + (cold.chats.length ? " " + i18n("Most in: %1.", cold.chats.map(c => i18n("%1 (%2×, %3)", c.name, c.resumes, view.money(c.cost))).join(", ")) : "")
-                }
-            }
-        }
-
-        // What would use less of your plan (Claude Code's /usage rules)
+        // What would use less of your plan (Claude Code's /usage rules), and
+        // what coming back to chats whose cache had expired cost
         ColumnLayout {
             Layout.fillWidth: true
             visible: view.hasData
@@ -1395,7 +1356,7 @@ PlasmaComponents3.ScrollView {
             PlasmaComponents3.Label {
                 textFormat: Text.PlainText
                 Layout.fillWidth: true
-                visible: view.tips.length === 0
+                visible: view.tips.length === 0 && !(view.spend && view.spend.cold.count > 0)
                 wrapMode: Text.Wrap
                 opacity: 0.7
                 text: i18n("Nothing stands out: no habit takes a tenth of the usage shown.")
@@ -1470,6 +1431,24 @@ PlasmaComponents3.ScrollView {
                             subText: i18n("Type it in a chat of yours.")
                         }
                     }
+                }
+            }
+            // coming back to chats whose cache had expired: what writing it again cost
+            PlasmaComponents3.Label {
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                visible: !!view.spend && view.spend.cold.count > 0
+                wrapMode: Text.Wrap
+                font: Kirigami.Theme.smallFont
+                opacity: 0.7
+                text: {
+                    if (!view.spend || !view.spend.cold.count)
+                        return ""
+                    const cold = view.spend.cold
+                    return i18np("You came back to a chat after its cache had expired (an hour without a reply) once: writing its context again cost %2 more than reading it from the cache.",
+                                 "You came back to chats after their cache had expired (an hour without a reply) %1 times: writing their context again cost %2 more than reading it from the cache.",
+                                 cold.count, view.money(cold.cost))
+                           + (cold.chats.length ? " " + i18n("Most in: %1.", cold.chats.map(c => i18n("%1 (%2×, %3)", c.name, c.resumes, view.money(c.cost))).join(", ")) : "")
                 }
             }
         }
