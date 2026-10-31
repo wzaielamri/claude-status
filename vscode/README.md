@@ -18,7 +18,9 @@ of your plan is left, and Talpy, a pet who acts it all out.
   going by itself.
 - **Recap and Permissions**: your day, week or everything with Claude, and
   every permission you gave, to revoke.
-- **Plans, memories, recent chats and Find a Chat**, to star, hide or delete.
+- **Recent chats, ★ starred chats and plans** under each account, a page at a
+  time; **every chat, plan and memory by project** on the Projects tab; and
+  Find a Chat. Star, hide or delete them.
 
 <!-- Screenshots show demo data only (Talpy Den: Toggle Demo Data, or dev/harness.html), never real chats. -->
 <p>

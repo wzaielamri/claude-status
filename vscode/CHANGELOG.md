@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- **The view is what goes on now and your shortlists; the Projects tab has
+  everything else, by project:** under each account, **Recent chats**,
+  **★ Starred chats** and **★ Starred plans** are flat lists, newest first,
+  a page at a time (as many as `talpyDen.recentChats`): **Show N more**
+  under one shows the next page at once, its title says how many of all
+  show (*Recent chats (10 of 23)*), and folded again it starts over; the
+  account's `CLAUDE.md` is one line to read or edit. Its **Plans** and
+  **Memories** folds are gone from there: the **Projects** tab lists each
+  project folded (it stays so), newest first, with when Claude last worked
+  there and a dot for each of its open chats, and opened, its open chats,
+  Claude's last recap of it, and all its chats, plans and memories as the
+  same lines as under an account, with their buttons (open, reopen, edit,
+  star, send, carry out, continue, share, hide, delete), a page at a time,
+  each with its account when the project is on several, *(not there any
+  more)* for a folder that's gone, and a line's folder said only below the
+  project's (*server* for *~/repos/api/server*). No time or money in the
+  Projects tab any more (the Recap has them, by project), and a project in
+  the Recap's *Where Claude worked* opens it there. Lists and projects open
+  as quickly as before or quicker: a line's buttons are made the first time
+  they're wanted, and a project's plans and memories a frame after its
+  chats; the status check counts every recent chat without getting slower.
+- **The Recap reads as a story:** the big picture first (the tiles in the
+  order *You*, *Claude worked*, *Prompts*, *Tokens*, *At API prices*), then
+  what Claude did, when (the day-by-day graph, your plan's limits over the
+  same days, the day chat by chat), where (by project, the chats it worked
+  on most), and the money last (API prices, and what could use less of your
+  plan, which now also says what coming back to chats after their cache
+  expired cost). *Turns that cost the most* and the *Costliest chats* line
+  are gone: they repeated *Chats it worked on most*.
 - **Delete a chat, a plan or a memory, to the Trash:** the trash button
   beside a line's × (a finished chat, a recent chat, a plan, a memory) asks
   first, saying what goes and on which accounts (*Delete “Fix the build” on
@@ -22,7 +51,7 @@
   Chats Again**, **Show Hidden Plans Again**, **Show Hidden Memories
   Again**, **Show Hidden Projects Again**, each only while something of that
   kind is hidden; an SSH host's eye button offers its own. Plans carry a
-  task icon and memories their kind's, on the Projects tab's chips too.
+  task icon and memories their kind's, in the Projects tab too.
 - **Stop asks about Keep going:** stopping a chat that keeps going says so
   in its question (*It keeps going after usage limits.*) and offers
   **Stop**, which leaves Keep going on for the next limit, and **Stop and
@@ -174,8 +203,9 @@
 - **The Projects tab starts folded, and a project's folder line fits:** the
   first three projects were open, and next to each project's numbers its
   folder and *last at work* line ran out of room in a narrow sidebar, cut
-  right after the folder. Every project starts folded now, the numbers are
-  a line of their own under the folder, and the arrow sits on the name.
+  right after the folder. Every project starts folded now, its folder and
+  *last at work* line has the width under its name, and the arrow sits on
+  the name.
 - **A pet you hold swings as on Plasma:** one you held and swung kept
   swinging like a pendulum for seconds, its burrow swinging with it as it
   dug in; its springs were only roughly Plasma's. They're stepped as Qt
