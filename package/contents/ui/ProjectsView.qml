@@ -48,6 +48,20 @@ PlasmaComponents3.ScrollView {
         return !!root.openProjects[project.path]
     }
 
+    // A project opened from the Recap, scrolled to the top of the view
+    property Item scrollTarget: null
+    Timer {
+        id: scroller
+        interval: 100
+        onTriggered: {
+            if (!view.scrollTarget)
+                return
+            const flick = view.contentItem
+            flick.contentY = Math.max(0, Math.min(view.scrollTarget.y, flick.contentHeight - flick.height))
+            view.scrollTarget = null
+        }
+    }
+
     // the title of an opened project's chats, plans, memories: small, as the folds of an account's lists
     component SubTitle: PlasmaComponents3.Label {
         textFormat: Text.PlainText
@@ -117,14 +131,12 @@ PlasmaComponents3.ScrollView {
                 function fold() {
                     root.toggleProject(project.path, unfolded)
                 }
-                // (opened from the Recap: brought into view)
+                // (opened from the Recap: brought into view, once the list is laid out)
                 function bringUp() {
                     if (root.projectToShow !== "" && root.projectToShow === project.path) {
                         root.projectToShow = ""
-                        Qt.callLater(() => {
-                            const flick = view.contentItem
-                            flick.contentY = Math.max(0, Math.min(card.y, flick.contentHeight - flick.height))
-                        })
+                        view.scrollTarget = card
+                        scroller.restart()
                     }
                 }
                 Component.onCompleted: bringUp()
