@@ -124,6 +124,32 @@ class RowButtonsTests(unittest.TestCase):
                 self.assertIn("activeFocusOnTab: true", label)
                 self.assertIn("Keys.onReturnPressed", label)
 
+    def test_a_queued_task_is_a_line_as_a_recent_chats(self):
+        # One line: its mark, what it is, its folder and when it starts at the
+        # end; Start now and Cancel only on hover, Tab or a finger's hold, over
+        # that end (both showed all the time, and in VS Code "starts in…" had
+        # a line of its own)
+        qml = (UI / "GroupSection.qml").read_text()
+        line = qml[qml.index("id: queuedLine\n"):qml.index("ConfirmLine {", qml.index("id: queuedLine\n"))]
+        self.assertRegex(line, r"queuedName\.activeFocus \|\| queuedButtons\.focused \|\| queuedButtons\.held")
+        self.assertEqual(len(re.findall(r"TouchHold \{\s+buttons: queuedButtons\s+\}", line)), 2)
+        self.assertIn("covered: queuedButtons.covering", line)
+        self.assertIn("under: queuedEnd", line)
+        buttons = line[line.index("HoverButtons {"):]
+        self.assertEqual(line.count("PlasmaComponents3.ToolButton"), buttons.count("PlasmaComponents3.ToolButton"))
+        self.assertEqual(buttons.count("PlasmaComponents3.ToolButton"), 2)
+        self.assertIn("Icons.plasma.startNow", buttons)
+        self.assertIn("Icons.plasma.cancel", buttons)
+
+        tsx = (UI.parent.parent.parent / "vscode/webview/components/QueuedTasks.tsx").read_text()
+        row = tsx[tsx.index('<div class="recent-item queued-line"'):tsx.index("</div>\n      {t.error")]
+        self.assertIn('class="queued-what"', row)
+        self.assertIn('class="queued-when', row)              # (on the same line, at its end)
+        self.assertIn('"row-actions"', row)                   # (hover buttons, as a recent chat's)
+        self.assertIn("woken", row)                           # (made the first time they show)
+        self.assertIn("icon={I.startNow}", row)
+        self.assertIn("icon={I.cancel}", row)
+
     def test_what_a_line_rarely_needs_is_made_only_when_needed(self):
         # Opening Recent chats, Plans or Memories made every line's buttons,
         # Delete question, keep-only question, a plan's new-chat box and its

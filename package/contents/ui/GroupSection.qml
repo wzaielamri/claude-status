@@ -392,6 +392,15 @@ ColumnLayout {
             Layout.rightMargin: Kirigami.Units.smallSpacing
             spacing: 0
 
+            // a line as a recent chat's: its mark, what it is, and at its end its
+            // folder and when it starts; Start now and Cancel on hover (or Tab,
+            // or a finger's hold), over that end
+            HoverHandler {
+                id: queuedHover
+            }
+            TouchHold {
+                buttons: queuedButtons
+            }
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
@@ -400,6 +409,8 @@ ColumnLayout {
                     source: queuedLine.task.error ? Icons.plasma.warning : Icons.plasma.goOnAt
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Layout.preferredWidth
+                    Layout.alignment: Qt.AlignVCenter
+                    opacity: queuedLine.task.error ? 1 : 0.7
                 }
                 PlasmaComponents3.Label {
                     id: queuedName
@@ -407,6 +418,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                     text: queuedLine.what.split("\n")[0]
                     elide: Text.ElideRight
+                    activeFocusOnTab: true   // (Tab: its buttons show)
 
                     PlasmaCore.ToolTipArea {
                         textFormat: Text.PlainText
@@ -418,63 +430,95 @@ ColumnLayout {
                                     ? i18n("The chat goes on in the background in %1, at %2, telling Claude that the limit has reset. A Claude that still has it open (in a terminal, or in the background) quits first; if it went on before then, nothing happens.",
                                            queuedLine.folder, root.startText(queuedLine.task.startAt))
                                     : i18n("Starts in the background in %1, at %2.", queuedLine.folder, root.startText(queuedLine.task.startAt)))
-                    }
-                }
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    text: queuedLine.task.error ? i18n("didn't start")
-                          : queuedLine.task.due || queuedLine.task.startAt <= root.now ? i18n("starting…")
-                          : queuedLine.task.startAt - root.now > 12 * 3600000
-                          ? i18nc("queued task: folder, when it starts", "%1 · starts %2", queuedLine.task.folderShort || "~",
-                                  root.startText(queuedLine.task.startAt))
-                          : i18nc("queued task: folder, when it starts", "%1 · starts in %2", queuedLine.task.folderShort || "~",
-                                  root.duration(queuedLine.task.startAt - root.now))
-                    color: queuedLine.task.error ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
-                    opacity: queuedLine.task.error ? 1 : 0.6
-                    font: Kirigami.Theme.smallFont
-                    elide: Text.ElideLeft
-                    Layout.maximumWidth: Kirigami.Units.gridUnit * 12
-                }
-                PlasmaComponents3.ToolButton {
-                    icon.name: Icons.plasma.startNow
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Start it now")
-                    enabled: !root.isStarting(queuedLine.task.id)
-                    Layout.preferredHeight: queuedName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: root.startQueued(queuedLine.task)
 
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Start it now")
-                        subText: queuedLine.task.scheduled ? i18n("In the background, without waiting for its time.")
-                                 : i18n("In the background, without waiting for the limit to reset. While the limit lasts, Claude stops again at once.")
+                        TouchHold {
+                            buttons: queuedButtons
+                        }
                     }
                 }
-                PlasmaComponents3.ToolButton {
-                    // (what you wrote for it is asked about first: it's gone with it)
-                    readonly property bool wrote: !queuedLine.task.chat || !!queuedLine.task.afterTurn
-                    readonly property bool kept: !!queuedLine.task.chat && !queuedLine.task.afterTurn && !queuedLine.task.host
-                                                 && root.keptChat(queuedLine.task.chat) !== null
-                    icon.name: Icons.plasma.cancel
-                    display: PlasmaComponents3.AbstractButton.IconOnly
-                    text: i18n("Cancel it")
-                    Layout.preferredHeight: queuedName.implicitHeight
-                    Layout.preferredWidth: Layout.preferredHeight
-                    onClicked: {
-                        if (wrote)
-                            root.unqueueAsk = root.unqueueAsk === queuedLine.task.id ? "" : queuedLine.task.id
-                        else
-                            root.unqueue(queuedLine.task)
-                    }
+                // its folder and when it starts, at the line's end
+                CoveredEnd {
+                    id: queuedEnd
+                    covered: queuedButtons.covering
+                    Layout.preferredWidth: Math.min(queuedWhen.implicitWidth, Kirigami.Units.gridUnit * 12)
+                    implicitHeight: queuedWhen.implicitHeight
 
-                    PlasmaCore.ToolTipArea {
+                    PlasmaComponents3.Label {
+                        id: queuedWhen
+                        width: queuedEnd.width
+                        horizontalAlignment: Text.AlignRight
                         textFormat: Text.PlainText
-                        anchors.fill: parent
-                        mainText: i18n("Cancel it")
-                        subText: i18n("It doesn't start.") + (parent.kept ? " " + i18n("It stops keeping going after usage limits too.") : "")
-                                 + (parent.wrote ? " " + i18n("It asks first: what you wrote for it is gone with it.") : "")
+                        text: queuedLine.task.error ? i18n("didn't start")
+                              : queuedLine.task.due || queuedLine.task.startAt <= root.now ? i18n("starting…")
+                              : queuedLine.task.startAt - root.now > 12 * 3600000
+                              ? i18nc("queued task: folder, when it starts", "%1 · starts %2", queuedLine.task.folderShort || "~",
+                                      root.startText(queuedLine.task.startAt))
+                              : i18nc("queued task: folder, when it starts", "%1 · starts in %2", queuedLine.task.folderShort || "~",
+                                      root.duration(queuedLine.task.startAt - root.now))
+                        color: queuedLine.task.error ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
+                        opacity: queuedLine.task.error ? 1 : 0.6
+                        font: Kirigami.Theme.smallFont
+                        elide: Text.ElideLeft
+                    }
+                }
+                HoverButtons {
+                    id: queuedButtons
+                    lineHeight: queuedName.implicitHeight
+                    shown: queuedHover.hovered || queuedName.activeFocus || queuedButtons.focused || queuedButtons.held
+                           || root.unqueueAsk === queuedLine.task.id
+                    under: queuedEnd
+
+                    RowLayout {   // (made the first time they show)
+                        spacing: 0
+
+                        PlasmaComponents3.ToolButton {
+                            icon.name: Icons.plasma.startNow
+                            display: PlasmaComponents3.AbstractButton.IconOnly
+                            text: i18n("Start it now")
+                            enabled: !root.isStarting(queuedLine.task.id)
+                            Layout.preferredHeight: queuedButtons.buttonSize
+                            Layout.preferredWidth: queuedButtons.buttonWidth
+                            icon.width: Kirigami.Units.iconSizes.small
+                            icon.height: Kirigami.Units.iconSizes.small
+                            Layout.alignment: Qt.AlignTop
+                            onClicked: root.startQueued(queuedLine.task)
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: i18n("Start it now")
+                                subText: queuedLine.task.scheduled ? i18n("In the background, without waiting for its time.")
+                                         : i18n("In the background, without waiting for the limit to reset. While the limit lasts, Claude stops again at once.")
+                            }
+                        }
+                        PlasmaComponents3.ToolButton {
+                            // (what you wrote for it is asked about first: it's gone with it)
+                            readonly property bool wrote: !queuedLine.task.chat || !!queuedLine.task.afterTurn
+                            readonly property bool kept: !!queuedLine.task.chat && !queuedLine.task.afterTurn && !queuedLine.task.host
+                                                         && root.keptChat(queuedLine.task.chat) !== null
+                            icon.name: Icons.plasma.cancel
+                            display: PlasmaComponents3.AbstractButton.IconOnly
+                            text: i18n("Cancel it")
+                            Layout.preferredHeight: queuedButtons.buttonSize
+                            Layout.preferredWidth: queuedButtons.buttonWidth
+                            icon.width: Kirigami.Units.iconSizes.small
+                            icon.height: Kirigami.Units.iconSizes.small
+                            Layout.alignment: Qt.AlignTop
+                            onClicked: {
+                                if (wrote)
+                                    root.unqueueAsk = root.unqueueAsk === queuedLine.task.id ? "" : queuedLine.task.id
+                                else
+                                    root.unqueue(queuedLine.task)
+                            }
+
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                anchors.fill: parent
+                                mainText: i18n("Cancel it")
+                                subText: i18n("It doesn't start.") + (parent.kept ? " " + i18n("It stops keeping going after usage limits too.") : "")
+                                         + (parent.wrote ? " " + i18n("It asks first: what you wrote for it is gone with it.") : "")
+                            }
+                        }
                     }
                 }
             }

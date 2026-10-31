@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A queued task is a line as a recent chat's:** its clock (or ⚠ when it
+  didn't start), what it is, and at the line's end its folder and when it
+  starts; **Start now** and **Cancel** show on hover or Tab, over that end,
+  instead of all the time, and *starts in…* is no longer a line of its own.
 - **One icon for one thing, the same as in Plasma and GNOME, and plain:**
   the widget's icon table (`icons.mjs`) gives each meaning its icon, and
   every button and mark asks it. **Cancel** is an × (a queued task's was a

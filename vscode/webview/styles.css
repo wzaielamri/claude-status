@@ -869,25 +869,39 @@ button:focus-visible {
   padding: 0;
 }
 
+/* A queued task: a line as a recent chat's (QueuedTasks.tsx), its folder and
+   when it starts at the end, Start now and Cancel over that end on hover */
 .queued-item {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
+  padding: 0;
+}
+
+.queued-line {
   align-items: center;
-  gap: 6px;
-  padding: 2px 0;
+}
+
+.queued-mark {
+  opacity: 0.7;
+}
+
+.queued-item.failed .queued-mark {
+  opacity: 1;
 }
 
 .queued-what {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 3em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.queued-actions {
-  display: flex;
+.queued-when {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  color: var(--cs-muted);
 }
 
 .queued-item.failed .queued-when,
@@ -895,10 +909,15 @@ button:focus-visible {
   color: var(--cs-failed);
 }
 
-.queued-when,
 .queued-error {
-  flex-basis: 100%;
-  padding-left: 1.5em;
+  padding-left: calc(16px + 6px);
+}
+
+.queued-line:hover > .row-actions,
+.queued-line:has(:focus-visible) > .row-actions,
+.queued-line > .row-actions.shown {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Continue on another account, under a chat a usage limit stopped */
@@ -3776,5 +3795,5 @@ body.vscode-high-contrast-light .pane {
 }
 
 .queued-item > .queued-ask {
-  flex-basis: 100%;
+  margin-left: calc(16px + 6px);
 }
