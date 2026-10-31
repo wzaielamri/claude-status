@@ -150,6 +150,37 @@ class RowButtonsTests(unittest.TestCase):
         self.assertIn("icon={I.startNow}", row)
         self.assertIn("icon={I.cancel}", row)
 
+    def test_the_tabs_stand_in_one_order_everywhere(self):
+        # your chats now, then your work by project, the permissions you gave, the Recap
+        repo = UI.parent.parent.parent
+        full = (UI / "FullRepresentation.qml").read_text()
+        self.assertIn('readonly property var tabOrder: ["chats", "projects", "perms", "week"]', full)
+        self.assertNotIn('["chats", "week", "perms", "projects"]', full)
+        names = re.findall(r'text: i18n\("([^"]+)"\)\n\s+onClicked: root\.popupTab = "(\w+)"', full)
+        self.assertEqual([t for _, t in names], ["chats", "projects", "perms", "week"])
+        ui = (repo / "vscode/webview/util/ui.ts").read_text()
+        self.assertIn('TAB_ORDER: readonly Tab[] = ["chats", "projects", "perms", "week"]', ui)
+        gnome = (repo / "gnome/extension/indicator.js").read_text()
+        self.assertIn("[['chats', 'Talpy Den'], ['perms', 'Permissions'], ['week', 'Recap']]", gnome)
+
+    def test_a_projects_dots_stand_top_right_and_its_buttons_cover_its_folder_line(self):
+        # (the buttons kept their room after the dots on the name's line, so the
+        # dots stood a few buttons in from the edge)
+        qml = (UI / "ProjectsView.qml").read_text()
+        head = qml[qml.index("id: projectName"):qml.index("TapHandler {", qml.index("id: projectName"))]
+        self.assertLess(head.index("Row {\n"), head.index("id: metaLine"))           # dots: on the name's line
+        meta = head[head.index("id: metaLine"):]
+        self.assertIn("id: headButtons", meta)                                        # buttons: on the folder's
+        self.assertIn("anchors.right: parent.right", meta)
+        self.assertNotIn("Layout.preferredWidth", meta[meta.index("id: headButtons"):meta.index("sourceComponent")])
+        self.assertIn("card.buttonsShown && headButtons.item ? headButtons.width", meta)   # (its end cut under them)
+        tsx = (UI.parent.parent.parent / "vscode/webview/components/ProjectsView.tsx").read_text()
+        self.assertLess(tsx.index('class="project-dots"'), tsx.index('class="project-actions"'))
+        css = (UI.parent.parent.parent / "vscode/webview/styles.css").read_text()
+        actions = css[css.index(".project-actions {"):]
+        self.assertIn("position: absolute;", actions[:200])
+        self.assertIn("bottom: 2px;", actions[:200])
+
     def test_what_a_line_rarely_needs_is_made_only_when_needed(self):
         # Opening Recent chats, Plans or Memories made every line's buttons,
         # Delete question, keep-only question, a plan's new-chat box and its

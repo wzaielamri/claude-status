@@ -3,17 +3,17 @@ import type { Counts, Group, HostState, Overall } from "../../src/shared/types";
 import { editorTab, post } from "../env";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
-import { setFocus, setTab, type Tab, uiState } from "../util/ui";
+import { setFocus, setTab, TAB_ORDER, type Tab, uiState } from "../util/ui";
 import { I, Icon, type IconName } from "../util/icons";
 import { IconButton } from "./IconButton";
 import { TalpyIcon } from "./TalpyIcon";
 
-const TABS: [Tab, string, IconName][] = [
-  ["chats", "Talpy Den", I.chats],
-  ["week", "Recap", I.recap],
-  ["perms", "Permissions", I.permissions],
-  ["projects", "Projects", I.project],
-];
+const TABS: Record<Tab, [string, IconName]> = {
+  chats: ["Talpy Den", I.chats],
+  projects: ["Projects", I.project],
+  perms: ["Permissions", I.permissions],
+  week: ["Recap", I.recap],
+};
 
 // The icon and the summary. In the sidebar the view's title bar has the
 // buttons; opened as an editor tab there's no title bar, so they're here.
@@ -37,11 +37,11 @@ export function Header(props: {
   return (
     <header class="header">
       <TalpyIcon state={overall} moving={visible} />
-      {/* The app's name is the first tab: your chats now. The others: your last 7 days with Claude (WeekView.tsx),
-          the permissions you gave (PermsView.tsx), your projects (ProjectsView.tsx) */}
+      {/* The app's name is the first tab: your chats now. The others: your projects (ProjectsView.tsx), the
+          permissions you gave (PermsView.tsx), your last 7 days with Claude (WeekView.tsx) */}
       {/* (in a narrow sidebar the tabs not shown are icons, so the Focus button stays in sight) */}
       <div class="tabs" role="tablist">
-        {TABS.map(([t, name, icon]) => (
+        {TAB_ORDER.map((t) => [t, ...TABS[t]] as const).map(([t, name, icon]) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} aria-label={name} class={"tab-btn" + (tab === t ? " on" : "")}
             title={t === "chats" ? tooltipLines(groups, counts, hosts).join("\n") : name}
             onClick={() => setTab(t)}>

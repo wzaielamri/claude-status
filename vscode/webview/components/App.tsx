@@ -19,7 +19,7 @@ import type { HeroInput } from "../pets/api";
 import { chatRefOf, contextFullText, groupKeyOf } from "../util/chat";
 import { useStore } from "../util/store";
 import { petColorsVersion, viewState } from "../util/stores";
-import { uiState } from "../util/ui";
+import { TAB_ORDER, uiState } from "../util/ui";
 import { ViewContext } from "./context";
 import { GroupSection } from "./GroupSection";
 import { Header } from "./Header";
@@ -30,7 +30,6 @@ import { PermsView } from "./PermsView";
 import { WeekView } from "./WeekView";
 
 const appClass = "app" + (editorTab ? " tab" : "");
-const TABS = ["chats", "week", "perms", "projects"];
 
 // A shadow under the sticky top once the list scrolls under it
 function useScrolled(): boolean {
@@ -80,7 +79,7 @@ export function App() {
   const lastTab = useRef(tab);
   const tabFrom = useRef(0);
   if (lastTab.current !== tab) {
-    tabFrom.current = TABS.indexOf(tab) > TABS.indexOf(lastTab.current) ? 1 : -1;
+    tabFrom.current = TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(lastTab.current) ? 1 : -1;
     lastTab.current = tab;
   }
   const tabIn = tabFrom.current ? { class: "content tab-in", style: { "--tab-from": `${tabFrom.current * 24}px` } } : { class: "content" };

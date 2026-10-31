@@ -18,6 +18,10 @@ PlasmaExtras.Representation {
 
     collapseMarginsHint: true
 
+    // The tabs, in the order they stand: your chats now, then the rest of your
+    // work by project, the permissions you gave, and the Recap of your days
+    readonly property var tabOrder: ["chats", "projects", "perms", "week"]
+
     header: PlasmaExtras.PlasmoidHeading {
         RowLayout {
             anchors.fill: parent
@@ -33,15 +37,15 @@ PlasmaExtras.Representation {
                 moving: root.dashboardShown && !root.coveredByWindow
             }
             // The app's name is the first tab: your chats now. The others: your
-            // last 7 days with Claude (WeekView.qml), the permissions you gave
-            // (PermsView.qml), your projects (ProjectsView.qml)
+            // projects (ProjectsView.qml), the permissions you gave
+            // (PermsView.qml), your last 7 days with Claude (WeekView.qml)
             PlasmaComponents3.TabBar {
                 id: tabs
                 // (squeezed, it shares out what's left, and "Recap" broke onto two lines)
                 Layout.minimumWidth: implicitWidth
                 // (set by a click, not by the bar's own index: a new popup
                 // starts at its first tab, which mustn't undo the one shown)
-                currentIndex: ["chats", "week", "perms", "projects"].indexOf(root.popupTab)
+                currentIndex: full.tabOrder.indexOf(root.popupTab)
 
                 PlasmaComponents3.TabButton {
                     width: implicitWidth   // (else the bar gives each the same share)
@@ -50,8 +54,8 @@ PlasmaExtras.Representation {
                 }
                 PlasmaComponents3.TabButton {
                     width: implicitWidth
-                    text: i18n("Recap")
-                    onClicked: root.popupTab = "week"
+                    text: i18n("Projects")
+                    onClicked: root.popupTab = "projects"
                 }
                 PlasmaComponents3.TabButton {
                     width: implicitWidth
@@ -60,13 +64,13 @@ PlasmaExtras.Representation {
                 }
                 PlasmaComponents3.TabButton {
                     width: implicitWidth
-                    text: i18n("Projects")
-                    onClicked: root.popupTab = "projects"
+                    text: i18n("Recap")
+                    onClicked: root.popupTab = "week"
                 }
                 Connections {
                     target: root
                     function onPopupTabChanged() {
-                        tabs.currentIndex = ["chats", "week", "perms", "projects"].indexOf(root.popupTab)
+                        tabs.currentIndex = full.tabOrder.indexOf(root.popupTab)
                     }
                 }
             }
@@ -179,9 +183,9 @@ PlasmaExtras.Representation {
             id: tabContent
             anchors.fill: parent
             spacing: Kirigami.Units.smallSpacing
-            // A tab slides in from the side it's on (Chats | Recap | Permissions | Projects), as in VS Code
+            // A tab slides in from the side it's on (Talpy Den | Projects | Permissions | Recap), as in VS Code
             transform: Translate { id: tabSlide }
-            property int tabIndex: ["chats", "week", "perms", "projects"].indexOf(root.popupTab)
+            property int tabIndex: full.tabOrder.indexOf(root.popupTab)
             onTabIndexChanged: {
                 if (!root.animateRows)
                     return

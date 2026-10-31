@@ -86,23 +86,24 @@ function Project({ p, open, here, now }: { p: ProjectRow; open: boolean; here: S
             </span>
           </span>
         </button>
-        {/* a dot for each of its open chats, in its state's color */}
+        {/* a dot for each of its open chats, in its state's color, at the top right */}
         {here.length ? (
           <span class="project-dots" title={`${here.length} open ${here.length === 1 ? "chat" : "chats"}\n` + here.map((s) => `${s.name}: ${stateText(s, now)}`).join("\n")}>
             {here.map((s) => <span key={s.key} class={`focus-dot st-${s.state}`} aria-hidden="true" />)}
           </span>
         ) : null}
+        {/* on hover (or Tab), over the end of its folder's line: the dots stay in sight, and nothing moves */}
         {unfiled ? null : (
-          <>
-            <button type="button" class="icon-btn project-action" title={`New chat here\n${p.short}`} aria-label="New chat here"
+          <span class="project-actions">
+            <button type="button" class="icon-btn" title={`New chat here\n${p.short}`} aria-label="New chat here"
               onClick={() => post({ type: "newChatIn", path: p.path, profileDir })}>
               <Icon name={I.newChat} />
             </button>
-            <button type="button" class="icon-btn project-action" title={`Hide this project\n${hideHint("projects")}`} aria-label="Hide this project"
+            <button type="button" class="icon-btn" title={`Hide this project\n${hideHint("projects")}`} aria-label="Hide this project"
               onClick={() => post({ type: "hide", kind: "projects", id: p.path })}>
               <Icon name={I.hide} />
             </button>
-          </>
+          </span>
         )}
       </div>
       {open ? <ProjectDetails p={p} here={here} now={now} /> : null}

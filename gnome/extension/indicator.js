@@ -1146,10 +1146,11 @@ class TalpyDenIndicator extends PanelMenu.Button {
             actor.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
             return actor;
         };
-        // The app's name is the first tab: your chats now. The others: your last
-        // 7 days with Claude (ui/weekView.js), the permissions you gave (ui/permsView.js)
+        // The app's name is the first tab: your chats now. The others: the
+        // permissions you gave (ui/permsView.js), your last 7 days with Claude
+        // (ui/weekView.js), in the order of Plasma's and VS Code's tabs
         this._tabs = {};
-        for (const [tab, text] of [['chats', 'Talpy Den'], ['week', 'Recap'], ['perms', 'Permissions']]) {
+        for (const [tab, text] of [['chats', 'Talpy Den'], ['perms', 'Permissions'], ['week', 'Recap']]) {
             const b = new St.Button({style_class: 'claude-tab', can_focus: true, child: whole(new St.Label({text})),
                 y_align: Clutter.ActorAlign.CENTER});
             b.connect('clicked', () => this.setTab(tab));

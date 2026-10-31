@@ -10,6 +10,9 @@ import { groupKeyOf } from "./chat";
 import { createStore } from "./store";
 
 export type Tab = "chats" | "week" | "perms" | "projects";
+// (in the order they stand: your chats now, then the rest of your work by
+// project, the permissions you gave, and the Recap of your days)
+export const TAB_ORDER: readonly Tab[] = ["chats", "projects", "perms", "week"];
 
 interface UiState {
   tab: Tab; // the view's tab: your chats now, your last 7 days, or the permissions you gave

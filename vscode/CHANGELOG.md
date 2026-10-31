@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The tabs in the order you go to them: Talpy Den, Projects,
+  Permissions, Recap.** A project's dots stand at the top right of its
+  line, which is a little taller: **New chat here** and **Hide** show on
+  hover or Tab over the end of its folder's line, instead of keeping their
+  room after the dots.
 - **A queued task is a line as a recent chat's:** its clock (or ⚠ when it
   didn't start), what it is, and at the line's end its folder and when it
   starts; **Start now** and **Cancel** show on hover or Tab, over that end,
