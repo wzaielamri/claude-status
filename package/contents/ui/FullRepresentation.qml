@@ -397,4 +397,17 @@ PlasmaExtras.Representation {
             }
         }
     }
+
+    // On the desktop, a right-click anywhere on it opens the widget's menu, as
+    // on the panel icon (MenuCatcher.qml); over the whole page, its heading too
+    Loader {
+        parent: full
+        anchors.fill: parent
+        z: 1000
+        active: root.onDesktop
+        sourceComponent: MenuCatcher {
+            covers: full
+            onMenu: at => root.openWidgetMenu(this, at.x, at.y)
+        }
+    }
 }

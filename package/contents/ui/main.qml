@@ -2229,6 +2229,36 @@ PlasmoidItem {
 
     property var hostItems: []
 
+    // The widget's menu, from a right-click on the dashboard on the desktop
+    // (MenuCatcher.qml): the panel icon's actions and Configure Talpy Den….
+    // (Plasma's own can't be had from here: the desktop's openContextMenu
+    // looks for a widget at its own top left corner, not under the pointer,
+    // and opens the desktop's menu.)
+    function openWidgetMenu(item, x, y) {
+        widgetMenu.clearMenuItems()
+        const items = []
+        for (const action of Plasmoid.contextualActions)
+            if (action.visible)
+                items.push(widgetMenuItem.createObject(widgetMenu, action.isSeparator ? { separator: true, section: action.text !== "",
+                                                                                          text: action.text }
+                                                                                        : { action: action }))
+        items.push(widgetMenuItem.createObject(widgetMenu, { separator: true }))
+        items.push(widgetMenuItem.createObject(widgetMenu, { action: Plasmoid.internalAction("configure") }))
+        for (const menuItem of items)
+            widgetMenu.addMenuItem(menuItem)
+        widgetMenuItems = items
+        widgetMenu.visualParent = item
+        widgetMenu.open(x, y)
+    }
+    property var widgetMenuItems: []
+    PlasmaExtras.Menu {
+        id: widgetMenu
+    }
+    Component {
+        id: widgetMenuItem
+        PlasmaExtras.MenuItem {}
+    }
+
     function openHostsMenu(button) {
         loadHosts()  // for next time, in case ~/.ssh/config changed
         hostsMenu.clearMenuItems()
