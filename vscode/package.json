@@ -137,6 +137,16 @@
         "category": "Talpy Den"
       },
       {
+        "command": "talpyDen.playfulOn",
+        "title": "Turn On Playful Talpy",
+        "category": "Talpy Den"
+      },
+      {
+        "command": "talpyDen.playfulOff",
+        "title": "Turn Off Playful Talpy",
+        "category": "Talpy Den"
+      },
+      {
         "command": "talpyDen.openSettings",
         "title": "Open Settings",
         "category": "Talpy Den",
@@ -290,6 +300,16 @@
           "command": "talpyDen.openUsagePage",
           "when": "view == talpyDen.view",
           "group": "2_usage@2"
+        },
+        {
+          "command": "talpyDen.playfulOff",
+          "when": "view == talpyDen.view && config.talpyDen.showPet && config.talpyDen.playfulTalpy",
+          "group": "1_view@6"
+        },
+        {
+          "command": "talpyDen.playfulOn",
+          "when": "view == talpyDen.view && config.talpyDen.showPet && !config.talpyDen.playfulTalpy",
+          "group": "1_view@6"
         },
         {
           "command": "talpyDen.accounts",
@@ -549,6 +569,12 @@
           "default": true,
           "markdownDescription": "Show Talpy, the animated pet.",
           "order": 20
+        },
+        "talpyDen.playfulTalpy": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Playful Talpy: his tricks and props, jokes, cookies and games. Off, he only shows what your chats do: his moods, his lamp and quiet moves (looking around, typing, thinking, sleeping). Notifications and the badge stay as they are.",
+          "order": 20.5
         },
         "talpyDen.chatPets": {
           "type": "integer",

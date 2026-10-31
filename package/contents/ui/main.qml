@@ -295,6 +295,8 @@ PlasmoidItem {
     // On the desktop the dashboard is shown all the time, and is often under
     // your windows: there the pets and the spinner stop moving while a window
     // covers it all (CoverWatch.qml), since every frame redraws the screen.
+    // Playful Talpy (a setting): his tricks, props, jokes, cookies and games; off, he shows only what the chats do
+    readonly property bool playful: Plasmoid.configuration.playful !== false
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar && !inTray
     // The dashboard is on screen: the popup is open, or it's shown in place
     // (on the desktop). There, opening a chat "closes the popup" too
@@ -426,7 +428,7 @@ PlasmoidItem {
     property bool inTray: (Plasmoid.containmentDisplayHints & PlasmaCore.Types.ContainmentDrawsPlasmoidHeading) !== 0
     readonly property var sharedKeys: ["pollInterval", "idlePollInterval", "extraConfigDirs", "notifyWaiting", "notifyDone",
         "notifyDoneMinSeconds", "notifySound", "soundVolume", "soundWaiting", "soundDone", "soundFailed", "recentChats",
-        "sshHosts", "remotePollSeconds", "sshUsage", "keepDoneHours", "showUsageInPanel", "showPet", "chatPets", "showTokens",
+        "sshHosts", "remotePollSeconds", "sshUsage", "keepDoneHours", "showUsageInPanel", "showPet", "playful", "chatPets", "showTokens",
         "newChatInVscode", "iconBlink", "awayDigest", "awayMinutes", "phoneWhileAway", "phoneFinished", "phoneDevice",
         "markdownApp", "newChatModel", "newChatEffort", "newChatMode", "usageCap", "usageRefreshMinutes", "recapRules", "clickOpensPane",
         "mondayRecap", "recapCurrency", "diffSideBySide", "paneTextPercent", "dictateLanguage"]
@@ -805,6 +807,15 @@ PlasmoidItem {
             icon.name: Icons.plasma.goTo
             visible: root.chatsNeedingYou().length > 0
             onTriggered: root.goToNextChat(root.chatsNeedingYou())
+        },
+        // Talpy plays (tricks, props, jokes, cookies, games), or only shows what the chats do
+        PlasmaCore.Action {
+            text: i18n("Playful Talpy")
+            icon.name: Icons.plasma.playful
+            checkable: true
+            checked: Plasmoid.configuration.playful
+            visible: Plasmoid.configuration.showPet
+            onTriggered: Plasmoid.configuration.playful = checked
         },
         PlasmaCore.Action {
             text: i18n("Open Usage Page on claude.ai")

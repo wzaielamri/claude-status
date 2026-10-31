@@ -102,6 +102,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
                 this._settings.connect(`changed::${key}`, () => this.refreshAll())),
             ...['show-usage-in-panel', 'show-pet', 'chat-pets'].map(key =>
                 this._settings.connect(`changed::${key}`, () => this.rerender())),
+            this._settings.connect('changed::playful-talpy', () => this._pets.playfulChanged()),
             this._settings.connect('changed::recap-rules', () => {
                 this.perms.rules = this._settings.get_boolean('recap-rules');
                 this.rerender();

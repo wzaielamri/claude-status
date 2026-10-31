@@ -569,6 +569,7 @@ export interface HostState {
 
 export interface ViewSettings {
   showPet: boolean;
+  playful?: boolean; // Playful Talpy: tricks, props, jokes, cookies, games (off: only what the chats do)
   chatPets: number;
   showTokens: boolean;
   recentChats: number;

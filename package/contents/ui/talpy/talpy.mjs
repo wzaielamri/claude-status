@@ -320,6 +320,7 @@ export class Talpy {
         this.lastAuto = '';
         this.nextBrain = 0;
         this.brainOn = opts.brain !== false;
+        this.playful = opts.playful !== false;   // its tricks and props (setPlayful)
         this.held = false;
         this.heldAt = 0;
         this.tugging = false;     // you pull at it, it hangs on to its burrow (tug)
@@ -370,6 +371,22 @@ export class Talpy {
         if (!this.run)
             this.apply({});
         this.nextBrain = this.now + random.rnd(200, 700);
+    }
+
+    // Playful Talpy (a setting): off, it picks only from its mood's calm moves
+    // (what the chats do, and quiet ones); a trick under way it picked itself stops
+    setPlayful(on) {
+        on = on !== false;
+        if (on === this.playful)
+            return;
+        this.playful = on;
+        if (on || !this.run || !this.run.auto)
+            return;
+        const calm = (MOODS[this.mood] || MOODS.idle).calm;
+        if (calm && !calm[this.run.name]) {
+            this.cancel();
+            this.apply({});
+        }
     }
 
     // An action now: a reaction to you or to an event (done(true) when it ran to the end)
@@ -724,7 +741,8 @@ export class Talpy {
             this.nextBrain = this.now + 2000;
             return;
         }
-        const pool = Object.assign({}, (MOODS[this.mood] || MOODS.idle).pool);
+        const mood = MOODS[this.mood] || MOODS.idle;
+        const pool = Object.assign({}, this.playful || !mood.calm ? mood.pool : mood.calm);
         if (!this.travels || !this.onTravel)
             delete pool.dig;
         delete pool[this.lastAuto];

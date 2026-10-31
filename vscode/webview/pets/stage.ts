@@ -29,8 +29,9 @@ import { Pet, SMALL } from "./pet";
 
 export const allStages = new Set<Stage>();
 
-const world = {
+export const world = {
   dark: isDark(),
+  playful: true, // Playful Talpy (setPlayfulAll)
   shownOnce: false, // pets have been on screen: from now on the hero digs its way up too
 };
 
@@ -42,6 +43,13 @@ export function setDarkAll(dark: boolean): void {
     s.root.classList.toggle("cs-dark", dark);
     s.themeChanged();
   }
+}
+
+// Playful Talpy on or off: every pet's Talpy picks from its calm moves, or all of them
+export function setPlayfulAll(on: boolean): void {
+  if (world.playful === on) return;
+  world.playful = on;
+  for (const s of allStages) s.playfulChanged();
 }
 
 function pageVisible(): boolean {
@@ -226,6 +234,10 @@ export class Stage implements PetStage, Animator {
   }
 
   // ------------------------------------------------------------ PetStage
+
+  playfulChanged(): void {
+    for (const p of this.pets) p.talpy.setPlayful(world.playful);
+  }
 
   update(input: HeroInput | AccountInput): void {
     if (this.destroyed) return;

@@ -71,11 +71,14 @@ export function App() {
   // pets changed color: repaint the bars next to their rows
   useStore(petColorsVersion);
   const scrolled = useScrolled();
+  // Playful Talpy on or off: the pets' tricks, props, jokes, cookies and games
+  const playful = state?.settings.playful !== false;
+  useEffect(() => pets.setPlayful(playful), [playful]);
   const { tab, focus } = useStore(uiState);
   const week = tab === "week";
   const perms = tab === "perms";
   const projectsTab = tab === "projects";
-  // A tab slides in from the side it's on (Chats | Recap | Permissions)
+  // A tab slides in from the side it's on (Talpy Den | Projects | Permissions | Recap)
   const lastTab = useRef(tab);
   const tabFrom = useRef(0);
   if (lastTab.current !== tab) {

@@ -26,7 +26,7 @@ import { BOX, LILAC, Talpy, calmColors, drawCookie, drawHole, drawHoleSide } fro
 import type { StageChat } from "./api";
 import { PALETTE, textOn } from "./colors";
 import { Spring, Timer, Tween, ease, reducedMotion } from "./motion";
-import type { Stage } from "./stage";
+import { world, type Stage } from "./stage";
 
 // Kirigami's small and large spacing at gridUnit 16
 export const SMALL = 4;
@@ -187,6 +187,7 @@ export class Pet {
       colors: this.lone ? LILAC : calmColors(PALETTE[colorIndex]),
       theme: stage.theme(),
       travels: this.lone && !reducedMotion(), // (no digging about, then)
+      playful: world.playful,
     });
     this.talpy.onTravel = (ms) => this.travel(ms);
     // (cut short while it tunnels: it pops up where it is)
@@ -401,7 +402,7 @@ export class Pet {
       return;
     }
     const mood = this.mood;
-    if (!this.lone || this.cookieOn || mood === "done" || mood === "loading" || offFor < 1500) return;
+    if (!this.lone || this.cookieOn || mood === "done" || mood === "loading" || offFor < 1500 || !world.playful) return;
     const holiday = holidayGreeting();
     if (holiday) {
       this.talpy.react("celebrate");
@@ -657,6 +658,7 @@ export class Pet {
     const agents = this.stage.heroInput?.agentsRunning ?? 0;
     if (mood === "agents") return `Juggling ${agents} agent${agents === 1 ? "" : "s"}!`;
     if (mood === "working") return "Busy coding… thanks!";
+    if (!world.playful) return ""; // (no jokes: only what the chats do)
     if (this.lone && !this.hadCookie && Math.random() < 0.25) return "Psst… double-click my stage for a cookie!";
     const lines = ["Hi!", "♥", "Ship it!", "All quiet here.", "Pet me more!"];
     return lines[Math.floor(Math.random() * lines.length)];
@@ -701,7 +703,7 @@ export class Pet {
 
   // A double-click on the stage at (x, y): false if it's too close to it
   placeCookie(x: number, y: number): boolean {
-    if (!this.game || !this.stage.live || !this.game.place(x, y)) return false;
+    if (!world.playful || !this.game || !this.stage.live || !this.game.place(x, y)) return false;
     this.hadCookie = true;
     return true;
   }

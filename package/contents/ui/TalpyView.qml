@@ -59,6 +59,15 @@ Item {
         return { fx: cssColor(Kirigami.Theme.textColor, 0.5), text: cssColor(Kirigami.Theme.textColor, 1) }
     }
 
+    // Playful Talpy off: only the moves that show what the chats do (talpy.mjs setPlayful)
+    Connections {
+        target: root
+        function onPlayfulChanged() {
+            if (view.talpy)
+                view.talpy.setPlayful(root.playful)
+        }
+    }
+
     Component.onCompleted: {
         // the few words it says, in your language
         const words = {
@@ -72,7 +81,8 @@ Item {
             "mmm…": i18nc("Talpy smells a flower", "mmm…"), "a star!": i18nc("Talpy sees a shooting star", "a star!"),
             "sniff sniff": i18nc("Talpy smells a cookie in its sleep", "sniff sniff")
         }
-        talpy = new T.Talpy({ colors: colors(), theme: theme(), travels: travels, words: s => words[s] || s })
+        talpy = new T.Talpy({ colors: colors(), theme: theme(), travels: travels, words: s => words[s] || s,
+                              playful: root.playful })
         talpy.facingLeft = facingLeft
         talpy.onTravel = ms => view.travel(ms)
         talpy.onTravelStop = () => view.travelStop()

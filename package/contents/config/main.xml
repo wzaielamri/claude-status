@@ -111,6 +111,10 @@
       <label>Show Talpy, the pet, in the popup and in notifications</label>
       <default>true</default>
     </entry>
+    <entry name="playful" type="Bool">
+      <label>Playful Talpy: his tricks and props, jokes, cookies and games; off, he only shows what the chats do</label>
+      <default>true</default>
+    </entry>
     <entry name="chatPets" type="Int">
       <label>Pets for each account's chats in the list, at most (0 = only the big Talpy)</label>
       <default>5</default>

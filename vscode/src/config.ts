@@ -89,6 +89,7 @@ function whereSet(key: string): vscode.ConfigurationTarget {
 export function viewSettings(): ViewSettings {
   return {
     showPet: cfg().get<boolean>("showPet", true),
+    playful: cfg().get<boolean>("playfulTalpy", true) !== false,
     chatPets: num("chatPets", 5, 0, 8),
     showTokens: settings.showTokens(),
     recentChats: settings.recentChats(),

@@ -158,7 +158,8 @@ class Pet {
 
         const s = stage.size;
         this.talpy = new Talpy({colors: this.lone ? LILAC : calmColors(this.tint), theme: stage.pets.theme,
-            travels: this.lone && !stage.pets.reducedMotion});   // (with less motion asked for, no digging about)
+            travels: this.lone && !stage.pets.reducedMotion,   // (with less motion asked for, no digging about)
+            playful: stage.pets.playful});
         this.talpy.onTravel = ms => this._travel(ms);
         // a run cut short while it tunnels (petted, a chat finished): it stops where it is
         this.talpy.onTravelStop = () => this.actor.remove_transition('x');
@@ -499,6 +500,8 @@ class Pet {
         }
         if (mood === 'working')
             return 'Busy coding… thanks!';
+        if (!this.stage.pets.playful)
+            return '';   // (no jokes: only what the chats do)
         return pick(['Hi!', '♥', 'Ship it!', 'All quiet here.', 'Pet me more!'], '');
     }
 
@@ -1056,7 +1059,7 @@ class Stage {
     _greet() {
         const hero = this.list.get('');
         const mood = this.pets.mood;
-        if (!hero || mood === 'done' || mood === 'loading')
+        if (!hero || mood === 'done' || mood === 'loading' || !this.playful)
             return;
         const text = holidayGreeting();
         if (text) {
@@ -1140,6 +1143,17 @@ export class Pets {
 
     get heroShown() {
         return this.settings.get_boolean('show-pet');
+    }
+
+    // Playful Talpy (a setting): off, the pets only show what the chats do
+    get playful() {
+        return this.settings.get_boolean('playful-talpy');
+    }
+
+    playfulChanged() {
+        for (const stage of [this.hero, ...this._stages.values()])
+            for (const pet of stage ? stage.list.values() : [])
+                pet.talpy.setPlayful(this.playful);
     }
 
     // Talpy's words and particles take the popup's text color

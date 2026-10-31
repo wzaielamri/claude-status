@@ -32,7 +32,7 @@ export interface Still {
 }
 
 export class Talpy {
-    constructor(opts?: { colors?: TalpyColors; theme?: TalpyTheme; words?: (s: string) => string; travels?: boolean; brain?: boolean });
+    constructor(opts?: { colors?: TalpyColors; theme?: TalpyTheme; words?: (s: string) => string; travels?: boolean; brain?: boolean; playful?: boolean });
     onTravel: ((ms: number) => void) | null;
     onTravelStop: (() => void) | null;   // a move cut short while it tunnels: it stops where it is
     facingLeft: boolean;
@@ -54,6 +54,8 @@ export class Talpy {
     setColors(colors: TalpyColors): void;
     setTheme(theme: TalpyTheme): void;
     setMood(mood: string): void;
+    playful: boolean;
+    setPlayful(on: boolean): void;
     react(name: string, done?: ((ok: boolean) => void) | null): void;
     // you pull at it: in its burrow it hangs on for a moment, then done(true) (take it: setHeld);
     // false: it isn't in its burrow, take it at once

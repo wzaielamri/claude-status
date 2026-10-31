@@ -106,6 +106,8 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
             "minutes; VS Code's Claude Code panel runs no status line, so while one of an account's chats works, Claude Code fetches its usage this old (as /usage does: no tokens, no chat saved), at most this often; 0 never",
             0, 60, 1));
         look.add(toggle('show-pet', 'Show Talpy, the pet', 'in the popup and in notifications'));
+        look.add(needs(toggle('playful-talpy', 'Playful Talpy',
+            'his tricks and props and jokes; off, he only shows what your chats do (moods, lamp, quiet moves)'), 'show-pet'));
         look.add(needs(spin('chat-pets', 'Chat pets per account, at most', '0 keeps only the big Talpy', 0, 8, 1),
             'show-pet'));
         look.add(toggle('show-tokens', 'Show token totals', 'from local transcripts'));

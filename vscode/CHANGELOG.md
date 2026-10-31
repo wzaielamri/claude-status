@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Playful Talpy (`talpyDen.playfulTalpy`, on by default):** off, Talpy only
+  shows what your chats do: his moods, his lamp and quiet moves (looking
+  around, typing, thinking, sleeping); no prop tricks, no joke bubbles, no
+  cookie, no games. *Turn Off Playful Talpy* / *Turn On Playful Talpy* in
+  the view's **⋯** menu switch it at once.
 - **The Talpy Den icon has its badge from startup,** like Source
   Control's: the chats that need you, else the chats that finished since you
   last looked (as the Plasma panel counts them), its tooltip saying which

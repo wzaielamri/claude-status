@@ -203,7 +203,8 @@ Item {
         }
     }
     onLiveChanged: {
-        if (!live || !lone || !talpy || cookieOn || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000)
+        if (!live || !lone || !talpy || cookieOn || mood === "done" || mood === "loading" || fresh(missed) || Date.now() - actedOutAt < 1000
+                || !root.playful)
             return   // (what it missed meanwhile comes instead, see onPlayingChanged)
         const holiday = holidayGreeting()
         if (holiday) {
@@ -428,6 +429,8 @@ Item {
             return i18np("Juggling %1 agent!", "Juggling %1 agents!", root.agentsRunning)
         if (mood === "working")
             return i18n("Busy coding… thanks!")
+        if (!root.playful)
+            return ""   // (no jokes: only what the chats do)
         if (lone && !hadCookie && Math.random() < 0.25)
             return i18n("Psst… double-click my stage for a cookie!")
         const lines = [i18n("Hi!"), "♥", i18n("Ship it!"), i18n("All quiet here."), i18n("Pet me more!")]
@@ -470,7 +473,7 @@ Item {
 
     // A double-click on the stage at (x, y): false if it's too close to it
     function placeCookie(x, y) {
-        if (game === null || !playing || !game.place(x, y))
+        if (!root.playful || game === null || !playing || !game.place(x, y))
             return false
         hadCookie = true
         return true

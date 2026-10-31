@@ -198,6 +198,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("talpyDen.showHiddenProjects", () => a.showHidden("projects")),
     vscode.commands.registerCommand("talpyDen.setupUsageBars", () => setUpUsageBars(context.extensionUri)),
     vscode.commands.registerCommand("talpyDen.removeUsageBars", () => setUpUsageBars(context.extensionUri, true)),
+    // Playful Talpy on or off (the view's … menu shows the one that changes it)
+    vscode.commands.registerCommand("talpyDen.playfulOn", () =>
+      vscode.workspace.getConfiguration("talpyDen").update("playfulTalpy", true, vscode.ConfigurationTarget.Global)),
+    vscode.commands.registerCommand("talpyDen.playfulOff", () =>
+      vscode.workspace.getConfiguration("talpyDen").update("playfulTalpy", false, vscode.ConfigurationTarget.Global)),
     vscode.commands.registerCommand("talpyDen.openUsagePage", () =>
       vscode.env.openExternal(vscode.Uri.parse("https://claude.ai/settings/usage")),
     ),

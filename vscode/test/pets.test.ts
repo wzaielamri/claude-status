@@ -20,7 +20,7 @@ function bundle(): string {
     const { buildSync } = createRequire(__filename)("esbuild") as Any; // (not bundled into this test)
     bundled = buildSync({
       stdin: {
-        contents: 'export { Stage, setDarkAll } from "./webview/pets/stage";\nexport { petFields, stageCallbacks } from "./webview/util/petStage";\n' +
+        contents: 'export { Stage, setDarkAll, setPlayfulAll } from "./webview/pets/stage";\nexport { petFields, stageCallbacks } from "./webview/util/petStage";\n' +
           'export { ACTIONS, MOODS } from "./vendor/talpy/actions.mjs";\nexport { Spring } from "./webview/pets/motion";\n',
         resolveDir: repo,
         loader: "ts",
@@ -158,7 +158,7 @@ function load() {
   return {
     Stage: exports.Stage as Any, petFields: exports.petFields as Any, ACTIONS: exports.ACTIONS as Any,
     MOODS: exports.MOODS as Any, stageCallbacks: exports.stageCallbacks as Any, resize, intersect, frames, posted,
-    setDarkAll: exports.setDarkAll as Any, css, Spring: exports.Spring as Any, micro,
+    setDarkAll: exports.setDarkAll as Any, setPlayfulAll: exports.setPlayfulAll as Any, css, Spring: exports.Spring as Any, micro,
   };
 }
 
@@ -319,6 +319,27 @@ test("a stage hidden while Talpy goes after a cookie draws him once and lets the
   t.intersect[0]([{ isIntersecting: false }]); // the sidebar switched to Explorer
   await new Promise((done) => setTimeout(done, 20));
   assert.equal(t.micro.queued, 1, "it keeps drawing itself while hidden");
+  stage.destroy();
+});
+
+// Playful Talpy off: no cookie, no joke bubbles; the pets' Talpys pick calm moves
+test("with Playful Talpy off the hero takes no cookie and tells no jokes", () => {
+  const t = load();
+  const stage: Any = new t.Stage(new FakeEl("div"), true, "hero", { open() {} });
+  t.resize[0]([{ contentRect: { width: 400, height: 96 } }]);
+  t.intersect[0]([{ isIntersecting: true }]);
+  stage.update({
+    mood: "idle", headline: "", counts: { waiting: 0, working: 0, idle: 1, limit: 0, done: 0 }, highUsageText: "",
+    contextFullText: "", maxFiveHour: 0, agentsRunning: 0, waiting: null,
+  });
+  t.setPlayfulAll(false);
+  const hero = stage.pets[0];
+  assert.equal(hero.talpy.playful, false);
+  assert.equal(hero.placeCookie(40, 30), false);
+  assert.equal(hero.petLine(), "");
+  t.setPlayfulAll(true);
+  assert.equal(hero.talpy.playful, true);
+  assert.ok(hero.placeCookie(40, 30));
   stage.destroy();
 });
 

@@ -83,6 +83,10 @@
       <default>true</default>
       <summary>Show Talpy, the pet, in the popup and in notifications</summary>
     </key>
+    <key name="playful-talpy" type="b">
+      <default>true</default>
+      <summary>Playful Talpy: his tricks and props and jokes; off, he only shows what the chats do</summary>
+    </key>
     <key name="chat-pets" type="i">
       <default>5</default>
       <range min="0" max="8"/>

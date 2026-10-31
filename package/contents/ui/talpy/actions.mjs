@@ -425,21 +425,28 @@ export const TUG = {
         { depth: 'half', eyes: 'happy', mouth: 'smile', t: 500 }]
 };
 
-// Moods: how it looks between actions (base) and what it picks (pool)
+// Moods: how it looks between actions (base) and what it picks (pool); with
+// Playful Talpy off (Talpy.setPlayful), only what shows what the chats do and
+// quiet moves (calm): no props, no tricks, no jokes
 export const MOODS = {
     idle: { base: { eyes: 'open', mouth: 'smile', depth: 'half', lamp: 'idle' }, pause: [700, 2000],
         pool: { lookaround: 3, duck: 1, popup: 1.2, twirl: 1, sneeze: 0.8, hiccups: 0.6, gum: 0.8, coffee: 1, music: 1, butterfly: 1,
                 balloon: 0.7, plane: 0.8, flip: 0.7, spin: 0.8, wave: 0.7, shake: 0.6, tidy: 0.7, sprout: 0.8, peekaboo: 0.8,
                 telescope: 0.6, nap: 0.6, shiver: 0.3, dig: 2.4, bubbles: 0.8, flower: 0.7, snack: 0.6, selfie: 0.5, wink: 0.5,
-                boogie: 0.5, bunnyhop: 0.5, blowkiss: 0.3, firefly: 0.3 } },
+                boogie: 0.5, bunnyhop: 0.5, blowkiss: 0.3, firefly: 0.3 },
+        calm: { lookaround: 3, duck: 0.6, nap: 0.6, dig: 1.2 } },
     working: { base: { eyes: 'open', mouth: 'flat', depth: 'half', lamp: 'working' }, pause: [500, 1500],
-        pool: { typing: 4, thinking: 2, idea: 1.2, debug: 1.2, tests: 1.2, read: 0.8, coffee: 0.6, telescope: 0.5, dig: 0.8, snack: 0.3 } },
+        pool: { typing: 4, thinking: 2, idea: 1.2, debug: 1.2, tests: 1.2, read: 0.8, coffee: 0.6, telescope: 0.5, dig: 0.8, snack: 0.3 },
+        calm: { typing: 4, thinking: 2, read: 0.8 } },
     agents: { base: { eyes: 'open', mouth: 'flat', depth: 'half', lamp: 'agents' }, pause: [500, 1500],
-        pool: { juggle: 4, typing: 1.2, thinking: 1, idea: 0.6, dig: 0.5 } },
+        pool: { juggle: 4, typing: 1.2, thinking: 1, idea: 0.6, dig: 0.5 },
+        calm: { typing: 1.2, thinking: 1 } },
     needs: { base: { eyes: 'wide', mouth: 'open', depth: 'high', plume: 'up', body: 'bounce', lamp: 'needs' }, pause: [300, 900],
-        pool: { alert: 2.5, sign: 2, phone: 1.5, letter: 1.2, wave: 0.8 } },
+        pool: { alert: 2.5, sign: 2, phone: 1.5, letter: 1.2, wave: 0.8 },
+        calm: { alert: 2.5, sign: 2, wave: 0.8 } },
     done: { base: { eyes: 'closed', mouth: 'small', depth: 'low', plume: 'droop', lamp: 'done' }, pause: [1500, 3500],
-        pool: { sleep: 3, nap: 0.6, dream: 1.4, stargaze: 0.5, firefly: 0.4 } },
+        pool: { sleep: 3, nap: 0.6, dream: 1.4, stargaze: 0.5, firefly: 0.4 },
+        calm: { sleep: 3, nap: 0.6 } },
     failed: { base: { eyes: 'sad', mouth: 'frown', depth: 'low', plume: 'droop', lamp: 'failed' }, pause: [1500, 3500],
         pool: { sad: 3, duck: 0.5 } },
     limit: { base: { eyes: 'tired', mouth: 'flat', depth: 'low', plume: 'droop', prop: 'battery', lamp: 'limit' }, pause: [1500, 3500],

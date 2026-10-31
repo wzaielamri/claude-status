@@ -57,4 +57,6 @@ export interface PetsModule {
   onColorsChanged(listener: () => void): () => void;
   // Light or dark theme changed (body.vscode-dark / vscode-light / vscode-high-contrast)
   setDark(dark: boolean): void;
+  // Playful Talpy (talpyDen.playfulTalpy): off, the pets only show what the chats do
+  setPlayful(on: boolean): void;
 }
