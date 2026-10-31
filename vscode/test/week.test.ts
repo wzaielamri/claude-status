@@ -8,7 +8,7 @@ import { demoPerms, demoState, demoWeek } from "../src/shared/demo";
 import type { WeekDay } from "../src/shared/types";
 import {
   coldText, currencyOf, dayTip, deltaText, factsText, fillPaths, footText, hoursText, hoverText, moneyText, periodText, planText, promptsText, ruleMeta,
-  weekAsked, weekRevokeAsked, weekRuleAsked, weekTiles, windowSpan, workText, grantMeta, grantedIntro,
+  weekAsked, weekRevokeAsked, weekRuleAsked, weekTiles, RECAP_SECTIONS, windowSpan, workText, grantMeta, grantedIntro,
   dateText, periodWaiting, rowDay, shortDay,
 } from "../src/shared/week";
 import { ViewHost } from "../src/view";
@@ -37,9 +37,15 @@ test("the days shown, and the week's facts", () => {
   assert.equal(periodText(demoWeek(NOW, 1)), "11 Oct – 17 Oct");
   assert.match(factsText(recap.sum), /^longest turn 48m \(Port the date parser\) · up to 2 chats at once · busiest day \w+day · usage limits stopped you 2 times$/);
   const tiles = weekTiles(recap);
-  assert.deepEqual(tiles.map((t) => t.label), ["You", "Claude worked", "At API prices", "Tokens", "Prompts"]);
+  assert.deepEqual(tiles.map((t) => t.label), ["You", "Claude worked", "Prompts", "Tokens", "At API prices"]);
   assert.match(tiles[1].tip, /On the clock it worked .*, and it waited 3h 18m for your answers\.\nThe 7 days before: /);
   assert.equal(weekTiles({ ...recap, previous: { youMs: 0, workedMs: 0, busyMs: 0, waitMs: 0, prompts: 0, cost: 0, tokenTotal: 0 } })[0].delta, "");
+});
+
+test("the Recap reads as a story: the tiles, what Claude did, when, where, then the money", () => {
+  assert.deepEqual(weekTiles(demoWeek(NOW)).map((t) => t.label), ["You", "Claude worked", "Prompts", "Tokens", "At API prices"]);
+  // (Turns that cost the most is gone: Chats it worked on most says it; the cold-cache note is with the tips)
+  assert.deepEqual([...RECAP_SECTIONS], ["work", "days", "plan", "lanes", "projects", "chats", "models", "tips"]);
 });
 
 test("the tokens used: a tile with its change and trend, and a row's tokens", () => {
@@ -86,7 +92,7 @@ test("amounts in another currency, at the rate week.py sends", () => {
   assert.equal(deltaText(397, 906, "money", eur), "−€455");
   const recap = { ...demoWeek(NOW), currency: { code: "EUR", rate: 0.9, date: "2026-10-23", error: "" } };
   assert.deepEqual(currencyOf(recap), recap.currency);
-  assert.match(weekTiles(recap)[2].value, /^€/);
+  assert.match(weekTiles(recap)[4].value, /^€/);
   assert.match(footText(recap), /Amounts in EUR at the European Central Bank's rate of 23 Oct 2026: 1 USD = 0\.9000 EUR\./);
   const failed = { ...recap, currency: { code: "USD", rate: 1, date: "", error: "no EUR rate from the European Central Bank yet" } };
   assert.equal(currencyOf(failed).code, "USD");

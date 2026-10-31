@@ -138,6 +138,13 @@ function amountText(v: number, kind: Kind, cur: Currency): string {
   return kind === "time" ? hoursText(v) : kind === "money" ? moneyText(v, cur) : kind === "tokens" ? shortCount(v) : String(v);
 }
 
+// The Recap's sections under its tiles, top to bottom (the same in every
+// front end): what Claude did; when (the day-by-day graph, your plan's
+// limits now, chat by chat); where (by project, the chats it worked on
+// most); then the money (at API prices, what could use less of your plan)
+export const RECAP_SECTIONS = ["work", "days", "plan", "lanes", "projects", "chats", "models", "tips"] as const;
+export type RecapSection = (typeof RECAP_SECTIONS)[number];
+
 export interface WeekTile {
   label: string;
   value: string;
@@ -186,13 +193,12 @@ export function weekTiles(recap: WeekRecap): WeekTile[] {
       trend: trendOf(recap, "workedMs"),
     },
     {
-      label: "At API prices",
-      value: moneyText(s.cost, cur),
-      delta: deltaText(s.cost, p ? p.cost : null, "money", cur),
-      tip:
-        `What the same tokens would cost on Claude's API, at its list prices of ${dateText(recap.prices.asOf)}. ` +
-        "Your plan isn't billed this way: this is the value of what you used." + before(p ? p.cost : 0, "money") + weeks("cost", "money"),
-      trend: trendOf(recap, "cost"),
+      label: "Prompts",
+      value: String(s.prompts),
+      delta: deltaText(s.prompts, p ? p.prompts : null, "count"),
+      tip: `${plural(s.chats, "In %1 chat", "In %1 chats")} · ${plural(s.turns, "%1 turn of Claude's", "%1 turns of Claude's")}` +
+        before(p ? p.prompts : 0, "count") + weeks("prompts", "count"),
+      trend: trendOf(recap, "prompts"),
     },
     {
       label: "Tokens",
@@ -202,12 +208,13 @@ export function weekTiles(recap: WeekRecap): WeekTile[] {
       trend: trendOf(recap, "tokenTotal"),
     },
     {
-      label: "Prompts",
-      value: String(s.prompts),
-      delta: deltaText(s.prompts, p ? p.prompts : null, "count"),
-      tip: `${plural(s.chats, "In %1 chat", "In %1 chats")} · ${plural(s.turns, "%1 turn of Claude's", "%1 turns of Claude's")}` +
-        before(p ? p.prompts : 0, "count") + weeks("prompts", "count"),
-      trend: trendOf(recap, "prompts"),
+      label: "At API prices",
+      value: moneyText(s.cost, cur),
+      delta: deltaText(s.cost, p ? p.cost : null, "money", cur),
+      tip:
+        `What the same tokens would cost on Claude's API, at its list prices of ${dateText(recap.prices.asOf)}. ` +
+        "Your plan isn't billed this way: this is the value of what you used." + before(p ? p.cost : 0, "money") + weeks("cost", "money"),
+      trend: trendOf(recap, "cost"),
     },
   ];
 }
@@ -380,12 +387,6 @@ export function coldText(recap: WeekRecap): string {
       `${moneyText(cold.cost, cur)} more than reading it from the cache.`
     : `You came back to chats after their cache had expired (an hour without a reply) ${cold.count} times: writing their ` +
       `context again cost ${moneyText(cold.cost, cur)} more than reading it from the cache.`) + (most ? ` Most in: ${most}.` : "");
-}
-
-export function costliestText(recap: WeekRecap): string {
-  const chats = recap.spend?.chats ?? [];
-  const cur = currencyOf(recap);
-  return chats.length ? `Costliest chats: ${chats.map((c) => `${c.name} ${moneyText(c.cost, cur)}`).join(" · ")}` : "";
 }
 
 export function footText(recap: WeekRecap): string {

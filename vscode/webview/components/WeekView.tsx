@@ -1,10 +1,10 @@
 import { drawCard } from "../util/card";
+import { Fragment, type JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { WeekChat, WeekDay, WeekPlanWindow, WeekRecap, WeekSpan } from "../../src/shared/types";
 import {
   cacheText,
   coldText,
-  costliestText,
   currencyOf,
   dayTip,
   factsText,
@@ -16,11 +16,12 @@ import {
   periodText,
   periodWaiting,
   planText,
+  RECAP_SECTIONS,
+  type RecapSection,
   rowDay,
   shareText,
   toolsText,
   weekTiles,
-  whenText,
   workText,
   type Currency,
   dayMoment,
@@ -34,10 +35,12 @@ import { weekAnswer } from "../util/stores";
 
 const REFRESH_MS = 10 * 60000; // while the tab is in sight
 
-// The Recap tab: your last 7 days with Claude. How long you were at it and
-// how long Claude worked, a day per row on a timeline, what the same work
-// would cost at API prices, where it went, and what would use less of your
-// plan (the rules of Claude Code's own /usage). The extension runs the
+// The Recap tab: your last 7 days with Claude, as a story. The big picture
+// (how long you were at it, how long Claude worked, your prompts, its
+// tokens, the API prices), what Claude did, when (a day per row on a
+// timeline, your plan's limits, chat by chat), where (by project, by chat),
+// then the money: what the same work would cost at API prices and what would
+// use less of your plan (the rules of Claude Code's own /usage). The extension runs the
 // widget's week.py for it (only while this tab is open): read from the chats'
 // transcripts, no tokens used.
 export function WeekView({ hosts, currency }: { hosts: string[]; currency: string }) {
@@ -72,6 +75,18 @@ export function WeekView({ hosts, currency }: { hosts: string[]; currency: strin
   const error = mine?.error ?? "";
   const s = recap?.sum;
   const hasData = !!s && (s.workedMs > 0 || s.prompts > 0 || s.cost > 0);
+
+  // (in the order of RECAP_SECTIONS: what Claude did, when, where, then the money)
+  const sections: Record<RecapSection, () => JSX.Element | null> = {
+    work: () => <Work recap={recap!} />,
+    days: () => <Timeline recap={recap!} />,
+    plan: () => <Plan recap={recap!} />,
+    lanes: () => <Lanes recap={recap!} />,
+    projects: () => <Projects recap={recap!} />,
+    chats: () => <Chats recap={recap!} />,
+    models: () => <Models recap={recap!} />,
+    tips: () => <Tips recap={recap!} copied={copied} onCopy={copy} />,
+  };
 
   function copy(text: string) {
     post({ type: "copy", text });
@@ -158,15 +173,7 @@ export function WeekView({ hosts, currency }: { hosts: string[]; currency: strin
             ))}
           </div>
           {factsText(s) ? <div class="week-facts small muted">{factsText(s)}</div> : null}
-          <Timeline recap={recap} />
-          <Plan recap={recap} />
-          <Projects recap={recap} />
-          <Lanes recap={recap} />
-          <Chats recap={recap} />
-          <Work recap={recap} />
-          <Models recap={recap} />
-          <Spend recap={recap} />
-          <Tips recap={recap} copied={copied} onCopy={copy} />
+          {RECAP_SECTIONS.map((k) => <Fragment key={k}>{sections[k]()}</Fragment>)}
           <div class="week-foot small muted">{footText(recap)}</div>
         </>
       ) : null}
@@ -496,34 +503,14 @@ function Models({ recap }: { recap: WeekRecap }) {
   );
 }
 
-// Where the money went: the turns that cost most, the chats, and coming
-// back to chats whose cache had expired
-function Spend({ recap }: { recap: WeekRecap }) {
-  const spend = recap.spend;
-  if (!spend || (!spend.turns.length && !spend.cold.count)) return null;
-  const cur = currencyOf(recap);
-  return (
-    <section class="week-section">
-      {spend.turns.length ? (
-        <>
-          <h2>Turns that cost the most</h2>
-          <ul class="week-chats">
-            {spend.turns.map((t) => <ChatLine key={t.host + t.chatId + t.startedAt} c={t} cur={cur} where={t.startedAt ? whenText(t.startedAt) : ""} />)}
-          </ul>
-        </>
-      ) : null}
-      {costliestText(recap) ? <div class="small muted">{costliestText(recap)}</div> : null}
-      {coldText(recap) ? <div class="small muted">{coldText(recap)}</div> : null}
-    </section>
-  );
-}
-
-// What would use less of your plan (Claude Code's /usage rules)
+// What would use less of your plan (Claude Code's /usage rules), and what
+// coming back to chats after their cache expired cost
 function Tips({ recap, copied, onCopy }: { recap: WeekRecap; copied: string; onCopy: (text: string) => void }) {
+  const cold = coldText(recap);
   return (
     <section class="week-section">
       <h2>What could use less of your plan</h2>
-      {!recap.tips.length ? <div class="muted">Nothing stands out: no habit takes a tenth of the usage shown.</div> : null}
+      {!recap.tips.length && !cold ? <div class="muted">Nothing stands out: no habit takes a tenth of the usage shown.</div> : null}
       <ul class="week-tips">
         {recap.tips.map((t) => (
           <li key={t.key} class="week-tip">
@@ -545,6 +532,7 @@ function Tips({ recap, copied, onCopy }: { recap: WeekRecap; copied: string; onC
           </li>
         ))}
       </ul>
+      {cold ? <div class="small muted">{cold}</div> : null}
     </section>
   );
 }
