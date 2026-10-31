@@ -11,7 +11,7 @@
 
 import { useEffect, useRef } from "preact/hooks";
 import type { Group, ProjectRow, Session } from "../../src/shared/types";
-import { doingText, duration, groupOfProfile, listedChats, pagedTitle, pageSizeOf, petKeyOf, projectLists, stateText } from "../../src/shared/model";
+import { doingText, duration, groupOfProfile, listedChats, openChatsByProject, pagedTitle, pageSizeOf, petKeyOf, projectLists, stateText } from "../../src/shared/model";
 import { post } from "../env";
 import { pets } from "../pets";
 import { chatRefOf, hideHint } from "../util/chat";
@@ -26,8 +26,6 @@ import { MemoryLine } from "./MemoryLine";
 import { MoreButton } from "./MoreButton";
 import { PlanLine } from "./PlanLine";
 import { RecentLine, reopenOf, type Reopen } from "./RecentLine";
-
-const under = (folder: string | undefined | null, path: string) => !!path && !!folder && (folder === path || folder.startsWith(path + "/"));
 
 export function ProjectsView() {
   const answer = useStore(projectsAnswer);
@@ -49,11 +47,13 @@ export function ProjectsView() {
   if (!projects.length) return <div class="empty muted">No projects yet: a project is a folder (or the git repository it's in) where you chatted with Claude.</div>;
   const groups = view.status?.groups ?? [];
   const now = Date.now();
+  // (each open chat in its closest project only; one you hid counts, so its chats show in no other)
+  const open = openChatsByProject([...projects, ...(answer.data?.hiddenPaths ?? []).map((path) => ({ path }))],
+    groups.flatMap((g) => g.sessions));
   return (
     <div class="projects">
       {projects.map((p) => (
-        <Project key={p.path} p={p} open={!!ui.projects[p.path]} now={now}
-          here={p.path ? groups.flatMap((g) => g.sessions.filter((s) => under(s.cwd, p.path))) : []} />
+        <Project key={p.path} p={p} open={!!ui.projects[p.path]} now={now} here={(p.path && open.get(p.path)) || []} />
       ))}
     </div>
   );
@@ -94,11 +94,11 @@ function Project({ p, open, here, now }: { p: ProjectRow; open: boolean; here: S
         ) : null}
         {unfiled ? null : (
           <>
-            <button type="button" class="icon-btn" title={`New chat here\n${p.short}`} aria-label="New chat here"
+            <button type="button" class="icon-btn project-action" title={`New chat here\n${p.short}`} aria-label="New chat here"
               onClick={() => post({ type: "newChatIn", path: p.path, profileDir })}>
               <Icon name="newChat" />
             </button>
-            <button type="button" class="icon-btn project-hide" title={`Hide this project\n${hideHint("projects")}`} aria-label="Hide this project"
+            <button type="button" class="icon-btn project-action" title={`Hide this project\n${hideHint("projects")}`} aria-label="Hide this project"
               onClick={() => post({ type: "hide", kind: "projects", id: p.path })}>
               <Icon name="close" />
             </button>

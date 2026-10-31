@@ -35,14 +35,26 @@ PlasmaComponents3.ScrollView {
     function under(folder, path) {
         return !!folder && !!path && (folder === path || folder.startsWith(path + "/"))
     }
-    // What goes on there now: its open chats (the status')
-    function openChats(project) {
-        const out = []
+    // What goes on in each project now (the status' open chats), by its path: each
+    // chat in one project only, the closest one whose folder holds the chat's (one
+    // in ~/repos/app is app's, not also ~/repos's and ~'s when chats once ran
+    // there too); a project you hid counts, so its chats show in no other
+    readonly property var openByProject: {
+        const paths = projects.map(p => p.path).concat((root.projectsData && root.projectsData.hiddenPaths) || [])
+        const out = {}
         for (const g of root.groups)
-            for (const s of g.sessions)
-                if (under(s.cwd, project.path))
-                    out.push({ key: root.petKeyOf(s, ""), session: s, host: "", account: g.title })
+            for (const s of g.sessions) {
+                let best = ""
+                for (const p of paths)
+                    if (p && p.length > best.length && under(s.cwd, p))
+                        best = p
+                if (best)
+                    (out[best] = out[best] || []).push({ key: root.petKeyOf(s, ""), session: s, host: "", account: g.title })
+            }
         return out
+    }
+    function openChats(project) {
+        return openByProject[project.path] || []
     }
     function isOpen(project) {
         return !!root.openProjects[project.path]
@@ -115,10 +127,12 @@ PlasmaComponents3.ScrollView {
                 readonly property bool unfiled: project.path === ""
                 readonly property bool unfolded: view.isOpen(project)
                 readonly property var here: unfiled ? [] : view.openChats(project)
-                // its hide button: on hover, while the keyboard is on its line
+                // its buttons (new chat here, hide): on hover, while the keyboard is on its line
                 // (Tab), or after a press and hold with a finger (TouchHold.qml)
-                readonly property bool buttonsShown: cardHover.hovered || projectName.activeFocus || newHere.visualFocus
-                                                     || hideHere.visualFocus || held
+                readonly property bool buttonsShown: cardHover.hovered || projectName.activeFocus
+                                                     || (headButtons.item !== null && headButtons.item.focused) || held
+                property bool made: false   // (its buttons, once they first showed: kept)
+                onButtonsShownChanged: if (buttonsShown) made = true
                 property bool held: false
                 property bool holding: false
                 Connections {
@@ -200,70 +214,91 @@ PlasmaComponents3.ScrollView {
                             elide: Text.ElideMiddle
                         }
                     }
-                    // a dot for each of its open chats, in its state's color (made only for a project that has some)
+                    // a dot for each of its open chats, in its state's color (made only for a project that has some);
+                    // its tooltip over the dots, not one of them: in the Row, sized by the Row, it grew the Row
+                    // it was sized by, a polish loop that left the whole tab unlaid out
                     Loader {
                         active: card.here.length > 0
                         visible: active
                         Layout.alignment: Qt.AlignTop
                         Layout.topMargin: Math.max(0, (projectName.implicitHeight - Kirigami.Units.smallSpacing * 2) / 2)
-                        sourceComponent: Row {
-                            spacing: Kirigami.Units.smallSpacing / 2
-                            Repeater {
-                                model: card.here.length
-                                delegate: Rectangle {
-                                    required property int index
-                                    width: Kirigami.Units.smallSpacing * 2
-                                    height: width
-                                    radius: width / 2
-                                    color: root.stateColor(card.here[index] ? card.here[index].session.state : "idle")
+                        sourceComponent: Item {
+                            implicitWidth: dots.implicitWidth
+                            implicitHeight: dots.implicitHeight
+                            Row {
+                                id: dots
+                                spacing: Kirigami.Units.smallSpacing / 2
+                                Repeater {
+                                    model: card.here.length
+                                    delegate: Rectangle {
+                                        required property int index
+                                        width: Kirigami.Units.smallSpacing * 2
+                                        height: width
+                                        radius: width / 2
+                                        color: root.stateColor(card.here[index] ? card.here[index].session.state : "idle")
+                                    }
                                 }
                             }
                             PlasmaCore.ToolTipArea {
                                 textFormat: Text.PlainText
-                                width: parent.width
-                                height: parent.height
+                                anchors.fill: parent
                                 mainText: i18np("%1 open chat", "%1 open chats", card.here.length)
                                 subText: card.here.map(c => c.session.name + ": " + root.stateText(c.session)).join("\n")
                             }
                         }
                     }
-                    PlasmaComponents3.ToolButton {
-                        id: newHere
+                    // on hover, as a line's buttons (or Tab, or a finger's hold): a new chat here, and hide it here
+                    // (nothing is deleted; its chats, plans and memories stay in their lists); made the first time
+                    // they show, their room kept so nothing moves
+                    Loader {
+                        id: headButtons
                         visible: !card.unfiled
+                        active: !card.unfiled && card.made
                         Layout.alignment: Qt.AlignTop
-                        icon.source: root.iconDir + "chat-new-symbolic.svg"   // (as an account's: at 16 px)
-                        icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: Kirigami.Units.iconSizes.small
-                        display: PlasmaComponents3.AbstractButton.IconOnly
-                        text: i18n("New chat here")
-                        onClicked: root.newChatInProject(card.project)
+                        Layout.preferredWidth: (Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2) * 2
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
+                        sourceComponent: RowLayout {
+                            readonly property bool focused: newHere.visualFocus || hideHere.visualFocus
+                            spacing: 0
+                            opacity: card.buttonsShown ? 1 : 0
+                            enabled: card.buttonsShown
 
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            anchors.fill: parent
-                            mainText: i18n("New chat here")
-                            subText: card.project.short
-                        }
-                    }
-                    // on hover: hide it here (nothing is deleted; its chats, plans and memories stay in their lists)
-                    PlasmaComponents3.ToolButton {
-                        id: hideHere
-                        visible: !card.unfiled
-                        Layout.alignment: Qt.AlignTop
-                        opacity: card.buttonsShown ? 1 : 0
-                        enabled: card.buttonsShown
-                        icon.name: "window-close"
-                        icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: Kirigami.Units.iconSizes.small
-                        display: PlasmaComponents3.AbstractButton.IconOnly
-                        text: i18n("Hide this project")
-                        onClicked: root.hideItem("projects", card.project.path, "")
+                            PlasmaComponents3.ToolButton {
+                                id: newHere
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
+                                Layout.preferredHeight: Layout.preferredWidth
+                                icon.source: root.iconDir + "chat-new-symbolic.svg"   // (as an account's: at 16 px)
+                                icon.width: Kirigami.Units.iconSizes.small
+                                icon.height: Kirigami.Units.iconSizes.small
+                                display: PlasmaComponents3.AbstractButton.IconOnly
+                                text: i18n("New chat here")
+                                onClicked: root.newChatInProject(card.project)
 
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            anchors.fill: parent
-                            mainText: i18n("Hide this project")
-                            subText: root.hideHint("projects", "")
+                                PlasmaCore.ToolTipArea {
+                                    textFormat: Text.PlainText
+                                    anchors.fill: parent
+                                    mainText: i18n("New chat here")
+                                    subText: card.project.short
+                                }
+                            }
+                            PlasmaComponents3.ToolButton {
+                                id: hideHere
+                                Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
+                                Layout.preferredHeight: Layout.preferredWidth
+                                icon.name: "window-close"
+                                icon.width: Kirigami.Units.iconSizes.small
+                                icon.height: Kirigami.Units.iconSizes.small
+                                display: PlasmaComponents3.AbstractButton.IconOnly
+                                text: i18n("Hide this project")
+                                onClicked: root.hideItem("projects", card.project.path, "")
+
+                                PlasmaCore.ToolTipArea {
+                                    textFormat: Text.PlainText
+                                    anchors.fill: parent
+                                    mainText: i18n("Hide this project")
+                                    subText: root.hideHint("projects", "")
+                                }
+                            }
                         }
                     }
                     TapHandler {

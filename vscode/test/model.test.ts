@@ -13,6 +13,7 @@ import {
   moreTitle,
   pagedTitle,
   pageSizeOf,
+  openChatsByProject,
   projectLists,
   recentPage,
   accountNameProblem,
@@ -377,6 +378,18 @@ test("an opened project: its chats but the running ones, plans and memories a pa
   // the chats listed now, under their account: not again in the project
   const groups = demoState(1_800_000_000_000).status!.groups;
   assert.ok(listedChats(groups).has(groups[0].sessions[0].sessionId));
+});
+
+test("an open chat shows in its closest project only, not also in the folders above it", () => {
+  const chat = (key: string, cwd: string) => ({ key, cwd }) as Session;
+  const projects = [{ path: "/h" }, { path: "/h/repos" }, { path: "/h/repos/app" }, { path: "/h/repos/app2" }];
+  const open = openChatsByProject(projects, [chat("a", "/h/repos/app"), chat("b", "/h/repos/app/src"), chat("c", "/h/repos"),
+    chat("d", "/h/notes"), chat("e", "/elsewhere"), chat("f", "/h/repos/app2")]);
+  assert.deepEqual(Object.fromEntries([...open].map(([path, s]) => [path, s.map((x) => x.key)])),
+    { "/h/repos/app": ["a", "b"], "/h/repos": ["c"], "/h": ["d"], "/h/repos/app2": ["f"] });
+  // in a project you hid: in no other
+  const hid = openChatsByProject([{ path: "/h" }, { path: "/h/secret" }], [chat("g", "/h/secret/x")]);
+  assert.deepEqual([...hid.keys()], ["/h/secret"]);
 });
 
 test("a line's folder in a project: only the part below the project's, nothing for the project's own", () => {

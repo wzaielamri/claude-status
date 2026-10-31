@@ -3731,13 +3731,14 @@ body.vscode-high-contrast-light .pane {
   opacity: 0.7;
 }
 
-/* a project's × shows when you point at its card (or Tab to it) */
-.project-head .project-hide {
+/* a project's buttons (new chat here, ×) show as a line's do: when you point at
+   its line, or Tab to it; their room is kept, so nothing moves (as in Plasma) */
+.project-head .project-action {
   visibility: hidden;
 }
 
-.project:hover .project-hide,
-.project-head .project-hide:focus-visible {
+.project-head:hover .project-action,
+.project-head:focus-within .project-action {
   visibility: visible;
 }
 

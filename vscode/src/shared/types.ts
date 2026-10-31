@@ -771,6 +771,7 @@ export interface ProjectsData {
   generatedAt: number;
   projects: ProjectRow[];
   hidden?: number; // how many projects you hid
+  hiddenPaths?: string[]; // their folders (an open chat in one shows in no other project)
 }
 
 export interface ProjectRow {

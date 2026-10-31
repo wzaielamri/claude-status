@@ -2604,11 +2604,12 @@ def main(argv=None):
             rows = projects(list(chats.values()), now_ms, home, items["plans"], items["memories"], items["accounts"],
                             items["starred"], items["there"])
             hidden = cs.load_hidden(cache_root)["projects"]  # (the ones you hid: jump.py --hide projects FOLDER)
-            rows, left_out = [p for p in rows if p["path"] not in hidden], sum(p["path"] in hidden for p in rows)
+            hidden_paths = [p["path"] for p in rows if p["path"] in hidden]   # (an open chat there is theirs, not shown elsewhere)
+            rows = [p for p in rows if p["path"] not in hidden]
             project_recaps(rows, ctx, items["paths"])
             for saved in (ctx.links, ctx.slugs, ctx.chats):
                 saved.save()
-            result = {"ok": True, "generatedAt": now_ms, "projects": rows, "hidden": left_out}
+            result = {"ok": True, "generatedAt": now_ms, "projects": rows, "hidden": len(hidden_paths), "hiddenPaths": hidden_paths}
         except Exception as exc:
             result = {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}
         return emit(result)

@@ -1026,6 +1026,21 @@ export function moreTitle(shown: number, count: number): string {
   return `${shown} of ${count} show. Folded again, the list shows its first ones again.`;
 }
 
+// What goes on in each project now: each open chat in one project only, the
+// closest one whose folder holds the chat's (a chat in ~/repos/app is app's,
+// not also ~/repos's and ~'s when chats once ran there too); by project path
+export function openChatsByProject(projects: { path: string }[], sessions: Session[]): Map<string, Session[]> {
+  const out = new Map<string, Session[]>();
+  for (const s of sessions) {
+    let best = "";
+    for (const p of projects)
+      if (p.path && p.path.length > best.length && !!s.cwd && (s.cwd === p.path || s.cwd.startsWith(p.path + "/")))
+        best = p.path;
+    if (best) (out.get(best) ?? out.set(best, []).get(best)!).push(s);
+  }
+  return out;
+}
+
 // An opened project's lists, pages of each shown: its chats (not the ones
 // listed as an account's chats now), plans and memories; tagged: each line
 // says its account (the project is on several)

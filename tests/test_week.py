@@ -1233,13 +1233,15 @@ class OutputTests(Home):
                 week.main(["--projects"])
             return json.loads(out.getvalue())
         result = projects()
-        self.assertEqual((len(result["projects"]), result["hidden"]), (1, 0))
+        self.assertEqual((len(result["projects"]), result["hidden"], result["hiddenPaths"]), (1, 0, []))
         row = result["projects"][0]
         self.assertEqual(([c["sessionId"] for c in row["chats"]], row["accounts"], row["recap"], row["plans"]),
                          (["chat-a"], ["work"], None, []))
-        cs.hide_item(cs.cache_dir(self.home), "projects", result["projects"][0]["path"])
+        hid = result["projects"][0]["path"]
+        cs.hide_item(cs.cache_dir(self.home), "projects", hid)
         result = projects()
-        self.assertEqual((result["projects"], result["hidden"]), ([], 1))
+        # (a hidden project's folder is said, so its open chats show in no other project)
+        self.assertEqual((result["projects"], result["hidden"], result["hiddenPaths"]), ([], 1, [hid]))
 
 
 if __name__ == "__main__":
