@@ -112,9 +112,13 @@ export function configDirArgs(): string[] {
   return extraConfigDirs().flatMap((d) => ["--config-dir", d]);
 }
 
-// Arguments of every status run, here and on hosts
+// Arguments of every status run, here and on hosts: a page more recent chats
+// than show (so the next page is there at once), and of the plans only the
+// starred ones, of the memories only the accounts' CLAUDE.md (the rest is in
+// the Projects tab)
 export function statusArgs(): string[] {
-  const args = ["--done-hours", String(settings.keepDoneHours()), "--recent", String(settings.recentChats())];
+  const recent = settings.recentChats();
+  const args = ["--done-hours", String(settings.keepDoneHours()), "--recent", String(recent > 0 ? 2 * recent : 0), "--plans", "0", "--memories", "0"];
   if (!settings.showTokens()) args.push("--no-tokens");
   // (an account's plan usage this old is fetched while one of its chats works)
   args.push("--usage-refresh", String(settings.usageRefreshMinutes()));

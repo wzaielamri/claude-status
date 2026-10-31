@@ -1,7 +1,7 @@
 // The dashboard's derived values, shared by the extension (status bar,
 // notifications) and the webview. Ported from the widget's main.qml.
 
-import type { Agent, ChangeSummary, ChatRef, ChatStats, ClaudeCodeInfo, Counts, Group, HostState, KeptChat, Limits, LimitWindow, LiveView, Memory, Overall, Overlap, PlanItem, QueuedTask, RecentChat, ReopenIn, Session, SharedPointer, SshUsage, StatsDay, Status, Stop, TaskProgress, Tokens, UsageStats, ViewState } from "./types";
+import type { Agent, ChangeSummary, ChatRef, ChatStats, ClaudeCodeInfo, Counts, Group, HostState, KeptChat, Limits, LimitWindow, LiveView, Memory, Overall, Overlap, PlanItem, ProjectRow, ProjectsData, QueuedTask, RecentChat, ReopenIn, Session, SharedPointer, SshUsage, StatsDay, Status, Stop, TaskProgress, Tokens, UsageStats, ViewState } from "./types";
 
 // This computer's accounts and the hosts', for the counts, the badge and
 // what needs you. A host whose last check failed still shows what it said
@@ -925,8 +925,121 @@ export function findMemory(status: Status | null, hosts: HostState[], host: unkn
   if (typeof key !== "string" || !key || typeof groupId !== "string" || (host !== undefined && host !== null && typeof host !== "string")) return null;
   const where = host ? hosts.find((h) => h.name === host)?.result : status;
   const group = where?.groups.find((g) => g.id === groupId);
-  const memory = group?.memories?.find((m) => m.key === key);
+  const memory = [...(group?.memories ?? []), ...(group?.instructions ?? [])].find((m) => m.key === key);
   return memory && group ? { memory, group: host ? { ...group, host: host as string } : group } : null;
+}
+
+// ---------------------------------------------------------------- the Projects tab's
+// Its chats, plans and memories are this computer's, from week.py
+// --projects: the extension finds the one a click names in what it last read
+
+// The account (of this computer) a project's chat, plan or memory is on
+export function groupOfProfile(status: Pick<Status, "groups"> | null | undefined, profileDir: string): Group | undefined {
+  return status?.groups.find((g) => (g.profileKeys ?? []).includes(profileDir));
+}
+
+export function findProjectChat(data: ProjectsData | null | undefined, key: unknown): ChatRef | null {
+  if (typeof key !== "string" || !key) return null;
+  for (const p of data?.projects ?? []) for (const c of p.chats ?? []) if (c.key === key) return recentRef(c);
+  return null;
+}
+
+export function findProjectPlan(data: ProjectsData | null | undefined, status: Status | null, key: unknown): { plan: PlanItem; group: Group } | null {
+  if (typeof key !== "string" || !key) return null;
+  const plan = (data?.projects ?? []).flatMap((p) => p.plans ?? []).find((x) => x.key === key);
+  const group = plan ? groupOfProfile(status, plan.profileDir) : undefined;
+  return plan && group ? { plan, group } : null;
+}
+
+export function findProjectMemory(data: ProjectsData | null | undefined, status: Status | null, key: unknown): { memory: Memory; group: Group } | null {
+  if (typeof key !== "string" || !key) return null;
+  const memory = (data?.projects ?? []).flatMap((p) => p.memories ?? []).find((m) => m.key === key);
+  const group = memory ? groupOfProfile(status, memory.profileDir) : undefined;
+  return memory && group ? { memory, group } : null;
+}
+
+// A line's folder inside a project: only its part below the project's
+// folder ("server" for ~/repos/api/server in ~/repos/api), nothing for the
+// project's folder itself; outside a project (or outside its folder), short
+export function folderIn(folder: string, project: string, short: string): string {
+  if (!project || !folder) return short;
+  if (folder === project) return "";
+  return folder.startsWith(project + "/") ? folder.slice(project.length + 1) : short;
+}
+
+// The ids of the chats listed as an account's chats now (open, or kept for
+// the record): not again under a project's Chats
+export function listedChats(groups: Pick<Group, "sessions">[]): Set<string> {
+  const ids = new Set<string>();
+  for (const g of groups) for (const s of g.sessions) for (const id of [s.chatId, s.sessionId, s.jobSessionId]) if (id) ids.add(id);
+  return ids;
+}
+
+// ---------------------------------------------------------------- lists a page at a time
+// Recent chats, ★ Starred chats and plans, and an opened project's chats,
+// plans and memories show a page at a time (as many as the Recent chats
+// setting, 5 when it's 0); "Show N more" adds the next page; folded again,
+// a list shows its first page. The status lists a page more recent chats
+// than show (so the next page is there at once) and counts them all
+// (recentCount); past that a check that lists more is run once for the
+// account (Dashboard.recentMore).
+
+export function pageSizeOf(recentChats: number): number {
+  return recentChats > 0 ? Math.round(recentChats) : 5;
+}
+
+// An account's recent chats as a check that listed more has them: asked, how many it was asked for
+export interface RecentMore {
+  recent: RecentChat[];
+  asked: number;
+}
+
+// An account's Recent chats with pages of them shown: all there are of them
+// here (the status', then more's past those, each once), how many there are
+// in all (a check that listed fewer than it was asked for has them all),
+// how many show, and how many a check should list for the next page (0: it's
+// here, or there's none)
+export function recentPage(group: Pick<Group, "recent" | "recentCount">, more: RecentMore | null | undefined, pages: number, size: number):
+    { all: RecentChat[]; count: number; shown: number; fetch: number } {
+  const recent = group.recent ?? [];
+  let all = recent;
+  if (more) {
+    const listed = new Set(recent.map((c) => c.sessionId));
+    all = recent.concat(more.recent.filter((c) => !listed.has(c.sessionId)));
+  }
+  const count = more && more.recent.length < more.asked ? all.length : Math.max(group.recentCount ?? 0, recent.length);
+  const wanted = Math.min(count, size * (pages + 1));
+  return { all, count, shown: Math.min(all.length, size * pages), fetch: all.length < wanted ? wanted : 0 };
+}
+
+// A paged list's title: "Recent chats (5 of 23)", all of them shown "Recent chats (23)"
+export function pagedTitle(title: string, shown: number, count: number): string {
+  return shown < count ? `${title} (${shown} of ${count})` : `${title} (${count})`;
+}
+
+// Its "Show N more" (N: the next page's) and that button's tooltip
+export function moreText(shown: number, count: number, size: number): string {
+  return `Show ${Math.min(size, count - shown)} more`;
+}
+
+export function moreTitle(shown: number, count: number): string {
+  return `${shown} of ${count} show. Folded again, the list shows its first ones again.`;
+}
+
+// An opened project's lists, pages of each shown: its chats (not the ones
+// listed as an account's chats now), plans and memories; tagged: each line
+// says its account (the project is on several)
+export function projectLists(p: ProjectRow, listed: Set<string>, pages: { chats?: number; plans?: number; memories?: number }, size: number) {
+  const chats = (p.chats ?? []).filter((c) => !listed.has(c.sessionId));
+  const plans = p.plans ?? [];
+  const memories = p.memories ?? [];
+  const shown = (n: number, pagesShown = 1) => Math.min(n, size * pagesShown);
+  return {
+    chats, chatsShown: shown(chats.length, pages.chats),
+    plans, plansShown: shown(plans.length, pages.plans),
+    memories, memoriesShown: shown(memories.length, pages.memories),
+    tagged: (p.accounts ?? []).length > 1,
+  };
 }
 
 

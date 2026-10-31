@@ -479,11 +479,13 @@ export interface Group {
   shareProfile: string | null;
   projects: Project[];
   sharedHere: SharedPointer[];
-  recent: RecentChat[];
+  recent: RecentChat[]; // the first of them (the status lists a page more than show)
+  recentCount?: number; // how many there are in all, for "Show N more". Older backends leave it out.
   starred?: RecentChat[]; // the chats you starred that aren't listed, newest first, however old. Older backends leave it out.
   plans?: PlanItem[]; // newest first. Older backends leave it out.
   starredPlans?: PlanItem[]; // the plans you starred, newest first, however old
   memories?: Memory[]; // newest first. Older backends leave it out.
+  instructions?: Memory[]; // its CLAUDE.md (type "account"): your instructions for every chat on it. Older backends leave it out.
   homeChatCommand?: string;
   // VS Code's Claude runs on this account (the backend's view of it; an SSH
   // host's: what its VS Code server's settings say, else its ~/.claude)
@@ -762,24 +764,27 @@ export interface PermsData {
 export type WeekSpan = "day" | "week" | "all";
 
 // The Projects tab (week.py --projects): each project (a git repository, else
-// a folder), newest first, with its chats newest first
+// a folder), newest first, with all its chats, plans and memories, each with
+// the account it's on (this computer's)
 export interface ProjectsData {
   ok: true;
   generatedAt: number;
   projects: ProjectRow[];
-  currency?: { code: string; rate: number; date?: string; error?: string };
+  hidden?: number; // how many projects you hid
 }
 
 export interface ProjectRow {
   name: string;
-  path: string;
+  path: string; // "": the plans whose chat is gone (their folder isn't known), last
   short: string;
-  workedMs: number;
-  weekMs: number; // the last 7 days
-  cost: number;
+  gone?: boolean; // its folder isn't there any more
   lastAt: number;
+  accounts: string[]; // the names of the accounts it has something on
   chatCount: number;
-  chats: { id: string; name: string; profileDir: string; cwd: string; lastAt: number; workedMs: number; cost: number }[];
+  chats: (RecentChat & { account: string })[]; // newest first, all of them
+  plans: (PlanItem & { account: string })[];
+  memories: (Memory & { account: string })[];
+  recap: { text: string; at: number | null } | null; // Claude's last recap of it
 }
 
 export interface WeekLane {
@@ -919,7 +924,8 @@ export type WebviewMessage =
   | { type: "weekRule"; allow: boolean; kind: string; value: string; project: string; id: string; host?: string } // allow a rule the tab offers, or take one back (on an SSH host shown, if host)
   | { type: "weekRevoke"; id: string; host?: string } // take a permission you gave out of its file
   | { type: "perms" } // the Permissions tab wants what it shows
-  | { type: "projects" } // the Projects tab wants its projects (week.py --projects)
+  | { type: "projects"; shown?: boolean } // the Projects tab wants its projects (week.py --projects); shown false: it's gone
+  | { type: "recentMore"; groupId: string; host?: string; count: number } // an account's first count recent chats, past the status
   | { type: "newChatIn"; path: string; profileDir: string } // + of a project: a new chat there, on the account of its newest chat
   | { type: "copy"; text: string }; // a tip's command, to the clipboard
 
@@ -934,4 +940,5 @@ export type HostMessage =
   | { type: "weekRule"; id: string; host: string; ok: boolean; message: string }
   | { type: "weekRevoke"; id: string; host: string; ok: boolean; message: string }
   | { type: "perms"; data: PermsData | null; error: string }
-  | { type: "projects"; data: ProjectsData | null; error: string };
+  | { type: "projects"; data: ProjectsData | null; error: string }
+  | { type: "recentMore"; groupId: string; host?: string; recent: RecentChat[]; asked: number }; // (none: the check failed)

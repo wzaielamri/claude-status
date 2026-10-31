@@ -146,7 +146,7 @@ test("a click on a chat opens its tab, unless clicks open the chat itself; answe
   const calls: { name: string; args: unknown[] }[] = [];
   const record = (name: string) => (...args: unknown[]) => void calls.push({ name, args });
   const actions = new Proxy({}, { get: (_t, name: string) => (name === "demoOnly" ? () => false : record(name)) });
-  const dash = { opened() {}, onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false, state: () => state, setVisible() {} };
+  const dash = { opened() {}, onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), liveHook: false, state: () => state, setVisible() {}, moreChat: () => null };
   const host = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, actions as never);
   host.panes = { open: record("panes.open"), answer: record("panes.answer") } as never;
   const receive = (m: unknown) => (host as unknown as { receive(w: unknown, m: unknown): void }).receive({ postMessage: async () => true }, m);

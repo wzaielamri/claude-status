@@ -9,11 +9,11 @@ import { toggleStats, uiState } from "../util/ui";
 import { AccountStage } from "./AccountStage";
 import { useView } from "./context";
 import { IconButton } from "./IconButton";
-import { MemoriesList } from "./MemoriesList";
-import { PlansList } from "./PlansList";
+import { MemoryLine } from "./MemoryLine";
 import { QueuedTasks } from "./QueuedTasks";
 import { RecentChats } from "./RecentChats";
 import { SessionRow, stateClass } from "./SessionRow";
+import { StarredPlans } from "./StarredPlans";
 import { useFlip } from "../util/motion";
 import { StatsPanel } from "./StatsPanel";
 import { Tag } from "./Tag";
@@ -42,8 +42,10 @@ function TokenLine({ tokens }: { tokens: Tokens }) {
 }
 
 // One Claude account: its pets, plan limits, token totals, chats (from every
-// config folder logged into it) and recent chats. With group.host set, the
-// account is on that SSH host and its actions run there.
+// config folder logged into it), then your shortlists: Recent chats, ★ Starred
+// chats and ★ Starred plans, and its CLAUDE.md. Its plans and memories are
+// in their projects (the Projects tab). With group.host set, the account is
+// on that SSH host and its actions run there.
 // accounts: how many its machine has (with two or more, the default one is marked)
 export function GroupSection({ group: g, accounts = 1 }: { group: Group; accounts?: number }) {
   const rowsRef = useRef<HTMLDivElement>(null);
@@ -215,8 +217,13 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
       ))}
 
       <RecentChats group={g} />
-      <PlansList group={g} />
-      <MemoriesList group={g} />
+      <StarredPlans group={g} />
+      {/* its CLAUDE.md: your instructions for every chat on it (read it, or edit it) */}
+      {g.instructions?.length ? (
+        <ul class="recent-list instructions">
+          {g.instructions.map((m) => <MemoryLine key={m.key} memory={m} group={g} />)}
+        </ul>
+      ) : null}
     </section>
   );
 }

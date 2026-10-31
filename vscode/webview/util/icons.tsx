@@ -3,7 +3,7 @@
 
 import type { JSX } from "preact";
 
-export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear" | "task" | "user" | "bookmark" | "note" | "trash";
+export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear" | "task" | "user" | "bookmark" | "note" | "trash" | "more";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -115,6 +115,7 @@ const shapes: Record<IconName, JSX.Element> = {
   ),
   bookmark: <path d="M4.25 2.25h7.5v11.5L8 10.75l-3.75 3z" />,
   note: <path d="M3.25 2.25h6.5l3 3v8.5h-9.5zM9.75 2.25v3h3M5.5 8.25h5M5.5 11h5" />,
+  more: <path d="M8 2.5v7M4.75 6.5L8 9.75l3.25-3.25M3 13.25h10" />,
   trash: <path d="M2.75 4.25h10.5M6.25 4.25v-1.5h3.5v1.5M4 4.25l.75 9.25h6.5l.75-9.25M6.75 6.75v4.5M9.25 6.75v4.5" />,
 };
 

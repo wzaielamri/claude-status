@@ -1,6 +1,6 @@
 // The webview's entry: draws the dashboard from what the extension sends.
 
-import { setTab } from "./util/ui";
+import { gotRecentMore, setTab } from "./util/ui";
 import { render } from "preact";
 import type { HostMessage } from "../src/shared/types";
 import { App } from "./components/App";
@@ -40,6 +40,9 @@ window.addEventListener("message", (event: MessageEvent) => {
       break;
     case "perms":
       permsAnswer.set(msg);
+      break;
+    case "recentMore":
+      gotRecentMore(msg);
       break;
     case "projects":
       projectsAnswer.set(msg);

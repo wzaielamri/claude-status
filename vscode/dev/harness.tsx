@@ -4,7 +4,7 @@
 import "../webview/main";
 import { demoPerms, demoProjects, demoState, demoWeek } from "../src/shared/demo";
 import type { HostMessage } from "../src/shared/types";
-import { setFocus, setTab, toggleStarred, uiState } from "../webview/util/ui";
+import { setFocus, setTab, toggleProject, toggleRecent, toggleStarred, uiState } from "../webview/util/ui";
 
 const params = new URLSearchParams(location.search);
 let phase = Number(params.get("phase")) || 0;
@@ -68,7 +68,18 @@ function sendState(): void {
       ];
     }
   }
-  // (?stars=1&open=1: the starred lists unfolded too)
+  // ?many=1: lists shown a page at a time: 10 of 23 recent chats here, 7 starred ones
+  if (params.get("many") === "1" && first?.recent?.[0]) {
+    const r = first.recent[0];
+    const names = ["Bump the lockfile", "Why is CI slow", "Draft the 2.1 roadmap", "Split the parser module", "Port the importer", "Add retries to the client",
+                   "Fix the flaky upload test", "Rename the settings keys", "Tidy the README", "Profile the startup"];
+    first.recent = names.map((name, i) => ({ ...r, key: `many-${i}`, sessionId: `many-${i}`, name, lastActive: Date.now() - (i + 1) * 3_600_000 }));
+    first.recentCount = 23;
+    first.starred = names.slice(0, 7).map((name, i) => ({ ...r, key: `many-${i}|starred`, sessionId: `many-s${i}`, name, starred: true,
+                                                          lastActive: Date.now() - (i + 9) * 86_400_000 }));
+  }
+  // (?open=1: Recent chats unfolded; with ?stars=1 the starred lists too)
+  if (params.get("open") === "1" && first && !uiState.get().recent[first.id]) toggleRecent(first.id);
   if (params.get("stars") === "1" && params.get("open") === "1" && first)
     for (const fold of ["|chats", "|plans"]) if (!uiState.get().starred[first.id + fold]) toggleStarred(first.id + fold);
   // ?question=1: the chat that waits asks Claude's questions instead of a permission
@@ -110,8 +121,10 @@ setTimeout(() => {
   const span = params.get("span") === "day" || params.get("span") === "all" ? (params.get("span") as "day" | "all") : "week";
   if (params.get("week") === "1") send({ type: "week", back: 0, account: "", span, recap: demoWeek(Date.now(), 0, "", span), error: "" });
   if (params.get("perms") === "1") send({ type: "perms", data: demoPerms(Date.now()), error: "" });
-  // ?tab=projects: that tab
+  // ?tab=projects: that tab (&project=webapp: that project opened)
   if (params.get("tab") === "projects") setTab("projects");
+  const project = demoProjects(Date.now()).projects.find((p) => p.name === params.get("project"));
+  if (project && !uiState.get().projects[project.path]) toggleProject(project.path);
   // ?focus=1: the focus view
   if (params.get("focus") === "1") setFocus(true);
   // ?scroll=N: to see the top stay put over the list

@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { demoState } from "../src/shared/demo";
+import { demoProjects, demoState } from "../src/shared/demo";
 import type { Group, HostState, Session, Status } from "../src/shared/types";
 import {
+  findProjectChat,
+  findProjectMemory,
+  findProjectPlan,
+  folderIn,
+  groupOfProfile,
+  listedChats,
+  moreText,
+  moreTitle,
+  pagedTitle,
+  pageSizeOf,
+  projectLists,
+  recentPage,
   accountNameProblem,
   agentDetailKey,
   agentRunTitle,
@@ -315,4 +327,74 @@ test("an account's plan usage line and token line read as in the widget", () => 
   const totals = (total: number, output: number) => ({ total, output, input: 0, cacheRead: 0, cacheWrite: 0, messages: 0, shared: 0 });
   const t = { today: totals(378_300, 12_000), week: totals(502_900, 15_000), models: [{ model: "claude-opus-5", total: 400_000 }] };
   assert.equal(tokensText(t as unknown as Parameters<typeof tokensText>[0]), "Tokens today 378.3k (12.0k out) · 7 days 502.9k (15.0k out)");
+});
+
+// ---------------------------------------------------------------- lists a page at a time
+
+const recentChat = (i: number) => ({ key: `p/c${i}/recent`, sessionId: `c${i}`, name: `chat ${i}`, cwd: "/w", cwdShort: "/w", lastActive: 1000 - i,
+                                     profile: "p", profileDir: "p", shared: false });
+
+test("Recent chats: a page at a time, the next one asked for before it's wanted, a check with fewer than asked is the end", () => {
+  assert.equal(pageSizeOf(0), 5);
+  assert.equal(pageSizeOf(3), 3);
+  // (the status lists a page more than shows, and counts them all)
+  const group = { recent: Array.from({ length: 10 }, (_, i) => recentChat(i)), recentCount: 23 };
+  let page = recentPage(group, null, 1, 5);
+  assert.deepEqual([page.shown, page.count, page.fetch], [5, 23, 0]);
+  assert.equal(pagedTitle("Recent chats", page.shown, page.count), "Recent chats (5 of 23)");
+  assert.equal(moreText(page.shown, page.count, 5), "Show 5 more");
+  assert.equal(moreTitle(page.shown, page.count), "5 of 23 show. Folded again, the list shows its first ones again.");
+  // two pages show: the third is asked for (a check that lists 15)
+  page = recentPage(group, null, 2, 5);
+  assert.deepEqual([page.shown, page.fetch], [10, 15]);
+  // its answer: the first 15 again, each once
+  const more = { recent: Array.from({ length: 15 }, (_, i) => recentChat(i)), asked: 15 };
+  page = recentPage(group, more, 2, 5);
+  assert.deepEqual([page.all.length, page.shown, page.fetch], [15, 10, 0]);
+  page = recentPage(group, more, 3, 5);
+  assert.deepEqual([page.shown, page.fetch], [15, 20]);
+  // fewer than asked: that's all of them, whatever the count said
+  page = recentPage(group, { recent: more.recent.slice(0, 13), asked: 20 }, 4, 5);
+  assert.deepEqual([page.shown, page.count, page.fetch], [13, 13, 0]);
+  assert.equal(pagedTitle("Recent chats", page.shown, page.count), "Recent chats (13)");
+  assert.equal(moreText(18, 20, 5), "Show 2 more");
+  // a page the status hasn't got yet isn't shown as empty lines
+  page = recentPage({ recent: [recentChat(0)], recentCount: 9 }, null, 2, 5);
+  assert.deepEqual([page.shown, page.count, page.fetch], [1, 9, 9]);
+  // an older backend: no count, what it lists
+  assert.equal(recentPage({ recent: [recentChat(0), recentChat(1)] }, null, 1, 5).count, 2);
+});
+
+test("an opened project: its chats but the running ones, plans and memories a page at a time, tagged when it's on several accounts", () => {
+  const project = demoProjects(1_800_000_000_000).projects[0];
+  const opened = projectLists(project, new Set(["demo-1"]), {}, 2);
+  assert.deepEqual(opened.chats.map((c) => c.sessionId), ["demo-r1", "demo-6"]);
+  assert.deepEqual([opened.chatsShown, opened.plansShown, opened.memoriesShown, opened.tagged], [2, 0, 1, false]);
+  const big = { ...project, accounts: ["personal", "work"], chats: Array.from({ length: 7 }, (_, i) => ({ ...recentChat(i), account: "work" })) };
+  const more = projectLists(big, new Set(), { chats: 2 }, 3);
+  assert.deepEqual([more.chats.length, more.chatsShown, more.tagged], [7, 6, true]);
+  assert.equal(pagedTitle("Chats", more.chatsShown, more.chats.length), "Chats (6 of 7)");
+  // the chats listed now, under their account: not again in the project
+  const groups = demoState(1_800_000_000_000).status!.groups;
+  assert.ok(listedChats(groups).has(groups[0].sessions[0].sessionId));
+});
+
+test("a line's folder in a project: only the part below the project's, nothing for the project's own", () => {
+  assert.equal(folderIn("/srv/repos/api/server", "/srv/repos/api", "~/repos/api/server"), "server");
+  assert.equal(folderIn("/srv/repos/api", "/srv/repos/api", "~/repos/api"), "");
+  assert.equal(folderIn("/srv/repos/api-v2", "/srv/repos/api", "~/repos/api-v2"), "~/repos/api-v2");
+  assert.equal(folderIn("/srv/x", "", "~/x"), "~/x"); // (the plans whose chat is gone: no project folder)
+  assert.equal(folderIn("", "/srv/repos/api", ""), "");
+});
+
+test("the Projects tab's chats, plans and memories are found by key, on the account of their folder", () => {
+  const state = demoState(1_800_000_000_000);
+  const data = demoProjects(1_800_000_000_000);
+  assert.equal(findProjectChat(data, ".claude/demo-6/project")?.sessionId, "demo-6");
+  assert.equal(findProjectChat(data, "nope"), null);
+  assert.equal(findProjectChat(null, ".claude/demo-6/project"), null);
+  assert.equal(findProjectPlan(data, state.status, "demo-plan-2")?.group.id, state.status!.groups[0].id);
+  assert.equal(findProjectMemory(data, state.status, "demo-mem-1")?.memory.name, "test-command");
+  assert.equal(findProjectMemory(data, state.status, 5), null);
+  assert.equal(groupOfProfile(state.status, ".claude")?.id, state.status!.groups[0].id);
 });

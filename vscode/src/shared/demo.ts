@@ -227,6 +227,7 @@ function personal(now: number, phase: number): Group {
       { path: "/home/alice", short: "~", newChatCommand: "echo 'Demo mode'" },
     ],
     sharedHere: [],
+    recentCount: 2,
     recent: [
       { key: "demo-r1", sessionId: "demo-r1", name: "Explain the build pipeline", cwd: "/home/alice/projects/webapp", cwdShort: "~/projects/webapp", lastActive: now - 5 * HOUR, profile: "personal", profileDir: ".claude", shared: false, openCommand: "echo 'Demo mode'" },
       { key: "demo-r2", sessionId: "demo-r2", name: "Rename the config module", cwd: "/home/alice/projects/api-server", cwdShort: "~/projects/api-server", lastActive: now - 26 * HOUR, profile: "personal", profileDir: ".claude", shared: false, openCommand: "echo 'Demo mode'" },
@@ -253,6 +254,12 @@ function personal(now: number, phase: number): Group {
         key: "demo-mem-2", name: "short-commit-messages", description: "Commit messages: one short line in the present tense, no body",
         type: "feedback", path: "/home/alice/.claude/projects/-home-alice-projects-api-server/memory/short-commit-messages.md",
         folder: "/home/alice/projects/api-server", folderShort: "~/projects/api-server", folderGone: false, profileDir: ".claude", profile: "personal", updatedAt: now - 2 * 24 * HOUR,
+      },
+    ],
+    instructions: [
+      {
+        key: ".claude/CLAUDE.md/memory", name: "CLAUDE.md", description: "Your instructions for every chat on this account", type: "account",
+        path: "/home/alice/.claude/CLAUDE.md", folder: "", folderShort: "", folderGone: false, profileDir: ".claude", profile: "personal", updatedAt: now - 9 * 24 * HOUR,
       },
     ],
     homeChatCommand: "echo 'Demo mode'",
@@ -592,19 +599,31 @@ export function demoPerms(now: number): PermsData {
 // The Projects tab: the demo's chats by project
 export function demoProjects(now: number): ProjectsData {
   const h = 3_600_000;
-  const chat = (id: string, name: string, cwd: string, ago: number, workedMs: number, cost: number) =>
-    ({ id, name, profileDir: ".claude", cwd, lastAt: now - ago, workedMs, cost });
+  const home = "/home/alice";
+  const chat = (id: string, name: string, cwd: string, ago: number) =>
+    ({ key: `.claude/${id}/project`, sessionId: id, name, cwd, cwdShort: cwd.replace(home, "~"), lastActive: now - ago, profile: "personal",
+       profileDir: ".claude", account: "personal", shared: false, starred: false });
+  const local = personal(now, 0);
+  const plans = (local.plans ?? []).map((p) => ({ ...p, account: "personal" }));
+  const memories = (local.memories ?? []).map((m) => ({ ...m, account: "personal" }));
+  const project = (name: string, path: string, ago: number, chats: ReturnType<typeof chat>[], recap: string | null) => ({
+    name, path, short: path.replace(home, "~"), gone: false, lastAt: now - ago, accounts: ["personal"], chatCount: chats.length, chats,
+    plans: plans.filter((p) => p.cwd === path), memories: memories.filter((m) => m.folder === path), recap: recap ? { text: recap, at: now - ago } : null,
+  });
   return {
     ok: true, generatedAt: now,
     projects: [
-      { name: "webapp", path: "/home/alice/projects/webapp", short: "~/projects/webapp", workedMs: 31 * h, weekMs: 9 * h, cost: 201.4,
-        lastAt: now - 0.2 * h, chatCount: 14,
-        chats: [chat("demo-1", "Fix the date parser", "/home/alice/projects/webapp", 0.2 * h, 1.8 * h, 12.4),
-                chat("demo-6", "Nightly dependency check", "/home/alice/projects/webapp", 3 * h, 0.3 * h, 1.1)] },
-      { name: "api-server", path: "/home/alice/projects/api-server", short: "~/projects/api-server", workedMs: 12 * h, weekMs: 2.5 * h, cost: 93.6,
-        lastAt: now - 0.5 * h, chatCount: 6, chats: [chat("demo-2", "Release notes for 2.0", "/home/alice/projects/api-server", 0.5 * h, 0.9 * h, 5.2)] },
-      { name: "notes", path: "/home/alice/notes", short: "~/notes", workedMs: 3 * h, weekMs: 0, cost: 34.6, lastAt: now - 50 * h, chatCount: 3,
-        chats: [chat("demo-9", "Sort the meeting notes", "/home/alice/notes", 50 * h, 0.6 * h, 2.3)] },
+      project("webapp", `${home}/projects/webapp`, 0.2 * h, [
+        chat("demo-1", "Fix the date parser", `${home}/projects/webapp`, 0.2 * h),
+        chat("demo-r1", "Explain the build pipeline", `${home}/projects/webapp/build`, 5 * h),
+        chat("demo-6", "Nightly dependency check", `${home}/projects/webapp`, 30 * h),
+      ], "Fixed the date parser for ISO weeks; the tests pass. Next: the release notes."),
+      project("api-server", `${home}/projects/api-server`, 0.5 * h, [
+        chat("demo-2", "Release notes for 2.0", `${home}/projects/api-server`, 0.5 * h),
+        chat("demo-r2", "Rename the config module", `${home}/projects/api-server/config`, 26 * h),
+      ], null),
+      project("notes", `${home}/notes`, 50 * h, [chat("demo-9", "Sort the meeting notes", `${home}/notes`, 50 * h)], null),
+      { ...project("", "", 72 * h, [], null), name: "", short: "", plans: plans.filter((p) => !p.cwd) },
     ],
   };
 }

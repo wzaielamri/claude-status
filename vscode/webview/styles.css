@@ -1474,14 +1474,35 @@ button:focus-visible {
   cursor: pointer;
 }
 
-/* The starred ones, unfolded: a step further in */
-.starred-toggle {
-  display: flex;
-  margin-left: 12px;
+/* "Show N more" under a list shown a page at a time (MoreButton.tsx) */
+.more-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 1px 0 2px 16px;
+  padding: 1px 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--cs-muted);
+  font: inherit;
+  cursor: pointer;
 }
 
-.recent-list.starred-list {
-  margin-left: 12px;
+.more-button:hover {
+  color: var(--cs-fg);
+  background: var(--cs-hover);
+}
+
+.more-button .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* An account's CLAUDE.md: its own line, under its lists */
+.recent-list.instructions {
+  margin-top: 4px;
+  padding-left: 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -3606,6 +3627,7 @@ body.vscode-high-contrast-light .pane {
 
 /* The Projects tab (ProjectsView.tsx) */
 .project {
+  scroll-margin-top: 3.5em; /* (brought into view from the Recap: below the sticky top) */
   padding: 6px 0;
   border-bottom: 1px solid var(--vscode-widget-border, color-mix(in srgb, var(--cs-fg) 12%, transparent));
 }
@@ -3644,12 +3666,6 @@ body.vscode-high-contrast-light .pane {
   transform: rotate(90deg);
 }
 
-.project-numbers {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .project-title strong {
   overflow: hidden;
   white-space: nowrap;
@@ -3681,11 +3697,29 @@ body.vscode-high-contrast-light .pane {
   opacity: 0.85;
 }
 
-.project-files {
+/* an opened project's Chats, Plans and Memories: small titles, as an account's folds */
+.project-list {
+  margin-top: 2px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.project-details > .recent-list {
+  padding-left: 4px;
+}
+
+.project-details > .more-button {
+  margin-left: 4px;
+}
+
+/* a dot for each of a project's open chats */
+.project-dots {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex: none;
+  gap: 3px;
   align-items: center;
+  height: 1.4em;
+  padding-top: 2px;
 }
 
 /* a plan's or a memory's kind, before its name (as in Plasma) */
@@ -3694,14 +3728,6 @@ body.vscode-high-contrast-light .pane {
   width: 12px;
   height: 12px;
   align-self: center;
-  opacity: 0.7;
-}
-
-.chip > .icon {
-  width: 11px;
-  height: 11px;
-  margin-right: 3px;
-  vertical-align: -1px;
   opacity: 0.7;
 }
 

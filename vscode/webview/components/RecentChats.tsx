@@ -1,56 +1,102 @@
-import {
-  ago,
-  goOnAt,
-  claudeCodeHere,
-  claudeCodeReopenHint,
-  cliInstalled,
-  keptChat,
-  keptTitle,
-  machineStatus,
-  queuedChat,
-  reopensInClaudeCode,
-  startText,
-  stopText,
-  terminalReopenHint,
-} from "../../src/shared/model";
-import { reviewPending, testsText } from "../../src/shared/pane";
-import type { Group, RecentChat, ReopenIn } from "../../src/shared/types";
+import { useEffect } from "preact/hooks";
+import { pagedTitle, pageSizeOf, recentPage } from "../../src/shared/model";
+import type { Group, ReopenIn } from "../../src/shared/types";
 import { post } from "../env";
-import { canShareRecent, deleteHint, groupKeyOf, recentRef, shareTitle } from "../util/chat";
+import { groupKeyOf } from "../util/chat";
 import { Icon } from "../util/icons";
 import { useStore } from "../util/store";
-import { toggleRecent, toggleStarred, uiState } from "../util/ui";
+import { askRecentMore, pages, pagesShown, recentMore, showMore, toggleRecent, toggleStarred, uiState } from "../util/ui";
 import { useView } from "./context";
-import { Elided } from "./Elided";
-import { IconButton } from "./IconButton";
-import { Tag } from "./Tag";
+import { MoreButton } from "./MoreButton";
+import { RecentLine, reopenOf, type Reopen } from "./RecentLine";
 
-// The account's latest other chats, to pick one up again. Folded by default:
-// the running chats come first. A switch above them says where they reopen:
-// in a terminal, or in a Claude Code panel (kept in talpyDen.reopenIn). A
-// half is greyed out where it can't work: no claude command on the chat's
-// machine, or Claude Code not here or on another account. The chats you
-// starred come first, under their own fold (★ Starred), however old.
+// The account's latest other chats, to pick one up again (Recent chats),
+// and the ones you starred, however old (★ Starred chats): each folded by
+// default (the running chats come first), flat, newest first, a page at a
+// time (as many as the Recent chats setting; "Show N more" the next page,
+// folded again the first one). The status lists a page more recent chats
+// than show, and how many there are; past those the extension runs a check
+// that lists more, once. A switch at the top says where they reopen: in a
+// terminal, or in a Claude Code panel (kept in talpyDen.reopenIn); a half is
+// greyed out where it can't work.
 export function RecentChats({ group }: { group: Group }) {
   const view = useView();
   const ui = useStore(uiState);
+  const shownPages = useStore(pages);
+  const more = useStore(recentMore);
   const key = groupKeyOf(group);
-  const items = (group.recent ?? []).slice(0, Math.max(0, view.settings.recentChats));
-  const starred = group.starred ?? [];
-  if (!items.length && !starred.length) return null;
+  const size = pageSizeOf(view.settings.recentChats);
   const open = !!ui.recent[key];
+  const recent = recentPage(group, open ? more[key] : null, pagesShown(shownPages, key + "|recent"), size);
+  // (the next page: asked for as the one before it shows)
+  useEffect(() => {
+    if (open && recent.fetch) askRecentMore(group, recent.fetch);
+  }, [open, recent.fetch, key]);
+  const starred = group.starred ?? [];
   const starredOpen = !!ui.starred[`${key}|chats`];
-  const status = machineStatus(view, group.host);
-  const share = canShareRecent(status);
-  const cliHere = cliInstalled(status);
-  const codeHere = claudeCodeHere(group, view.claudeCode);
-  const inCode = reopensInClaudeCode(view.settings.reopenIn, cliHere, codeHere);
-  const groups = view.status?.groups ?? [];
-  const terminalHint = terminalReopenHint(group.host, cliHere);
-  const codeHint = claudeCodeReopenHint(group, view.claudeCode, groups);
-  const canOpen = inCode || cliHere;
-  const reopen = !canOpen ? `${terminalHint}\n${codeHint}` : inCode ? codeHint : terminalHint;
+  const starredShown = Math.min(starred.length, size * pagesShown(shownPages, key + "|chats"));
+  if (!recent.count && !starred.length) return null;
+  const how = open || starredOpen ? reopenOf(view, group) : null;
+  const paneFirst = view.settings.clickOpensPane !== false;
 
+  return (
+    <>
+      {recent.count ? (
+        <div class="recent">
+          <button
+            type="button"
+            class="recent-toggle small"
+            aria-expanded={open}
+            title={(paneFirst
+              ? "This account's latest chats that aren't listed above, newest first. Click one to open it in a tab; its reopen button (on hover) reopens it in a terminal or in a Claude Code panel (the switch at the top of the list)."
+              : "This account's latest chats that aren't listed above, newest first. Click one to reopen it, in a terminal or in a Claude Code panel (the switch at the top of the list).") +
+              " Show more lists more of them; folded again, it lists the first ones again. Every chat of a project is in the Projects tab."}
+            onClick={() => toggleRecent(key)}
+          >
+            <Icon name="chevron" class={open ? "open" : ""} />
+            {pagedTitle("Recent chats", recent.shown, recent.count)}
+          </button>
+          {open && how ? (
+            <>
+              <OpenIn how={how} />
+              <ul class="recent-list">
+                {recent.all.slice(0, recent.shown).map((c) => <RecentLine key={c.key} chat={c} group={group} how={how} />)}
+              </ul>
+              <MoreButton shown={recent.shown} count={recent.count} size={size} onClick={() => showMore(key + "|recent")} />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      {starred.length ? (
+        <div class="recent">
+          <button
+            type="button"
+            class="recent-toggle small"
+            aria-expanded={starredOpen}
+            title="The chats of this account you starred (☆ next to a chat), newest first, however old they are; not the ones listed above. Click a chat's ★ to unstar it."
+            onClick={() => toggleStarred(`${key}|chats`)}
+          >
+            <Icon name="chevron" class={starredOpen ? "open" : ""} />
+            {pagedTitle("★ Starred chats", starredShown, starred.length)}
+          </button>
+          {starredOpen && how ? (
+            <>
+              {/* (the switch here too while Recent chats is folded) */}
+              {open ? null : <OpenIn how={how} />}
+              <ul class="recent-list">
+                {starred.slice(0, starredShown).map((c) => <RecentLine key={c.key} chat={c} group={group} how={how} />)}
+              </ul>
+              <MoreButton shown={starredShown} count={starred.length} size={size} onClick={() => showMore(`${key}|chats`)} />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+// Where an account's chats reopen: Terminal | Claude Code panel
+function OpenIn({ how }: { how: Reopen }) {
   const half = (where: ReopenIn, text: string, available: boolean, checked: boolean, title: string) => (
     <button
       type="button"
@@ -63,154 +109,15 @@ export function RecentChats({ group }: { group: Group }) {
       {text}
     </button>
   );
-
+  const { cliHere, codeHere, inCode, terminalHint, codeHint } = how;
   return (
-    <div class="recent">
-      <button
-        type="button"
-        class="recent-toggle small"
-        aria-expanded={open}
-        title={view.settings.clickOpensPane !== false
-          ? "This account's latest chats that aren't listed above, and the ones you starred. Click one to open it in a tab; its reopen button (on hover) reopens it in a terminal or in a Claude Code panel (the switch at the top of the list)."
-          : "This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in a Claude Code panel (the switch at the top of the list)."}
-        onClick={() => toggleRecent(key)}
-      >
-        <Icon name="chevron" class={open ? "open" : ""} />
-        {items.length || !starred.length ? `Recent chats (${items.length})` : `Recent chats: ★ Starred (${starred.length})`}
-      </button>
-      {open ? (
-        <>
-          <div class="open-in small" role="group" aria-label="Where recent chats reopen">
-            <span class="muted">Open in:</span>
-            {half("terminal", "Terminal", cliHere, cliHere && !inCode, (cliHere ? "Reopen chats in a terminal\n" : "No claude command\n") + terminalHint)}
-            {half("claudeCode", "Claude Code panel", codeHere, inCode, (codeHere ? "Reopen chats in a Claude Code panel\n" : "Not here\n") + codeHint)}
-          </div>
-          {!cliHere && !codeHere ? <div class="open-in-why small muted">{`${terminalHint} ${codeHint}`}</div> : null}
-          {starred.length ? (
-            <button
-              type="button"
-              class="recent-toggle starred-toggle small"
-              aria-expanded={starredOpen}
-              title="The chats of this account you starred (☆ next to a chat), newest first, however old they are; not the ones listed above. Click a chat's ★ to unstar it."
-              onClick={() => toggleStarred(`${key}|chats`)}
-            >
-              <Icon name="chevron" class={starredOpen ? "open" : ""} />★ Starred ({starred.length})
-            </button>
-          ) : null}
-          {starredOpen && starred.length ? <ul class="recent-list starred-list">{starred.map((c) => line(c))}</ul> : null}
-          <ul class="recent-list">{items.map((c) => line(c))}</ul>
-        </>
-      ) : null}
-    </div>
+    <>
+      <div class="open-in small" role="group" aria-label="Where recent chats reopen">
+        <span class="muted">Open in:</span>
+        {half("terminal", "Terminal", cliHere, cliHere && !inCode, (cliHere ? "Reopen chats in a terminal\n" : "No claude command\n") + terminalHint)}
+        {half("claudeCode", "Claude Code panel", codeHere, inCode, (codeHere ? "Reopen chats in a Claude Code panel\n" : "Not here\n") + codeHint)}
+      </div>
+      {!cliHere && !codeHere ? <div class="open-in-why small muted">{`${terminalHint} ${codeHint}`}</div> : null}
+    </>
   );
-
-  function line(c: RecentChat) {
-    const chat = recentRef(c, group.host);
-    const goOn = goOnAt(c);
-    const goingOn = queuedChat(view.status, c.sessionId, group.host);
-    const kept = group.host ? null : keptChat(view.status, c.sessionId);
-    const later = group.host ? "" : " Once: ↻ beside it goes on after later limits too, until it's done.";
-    const canKeep = !group.host && !kept && !goingOn && goOn > 0;
-    // a click opens its tab (else the chat itself, as the switch above says)
-    const paneFirst = view.settings.clickOpensPane !== false;
-    const reopenIt = () => post(inCode ? { type: "openInClaudeCode", chat } : { type: "openWindow", chat });
-    const toReview = reviewPending({ ...c, chatId: c.sessionId, state: "done" }, view.status, group.host);
-    const tests = testsText(c.review);
-    return (
-      <li key={c.key} class={"recent-item" + (canOpen || paneFirst ? "" : " unavailable")}>
-        <button
-          type="button"
-          class="link recent-name"
-          aria-disabled={!canOpen && !paneFirst}
-          title={
-            `${c.name}\n` +
-            (paneFirst
-              ? "Click to open it in a tab: its conversation, a box to reply, and what it changed." + (canOpen ? `\nThe reopen button (on hover): ${reopen}` : "")
-              : reopen) +
-            (c.cwd ? `\nFolder: ${group.host ? `${group.host}:` : ""}${c.cwd}` : "") +
-            (c.shared ? `\nShared between accounts; last used on ${c.profile}.` : "") +
-            (c.stopped ? `\n\n${stopText(c.stopped)}` : "") +
-            (c.recap?.text ? `\n\nRecap: ${c.recap.text}` : "")
-          }
-          onClick={() => (paneFirst ? post({ type: "openPane", chat }) : canOpen && reopenIt())}
-        >
-          {c.name}
-        </button>
-        {c.shared ? (
-          <span class="muted" title="Shared between accounts">
-            ⇄
-          </span>
-        ) : null}
-        {goingOn ? (
-          <Tag
-            text={`⏱ ${startText(goingOn.startAt, view.now)}`}
-            active
-            title={`Goes on by itself at ${startText(goingOn.startAt, view.now)}, in the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).\n\nClick to cancel it.`}
-            onClick={() => post({ type: "unqueue", id: goingOn.id })}
-          />
-        ) : c.stopped?.kind === "limit" && !c.stopped.over ? (
-          <Tag
-            text="Limit"
-            warning
-            title={`A usage limit stopped it\n${c.stopped.text}` + (goOn ? `\n\nClick to have it go on by itself in the background at ${startText(goOn, view.now)}, a minute after the limit resets.${later}` : "")}
-            onClick={goOn ? () => post({ type: "queueContinue", chat }) : undefined}
-          />
-        ) : null}
-        {kept ? (
-          <Tag
-            text="↻"
-            active={!kept.error}
-            warning={!!kept.error || !!kept.note}
-            title={keptTitle(kept)}
-            onClick={() => post({ type: "keepGoing", chat, on: false })}
-          />
-        ) : canKeep ? (
-          <Tag
-            text="↻"
-            title={`Keep going until it's done\nClick to have it go on by itself in the background at ${startText(goOn, view.now)}, a minute after the limit resets, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.`}
-            onClick={() => post({ type: "queueContinue", chat, keep: true })}
-          />
-        ) : null}
-        {toReview ? (
-          <Tag
-            text="To review"
-            active
-            title="It changed files. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed."
-            onClick={() => post({ type: "openPane", chat, tab: "review" })}
-          />
-        ) : null}
-        {toReview && tests ? <Tag text={tests.text} title={tests.title} active={tests.ok === true} warning={tests.ok === false} /> : null}
-        {c.starred ? (
-          <button type="button" class="star-mark" title="Starred: it stays listed under Starred, however old it is. Click to unstar it." onClick={() => post({ type: "star", chat, on: false })}>
-            ★
-          </button>
-        ) : null}
-        <Elided text={c.cwdShort || "~"} class="recent-folder small muted" title={c.cwd} />
-        <span class="recent-ago small muted nowrap">{ago(view.now - c.lastActive)}</span>
-        <div class="row-actions">
-          {paneFirst && canOpen ? (
-            <IconButton icon="external" label="Reopen this chat" title={reopen} onClick={reopenIt} />
-          ) : null}
-          {c.starred ? null : (
-            <IconButton
-              icon="star"
-              label="Star"
-              title="Star this chat: it stays listed under Recent chats → Starred, however old it is."
-              onClick={() => post({ type: "star", chat, on: true })}
-            />
-          )}
-          {share ? (
-            <IconButton
-              icon="share"
-              label="Continue on another account…"
-              title={shareTitle(group.host)}
-              onClick={() => post({ type: "share", chat })}
-            />
-          ) : null}
-          <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
-            onClick={() => post({ type: "delete", kind: "chat", chat })} />
-        </div>
-      </li>
-    );
-  }
 }

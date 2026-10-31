@@ -1,8 +1,12 @@
 // UI state kept across reloads of the webview (VS Code drops a hidden view's
-// page): which subagent trees (and subagents), peeks, recent-chat lists and stats
-// are open. Kept by row and account key, since every poll brings new objects.
+// page): which subagent trees (and subagents), peeks, recent-chat lists,
+// projects and stats are open. Kept by row and account key, since every poll
+// brings new objects.
 
-import { savedState, saveState } from "../env";
+import type { RecentMore } from "../../src/shared/model";
+import type { Group, RecentChat } from "../../src/shared/types";
+import { post, savedState, saveState } from "../env";
+import { groupKeyOf } from "./chat";
 import { createStore } from "./store";
 
 export type Tab = "chats" | "week" | "perms" | "projects";
@@ -14,9 +18,8 @@ interface UiState {
   agentDetail: Record<string, true>; // by agentDetailKey(): row key + "|" + agent id
   peek: Record<string, true>;
   recent: Record<string, true>;
-  plans: Record<string, true>;
   starred: Record<string, true>; // an account's starred chats or plans unfolded: its key + "|chats" or "|plans"
-  memories: Record<string, true>;
+  projects: Record<string, true>; // the Projects tab's projects unfolded, by folder
   stats: Record<string, true>;
 }
 
@@ -34,9 +37,8 @@ function load(): UiState {
     agentDetail: { ...(saved?.agentDetail ?? {}) },
     peek: { ...(saved?.peek ?? {}) },
     recent: { ...(saved?.recent ?? {}) },
-    plans: { ...(saved?.plans ?? {}) },
     starred: { ...(saved?.starred ?? {}) },
-    memories: { ...(saved?.memories ?? {}) },
+    projects: { ...(saved?.projects ?? {}) },
     stats: { ...(saved?.stats ?? {}) },
   };
 }
@@ -82,24 +84,92 @@ export function togglePeek(rowKey: string): void {
   persist({ ...s, peek: toggled(s.peek, rowKey) });
 }
 
+// (folded: its first page again, without the chats a bigger check listed)
 export function toggleRecent(groupKey: string): void {
   const s = uiState.get();
+  if (s.recent[groupKey]) {
+    firstPage(groupKey + "|recent");
+    dropRecentMore(groupKey);
+  }
   persist({ ...s, recent: toggled(s.recent, groupKey) });
-}
-
-export function togglePlans(groupKey: string): void {
-  const s = uiState.get();
-  persist({ ...s, plans: toggled(s.plans, groupKey) });
 }
 
 export function toggleStarred(key: string): void {
   const s = uiState.get();
+  if (s.starred[key]) firstPage(key);
   persist({ ...s, starred: toggled(s.starred, key) });
 }
 
-export function toggleMemories(groupKey: string): void {
+// A project of the Projects tab, unfolded or folded (then its lists show their first page again)
+export function toggleProject(path: string): void {
   const s = uiState.get();
-  persist({ ...s, memories: toggled(s.memories, groupKey) });
+  if (s.projects[path]) firstPage(...PROJECT_LISTS.map((l) => projectListKey(path, l)));
+  persist({ ...s, projects: toggled(s.projects, path) });
+}
+
+// The Recap's project row: the Projects tab, that project unfolded and brought into view
+export function showProject(path: string): void {
+  const s = uiState.get();
+  projectToShow.set(path);
+  persist({ ...s, tab: "projects", projects: s.projects[path] ? s.projects : toggled(s.projects, path) });
+}
+export const projectToShow = createStore("");
+
+// ---------------------------------------------------------------- lists a page at a time
+// How many pages past its first a list shows (by its key: an account's key
+// + "|recent", "|chats" or "|plans", a project's projectListKey), while the
+// view is open (src/shared/model.ts: recentPage, projectLists)
+export const pages = createStore<Record<string, number>>({});
+
+export const PROJECT_LISTS = ["chats", "plans", "memories"] as const;
+export function projectListKey(path: string, list: (typeof PROJECT_LISTS)[number]): string {
+  return `project|${path}|${list}`;
+}
+
+export function pagesShown(all: Record<string, number>, key: string): number {
+  return 1 + (all[key] ?? 0);
+}
+
+export function showMore(key: string): void {
+  const all = pages.get();
+  pages.set({ ...all, [key]: (all[key] ?? 0) + 1 });
+}
+
+function firstPage(...keys: string[]): void {
+  const all = pages.get();
+  if (!keys.some((k) => k in all)) return;
+  const next = { ...all };
+  for (const k of keys) delete next[k];
+  pages.set(next);
+}
+
+// An account's recent chats past what the status lists, as a bigger check
+// listed them (the extension runs it: "recentMore"), by its key; asked once
+// for each count while its list is open
+export const recentMore = createStore<Record<string, RecentMore>>({});
+const recentAsked = new Map<string, number>();
+
+export function askRecentMore(group: Group, count: number): void {
+  const key = groupKeyOf(group);
+  if (recentAsked.get(key) === count) return;
+  recentAsked.set(key, count);
+  post({ type: "recentMore", groupId: group.id, ...(group.host ? { host: group.host } : {}), count });
+}
+
+// Its answer, while the list is still open (folded, its first page shows)
+export function gotRecentMore(m: { groupId: string; host?: string; recent: RecentChat[]; asked: number }): void {
+  const key = (m.host ? m.host + "/" : "") + m.groupId;
+  if (!m.asked || !uiState.get().recent[key]) return;
+  recentMore.set({ ...recentMore.get(), [key]: { recent: m.recent, asked: m.asked } });
+}
+
+function dropRecentMore(key: string): void {
+  recentAsked.delete(key);
+  const all = recentMore.get();
+  if (!(key in all)) return;
+  const next = { ...all };
+  delete next[key];
+  recentMore.set(next);
 }
 
 export function toggleStats(groupKey: string): void {

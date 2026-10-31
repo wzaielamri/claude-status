@@ -16,7 +16,7 @@ import { LiveWatch } from "./live";
 import type { Notifier } from "./notify";
 import { currentRemoteAuthority, hostFromAuthority, portFromAuthority, sshPort } from "./remoteHost";
 import { demoPerms, demoProjects, demoState, demoWeek } from "./shared/demo";
-import { allGroups, chatsNeedingYou, keptChat, limitReset, liveFromRows, queuedWhat, shareUsage, toLocalClock, trackKey, withLive, type ChatSpot } from "./shared/model";
+import { allGroups, chatsNeedingYou, findProjectChat, keptChat, limitReset, liveFromRows, queuedWhat, recentRef, shareUsage, toLocalClock, trackKey, withLive, type ChatSpot, type RecentMore } from "./shared/model";
 import { chatRef } from "./notify";
 import type { ChatRef, ClaudeCodeInfo, DigestCard, Group, HostState, LiveView, PermsData, PetEventKind, ProjectsData, QueuedTask, Status, ViewState, WeekRecap, WeekSpan } from "./shared/types";
 import type { WeekRuleAsk } from "./shared/week";
@@ -46,6 +46,8 @@ export class Dashboard implements vscode.Disposable {
   private retryTimer?: NodeJS.Timeout; // Python didn't work: try again (its own timer: polls mustn't cancel it)
   private demoTimer?: NodeJS.Timeout;
   private demoPhase: number | null = null;
+  private projectsData: ProjectsData | null = null; // the Projects tab's, as last read
+  private moreRecent = new Map<string, RecentMore>(); // "host|account id": its recent chats as a bigger check listed them
   private tracker = new TransitionTracker();
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
@@ -740,10 +742,46 @@ export class Dashboard implements vscode.Disposable {
 
   // The Permissions tab: the permissions you gave and the prompts of the
   // last 7 days (this computer's)
+  // (kept: a click on one of its chats, plans or memories is found in it)
   async projects(): Promise<{ data?: ProjectsData; error?: string }> {
-    if (this.demoPhase !== null) return { data: demoProjects(Date.now()) };
-    const currency = vscode.workspace.getConfiguration("talpyDen").get<string>("recapCurrency") || "USD";
-    return this.backend.projects([...(currency !== "USD" ? ["--currency", currency] : []), ...configDirArgs()]);
+    const answer = this.demoPhase !== null ? { data: demoProjects(Date.now()) } : await this.backend.projects(configDirArgs());
+    if (answer.data) this.projectsData = answer.data;
+    return answer;
+  }
+
+  projectsRead(): ProjectsData | null {
+    return this.projectsData;
+  }
+
+  // An account's first count recent chats, past what the status lists
+  // ("Show N more"): the status run once more, listing that many (a host's
+  // there), without the tokens or a usage fetch. Kept, so a click on one is
+  // found (moreChat).
+  async recentMore(groupId: string, host: string | undefined, count: number): Promise<RecentMore | null> {
+    if (this.demo || this.disposed) return null;
+    const more = ["--recent", String(count), "--no-tokens", "--usage-refresh", "0"];
+    let result: Status | undefined;
+    if (host) {
+      const answer = await this.backend.hostStatus(host, [...statusArgs(), ...more]);
+      if (answer.ok && answer.result) result = toLocalClock(answer.result, Date.now() - (answer.result.generatedAt || Date.now()));
+    } else result = (await this.backend.status([...configDirArgs(), ...statusArgs(), ...more])).status;
+    const g = result?.groups.find((x) => x.id === groupId);
+    if (!g) return null;
+    const found = { recent: g.recent ?? [], asked: count };
+    this.moreRecent.set(`${host ?? ""}|${groupId}`, found);
+    return found;
+  }
+
+  // A chat a click names that the status doesn't list: one of an account's
+  // recent chats a bigger check listed, or one of the Projects tab's (this computer's)
+  moreChat(host: unknown, key: unknown): ChatRef | null {
+    if (typeof key !== "string" || !key || (host !== undefined && host !== null && typeof host !== "string")) return null;
+    for (const [where, more] of this.moreRecent)
+      if (where.startsWith(`${host ?? ""}|`)) {
+        const c = more.recent.find((x) => x.key === key);
+        if (c) return recentRef(c, (host as string) || undefined);
+      }
+    return host ? null : findProjectChat(this.projectsData, key);
   }
 
   async perms(): Promise<{ data?: PermsData; error?: string }> {

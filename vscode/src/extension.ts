@@ -109,7 +109,9 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!file) return void vscode.window.showInformationMessage("Talpy Den: open a plan's file first (✎ next to a plan).");
     const state = dash.state();
     const groups = state.status?.groups ?? [];
-    const listed = groups.flatMap((g) => g.plans ?? []).find((p) => p.path === file.file);
+    // (the status lists the starred plans; the Projects tab, as last read, every one)
+    const listed = [...groups.flatMap((g) => [...(g.plans ?? []), ...(g.starredPlans ?? [])]), ...(dash.projectsRead()?.projects ?? []).flatMap((p) => p.plans)]
+      .find((p) => p.path === file.file);
     const row = groups.flatMap((g) => g.sessions).find((s) => s.plan?.path === file.file);
     void a.sendPlanFeedback(
       listed ?? {

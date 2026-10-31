@@ -5,14 +5,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as vscode from "vscode";
-import { demoState } from "../src/shared/demo";
-import { chatRefOf } from "../src/shared/model";
+import { demoProjects, demoState } from "../src/shared/demo";
+import { chatRefOf, findProjectChat } from "../src/shared/model";
 import type { ViewState } from "../src/shared/types";
 import { ViewHost } from "../src/view";
 
 const NOW = 1_800_000_000_000;
 
-function setup(state: ViewState = demoState(NOW)) {
+function setup(state: ViewState = demoState(NOW), projects = demoProjects(NOW)) {
   const calls: { name: string; args: unknown[] }[] = [];
   const record = (name: string) => (...args: unknown[]) => {
     calls.push({ name, args });
@@ -30,6 +30,11 @@ function setup(state: ViewState = demoState(NOW)) {
     pollHost: record("pollHost"),
     refreshAll: record("refreshAll"),
     startQueued: (t: { id: string }) => record("startQueued")(t.id),
+    // (the Projects tab as it was last read; a bigger check's recent chats)
+    projects: () => Promise.resolve({ data: projects }),
+    projectsRead: () => projects,
+    moreChat: (host: unknown, key: unknown) => (host ? null : findProjectChat(projects, key)),
+    recentMore: (...args: unknown[]) => (calls.push({ name: "recentMore", args }), Promise.resolve({ recent: [], asked: args[2] })),
   };
   const host = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, actions as never);
   const priv = host as unknown as { receive(webview: unknown, m: unknown): void; html(webview: unknown, editorTab: boolean): string };
@@ -97,6 +102,49 @@ test("a chat that isn't in the extension's state, and a message that isn't one, 
   receive("open");
   receive(null);
   assert.deepEqual(calls, []);
+});
+
+// The Projects tab's lines are this computer's chats, plans and memories as
+// week.py --projects last listed them: the status lists only the starred
+// plans and the CLAUDE.md, so a click on one is found there
+test("a project's chat, plan and memory are found in what the Projects tab last read", () => {
+  const state = demoState(NOW);
+  const g = state.status!.groups[0];
+  g.plans = [];
+  g.memories = [];
+  const { calls, receive } = setup(state);
+  const names = () => calls.splice(0).map((c) => [c.name, ...c.args.map((a) => (a && typeof a === "object" && "sessionId" in a ? a.sessionId : a))]);
+  receive({ type: "open", chat: { key: ".claude/demo-6/project" } });
+  receive({ type: "star", chat: { key: ".claude/demo-6/project" }, on: true });
+  assert.deepEqual(names(), [["open", "demo-6"], ["star", "chats", "demo-6", undefined, true]]);
+  receive({ type: "openPlan", groupId: g.id, plan: "demo-plan-1" });
+  receive({ type: "hide", kind: "plans", groupId: g.id, id: "demo-plan-2" });
+  receive({ type: "openMemory", groupId: g.id, memory: "demo-mem-1", edit: true });
+  receive({ type: "delete", kind: "memory", groupId: g.id, id: "demo-mem-2" });
+  const got = calls.splice(0);
+  assert.deepEqual(got.map((c) => c.name), ["openPlan", "hide", "openMemory", "delete"]);
+  assert.equal((got[0].args[0] as { slug: string }).slug, "brave-green-otter");
+  assert.deepEqual(got[1].args, ["plans", "quiet-amber-heron", undefined]);
+  assert.deepEqual([(got[2].args[0] as { key: string }).key, got[2].args[2]], ["demo-mem-1", true]);
+  assert.deepEqual(got[3].args, ["memory", "demo-mem-2", "", undefined]);
+  // (an SSH host's are never looked for there, nor what it doesn't list)
+  receive({ type: "openPlan", groupId: g.id, host: state.hosts[0]?.name ?? "box", plan: "demo-plan-1" });
+  receive({ type: "open", chat: { host: state.hosts[0]?.name ?? "box", key: ".claude/demo-6/project" } });
+  receive({ type: "openMemory", groupId: g.id, memory: "nope" });
+  assert.deepEqual(calls, []);
+});
+
+// "Show N more" past what the status lists: the extension runs a bigger
+// check for the account, of a few pages, here or on a host shown
+test("more recent chats are asked only for an account here or on a host shown, a few pages of it", () => {
+  const { state, calls, receive } = setup();
+  const g = state.status!.groups[0];
+  receive({ type: "recentMore", groupId: g.id, count: 10 });
+  receive({ type: "recentMore", groupId: g.id, host: state.hosts[0].name, count: 15 });
+  for (const count of [0, -5, 2.5, "10", 5000]) receive({ type: "recentMore", groupId: g.id, count });
+  receive({ type: "recentMore", groupId: g.id, host: "elsewhere", count: 10 });
+  receive({ type: "recentMore", groupId: "", count: 10 });
+  assert.deepEqual(calls.map((c) => c.args), [[g.id, undefined, 10], [g.id, state.hosts[0].name, 15]]);
 });
 
 test("agent ids, hosts and accounts in a message are checked", () => {

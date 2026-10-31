@@ -570,7 +570,7 @@
           "default": 5,
           "minimum": 0,
           "maximum": 20,
-          "markdownDescription": "How many recent chats to list per account.",
+          "markdownDescription": "How many recent chats each account lists at a time: **Show N more** under them lists the next ones (0: none). ★ Starred chats and plans, and an opened project's chats, plans and memories, show as many at a time (5 with 0).",
           "order": 24
         },
         "talpyDen.keepDoneHours": {

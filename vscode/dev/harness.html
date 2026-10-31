@@ -3,10 +3,10 @@
   The webview in a browser, with demo data: build with `npm run build` and
   `node esbuild.mjs --harness`, serve the repository folder over http and open
   dev/harness.html. ?theme=dark|light|hc|hcl (High Contrast Dark, Light)  ?width=360  ?tab=1  ?phase=0  ?week=1 (the Recap tab; ?span=day or all for a day or everything)  ?perms=1 (the Permissions tab)  ?rules=0 (its rule suggestions left out)
-  ?live=1 (live mode: a working chat's step)  ?open=1 (subagents with two of them unfolded, a peek, recent chats, plans, memories and the stats)  ?digest=1 (the "while
+  ?live=1 (live mode: a working chat's step)  ?open=1 (subagents with two of them unfolded, a peek, recent chats and the stats)  ?digest=1 (the "while
   you were away" card)  ?hover=1 (the rows' hover
   buttons shown)  ?scroll=N (scrolled down N px)  ?stopped=1 (two chats here a usage limit
-  stopped, one going on and keeping going)  ?stars=1 (starred chats and plans)  ?banner=0 (no "Demo data"
+  stopped, one going on and keeping going)  ?stars=1 (starred chats and plans)  ?many=1 (10 of 23 recent chats, 7 starred ones)  ?tab=projects&project=webapp (the Projects tab, a project opened)  ?banner=0 (no "Demo data"
   line, for screenshots). Errors show in a red box.
 -->
 <html lang="en">
@@ -120,7 +120,7 @@
         // ?open=1: the webview's saved state with the folded parts open
         let state = params.get("week") === "1" ? { ui: { tab: "week" } } : params.get("perms") === "1" ? { ui: { tab: "perms" } } : params.get("open") === "1"
           ? { ui: { agents: { "demo-1": true }, agentDetail: { "demo-1|a1": true, "demo-1|a2": true }, peek: { "demo-1": true },
-                    recent: { "demo-personal": true }, plans: { "demo-personal": true }, memories: { "demo-personal": true }, stats: { "demo-personal": true } } }
+                    recent: { "demo-personal": true }, stats: { "demo-personal": true } } }
           : undefined;
         function showError(text) {
           const box = document.createElement("pre");

@@ -32,6 +32,7 @@ import { Icon } from "../util/icons";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
 import { weekAnswer } from "../util/stores";
+import { showProject } from "../util/ui";
 
 const REFRESH_MS = 10 * 60000; // while the tab is in sight
 
@@ -375,7 +376,8 @@ function FillChart({ w, now }: { w: WeekPlanWindow; now: number }) {
 }
 
 // The project folders Claude worked in most (a chat started in a subfolder
-// of a repository counts for the repository): click one for its chats
+// of a repository counts for the repository): click one of this computer's
+// to open it in the Projects tab, an SSH host's for its chats
 function Projects({ recap }: { recap: WeekRecap }) {
   const [open, setOpen] = useState("");
   if (!recap.projects.length) return null;
@@ -390,9 +392,10 @@ function Projects({ recap }: { recap: WeekRecap }) {
           const shown = open === key;
           const chats = Array.isArray(p.chats) ? p.chats : [];
           return [
-            <li key={key} class={"opens" + (shown ? " open" : "")} {...opens(shown, () => setOpen(shown ? "" : key))}
+            <li key={key} class={"opens" + (shown ? " open" : "")} {...opens(shown, () => (p.host ? setOpen(shown ? "" : key) : showProject(p.path)))}
               title={`${p.host ? p.host + ": " : ""}${p.path}\nClaude worked ${hoursText(p.workedMs)} · ${moneyText(p.cost, cur)} at API prices\n` +
-                `${p.prompts} prompts · ${p.chatCount ?? chats.length} chats\nClick for its chats`}>
+                `${p.prompts} prompts · ${p.chatCount ?? chats.length} chats\n` +
+                (p.host ? "Click for its chats." : "Click to open it in the Projects tab: its chats, plans and memories.")}>
               <span class="week-bar-name">
                 <Icon name="chevron" class={shown ? "turn" : ""} />
                 {(p.host ? p.host + ": " : "") + p.name}
