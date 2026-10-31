@@ -15,7 +15,7 @@ import { sharedTagTitle } from "./util/chat";
 import { IconButton } from "./components/IconButton";
 import { Tag } from "./components/Tag";
 import { TalpyIcon } from "./components/TalpyIcon";
-import { Icon } from "./util/icons";
+import { I, Icon } from "./util/icons";
 import { Markdown } from "./util/markdown";
 
 declare global {
@@ -728,16 +728,16 @@ function ChatApp() {
                 if (dictating === "") setDictating("starting"); // (until it records, or says why not: no second recorder)
                 post({ type: "dictate", action: "toggle" });
               }}>
-              <Icon name={dictating === "recording" ? "stop" : "mic"} />
+              <Icon name={dictating === "recording" ? I.stop : I.dictate} />
               {dictating === "" || dictating === "starting" ? null : <span>{micText}</span>}
             </button>
             {dictating === "recording" ? (
-              <IconButton icon="close" label="Stop, don't write it down" onClick={() => post({ type: "dictate", action: "cancel" })} />
+              <IconButton icon={I.cancel} label="Stop, don't write it down" onClick={() => post({ type: "dictate", action: "cancel" })} />
             ) : null}
-            <IconButton icon="attach" class="pane-attach" label="Attach files…"
+            <IconButton icon={I.attach} class="pane-attach" label="Attach files…"
               title={chat?.host ? `Attach pictures (copied to ${chat.host})` : "Attach files: a picture goes in as one, another file is named for Claude to read. You can drop them on the tab too (hold Shift from the Explorer)."}
               onClick={() => post({ type: "pickFiles" })} />
-            <IconButton icon="camera" class="pane-shot" label="Screenshot…" title="Screenshot: pick a region of the screen, its picture goes in your reply"
+            <IconButton icon={I.screenshot} class="pane-shot" label="Screenshot…" title="Screenshot: pick a region of the screen, its picture goes in your reply"
               onClick={screenshot} />
             {terminal ? (
               <button type="button" class="btn secondary" disabled={!text.trim() || sending} onClick={() => send("copy", false)}>

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **One icon for one thing, the same as in Plasma and GNOME, and plain:**
+  the widget's icon table (`icons.mjs`) gives each meaning its icon, and
+  every button and mark asks it. **Cancel** is an × (a queued task's was a
+  trash can), the **trash can** is only *Delete…* to the Trash, and
+  **Hide** is a struck-out eye, beside *Show hidden*'s eye. The clock, ✓
+  and ↻ written as text (*⏱ Go on at*, *✓ Goes on at*, *↻ Keep going*,
+  *↻ Keeps going*, a recent chat's *⏱ 21:21* and ↻, a queued task's ⏱ and
+  ⚠, *⚠ Same files*) are icons as big as the buttons' now; *Goes on at* is
+  pressed, as a toggle that's on, and only a warning or an error is
+  colored.
 - **The view is what goes on now and your shortlists; the Projects tab has
   everything else, by project:** under each account, **Recent chats**,
   **★ Starred chats** and **★ Starred plans** are flat lists, newest first,
@@ -182,7 +192,7 @@
 - **Every account's usage bars are alike:** they start and end at the same
   place in every account, *resets in …* at the line's end in a column kept
   for it; an account with no reset time had longer bars.
-- **Hiding a chat is an ×,** as on Plasma (it was a −).
+- **Hiding a chat is a plain button,** as on Plasma (it was a −).
 - **The chat tab shows its chat's tags:** beside where it runs, what its
   row in the list says: *⇄ Shared* or *⇄ Shared copy*, its permission mode,
   *Plan ↗* (click: the plan) and its subagents.

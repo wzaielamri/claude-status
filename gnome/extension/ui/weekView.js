@@ -11,6 +11,7 @@ import St from 'gi://St';
 
 import * as L from '../logic.js';
 import {box, column, iconButton, label, meter, paragraph, scaleFactor, textButton} from './widgets.js';
+import * as Icons from './icons.js';
 
 // (in the display's units: the Cairo drawings are scaled, see scaled())
 const ROW_PX = 18;
@@ -50,7 +51,7 @@ export function buildWeekView(ctx) {
     const shown = recap && recap.span === week.span;
     const period = box('claude-week-period', {x_expand: true});
     const day = week.span === 'day';
-    const before = iconButton('go-previous-symbolic', () => ctx.setWeek({back: week.back + 1}));
+    const before = iconButton(Icons.gnome.previous, () => ctx.setWeek({back: week.back + 1}));
     ctx.tips.add(before, day ? 'The day before' : 'The week before');
     // (after its tooltip, which makes it reactive: greyed out, it does nothing)
     before.reactive = before.can_focus = shown && week.back < recap.backMax;
@@ -59,7 +60,7 @@ export function buildWeekView(ctx) {
     period.add_child(before);
     period.add_child(label(shown ? L.weekPeriodText({...recap, back: week.back}) : L.weekPeriodWaiting(week.span, week.back),
         'claude-week-span', {x_expand: true, x_align: Clutter.ActorAlign.CENTER}));
-    const after = iconButton('go-next-symbolic', () => ctx.setWeek({back: week.back - 1}));
+    const after = iconButton(Icons.gnome.next, () => ctx.setWeek({back: week.back - 1}));
     ctx.tips.add(after, day ? 'The day after' : 'The week after');
     after.reactive = after.can_focus = week.back > 0;
     after.opacity = after.reactive ? 255 : 90;
@@ -412,7 +413,7 @@ function buildProjects(ctx, recap, cur) {
         const open = ctx.week.open === key;
         const chats = Array.isArray(p.chats) ? p.chats : [];
         const line = box('claude-stats-project', {x_expand: true});
-        line.add_child(new St.Icon({icon_name: open ? 'pan-down-symbolic' : 'pan-end-symbolic', style_class: 'claude-week-fold'}));
+        line.add_child(new St.Icon({icon_name: open ? Icons.gnome.unfolded : Icons.gnome.folded, style_class: 'claude-week-fold'}));
         line.add_child(label((p.host ? `${p.host}: ` : '') + p.name, `claude-small claude-week-name${open ? ' claude-strong' : ''}`));
         line.add_child(meter(100 * p.workedMs / most, 'working', 'claude-meter claude-stats-meter'));
         line.add_child(label(`${L.hoursText(p.workedMs)} · ${L.moneyText(p.cost, cur)}`, 'claude-small claude-dim claude-stats-numbers'));

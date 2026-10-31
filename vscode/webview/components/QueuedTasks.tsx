@@ -4,6 +4,7 @@ import type { Group } from "../../src/shared/types";
 import { post } from "../env";
 import { useView } from "./context";
 import { IconButton } from "./IconButton";
+import { Icon, I } from "../util/icons";
 
 // Tasks waiting for this account's usage limit to reset (the queue is
 // this computer's, an SSH host's tasks included): when each starts, or why
@@ -35,15 +36,13 @@ export function QueuedTasks({ group }: { group: Group }) {
               : `starts in ${duration(t.startAt - view.now)}`;
         return (
           <li key={t.id} class={"queued-item" + (t.error ? " failed" : "")}>
-            <span class="queued-mark" aria-hidden="true">
-              {t.error ? "⚠" : "⏱"}
-            </span>
+            <Icon name={t.error ? I.warning : I.goOnAt} class="queued-mark" />
             <span class="queued-what" title={`${what}\n\n${how}`}>
               {what.split("\n")[0]}
             </span>
             <div class="queued-actions">
               <IconButton
-                icon="play"
+                icon={I.startNow}
                 label="Start it now"
                 title={
                   t.scheduled
@@ -52,7 +51,7 @@ export function QueuedTasks({ group }: { group: Group }) {
                 }
                 onClick={() => post({ type: "startQueued", id: t.id })}
               />
-              <IconButton icon="trash" label="Cancel it"
+              <IconButton icon={I.cancel} label="Cancel it"
                 title={"Cancel it\nIt doesn't start." + (kept ? " It stops keeping going after usage limits too." : "")
                   + (wrote ? " It asks first: what you wrote for it is gone with it." : "")}
                 onClick={() => (wrote ? setAsking(asking === t.id ? "" : t.id) : post({ type: "unqueue", id: t.id }))} />

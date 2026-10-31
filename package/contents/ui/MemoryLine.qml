@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // One of Claude's memories (<config>/projects/<folder>/memory), or an
 // account's CLAUDE.md (type "account": your instructions for every chat on
@@ -136,7 +137,7 @@ ColumnLayout {
 
                 PlasmaComponents3.ToolButton {
                     visible: !memoryLine.remoteHost   // (an SSH host's opens to change it with a click: VS Code)
-                    icon.name: "document-edit"
+                    icon.name: Icons.plasma.edit
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: memoryLine.memory.type === "account" ? i18n("Edit your instructions") : i18n("Edit this memory")
                     Layout.preferredHeight: memoryButtons.buttonSize
@@ -157,7 +158,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     // to the Trash, after a question (DeleteAsk under the line); not the account's CLAUDE.md
                     visible: memoryLine.memory.type !== "account"
-                    icon.name: "user-trash"
+                    icon.name: Icons.plasma.delete
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Delete…")
                     Layout.preferredHeight: memoryButtons.buttonSize
@@ -177,7 +178,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     // hide it here (nothing is deleted); not the account's CLAUDE.md, which has a line of its own
                     visible: memoryLine.memory.type !== "account"
-                    icon.name: "window-close"
+                    icon.name: Icons.plasma.hide
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Hide this memory")
                     Layout.preferredHeight: memoryButtons.buttonSize

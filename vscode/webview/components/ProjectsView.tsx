@@ -15,7 +15,7 @@ import { doingText, duration, groupOfProfile, listedChats, openChatsByProject, p
 import { post } from "../env";
 import { pets } from "../pets";
 import { chatRefOf, hideHint } from "../util/chat";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useAfterFrame } from "../util/lazy";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
@@ -77,7 +77,7 @@ function Project({ p, open, here, now }: { p: ProjectRow; open: boolean; here: S
     <section class="project" ref={card}>
       <div class="project-head">
         <button type="button" class="project-name" aria-expanded={open} onClick={() => toggleProject(p.path)}>
-          <span class={"chevron" + (open ? " open" : "")} aria-hidden="true"><Icon name="chevron" /></span>
+          <span class={"chevron" + (open ? " open" : "")} aria-hidden="true"><Icon name={I.folded} /></span>
           <span class="project-title">
             <strong>{unfiled ? "Plans whose chat is gone" : p.name}</strong>
             <span class="small muted project-meta" title={p.path || undefined}>
@@ -96,11 +96,11 @@ function Project({ p, open, here, now }: { p: ProjectRow; open: boolean; here: S
           <>
             <button type="button" class="icon-btn project-action" title={`New chat here\n${p.short}`} aria-label="New chat here"
               onClick={() => post({ type: "newChatIn", path: p.path, profileDir })}>
-              <Icon name="newChat" />
+              <Icon name={I.newChat} />
             </button>
             <button type="button" class="icon-btn project-action" title={`Hide this project\n${hideHint("projects")}`} aria-label="Hide this project"
               onClick={() => post({ type: "hide", kind: "projects", id: p.path })}>
-              <Icon name="close" />
+              <Icon name={I.hide} />
             </button>
           </>
         )}

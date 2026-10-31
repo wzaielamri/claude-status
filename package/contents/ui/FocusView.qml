@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // The focus view (the header's filter button, root.focusView): only what
 // needs you, as full rows (their questions, Allow / Deny, Go on), the chats
@@ -97,7 +98,7 @@ ColumnLayout {
     }
     PlasmaComponents3.Button {
         Layout.alignment: Qt.AlignHCenter
-        icon.name: "view-list-details"
+        icon.name: Icons.plasma.showAll
         text: i18n("Show everything")
         onClicked: root.setFocusView(false)
     }

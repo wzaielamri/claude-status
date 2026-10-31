@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import QtQuick.Dialogs as Dialogs
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // Picks a notification sound: one of the sound theme's sounds, none, or a
 // file. value is what notify_sound.py takes (theme names, comma separated
@@ -56,7 +57,7 @@ RowLayout {
         Layout.maximumWidth: Kirigami.Units.gridUnit * 8
     }
     QQC2.ToolButton {
-        icon.name: "media-playback-start"
+        icon.name: Icons.plasma.startNow
         enabled: chooser.value !== ""
         display: QQC2.AbstractButton.IconOnly
         text: i18n("Play this sound")

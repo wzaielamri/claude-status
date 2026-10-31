@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // An SSH host you picked: its Claude accounts, sessions and recent chats,
 // fetched by remote.py (ssh). The host's own answer is kept when a poll
@@ -32,7 +33,7 @@ ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
         Kirigami.Icon {
-            source: "network-server"
+            source: Icons.plasma.host
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
         }
@@ -77,7 +78,7 @@ ColumnLayout {
         PlasmaComponents3.ToolButton {
             id: hiddenButton
             readonly property var kinds: hostSection.info.result ? root.hiddenKinds.filter(k => root.hiddenCount(k, hostSection.host) > 0) : []
-            icon.name: "view-visible"
+            icon.name: Icons.plasma.showHidden
             visible: kinds.length > 0
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("Show hidden ones again…")
@@ -90,7 +91,7 @@ ColumnLayout {
             }
         }
         PlasmaComponents3.ToolButton {
-            icon.name: "network-disconnect"
+            icon.name: Icons.plasma.signOut
             visible: !!hostSection.info.loggedIn
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("Disconnect from %1", hostSection.host)
@@ -103,7 +104,7 @@ ColumnLayout {
             }
         }
         PlasmaComponents3.ToolButton {
-            icon.name: "view-refresh"
+            icon.name: Icons.plasma.refresh
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("Refresh %1", hostSection.host)
             onClicked: root.pollHost(hostSection.host)
@@ -115,7 +116,7 @@ ColumnLayout {
             }
         }
         PlasmaComponents3.ToolButton {
-            icon.name: "window-close"
+            icon.name: Icons.plasma.hide
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("Hide %1", hostSection.host)
             onClicked: root.toggleHost(hostSection.host)
@@ -147,7 +148,7 @@ ColumnLayout {
             wrapMode: Text.Wrap
         }
         PlasmaComponents3.Button {
-            icon.name: "dialog-password"
+            icon.name: Icons.plasma.password
             text: i18n("Log in…")
             onClicked: root.loginHost(hostSection.host)
             PlasmaCore.ToolTipArea {

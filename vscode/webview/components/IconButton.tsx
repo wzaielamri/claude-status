@@ -10,6 +10,7 @@ export function IconButton(props: {
   class?: string;
   children?: ComponentChildren;
   disabled?: boolean; // (greyed out in its place, so every line's buttons stay in the same columns)
+  pressed?: boolean; // a toggle that's on (drawn pressed)
 }) {
   return (
     <button
@@ -18,6 +19,7 @@ export function IconButton(props: {
       title={props.title ?? props.label}
       aria-label={props.label}
       disabled={props.disabled}
+      aria-pressed={props.pressed}
       onClick={(e) => {
         e.stopPropagation();
         props.onClick();

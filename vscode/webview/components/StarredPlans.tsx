@@ -1,7 +1,7 @@
 import { pagedTitle, pageSizeOf } from "../../src/shared/model";
 import type { Group } from "../../src/shared/types";
 import { groupKeyOf } from "../util/chat";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useStore } from "../util/store";
 import { pages, pagesShown, showMore, toggleStarred, uiState } from "../util/ui";
 import { useView } from "./context";
@@ -30,7 +30,7 @@ export function StarredPlans({ group }: { group: Group }) {
         title="The plans of this account you starred (☆ next to a plan), newest first, however old they are. Click one to read it; carry it out in a new chat, go back to the chat that made it, or share it with your other accounts. Click a plan's ★ to unstar it. Every plan is in its project, in the Projects tab."
         onClick={() => toggleStarred(key)}
       >
-        <Icon name="chevron" class={open ? "open" : ""} />
+        <Icon name={I.folded} class={open ? "open" : ""} />
         {pagedTitle("★ Starred plans", shown, starred.length)}
       </button>
       {open ? (

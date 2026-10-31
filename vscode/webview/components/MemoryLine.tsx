@@ -2,7 +2,7 @@ import { ago, folderIn } from "../../src/shared/model";
 import type { Group, Memory } from "../../src/shared/types";
 import { post } from "../env";
 import { deleteHint, hideHint } from "../util/chat";
-import { Icon, memoryIcon } from "../util/icons";
+import { I, Icon, memoryIcon } from "../util/icons";
 import { useWoken } from "../util/lazy";
 import { useView } from "./context";
 import { Elided } from "./Elided";
@@ -55,25 +55,25 @@ export function MemoryLine({ memory: m, group, project, accountTag }: { memory: 
         <div class="row-actions">
           {elsewhere ? null : account ? (
             <IconButton
-              icon="edit"
+              icon={I.edit}
               label="Edit your instructions"
               title="Edit your instructions: its CLAUDE.md opens in an editor tab. Claude reads it in every new chat on this account."
               onClick={() => post(ref(true))}
             />
           ) : (
             <IconButton
-              icon="edit"
+              icon={I.edit}
               label="Edit this memory"
               title="Edit this memory: its file opens in an editor tab. What you change there is what Claude remembers; it reads it in new chats in that folder."
               onClick={() => post(ref(true))}
             />
           )}
           {account ? null : (
-            <IconButton icon="trash" label="Delete this memory…" title={`Delete this memory…\n${deleteHint("memory")}`}
+            <IconButton icon={I.delete} label="Delete this memory…" title={`Delete this memory…\n${deleteHint("memory")}`}
               onClick={() => post({ type: "delete", kind: "memory", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
           )}
           {account ? null : (
-            <IconButton icon="close" label="Hide this memory" title={`Hide this memory\n${hideHint("memories", host)}`}
+            <IconButton icon={I.hide} label="Hide this memory" title={`Hide this memory\n${hideHint("memories", host)}`}
               onClick={() => post({ type: "hide", kind: "memories", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
           )}
         </div>

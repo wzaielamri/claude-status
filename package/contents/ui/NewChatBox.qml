@@ -5,6 +5,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // A new chat on an account: what Claude should do (optional), then the folder
 // it starts in. The + next to an account opens one; so does a plan's "Carry
@@ -320,7 +321,7 @@ Rectangle {
             // the day: today and the next six
             PlasmaComponents3.ToolButton {
                 enabled: root.taskLater && root.taskLaterDay > 0
-                icon.name: "go-previous"
+                icon.name: Icons.plasma.previous
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: i18n("A day earlier")
                 Layout.preferredHeight: laterTime.implicitHeight
@@ -336,7 +337,7 @@ Rectangle {
             }
             PlasmaComponents3.ToolButton {
                 enabled: root.taskLater && root.taskLaterDay < box.days.length - 1
-                icon.name: "go-next"
+                icon.name: Icons.plasma.next
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: i18n("A day later")
                 Layout.preferredHeight: laterTime.implicitHeight
@@ -385,7 +386,7 @@ Rectangle {
                 readonly property var folder: box.folders[index] || ({ path: "", short: "", newChatCommand: "", trusted: true })
                 readonly property bool untrusted: box.background && folder.trusted === false
                 Layout.fillWidth: true
-                icon.name: folderRow.folder.short === "~" ? "user-home" : "folder"
+                icon.name: folderRow.folder.short === "~" ? Icons.plasma.home : Icons.plasma.folder
                 text: (folderRow.folder.short === "~" ? i18n("Home folder (~)") : folderRow.folder.short)
                       + (box.plan && index === 0 && box.plan.cwd ? "  " + i18nc("the folder a plan was made in", "(the plan's)") : "")
                 enabled: box.usable(folderRow.folder)
@@ -432,7 +433,7 @@ Rectangle {
             visible: !box.remoteHost
             enabled: box.later && !box.laterAt ? false : box.background ? box.terminalHere : (box.inVscode || box.terminalHere)
             Layout.fillWidth: true
-            icon.name: "folder-open"
+            icon.name: Icons.plasma.chooseFolder
             text: i18n("Choose folder…")
             onClicked: root.startChat(box.group, box.remoteHost, { path: "", short: "" }, box.inVscode, box.plan)
         }

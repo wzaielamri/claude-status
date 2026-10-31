@@ -30,6 +30,8 @@ cp "$repo"/package/contents/icons/*-symbolic.svg "$dest/icons/"   # (the icons S
 for f in "$repo"/package/contents/ui/talpy/*.mjs; do
   sed "s/\.mjs';\$/.js';/" "$f" > "$dest/ui/talpy/$(basename "${f%.mjs}").js"
 done
+# and the icon table, one icon per meaning in every front end
+cp "$repo/package/contents/ui/icons.mjs" "$dest/ui/icons.js"
 cp "$repo/LICENSE" "$dest/"
 glib-compile-schemas --strict "$dest/schemas"
 if [ "$gnome43" = 1 ]; then

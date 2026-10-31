@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // What "Find a chat" found (main.qml: runSearch): on this computer, then on
 // each SSH host shown, newest first. Click one to bring it up where it runs,
@@ -63,13 +64,13 @@ ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
 
                         Kirigami.Icon {
-                            source: block.open ? "arrow-down" : "arrow-right"
+                            source: block.open ? Icons.plasma.unfolded : Icons.plasma.folded
                             Layout.preferredWidth: Kirigami.Units.iconSizes.small
                             Layout.preferredHeight: Layout.preferredWidth
                             opacity: sourceMouse.containsMouse ? 0.9 : 0.6
                         }
                         Kirigami.Icon {
-                            source: block.host ? "network-server" : "computer"
+                            source: block.host ? Icons.plasma.host : Icons.plasma.computer
                             Layout.preferredWidth: Kirigami.Units.iconSizes.small
                             Layout.preferredHeight: Layout.preferredWidth
                         }
@@ -113,7 +114,7 @@ ColumnLayout {
                 // every kind it found at once (folding them leaves the source open)
                 PlasmaComponents3.ToolButton {
                     visible: block.kinds.length > 1
-                    icon.name: block.allOpen ? "collapse-all" : "expand-all"
+                    icon.name: block.allOpen ? Icons.plasma.collapseAll : Icons.plasma.expandAll
                     text: block.allOpen ? i18n("Fold all") : i18n("Unfold all")
                     font: Kirigami.Theme.smallFont
                     Layout.preferredHeight: sourceLabel.implicitHeight + Kirigami.Units.smallSpacing
@@ -145,7 +146,7 @@ ColumnLayout {
             PlasmaComponents3.ToolButton {
                 visible: block.open && block.projects.length > 0
                 flat: true
-                icon.name: block.projectsOpen ? "arrow-down" : "arrow-right"
+                icon.name: block.projectsOpen ? Icons.plasma.unfolded : Icons.plasma.folded
                 text: i18n("Folders (%1)", block.projects.length)
                 font: Kirigami.Theme.smallFont
                 onClicked: root.showFound(block.host, ["projects"], !block.projectsOpen)
@@ -155,7 +156,7 @@ ColumnLayout {
                 delegate: FoundLine {
                     required property int index
                     readonly property var project: block.projects[index] || ({ folder: "", folderShort: "", chats: 0, lastActive: 0, account: "", groupId: "" })
-                    icon: "folder"
+                    icon: Icons.plasma.project
                     text: project.folderShort || project.folder
                     detail: i18np("%1 chat", "%1 chats", project.chats) + " · " + root.ago(root.now - project.lastActive)
                     account: root.hostGroups(block.host).length > 1 ? project.profile : ""
@@ -169,7 +170,7 @@ ColumnLayout {
             PlasmaComponents3.ToolButton {
                 visible: block.open && block.plans.length > 0
                 flat: true
-                icon.name: block.plansOpen ? "arrow-down" : "arrow-right"
+                icon.name: block.plansOpen ? Icons.plasma.unfolded : Icons.plasma.folded
                 text: i18n("Plans (%1)", block.plans.length)
                 font: Kirigami.Theme.smallFont
                 onClicked: root.showFound(block.host, ["plans"], !block.plansOpen)
@@ -179,7 +180,7 @@ ColumnLayout {
                 delegate: FoundLine {
                     required property int index
                     readonly property var plan: block.plans[index] || ({ slug: "", title: "", profileDir: "", updatedAt: 0, account: "" })
-                    icon: "view-task"
+                    icon: Icons.plasma.plan
                     text: plan.title
                     detail: root.ago(root.now - plan.updatedAt)
                     account: root.hostGroups(block.host).length > 1 ? plan.profile : ""
@@ -193,7 +194,7 @@ ColumnLayout {
             PlasmaComponents3.ToolButton {
                 visible: block.open && block.memories.length > 0
                 flat: true
-                icon.name: block.memoriesOpen ? "arrow-down" : "arrow-right"
+                icon.name: block.memoriesOpen ? Icons.plasma.unfolded : Icons.plasma.folded
                 text: i18n("Memories (%1)", block.memories.length)
                 font: Kirigami.Theme.smallFont
                 onClicked: root.showFound(block.host, ["memories"], !block.memoriesOpen)
@@ -219,7 +220,7 @@ ColumnLayout {
             PlasmaComponents3.ToolButton {
                 visible: block.open && block.answer.results.length > 0
                 flat: true
-                icon.name: block.chatsOpen ? "arrow-down" : "arrow-right"
+                icon.name: block.chatsOpen ? Icons.plasma.unfolded : Icons.plasma.folded
                 text: i18n("Chats (%1)", block.answer.results.length + (block.answer.more ? "+" : ""))
                 font: Kirigami.Theme.smallFont
                 onClicked: root.showFound(block.host, ["chats"], !block.chatsOpen)

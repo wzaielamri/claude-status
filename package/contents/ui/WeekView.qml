@@ -7,6 +7,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import "hub"
+import "icons.mjs" as Icons
 
 // The Recap tab (main.qml: loadWeek, week.py): your last 7 days with Claude,
 // as a story: the big picture (how long you were at it, how long Claude
@@ -372,7 +373,7 @@ PlasmaComponents3.ScrollView {
             spacing: Kirigami.Units.smallSpacing
 
             PlasmaComponents3.ToolButton {
-                icon.name: "go-previous"
+                icon.name: Icons.plasma.previous
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: view.span === "day" ? i18n("The day before") : i18n("The week before")
                 visible: view.span !== "all"
@@ -394,7 +395,7 @@ PlasmaComponents3.ScrollView {
                 text: view.periodText()
             }
             PlasmaComponents3.ToolButton {
-                icon.name: "go-next"
+                icon.name: Icons.plasma.next
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: view.span === "day" ? i18n("The day after") : i18n("The week after")
                 visible: view.span !== "all"
@@ -408,7 +409,7 @@ PlasmaComponents3.ScrollView {
                 }
             }
             PlasmaComponents3.ToolButton {
-                icon.name: "document-share"
+                icon.name: Icons.plasma.share
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: i18n("Share as a picture…")
                 enabled: view.hasData
@@ -475,7 +476,7 @@ PlasmaComponents3.ScrollView {
         PlasmaExtras.PlaceholderMessage {
             Layout.fillWidth: true
             visible: !!view.recap && !view.hasData
-            iconName: "view-calendar-week"
+            iconName: Icons.plasma.recap
             text: view.span === "day" ? i18n("No Claude on this day") : view.span === "all" ? i18n("No Claude yet") : i18n("No Claude in these days")
             explanation: view.span === "day" ? i18n("None of your chats here (or on the SSH hosts shown) has a prompt or a reply on this day.")
                          : view.span === "all" ? i18n("None of your chats here (or on the SSH hosts shown) has a prompt or a reply yet.")
@@ -1183,8 +1184,8 @@ PlasmaComponents3.ScrollView {
                             Kirigami.Icon {
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                                 Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                                source: !projectRow.project.host ? "go-next"   // (to the Projects tab)
-                                        : projectRow.open ? "arrow-down" : (Qt.application.layoutDirection === Qt.RightToLeft ? "arrow-left" : "arrow-right")
+                                source: !projectRow.project.host ? Icons.plasma.goTo   // (to the Projects tab)
+                                        : projectRow.open ? Icons.plasma.unfolded : Icons.plasma.folded
                                 opacity: 0.6
                             }
                             PlasmaComponents3.Label {
@@ -1567,17 +1568,17 @@ PlasmaComponents3.ScrollView {
                     opacity: 0.8
                 }
                 PlasmaComponents3.Button {
-                    icon.name: "document-save"
+                    icon.name: Icons.plasma.save
                     text: i18n("Save")
                     onClicked: sharing.save()
                 }
                 PlasmaComponents3.Button {
-                    icon.name: "edit-copy"
+                    icon.name: Icons.plasma.copy
                     text: i18n("Copy")
                     onClicked: sharing.copy()
                 }
                 PlasmaComponents3.Button {
-                    icon.name: "dialog-close"
+                    icon.name: Icons.plasma.close
                     text: i18n("Close")
                     onClicked: sharing.close()
                 }

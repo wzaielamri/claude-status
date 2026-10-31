@@ -4,6 +4,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // The Projects tab: each project (a chat's git repository, else its folder),
 // newest first, folded: its name, when Claude last worked there, a dot for
@@ -110,7 +111,7 @@ PlasmaComponents3.ScrollView {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.gridUnit
             visible: !root.projectsBusy && root.projectsData !== null && view.projects.length === 0
-            iconName: "folder-open"
+            iconName: Icons.plasma.project
             text: i18n("No projects yet")
             explanation: i18n("A project is a folder (or the git repository it's in) where you chatted with Claude.")
         }
@@ -180,7 +181,7 @@ PlasmaComponents3.ScrollView {
                         buttons: card
                     }
                     Kirigami.Icon {
-                        source: card.unfolded ? "go-down" : "go-next"
+                        source: card.unfolded ? Icons.plasma.unfolded : Icons.plasma.folded
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: Layout.preferredWidth
                         // (on the name's line)
@@ -285,7 +286,7 @@ PlasmaComponents3.ScrollView {
                                 id: hideHere
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
                                 Layout.preferredHeight: Layout.preferredWidth
-                                icon.name: "window-close"
+                                icon.name: Icons.plasma.hide
                                 icon.width: Kirigami.Units.iconSizes.small
                                 icon.height: Kirigami.Units.iconSizes.small
                                 display: PlasmaComponents3.AbstractButton.IconOnly

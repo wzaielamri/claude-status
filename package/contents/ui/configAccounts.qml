@@ -5,6 +5,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import org.kde.plasma.plasmoid
 import "hub"
+import "icons.mjs" as Icons
 
 // The Claude accounts on this computer or an SSH host (code/accounts.py; a
 // host's through remote.py --accounts): add one (a ~/.claude-NAME folder that
@@ -242,7 +243,7 @@ KCM.SimpleKCM {
                     RowLayout {
                         Layout.fillWidth: true
                         Kirigami.Icon {
-                            source: card.account.loggedIn ? "user-identity" : "im-user-offline"
+                            source: card.account.loggedIn ? Icons.plasma.account : Icons.plasma.accountOut
                             Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
                             Layout.preferredHeight: Layout.preferredWidth
                         }
@@ -308,12 +309,12 @@ KCM.SimpleKCM {
                         actions: [
                             Kirigami.Action {
                                 text: page.confirm.startsWith("remove:") ? i18n("Remove") : i18n("Log out")
-                                icon.name: page.confirm.startsWith("remove:") ? "edit-delete" : "system-log-out"
+                                icon.name: page.confirm.startsWith("remove:") ? Icons.plasma.delete : Icons.plasma.signOut
                                 onTriggered: page.act([page.confirm.startsWith("remove:") ? "--remove" : "--logout", card.account.key], card.account.key)
                             },
                             Kirigami.Action {
                                 text: i18n("Cancel")
-                                icon.name: "dialog-cancel"
+                                icon.name: Icons.plasma.cancel
                                 onTriggered: page.confirm = ""
                             }
                         ]
@@ -328,7 +329,7 @@ KCM.SimpleKCM {
                             visible: page.canDefault && page.accounts.length > 1 && card.account.loggedIn
                                      && (!card.account.default || (page.linked && !card.account.main))
                             text: i18n("Make Default")
-                            icon.name: "starred-symbolic"
+                            icon.name: Icons.plasma.starred
                             enabled: page.busy === ""
                             onClicked: page.act(["--default", card.account.key], card.account.key)
                             QQC2.ToolTip.visible: hovered
@@ -339,7 +340,7 @@ KCM.SimpleKCM {
                         QQC2.Button {
                             visible: !card.account.loggedIn
                             text: i18n("Log in…")
-                            icon.name: "go-next"
+                            icon.name: Icons.plasma.signIn
                             enabled: page.busy === "" && page.canCheck
                             onClicked: page.act(["--login", card.account.key], card.account.key)
                             QQC2.ToolTip.visible: hovered
@@ -348,7 +349,7 @@ KCM.SimpleKCM {
                         QQC2.Button {
                             visible: card.account.loggedIn
                             text: i18n("Log out…")
-                            icon.name: "system-log-out"
+                            icon.name: Icons.plasma.signOut
                             enabled: page.busy === "" && card.account.chats === 0
                             onClicked: page.confirm = "logout:" + card.account.key
                             QQC2.ToolTip.visible: hovered
@@ -357,7 +358,7 @@ KCM.SimpleKCM {
                         }
                         QQC2.Button {
                             text: i18n("Remove…")
-                            icon.name: "edit-delete"
+                            icon.name: Icons.plasma.delete
                             enabled: page.busy === "" && !card.account.notRemovable
                             onClicked: page.confirm = "remove:" + card.account.key
                             QQC2.ToolTip.visible: hovered
@@ -444,7 +445,7 @@ KCM.SimpleKCM {
             RowLayout {
                 QQC2.Button {
                     text: i18n("Add and Log In…")
-                    icon.name: "list-add-user"
+                    icon.name: Icons.plasma.addAccount
                     enabled: page.name !== "" && page.nameProblem === "" && page.busy === "" && page.canCheck
                     onClicked: page.act(["--add", page.name].concat(shareFrom.currentValue ? ["--share-from", shareFrom.currentValue] : [],
                                                                     withCommand.checked ? ["--command"] : []), "add")

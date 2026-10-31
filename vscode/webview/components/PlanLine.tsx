@@ -2,7 +2,7 @@ import { ago, folderIn, machineStatus, shareAccounts } from "../../src/shared/mo
 import type { Group, PlanItem } from "../../src/shared/types";
 import { post } from "../env";
 import { deleteHint, hideHint } from "../util/chat";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useWoken } from "../util/lazy";
 import { useView } from "./context";
 import { Elided } from "./Elided";
@@ -28,7 +28,7 @@ export function PlanLine({ plan: p, group, project, accountTag }: { plan: PlanIt
   const folder = project !== undefined ? folderIn(p.cwd, project, p.cwdShort) : p.cwdShort;
   return (
     <li class="recent-item" {...wake}>
-      <Icon name="task" class="line-icon" />
+      <Icon name={I.plan} class="line-icon" />
       <button
         type="button"
         class="link recent-name"
@@ -70,7 +70,7 @@ export function PlanLine({ plan: p, group, project, accountTag }: { plan: PlanIt
         <div class="row-actions">
           {p.starred ? null : (
             <IconButton
-              icon="star"
+              icon={I.star}
               label="Star"
               title="Star this plan: it stays listed under its account's ★ Starred plans, however old it is."
               onClick={() => post({ type: "star", ...ref(p.key), on: true })}
@@ -78,7 +78,7 @@ export function PlanLine({ plan: p, group, project, accountTag }: { plan: PlanIt
           )}
           {copy ? null : (
             <IconButton
-              icon="edit"
+              icon={I.edit}
               label="Edit the plan"
               title="Edit the plan: its Markdown file opens in an editor tab. What you change there is the plan."
               onClick={() => post({ type: "openPlan", ...ref(p.key), edit: true })}
@@ -86,7 +86,7 @@ export function PlanLine({ plan: p, group, project, accountTag }: { plan: PlanIt
           )}
           {copy || host ? null : (
             <IconButton
-              icon="send"
+              icon={I.send}
               label="Send your feedback to Claude"
               disabled={!p.chatId}
               title={
@@ -98,13 +98,13 @@ export function PlanLine({ plan: p, group, project, accountTag }: { plan: PlanIt
             />
           )}
           <IconButton
-            icon="play"
+            icon={I.startNow}
             label="Carry it out…"
             title="Carry it out in a new chat: the plan is the chat's first message, with what you add; in a terminal, in the background or in a Claude Code panel, in the plan's folder or another one."
             onClick={() => post({ type: "carryOutPlan", ...ref(p.key) })}
           />
           <IconButton
-            icon="back"
+            icon={I.origin}
             label="Continue the chat that made it"
             disabled={!p.chatId}
             title={p.chatId
@@ -114,15 +114,15 @@ export function PlanLine({ plan: p, group, project, accountTag }: { plan: PlanIt
           />
           {share ? (
             <IconButton
-              icon="share"
+              icon={I.share}
               label="Share this plan…"
               title="Share this plan with your other accounts: one file on each of them, so a change shows on all of them. Sharing a chat shares its plan too."
               onClick={() => post({ type: "sharePlan", ...ref(p.key) })}
             />
           ) : null}
-          <IconButton icon="trash" label="Delete this plan…" title={`Delete this plan…\n${deleteHint("plan")}`}
+          <IconButton icon={I.delete} label="Delete this plan…" title={`Delete this plan…\n${deleteHint("plan")}`}
             onClick={() => post({ type: "delete", kind: "plan", groupId: group.id, ...(host ? { host } : {}), id: p.key })} />
-          <IconButton icon="close" label="Hide this plan" title={`Hide this plan\n${hideHint("plans", host)}`}
+          <IconButton icon={I.hide} label="Hide this plan" title={`Hide this plan\n${hideHint("plans", host)}`}
             onClick={() => post({ type: "hide", kind: "plans", groupId: group.id, ...(host ? { host } : {}), id: p.key })} />
         </div>
       ) : null}

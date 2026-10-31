@@ -5,6 +5,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 PlasmaExtras.Representation {
     id: full
@@ -80,7 +81,7 @@ PlasmaExtras.Representation {
             }
             PlasmaComponents3.ToolButton {
                 visible: root.popupTab === "chats"
-                icon.name: "view-filter"
+                icon.name: Icons.plasma.focus
                 checkable: true
                 checked: root.focusView
                 display: PlasmaComponents3.AbstractButton.IconOnly
@@ -97,7 +98,7 @@ PlasmaExtras.Representation {
             }
             PlasmaComponents3.ToolButton {
                 visible: root.popupTab === "chats"
-                icon.name: "edit-find"
+                icon.name: Icons.plasma.search
                 checkable: true
                 checked: root.searchOpen
                 display: PlasmaComponents3.AbstractButton.IconOnly
@@ -113,7 +114,7 @@ PlasmaExtras.Representation {
             }
             PlasmaComponents3.ToolButton {
                 id: hostsButton
-                icon.name: "network-server"
+                icon.name: Icons.plasma.host
                 text: root.shownHosts.length > 0 ? String(root.shownHosts.length) : ""
                 display: root.shownHosts.length > 0 ? PlasmaComponents3.AbstractButton.TextBesideIcon
                                                     : PlasmaComponents3.AbstractButton.IconOnly
@@ -129,7 +130,7 @@ PlasmaExtras.Representation {
                 }
             }
             PlasmaComponents3.ToolButton {
-                icon.name: "view-refresh"
+                icon.name: Icons.plasma.refresh
                 onClicked: {
                     root.refresh()
                     root.fetchUsage()   // (the plan usage too, when it's over a minute old)
@@ -305,13 +306,13 @@ PlasmaExtras.Representation {
                         Layout.margins: Kirigami.Units.smallSpacing
                         visible: root.awayDigest !== null
                         type: Kirigami.MessageType.Information
-                        icon.name: "user-away"
+                        icon.name: Icons.plasma.away
                         text: root.awayDigest ? "<b>" + root.escapeHtml(root.awayDigest.title) + "</b><br>"
                                                 + root.awayDigest.lines.map(root.escapeHtml).join("<br>") : ""
                         actions: [
                             Kirigami.Action {
                                 text: i18n("Dismiss")
-                                icon.name: "dialog-close"
+                                icon.name: Icons.plasma.close
                                 onTriggered: root.awayDigest = null
                             }
                         ]
@@ -379,7 +380,7 @@ PlasmaExtras.Representation {
                         Layout.fillWidth: true
                         Layout.margins: Kirigami.Units.gridUnit
                         visible: root.status !== null && root.groups.length === 0 && root.shownHosts.length === 0
-                        iconName: "dialog-information"
+                        iconName: Icons.plasma.info
                         text: i18n("No Claude Code chats yet")
                         explanation: i18n("Your Claude Code chats show up here once you start claude in a terminal or open Claude in VS Code. Talpy Den looks in ~/.claude and ~/.claude-*; other folders go in its settings (Extra config dirs).")
                     }

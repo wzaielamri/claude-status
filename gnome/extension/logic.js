@@ -520,7 +520,7 @@ export class Tracker {
                             key: sid, session: s, kind: 'waiting', host,
                             title: fmt('%1 needs your input', s.name),
                             body: `${s.detail || reasonText(s.reason)}\n${s.cwdShort}${where}`,
-                            icon: 'dialog-warning-symbolic',
+                            icon: 'warning',   // (a meaning of ui/icons.js: notifier.js)
                         });
                         sound('waiting');
                     }
@@ -584,7 +584,7 @@ export class Tracker {
                 key: sid, session: s, kind: stop, host,
                 title: stop === 'limit' ? fmt('%1 hit the usage limit', s.name) : fmt('%1 stopped: the login expired', s.name),
                 body: `${s.stopped.text}\n${fmt('Took %1 · %2', duration(took), s.cwdShort)}${where}`,
-                icon: stop === 'limit' ? 'appointment-soon-symbolic' : 'dialog-error-symbolic',
+                icon: stop === 'limit' ? 'goOnAt' : 'error',
             });
             sound('failed');
         } else {
@@ -594,7 +594,7 @@ export class Tracker {
             out.notify.push({
                 key: sid, session: s, kind: 'done', host, title,
                 body: `${s.detail ? `${s.detail}\n` : ''}${fmt('Took %1 · %2', duration(took), s.cwdShort)}${where}`,
-                icon: 'emblem-ok-symbolic',
+                icon: 'done',
             });
             sound(s.reason === 'failed' ? 'failed' : 'done');
         }
@@ -680,7 +680,7 @@ function limitResetNotice(source, g, freed, host) {
         key: `${source ? `${source}|` : ''}limit-reset:${g.id}`, session: freed[0], kind: 'reset', host,
         title: fmt('%1: the usage limit reset', host ? fmt('%1: %2', host, g.name) : g.name),
         body: freed.length === 1 ? fmt('%1 can go on.', names) : fmt('%1 chats can go on: %2', freed.length, names),
-        icon: 'emblem-ok-symbolic',
+        icon: 'done',
     };
 }
 

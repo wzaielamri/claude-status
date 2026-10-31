@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 import "codehtml.mjs" as Code
+import "icons.mjs" as Icons
 
 // A diff (its unified lines, as pane.py and the asks give them) as
 // codehtml.mjs draws it: numbered, + and −, tinted lines with the changed
@@ -76,7 +77,7 @@ Rectangle {
         anchors.top: parent.top
         anchors.right: parent.right
         sourceComponent: PlasmaComponents3.ToolButton {
-        icon.name: Plasmoid.configuration.diffSideBySide ? "view-split-top-bottom" : "view-split-left-right"
+        icon.name: Plasmoid.configuration.diffSideBySide ? Icons.plasma.aboveBelow : Icons.plasma.sideBySide
         display: PlasmaComponents3.AbstractButton.IconOnly
         text: Plasmoid.configuration.diffSideBySide ? i18n("One after the other") : i18n("Side by side")
         onClicked: Plasmoid.configuration.diffSideBySide = !Plasmoid.configuration.diffSideBySide

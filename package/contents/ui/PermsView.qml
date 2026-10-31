@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // The Permissions tab (main.qml: loadPerms, week.py --permissions): the
 // permissions you gave, every rule and mode that lets chats on this computer
@@ -41,18 +42,18 @@ PlasmaComponents3.ScrollView {
     // check, a folder to read, a mode, a command, the web
     function grantIcon(g) {
         if (g.kind === "trust")
-            return "folder-locked"
+            return Icons.plasma.trusted
         if (g.kind === "mcp")
-            return "network-connect"
+            return Icons.plasma.mcp
         if (g.kind === "flag")
-            return "dialog-warning"
+            return Icons.plasma.warning
         if (g.kind === "dir")
-            return "folder-open"
+            return Icons.plasma.folder
         if (g.kind === "mode")
-            return g.value === "acceptEdits" ? "document-edit" : "security-low"
+            return g.value === "acceptEdits" ? Icons.plasma.edit : Icons.plasma.warning
         if (g.value.indexOf("WebFetch") === 0 || g.value === "WebSearch")
-            return "globe"
-        return g.value.indexOf("Bash") === 0 ? "utilities-terminal" : "checkmark"
+            return Icons.plasma.webAccess
+        return g.value.indexOf("Bash") === 0 ? Icons.plasma.terminal : Icons.plasma.allowed
     }
 
     // 3h 05m, 45m
@@ -247,7 +248,7 @@ PlasmaComponents3.ScrollView {
                                 spacing: Kirigami.Units.smallSpacing
 
                                 PlasmaComponents3.Button {
-                                    icon.name: "edit-delete-remove"
+                                    icon.name: Icons.plasma.cancel
                                     text: i18n("Revoke")
                                     enabled: root.ruleBusy === ""   // (one settings write at a time)
                                     onClicked: {
@@ -343,8 +344,8 @@ PlasmaComponents3.ScrollView {
                                 Layout.alignment: Qt.AlignTop
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                                 Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                                source: ruleRow.rule.kind === "dir" ? "folder-open" : ruleRow.rule.kind === "edits" ? "document-edit"
-                                      : ruleRow.rule.value.indexOf("WebFetch") === 0 ? "globe" : "utilities-terminal"
+                                source: ruleRow.rule.kind === "dir" ? Icons.plasma.folder : ruleRow.rule.kind === "edits" ? Icons.plasma.edit
+                                      : ruleRow.rule.value.indexOf("WebFetch") === 0 ? Icons.plasma.webAccess : Icons.plasma.terminal
                                 opacity: 0.8
                             }
                             ColumnLayout {
@@ -389,7 +390,7 @@ PlasmaComponents3.ScrollView {
                                 Layout.alignment: Qt.AlignTop
                                 visible: ruleRow.rule.state === "added"
                                 enabled: root.ruleBusy === ""
-                                icon.name: "edit-undo"
+                                icon.name: Icons.plasma.undo
                                 text: i18n("Undo")
                                 onClicked: root.changeRule(ruleRow.rule, false, origin.host)
 
@@ -426,7 +427,7 @@ PlasmaComponents3.ScrollView {
                                 spacing: Kirigami.Units.smallSpacing
 
                                 PlasmaComponents3.Button {
-                                    icon.name: "dialog-ok-apply"
+                                    icon.name: Icons.plasma.allow
                                     text: i18n("Allow")
                                     enabled: root.ruleBusy === ""   // (one settings write at a time)
                                     onClicked: {

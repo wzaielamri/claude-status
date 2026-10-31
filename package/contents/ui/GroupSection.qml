@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // One Claude account: plan limits, token totals, its sessions (which may
 // come from several config dirs logged into that account) and recent chats.
@@ -189,7 +190,7 @@ ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
         Kirigami.Icon {
-            source: "im-user-offline"
+            source: Icons.plasma.accountOut
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Layout.preferredWidth
         }
@@ -202,7 +203,7 @@ ColumnLayout {
         }
         PlasmaComponents3.Button {
             text: i18n("Log in…")
-            icon.name: "go-next"
+            icon.name: Icons.plasma.signIn
             enabled: !section.remoteHost || !!section.group.loginCommand
 
             PlasmaCore.ToolTipArea {
@@ -280,7 +281,7 @@ ColumnLayout {
 
         Kirigami.Icon {
             visible: section.hasStats
-            source: section.statsOpen ? "arrow-down" : "arrow-right"
+            source: section.statsOpen ? Icons.plasma.unfolded : Icons.plasma.folded
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Layout.preferredWidth
             opacity: 0.6
@@ -396,7 +397,7 @@ ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing
 
                 Kirigami.Icon {
-                    source: queuedLine.task.error ? "dialog-warning" : "chronometer"
+                    source: queuedLine.task.error ? Icons.plasma.warning : Icons.plasma.goOnAt
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Layout.preferredWidth
                 }
@@ -435,7 +436,7 @@ ColumnLayout {
                     Layout.maximumWidth: Kirigami.Units.gridUnit * 12
                 }
                 PlasmaComponents3.ToolButton {
-                    icon.name: "media-playback-start"
+                    icon.name: Icons.plasma.startNow
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Start it now")
                     enabled: !root.isStarting(queuedLine.task.id)
@@ -456,7 +457,7 @@ ColumnLayout {
                     readonly property bool wrote: !queuedLine.task.chat || !!queuedLine.task.afterTurn
                     readonly property bool kept: !!queuedLine.task.chat && !queuedLine.task.afterTurn && !queuedLine.task.host
                                                  && root.keptChat(queuedLine.task.chat) !== null
-                    icon.name: "edit-delete-remove"
+                    icon.name: Icons.plasma.cancel
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Cancel it")
                     Layout.preferredHeight: queuedName.implicitHeight
@@ -585,7 +586,7 @@ ColumnLayout {
         visible: section.recentCount > 0
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
-        icon.name: section.recentOpen ? "arrow-down" : "arrow-right"
+        icon.name: section.recentOpen ? Icons.plasma.unfolded : Icons.plasma.folded
         text: section.recentShown < section.recentCount
               ? i18nc("recent chats: how many show, of how many", "Recent chats (%1 of %2)", section.recentShown, section.recentCount)
               : i18n("Recent chats (%1)", section.recentCount)
@@ -638,7 +639,7 @@ ColumnLayout {
         visible: section.starred.length > 0
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
-        icon.name: section.starredOpen ? "arrow-down" : "arrow-right"
+        icon.name: section.starredOpen ? Icons.plasma.unfolded : Icons.plasma.folded
         text: section.starredShown < section.starred.length
               ? i18nc("starred chats: how many show, of how many", "★ Starred chats (%1 of %2)", section.starredShown, section.starred.length)
               : i18nc("starred chats, how many", "★ Starred chats (%1)", section.starred.length)
@@ -685,7 +686,7 @@ ColumnLayout {
         visible: section.starredPlans.length > 0
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
-        icon.name: section.starredPlansOpen ? "arrow-down" : "arrow-right"
+        icon.name: section.starredPlansOpen ? Icons.plasma.unfolded : Icons.plasma.folded
         text: section.starredPlansShown < section.starredPlans.length
               ? i18nc("starred plans: how many show, of how many", "★ Starred plans (%1 of %2)", section.starredPlansShown, section.starredPlans.length)
               : i18nc("starred plans, how many", "★ Starred plans (%1)", section.starredPlans.length)

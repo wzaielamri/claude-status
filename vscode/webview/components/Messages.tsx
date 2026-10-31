@@ -1,6 +1,7 @@
 import type { ViewState } from "../../src/shared/types";
 import { post } from "../env";
 import { IconButton } from "./IconButton";
+import { I } from "../util/icons";
 
 // What went wrong (or right) outside the list: the status itself, the last
 // action, the platform; and a reminder when the data is made up.
@@ -33,7 +34,7 @@ export function Messages({ state }: { state: ViewState }) {
         <div class="msg digest" role="status">
           <div class="digest-head">
             <strong class="digest-title">{state.digest.title}</strong>
-            <IconButton icon="close" label="Close" title="Close this summary" onClick={() => post({ type: "dismissDigest" })} />
+            <IconButton icon={I.close} label="Close" title="Close this summary" onClick={() => post({ type: "dismissDigest" })} />
           </div>
           {state.digest.lines.map((line, i) => (
             <div key={i} class="digest-line">

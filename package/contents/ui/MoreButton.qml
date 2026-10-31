@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // "Show N more" under a list that shows a page at a time (Recent chats,
 // ★ Starred chats and plans, a project's chats): the next page of it
@@ -19,7 +20,7 @@ PlasmaComponents3.ToolButton {
     visible: open && shown < count
     Layout.leftMargin: Kirigami.Units.gridUnit
     flat: true
-    icon.name: "go-down-skip"
+    icon.name: Icons.plasma.more
     icon.width: Kirigami.Units.iconSizes.small
     icon.height: Kirigami.Units.iconSizes.small
     text: i18np("Show %1 more", "Show %1 more", next)

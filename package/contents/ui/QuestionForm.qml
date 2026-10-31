@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // Claude's multiple-choice questions (its AskUserQuestion tool; talpy_den.py:
 // question_view): each question with its options, one to choose (or several,
@@ -167,7 +168,7 @@ ColumnLayout {
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: Kirigami.Units.iconSizes.small
                         Layout.alignment: Qt.AlignTop
-                        source: "help-about"
+                        source: Icons.plasma.question
                         opacity: 0.6
 
                         TipArea {

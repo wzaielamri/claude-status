@@ -3,7 +3,7 @@ import { formatTokens, planUsageText, stateText, tokensText } from "../../src/sh
 import type { Group, TokenTotals, Tokens } from "../../src/shared/types";
 import { post } from "../env";
 import { fiveHourOf, groupKeyOf, sharedRef, stageChats } from "../util/chat";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useStore } from "../util/store";
 import { toggleStats, uiState } from "../util/ui";
 import { AccountStage } from "./AccountStage";
@@ -82,7 +82,7 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
           />
         ) : null}
         <IconButton
-          icon="newChat"
+          icon={I.newChat}
           label={`New chat on ${g.title}`}
           title={
             (host
@@ -168,7 +168,7 @@ export function GroupSection({ group: g, accounts = 1 }: { group: Group; account
             title={`${tokenTitle(tokens)}\n\nClick to ${statsOpen ? "hide" : "show"} the last ${stats.days.length} days.`}
             onClick={() => toggleStats(key)}
           >
-            <Icon name="chevron" class={statsOpen ? "open" : ""} />
+            <Icon name={I.folded} class={statsOpen ? "open" : ""} />
             <TokenLine tokens={tokens} />
           </button>
         ) : (

@@ -23,6 +23,7 @@ import { useView } from "./context";
 import { Elided } from "./Elided";
 import { IconButton } from "./IconButton";
 import { Tag } from "./Tag";
+import { I } from "../util/icons";
 
 // Where an account's chats that no Claude has open reopen: in a terminal,
 // or in a Claude Code panel (the switch above Recent chats, kept in
@@ -66,7 +67,7 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
   const goOn = goOnAt(c);
   const goingOn = queuedChat(view.status, c.sessionId, group.host);
   const kept = group.host ? null : keptChat(view.status, c.sessionId);
-  const later = group.host ? "" : " Once: ↻ beside it goes on after later limits too, until it's done.";
+  const later = group.host ? "" : " Once: Keep going beside it goes on after later limits too, until it's done.";
   const canKeep = !group.host && !kept && !goingOn && goOn > 0;
   // a click opens its tab (else the chat itself, as the switch above says)
   const paneFirst = view.settings.clickOpensPane !== false;
@@ -102,7 +103,8 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
       ) : null}
       {goingOn ? (
         <Tag
-          text={`⏱ ${startText(goingOn.startAt, view.now)}`}
+          icon={I.goOnAt}
+          text={startText(goingOn.startAt, view.now)}
           active
           title={`Goes on by itself at ${startText(goingOn.startAt, view.now)}, in the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).\n\nClick to cancel it.`}
           onClick={() => post({ type: "unqueue", id: goingOn.id })}
@@ -117,7 +119,8 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
       ) : null}
       {kept ? (
         <Tag
-          text="↻"
+          icon={I.keepGoing}
+          text=""
           active={!kept.error}
           warning={!!kept.error || !!kept.note}
           title={keptTitle(kept)}
@@ -125,7 +128,8 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
         />
       ) : canKeep ? (
         <Tag
-          text="↻"
+          icon={I.keepGoing}
+          text=""
           title={`Keep going until it's done\nClick to have it go on by itself in the background at ${startText(goOn, view.now)}, a minute after the limit resets, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.`}
           onClick={() => post({ type: "queueContinue", chat, keep: true })}
         />
@@ -150,11 +154,11 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
       {woken ? (
         <div class="row-actions">
           {paneFirst && canOpen ? (
-            <IconButton icon="external" label="Reopen this chat" title={reopen} onClick={reopenIt} />
+            <IconButton icon={I.openWindow} label="Reopen this chat" title={reopen} onClick={reopenIt} />
           ) : null}
           {c.starred ? null : (
             <IconButton
-              icon="star"
+              icon={I.star}
               label="Star"
               title="Star this chat: it stays listed under its account's ★ Starred chats, however old it is."
               onClick={() => post({ type: "star", chat, on: true })}
@@ -162,13 +166,13 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
           )}
           {share ? (
             <IconButton
-              icon="share"
+              icon={I.share}
               label="Continue on another account…"
               title={shareTitle(group.host)}
               onClick={() => post({ type: "share", chat })}
             />
           ) : null}
-          <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
+          <IconButton icon={I.delete} label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
             onClick={() => post({ type: "delete", kind: "chat", chat })} />
         </div>
       ) : null}

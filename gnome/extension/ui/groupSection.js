@@ -11,6 +11,7 @@ import St from 'gi://St';
 import * as L from '../logic.js';
 import {buildDeleteAsk, buildSessionRow, buildKeepOnly, buildShareMenu} from './sessionRow.js';
 import {box, column, iconButton, label, link, meter, paragraph, scaleFactor, separator, showOnHover, tag, textButton, usageMeter} from './widgets.js';
+import * as Icons from './icons.js';
 
 // accounts: how many its machine has (with two or more, the default one is marked)
 export function buildGroupSection(ctx, group, {last = false, remoteHost = '', accounts = 1} = {}) {
@@ -57,7 +58,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
     // login, in a terminal (over ssh for a host's)
     if (group.loggedOut) {
         const row = box('claude-login', {x_expand: true});
-        row.add_child(new St.Icon({icon_name: 'avatar-default-symbolic', style_class: 'claude-button-icon claude-dim'}));
+        row.add_child(new St.Icon({icon_name: Icons.gnome.account, style_class: 'claude-button-icon claude-dim'}));
         row.add_child(label('Not logged in', 'claude-dim', {x_expand: true}));
         if (!remoteHost || group.loginCommand) {
             const login = textButton('Log in…', () => ctx.logIn(group, remoteHost), 'claude-text-button claude-login-button');
@@ -107,7 +108,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
         const statsOpen = !!group.stats && ctx.ui.expandedStats[groupKey] === true;
         const tokens = group.stats
             ? textButton(L.tokensText(group.tokens), () => ctx.toggleStats(groupKey),
-                'claude-text-button claude-tokens claude-expander', statsOpen ? 'pan-down-symbolic' : 'pan-end-symbolic')
+                'claude-text-button claude-tokens claude-expander', statsOpen ? Icons.gnome.unfolded : Icons.gnome.folded)
             : label(L.tokensText(group.tokens), 'claude-tokens', {x_expand: true});
         tips.add(tokens, () => ["Tokens (this machine's transcripts only)", L.tokensTooltip(group.tokens)
             + (group.stats ? `\n\n${L.fmt('Click to %1 the last %2 days.', statsOpen ? 'hide' : 'show', group.stats.days.length)}` : '')]);
@@ -138,7 +139,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
         ctx.fetchRecent(groupKey, group.id, remoteHost, recent.fetch);
     if (recent.count > 0) {
         const toggle = textButton(L.pagedTitle('Recent chats', recent.shown, recent.count), () => ctx.toggleRecent(groupKey, recentOpen),
-            'claude-text-button claude-small claude-expander', recentOpen ? 'pan-down-symbolic' : 'pan-end-symbolic');
+            'claude-text-button claude-small claude-expander', recentOpen ? Icons.gnome.unfolded : Icons.gnome.folded);
         tips.add(toggle, ['Recent chats',
             "This account's latest chats that aren't listed above, newest first. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list). " +
             'Show more lists more of them; folded again, it lists the first ones again.']);
@@ -161,7 +162,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
         const starredOpen = !!ctx.ui.expandedStarred[groupKey];
         const shown = Math.min(starred.length, size * ctx.pagesShown(`${groupKey}|starred`));
         const toggle = textButton(L.pagedTitle('★ Starred chats', shown, starred.length), () => ctx.toggleStarred(groupKey, starredOpen),
-            'claude-text-button claude-small claude-expander', starredOpen ? 'pan-down-symbolic' : 'pan-end-symbolic');
+            'claude-text-button claude-small claude-expander', starredOpen ? Icons.gnome.unfolded : Icons.gnome.folded);
         tips.add(toggle, ['Starred chats',
             "The chats of this account you starred (☆ next to a chat), newest first, however old they are; not the ones listed above. Click a chat's ★ to unstar it."]);
         section.add_child(toggle);
@@ -188,7 +189,7 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
 function moreButton(ctx, listKey, shown, count) {
     const size = ctx.pageSize;
     const more = textButton(L.showMoreText(size, shown, count), () => ctx.showMore(listKey),
-        'claude-text-button claude-small claude-more', 'go-bottom-symbolic');
+        'claude-text-button claude-small claude-more', Icons.gnome.more);
     ctx.tips.add(more, L.showMoreTip(size, shown, count));
     return more;
 }
@@ -261,7 +262,7 @@ function buildNewChatMenu(ctx, group, host) {
                 ctx.remoteOpen(host, f.newChatCommand || '');
             else
                 ctx.newChat(group.chatProfile, f.path, inVscode);
-        }, 'claude-menu-item', f.short === '~' ? 'user-home-symbolic' : 'folder-symbolic');
+        }, 'claude-menu-item', f.short === '~' ? Icons.gnome.home : Icons.gnome.folder);
         item.x_expand = true;
         item.reactive = inVscode || (terminalHere && (!host || !!f.newChatCommand));
         if (!item.reactive)
@@ -270,7 +271,7 @@ function buildNewChatMenu(ctx, group, host) {
     }
     if (!host) {
         const choose = textButton('Choose folder…', () => ctx.newChatChoosingFolder(group.chatProfile, inVscode),
-            'claude-menu-item', 'folder-open-symbolic');
+            'claude-menu-item', Icons.gnome.chooseFolder);
         choose.x_expand = true;
         choose.reactive = inVscode || terminalHere;
         if (!choose.reactive)
@@ -303,11 +304,11 @@ function openInSwitch(ctx, group, host, resuming) {
         ctx.tips.add(wrap, tip);
         return wrap;
     };
-    line.add_child(half('utilities-terminal-symbolic', 'utilities-terminal', 'Terminal', terminalHere && !inVscode,
+    line.add_child(half(Icons.gnome.terminal, 'utilities-terminal', 'Terminal', terminalHere && !inVscode,
         terminalHere, () => ctx.setNewChatInVscode(false),
         [!terminalHere ? 'No claude command' : resuming ? 'Reopen chats in a terminal' : 'New chats in a terminal',
             L.terminalHint(host, terminalHere, resuming)]));
-    line.add_child(half('vscode', 'text-editor-symbolic', 'Claude Code panel', inVscode, vscodeHere,
+    line.add_child(half('vscode', Icons.gnome.vscodeApp, 'Claude Code panel', inVscode, vscodeHere,
         () => ctx.setNewChatInVscode(true),
         [!ctx.vscodeInstalled ? "VS Code isn't installed" : !vscodeHere ? 'Not on this account'
             : resuming ? 'Reopen chats in VS Code' : 'New chats in VS Code',
@@ -390,13 +391,13 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
     const hoverButtons = [];
     // star it: it stays listed under ★ Starred chats (a starred one has its ★)
     if (!chat.starred) {
-        const star = iconButton('non-starred-symbolic', () => ctx.setStar(chat.sessionId, remoteHost, true));
+        const star = iconButton(Icons.gnome.star, () => ctx.setStar(chat.sessionId, remoteHost, true));
         ctx.tips.add(star, ['Star this chat', L.starHint(false)]);
         hoverButtons.push(star);
         line.add_child(star);
     }
     if (ctx.canShareChats && !remoteHost && ctx.shareAccounts.length >= 2) {
-        const share = iconButton('emblem-shared-symbolic', () => ctx.toggleShareMenu(rowKey, {
+        const share = iconButton(Icons.gnome.share, () => ctx.toggleShareMenu(rowKey, {
             chatId: chat.sessionId, name: chat.name, profileDir: chat.profileDir, shared: chat.shared,
         }));
         ctx.tips.add(share, ['Continue on another account',
@@ -406,7 +407,7 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
     }
     // to the Trash, after a question (under the line)
     const asksDelete = ctx.ui.deleteAsk?.key === rowKey;
-    const del = iconButton('user-trash-symbolic', () => ctx.askDelete(rowKey, chat.sessionId, chat.profileDir, remoteHost));
+    const del = iconButton(Icons.gnome.delete, () => ctx.askDelete(rowKey, chat.sessionId, chat.profileDir, remoteHost));
     ctx.tips.add(del, ['Delete this chat…', L.DELETE_HINT]);
     if (!asksDelete)
         hoverButtons.push(del);
@@ -436,7 +437,7 @@ export function buildHostSection(ctx, host) {
     section.add_child(rule);
 
     const head = box('claude-group-head', {x_expand: true});
-    head.add_child(new St.Icon({icon_name: 'network-server-symbolic', style_class: 'claude-button-icon'}));
+    head.add_child(new St.Icon({icon_name: Icons.gnome.host, style_class: 'claude-button-icon'}));
     head.add_child(label(host, 'claude-host-title'));
     const real = info.result && info.result.host && info.result.host.split('.')[0] !== host ? info.result.host : '';
     if (real)
@@ -447,12 +448,12 @@ export function buildHostSection(ctx, host) {
             : ctx.now - info.updatedAt < 60000 ? 'updated just now'
                 : L.fmt('updated %1 ago', L.duration(ctx.now - info.updatedAt)), 'claude-small claude-dim'));
     if (info.result && (info.result.dismissed || 0) > 0) {
-        head.add_child(tips.add(iconButton('view-reveal-symbolic', () => ctx.remoteUndismissAll(host)),
+        head.add_child(tips.add(iconButton(Icons.gnome.showHidden, () => ctx.remoteUndismissAll(host)),
             L.fmt('Show Hidden Chats Again (%1)', info.result.dismissed)));
     }
-    head.add_child(tips.add(iconButton('view-refresh-symbolic', () => ctx.pollHost(host)),
+    head.add_child(tips.add(iconButton(Icons.gnome.refresh, () => ctx.pollHost(host)),
         [L.fmt('Refresh %1', host), L.fmt("Checked every %1 seconds while it's shown.", ctx.remotePollSeconds)]));
-    head.add_child(tips.add(iconButton('window-close-symbolic', () => ctx.toggleHost(host)),
+    head.add_child(tips.add(iconButton(Icons.gnome.hide, () => ctx.toggleHost(host)),
         [L.fmt('Stop showing %1', host), 'Pick it again with the SSH hosts button at the top.']));
     section.add_child(head);
 

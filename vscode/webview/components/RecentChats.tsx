@@ -3,7 +3,7 @@ import { pagedTitle, pageSizeOf, recentPage } from "../../src/shared/model";
 import type { Group, ReopenIn } from "../../src/shared/types";
 import { post } from "../env";
 import { groupKeyOf } from "../util/chat";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useStore } from "../util/store";
 import { askRecentMore, pages, pagesShown, recentMore, showMore, toggleRecent, toggleStarred, uiState } from "../util/ui";
 import { useView } from "./context";
@@ -53,7 +53,7 @@ export function RecentChats({ group }: { group: Group }) {
               " Show more lists more of them; folded again, it lists the first ones again. Every chat of a project is in the Projects tab."}
             onClick={() => toggleRecent(key)}
           >
-            <Icon name="chevron" class={open ? "open" : ""} />
+            <Icon name={I.folded} class={open ? "open" : ""} />
             {pagedTitle("Recent chats", recent.shown, recent.count)}
           </button>
           {open && how ? (
@@ -76,7 +76,7 @@ export function RecentChats({ group }: { group: Group }) {
             title="The chats of this account you starred (☆ next to a chat), newest first, however old they are; not the ones listed above. Click a chat's ★ to unstar it."
             onClick={() => toggleStarred(`${key}|chats`)}
           >
-            <Icon name="chevron" class={starredOpen ? "open" : ""} />
+            <Icon name={I.folded} class={starredOpen ? "open" : ""} />
             {pagedTitle("★ Starred chats", starredShown, starred.length)}
           </button>
           {starredOpen && how ? (

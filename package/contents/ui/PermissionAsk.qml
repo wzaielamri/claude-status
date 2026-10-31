@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 import "markdown.mjs" as Md
+import "icons.mjs" as Icons
 
 // What a chat waiting for a permission asks (talpy_den.py:
 // note_permissions): the command, or the file and the change; then Allow
@@ -171,13 +172,13 @@ ColumnLayout {
 
         PlasmaComponents3.Button {
             enabled: !ask.busy && questionForm.complete
-            icon.name: "document-send"
+            icon.name: Icons.plasma.send
             text: i18n("Send answers")
             onClicked: ask.answered("answer", "", questionForm.answers())
         }
         PlasmaComponents3.Button {
             enabled: !ask.busy
-            icon.name: "dialog-cancel"
+            icon.name: Icons.plasma.deny
             text: i18n("Decline…")
             onClicked: ask.denyWithNote()
         }
@@ -192,7 +193,7 @@ ColumnLayout {
 
         PlasmaComponents3.Button {
             enabled: !ask.busy
-            icon.name: "dialog-ok"
+            icon.name: Icons.plasma.always
             text: i18n("Approve, accept edits")
             font.bold: true
             onClicked: ask.answered("approve-edits", "", null)
@@ -206,7 +207,7 @@ ColumnLayout {
         }
         PlasmaComponents3.Button {
             enabled: !ask.busy
-            icon.name: "dialog-ok-apply"
+            icon.name: Icons.plasma.allow
             text: i18n("Approve")
             onClicked: ask.answered("approve", "", null)
 
@@ -219,7 +220,7 @@ ColumnLayout {
         }
         PlasmaComponents3.Button {
             enabled: !ask.busy
-            icon.name: "document-edit"
+            icon.name: Icons.plasma.edit
             text: i18n("Keep planning…")
             onClicked: ask.denyWithNote()
         }
@@ -231,14 +232,14 @@ ColumnLayout {
 
         PlasmaComponents3.Button {
             enabled: !ask.busy
-            icon.name: "dialog-ok-apply"
+            icon.name: Icons.plasma.allow
             text: i18n("Allow once")
             onClicked: ask.answered("allow", "", null)
         }
         PlasmaComponents3.Button {
             visible: ask.permission && (ask.permission.answer === "keys" || ask.permission.always !== "")
             enabled: !ask.busy
-            icon.name: "dialog-ok"
+            icon.name: Icons.plasma.always
             text: i18n("Always allow")
             onClicked: ask.answered("always", "", null)
 
@@ -254,7 +255,7 @@ ColumnLayout {
         }
         PlasmaComponents3.Button {
             enabled: !ask.busy
-            icon.name: "dialog-cancel"
+            icon.name: Icons.plasma.deny
             text: i18n("Deny…")
             onClicked: ask.denyWithNote()
         }
@@ -277,7 +278,7 @@ ColumnLayout {
         PlasmaComponents3.Button {
             id: denyButton
             enabled: !ask.busy
-            icon.name: ask.plan ? "document-edit" : "dialog-cancel"
+            icon.name: ask.plan ? Icons.plasma.edit : Icons.plasma.deny
             text: ask.plan ? i18n("Keep planning") : ask.asksQuestions ? i18n("Decline") : i18n("Deny")
             onClicked: {
                 ask.answered(ask.plan ? "keep" : "deny", noteField.text.trim(), null)
@@ -285,7 +286,7 @@ ColumnLayout {
             }
         }
         PlasmaComponents3.ToolButton {
-            icon.name: "edit-undo"
+            icon.name: Icons.plasma.undo
             display: PlasmaComponents3.AbstractButton.IconOnly
             text: i18n("Cancel")
             onClicked: ask.cancelDeny()

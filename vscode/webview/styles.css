@@ -359,11 +359,34 @@ code {
   padding-right: 2px;
 }
 
+/* A button with its words beside its icon (Go on at …, Keep going), as
+   Plasma's tool buttons with text; pressed: a toggle that's on */
+.icon-btn.text-btn {
+  gap: 4px;
+  padding: 0 6px 0 3px;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.icon-btn[aria-pressed="true"] {
+  background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground, var(--cs-hover)));
+  box-shadow: inset 0 0 0 1px var(--cs-tag-border);
+}
+
 .icon {
   display: block;
   flex: none;
   width: 16px;
   height: 16px;
+}
+
+/* Only what says something is wrong is colored (icons.mjs) */
+.icon.icon-warning {
+  color: var(--cs-waiting);
+}
+
+.icon.icon-error {
+  color: var(--cs-failed);
 }
 
 .link {
@@ -412,6 +435,16 @@ button:focus-visible {
   border-color: var(--cs-failed);
   color: var(--cs-failed);
   opacity: 1;
+}
+
+/* An icon in a tag: as big as the buttons' (16 px), the tag as high as a button's icon */
+.tag.with-icon {
+  gap: 3px;
+  padding: 0 4px 0 2px;
+}
+
+.tag.warning .icon:not(.icon-warning):not(.icon-error) {
+  color: inherit; /* (a plain icon in the warning's color, as its text) */
 }
 
 .tag.clickable {

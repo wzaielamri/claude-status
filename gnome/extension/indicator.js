@@ -22,6 +22,7 @@ import {TalpyIcon} from './ui/talpyIcon.js';
 import {buildPermsView} from './ui/permsView.js';
 import {buildWeekView} from './ui/weekView.js';
 import {box, column, iconButton, label, paragraph, scaleFactor, textButton, Tooltips} from './ui/widgets.js';
+import * as Icons from './ui/icons.js';
 
 const USAGE_PAGE = 'https://claude.ai/settings/usage';
 const WEEK_REFRESH_S = 600;   // the Recap tab reads again while it's open
@@ -369,7 +370,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         const card = column('claude-digest', {x_expand: true});
         const head = box('claude-line', {x_expand: true});
         head.add_child(label(d.title, 'claude-strong', {x_expand: true}));
-        head.add_child(this.tips.add(iconButton('window-close-symbolic', () => this.dismissDigest()), 'Dismiss'));
+        head.add_child(this.tips.add(iconButton(Icons.gnome.close, () => this.dismissDigest()), 'Dismiss'));
         card.add_child(head);
         card.add_child(paragraph(d.body, 'claude-small'));
         if (d.first) {
@@ -414,7 +415,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         const first = digest.first;
         // its own kind: closeMissing() closes 'waiting' notifications of chats that are gone
         this._notifier.notify({key: 'away-digest', kind: 'digest', waiting: !!first, title: digest.title,
-            body: digest.body, icon: first ? 'dialog-warning-symbolic' : 'emblem-ok-symbolic', session: null,
+            body: digest.body, icon: first ? Icons.gnome.warning : Icons.gnome.done, session: null,
             action: first ? 'Open the chat that needs you' : 'Show chats'},
         this._settings.get_boolean('show-pet'), ind => (first ? ind._openChat(first) : ind.menu.open()));
     }
@@ -497,7 +498,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._oops();
         if (!this.menu.isOpen) {
             this._notifier.notify({key: 'jump-error', kind: 'error', title: "Couldn't open the chat",
-                body: result.message, icon: 'dialog-error-symbolic', session: null},
+                body: result.message, icon: Icons.gnome.error, session: null},
             this._settings.get_boolean('show-pet'), ind => ind.showChats());
         }
     }
@@ -975,7 +976,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
             this._oops();
             if (!this.menu.isOpen) {   // e.g. from a notification or the hotkey: say so
                 this._notifier.notify({key: 'remote-error', kind: 'error', title: L.fmt("That didn't work on %1", host),
-                    body: this._actionError, icon: 'dialog-error-symbolic', session: null},
+                    body: this._actionError, icon: Icons.gnome.error, session: null},
                 this._settings.get_boolean('show-pet'), ind => ind.showChats());
             }
         }
@@ -1158,7 +1159,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._summary = label('', 'claude-summary', {x_expand: true, x_align: Clutter.ActorAlign.END});
         header.add_child(this._summary);
         const hostsContent = box('claude-button-box');
-        hostsContent.add_child(new St.Icon({icon_name: 'network-server-symbolic', style_class: 'claude-button-icon'}));
+        hostsContent.add_child(new St.Icon({icon_name: Icons.gnome.host, style_class: 'claude-button-icon'}));
         this._hostsCount = label('', '');
         hostsContent.add_child(this._hostsCount);
         const hostsButton = new St.Button({style_class: 'claude-icon-button', can_focus: true, child: hostsContent});
@@ -1170,12 +1171,12 @@ class TalpyDenIndicator extends PanelMenu.Button {
             ? L.fmt('Showing Claude on %1. Click to pick hosts from ~/.ssh/config.', this.shownHosts.join(', '))
             : 'Show the Claude chats of your SSH hosts (from ~/.ssh/config) here too.']);
         header.add_child(hostsButton);
-        header.add_child(this.tips.add(iconButton('view-refresh-symbolic', () => {
+        header.add_child(this.tips.add(iconButton(Icons.gnome.refresh, () => {
             this.refreshAll();
             this._loadTab();
             this.fetchUsage();
         }), 'Refresh'));
-        header.add_child(this.tips.add(iconButton('emblem-system-symbolic', () => {
+        header.add_child(this.tips.add(iconButton(Icons.gnome.settings, () => {
             this.menu.close();
             this._extension.openPreferences();
         }), 'Settings'));
@@ -1200,10 +1201,10 @@ class TalpyDenIndicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._undismissItem = this.menu.addAction('Show Hidden Chats Again',
-            () => this.showHiddenChats(), 'view-reveal-symbolic');
+            () => this.showHiddenChats(), Icons.gnome.showHidden);
         this.menu.addAction('Open usage page on claude.ai', () => {
             Gio.AppInfo.launch_default_for_uri(USAGE_PAGE, global.create_app_launch_context(0, -1));
-        }, 'web-browser-symbolic');
+        }, Icons.gnome.web);
 
         this.menu.connect('open-state-changed', (menu, open) => {
             if (open) {
@@ -1503,17 +1504,17 @@ class TalpyDenIndicator extends PanelMenu.Button {
             const on = shown.includes(h.name);
             menu.add_child(textButton(target !== h.name ? `${h.name}  (${target})` : h.name,
                 () => this.toggleHost(h.name), 'claude-menu-item',
-                on ? 'object-select-symbolic' : 'network-server-symbolic'));
+                on ? Icons.gnome.ticked : Icons.gnome.host));
         }
         // picked hosts that aren't in ~/.ssh/config (any more)
         for (const host of shown) {
             if (!this._sshHosts.some(h => h.name === host))
-                menu.add_child(textButton(host, () => this.toggleHost(host), 'claude-menu-item', 'object-select-symbolic'));
+                menu.add_child(textButton(host, () => this.toggleHost(host), 'claude-menu-item', Icons.gnome.ticked));
         }
         if (this._sshHosts.length === 0 && shown.length === 0)
             menu.add_child(label('No hosts in ~/.ssh/config', 'claude-dim claude-indent'));
         menu.add_child(textButton('Reload ~/.ssh/config', () => this._loadHosts(), 'claude-menu-item',
-            'view-refresh-symbolic'));
+            Icons.gnome.refresh));
         return menu;
     }
 

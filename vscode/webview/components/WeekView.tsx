@@ -28,7 +28,7 @@ import {
   dayPlace,
 } from "../../src/shared/week";
 import { post } from "../env";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
 import { weekAnswer } from "../util/stores";
@@ -114,7 +114,7 @@ export function WeekView({ hosts, currency }: { hosts: string[]; currency: strin
           <button type="button" class="icon-btn flip" title={span === "day" ? "The day before" : "The week before"}
             aria-label={span === "day" ? "The day before" : "The week before"}
             disabled={!mine || back >= (recap?.backMax ?? 0)} onClick={() => setBack(back + 1)}>
-            <Icon name="chevron" />
+            <Icon name={I.previous} />
           </button>
         ) : null}
         <span class="week-span">{mine && recap ? periodText({ ...recap, back }) : periodWaiting(span, back)}</span>
@@ -122,15 +122,15 @@ export function WeekView({ hosts, currency }: { hosts: string[]; currency: strin
           <button type="button" class="icon-btn" title={span === "day" ? "The day after" : "The week after"}
             aria-label={span === "day" ? "The day after" : "The week after"} disabled={back <= 0}
             onClick={() => setBack(back - 1)}>
-            <Icon name="chevron" />
+            <Icon name={I.next} />
           </button>
         ) : null}
         <button type="button" class="icon-btn" title="Read again" aria-label="Read again" onClick={ask}>
-          <Icon name="refresh" />
+          <Icon name={I.refresh} />
         </button>
         <button type="button" class="icon-btn" title="Share as a picture: these days as a card with Talpy, to save or copy"
           aria-label="Share as a picture" disabled={!(recap && hasData)} onClick={() => setSharing(true)}>
-          <Icon name="share" />
+          <Icon name={I.share} />
         </button>
       </div>
       {sharing && recap ? <ShareCard recap={recap} onClose={() => setSharing(false)} /> : null}
@@ -397,7 +397,7 @@ function Projects({ recap }: { recap: WeekRecap }) {
                 `${p.prompts} prompts · ${p.chatCount ?? chats.length} chats\n` +
                 (p.host ? "Click for its chats." : "Click to open it in the Projects tab: its chats, plans and memories.")}>
               <span class="week-bar-name">
-                <Icon name="chevron" class={shown ? "turn" : ""} />
+                <Icon name={I.folded} class={shown ? "turn" : ""} />
                 {(p.host ? p.host + ": " : "") + p.name}
               </span>
               <span class="week-bar-meter work"><span style={{ width: `${(100 * p.workedMs) / most}%` }} /></span>

@@ -4,15 +4,15 @@ import { editorTab, post } from "../env";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
 import { setFocus, setTab, type Tab, uiState } from "../util/ui";
-import { Icon, type IconName } from "../util/icons";
+import { I, Icon, type IconName } from "../util/icons";
 import { IconButton } from "./IconButton";
 import { TalpyIcon } from "./TalpyIcon";
 
 const TABS: [Tab, string, IconName][] = [
-  ["chats", "Talpy Den", "chat"],
-  ["week", "Recap", "chart"],
-  ["perms", "Permissions", "shield"],
-  ["projects", "Projects", "folder"],
+  ["chats", "Talpy Den", I.chats],
+  ["week", "Recap", I.recap],
+  ["perms", "Permissions", I.permissions],
+  ["projects", "Projects", I.project],
 ];
 
 // The icon and the summary. In the sidebar the view's title bar has the
@@ -55,7 +55,7 @@ export function Header(props: {
       </span>
       {tab === "chats" ? (
         <IconButton
-          icon="filter"
+          icon={I.focus}
           label={focus ? "Show everything" : "Focus"}
           title={focus ? "Show everything: back to every account, chat, pet and usage bar."
             : "Focus: only what needs you, the chats that finished a turn you haven't looked at yet, and one line for each chat at work."}
@@ -66,13 +66,13 @@ export function Header(props: {
       {editorTab ? (
         <div class="header-actions">
           <IconButton
-            icon="search"
+            icon={I.search}
             label="Find a chat…"
             title="Find a chat: every chat with all the words you type in its name, its folder or your prompts, here and on the SSH hosts shown."
             onClick={() => post({ type: "findChat" })}
           />
           <IconButton
-            icon="server"
+            icon={I.host}
             label="SSH hosts…"
             title={
               hosts.length
@@ -84,8 +84,8 @@ export function Header(props: {
           >
             {hosts.length ? <span class="count">{hosts.length}</span> : null}
           </IconButton>
-          <IconButton icon="refresh" label="Refresh" onClick={() => post({ type: "refresh" })} />
-          <IconButton icon="gear" label="Settings" title="Talpy Den's settings, in VS Code's Settings editor." onClick={() => post({ type: "openSettings" })} />
+          <IconButton icon={I.refresh} label="Refresh" onClick={() => post({ type: "refresh" })} />
+          <IconButton icon={I.settings} label="Settings" title="Talpy Den's settings, in VS Code's Settings editor." onClick={() => post({ type: "openSettings" })} />
         </div>
       ) : null}
     </header>

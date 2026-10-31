@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // A plan a chat in plan mode wrote (<config>/plans): click to read it; on
 // hover (or Tab, or a finger's hold) its buttons: star, edit, send your
@@ -38,7 +39,7 @@ ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
         Kirigami.Icon {
-            source: "view-task"
+            source: Icons.plasma.plan
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Layout.preferredWidth
             opacity: 0.7
@@ -165,7 +166,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     // star it: it stays listed under Starred (a starred one has its ★)
                     visible: !planLine.plan.starred
-                    icon.name: "non-starred-symbolic"
+                    icon.name: Icons.plasma.star
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Star")
                     Layout.preferredHeight: planButtons.buttonSize
@@ -184,7 +185,7 @@ ColumnLayout {
                 // the plan's Markdown file itself, to change it (an SSH host's: in VS Code, over Remote-SSH)
                 PlasmaComponents3.ToolButton {
                     visible: !planLine.remoteHost || root.vscodeInstalled
-                    icon.name: "document-edit"
+                    icon.name: Icons.plasma.edit
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Edit the plan")
                     Layout.preferredHeight: planButtons.buttonSize
@@ -207,7 +208,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     visible: !planLine.remoteHost
                     enabled: !!planLine.plan.chatId
-                    icon.name: "mail-send"
+                    icon.name: Icons.plasma.send
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Send your changes to Claude")
                     Layout.preferredHeight: planButtons.buttonSize
@@ -226,7 +227,7 @@ ColumnLayout {
                 }
                 PlasmaComponents3.ToolButton {
                     id: planGo
-                    icon.name: "media-playback-start"
+                    icon.name: Icons.plasma.startNow
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Carry it out…")
                     checked: root.planComposer === planLine.composerKey
@@ -244,7 +245,7 @@ ColumnLayout {
                     }
                 }
                 PlasmaComponents3.ToolButton {
-                    icon.name: "go-previous"
+                    icon.name: Icons.plasma.origin
                     enabled: !!planLine.plan.chatId
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Continue the chat that made it")
@@ -264,7 +265,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     id: planShare
                     visible: root.shareAccountsOf(planLine.remoteHost).length >= 2
-                    icon.name: "document-share"
+                    icon.name: Icons.plasma.share
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Share it with another account…")
                     Layout.preferredHeight: planButtons.buttonSize
@@ -282,7 +283,7 @@ ColumnLayout {
                 }
                 PlasmaComponents3.ToolButton {
                     // to the Trash, after a question (DeleteAsk under the line)
-                    icon.name: "user-trash"
+                    icon.name: Icons.plasma.delete
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Delete…")
                     Layout.preferredHeight: planButtons.buttonSize
@@ -301,7 +302,7 @@ ColumnLayout {
                 }
                 PlasmaComponents3.ToolButton {
                     // hide it here (nothing is deleted)
-                    icon.name: "window-close"
+                    icon.name: Icons.plasma.hide
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Hide this plan")
                     Layout.preferredHeight: planButtons.buttonSize

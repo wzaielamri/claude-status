@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // A chat to pick up again: one of an account's recent or starred chats, or
 // of a project's (ProjectsView.qml). A click opens it beside the popup (or
@@ -132,7 +133,8 @@ ColumnLayout {
                 readonly property var goingOn: root.queuedChat(recentLine.chat.sessionId, recentLine.remoteHost)
                 visible: goingOn !== null
                          || (!!recentLine.chat.stopped && recentLine.chat.stopped.kind === "limit" && !recentLine.chat.stopped.over)
-                text: goingOn ? i18nc("a chat that goes on by itself at this time", "⏱ %1", root.startText(goingOn.startAt))
+                icon: goingOn ? Icons.plasma.goOnAt : ""
+                text: goingOn ? root.startText(goingOn.startAt)
                               : i18n("Limit")
                 warning: goingOn === null
                 active: goingOn !== null
@@ -142,7 +144,7 @@ ColumnLayout {
                 tooltip: (goingOn ? i18n("In the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).")
                           : (recentLine.chat.stopped ? recentLine.chat.stopped.text : "")
                             + (goOnAt > 0 ? "\n\n" + i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, once.", root.startText(goOnAt))
-                                            + (recentLine.remoteHost ? "" : " " + i18n("↻ beside it: after later limits too, until it's done.")) : ""))
+                                            + (recentLine.remoteHost ? "" : " " + i18n("Keep going beside it: after later limits too, until it's done.")) : ""))
                          + (goingOn ? "\n\n" + i18n("Click to cancel it.")
                                       + (root.keptChat(recentLine.chat.sessionId) !== null && !recentLine.remoteHost
                                          ? " " + i18n("It stops keeping going after usage limits too.") : "") : "")
@@ -163,7 +165,7 @@ ColumnLayout {
                 readonly property bool canKeep: kept === null && !recentLine.remoteHost && root.goOnAt(recentLine.chat) > 0
                                                 && root.queuedChat(recentLine.chat.sessionId, recentLine.remoteHost) === null
                 visible: kept !== null || canKeep
-                text: i18nc("a chat that goes on by itself after usage limits", "↻")
+                icon: Icons.plasma.keepGoing
                 active: kept !== null && !kept.error
                 warning: kept !== null && (!!kept.error || !!kept.note)
                 clickable: true
@@ -258,7 +260,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     // with clicks opening the pane: reopen the chat itself
                     visible: Plasmoid.configuration.clickOpensPane && recentLine.canOpen
-                    icon.name: "window"
+                    icon.name: Icons.plasma.openWindow
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Reopen this chat")
                     Layout.preferredHeight: recentButtons.buttonSize
@@ -278,7 +280,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     // star it: it stays listed under Starred (a starred one has its ★)
                     visible: !recentLine.chat.starred
-                    icon.name: "non-starred-symbolic"
+                    icon.name: Icons.plasma.star
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Star")
                     Layout.preferredHeight: recentButtons.buttonSize
@@ -297,7 +299,7 @@ ColumnLayout {
                 PlasmaComponents3.ToolButton {
                     id: recentShare
                     visible: root.shareAccountsOf(recentLine.remoteHost).length >= 2
-                    icon.name: "document-share"
+                    icon.name: Icons.plasma.share
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Share or continue on another account…")
                     Layout.preferredHeight: recentButtons.buttonSize
@@ -318,7 +320,7 @@ ColumnLayout {
                 }
                 PlasmaComponents3.ToolButton {
                     // to the Trash, after a question (DeleteAsk under the line)
-                    icon.name: "user-trash"
+                    icon.name: Icons.plasma.delete
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Delete…")
                     Layout.preferredHeight: recentButtons.buttonSize

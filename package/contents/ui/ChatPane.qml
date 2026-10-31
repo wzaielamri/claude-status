@@ -7,6 +7,7 @@ import org.kde.kirigami as Kirigami
 import "hub"
 import "markdown.mjs" as Md
 import "codehtml.mjs" as Code
+import "icons.mjs" as Icons
 
 // A chat beside the popup (main.qml: openPane): its conversation, updating
 // while it works, drawn the way Claude's terminal draws it (a dot before each
@@ -979,9 +980,9 @@ Window {
         id: widestSend
         visible: false
         spacing: Kirigami.Units.smallSpacing
-        PlasmaComponents3.Button { icon.name: "edit-copy"; text: i18n("Copy and open its tab") }
-        PlasmaComponents3.Button { icon.name: "chronometer"; text: i18n("Send when this turn ends") }
-        PlasmaComponents3.Button { icon.name: "document-send"; text: i18n("Send, go on in the background") }
+        PlasmaComponents3.Button { icon.name: Icons.plasma.copy; text: i18n("Copy and open its tab") }
+        PlasmaComponents3.Button { icon.name: Icons.plasma.later; text: i18n("Send when this turn ends") }
+        PlasmaComponents3.Button { icon.name: Icons.plasma.send; text: i18n("Send, go on in the background") }
     }
 
     // ---------------------------------------------------------------- what's shown
@@ -1074,7 +1075,7 @@ Window {
                     }
                 }
                 PlasmaComponents3.ToolButton {
-                    icon.name: "zoom-out"
+                    icon.name: Icons.plasma.zoomOut
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Smaller text")
                     enabled: pane.textPercent > pane.scales[0]
@@ -1083,7 +1084,7 @@ Window {
                     PlasmaComponents3.ToolTip.visible: hovered
                 }
                 PlasmaComponents3.ToolButton {
-                    icon.name: "zoom-in"
+                    icon.name: Icons.plasma.zoomIn
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Larger text")
                     enabled: pane.textPercent < pane.scales[pane.scales.length - 1]
@@ -1092,7 +1093,7 @@ Window {
                     PlasmaComponents3.ToolTip.visible: hovered
                 }
                 PlasmaComponents3.ToolButton {
-                    icon.name: "window"
+                    icon.name: Icons.plasma.openWindow
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Open its window")
                     onClicked: root.openRow(pane.row || pane.chat, pane.host)
@@ -1303,7 +1304,7 @@ Window {
                             PlasmaComponents3.Button {
                                 visible: pane.more && pane.limit < pane.limitMax
                                 Layout.alignment: Qt.AlignHCenter
-                                icon.name: "go-up"
+                                icon.name: Icons.plasma.earlier
                                 text: i18n("Show earlier")
                                 onClicked: {
                                     pane.limit = Math.min(pane.limitMax, pane.limit * 2)
@@ -1704,7 +1705,7 @@ Window {
                         color: Kirigami.Theme.focusColor
                     }
                     PlasmaComponents3.ToolButton {
-                        icon.name: "edit-delete-remove"
+                        icon.name: Icons.plasma.cancel
                         text: i18n("Cancel")
                         onClicked: root.unqueue(pane.queued)
                     }
@@ -1957,7 +1958,7 @@ Window {
                         spacing: Kirigami.Units.smallSpacing
 
                         PlasmaComponents3.ToolButton {
-                            icon.name: pane.dictating === "recording" ? "media-playback-stop" : "audio-input-microphone"
+                            icon.name: pane.dictating === "recording" ? Icons.plasma.stop : Icons.plasma.dictate
                             icon.color: pane.dictating === "recording" ? Kirigami.Theme.negativeTextColor : "transparent"
                             enabled: pane.dictating === "" || pane.dictating === "recording"
                             text: pane.dictating === "recording" ? i18n("Stop: write it down") + " · " + root.duration(Math.max(1000, pane.recordedMs))
@@ -1978,13 +1979,13 @@ Window {
                         }
                         PlasmaComponents3.ToolButton {
                             visible: pane.dictating === "recording"
-                            icon.name: "dialog-cancel"
+                            icon.name: Icons.plasma.cancel
                             display: PlasmaComponents3.AbstractButton.IconOnly
                             text: i18n("Stop, don't write it down")
                             onClicked: pane.cancelDictation()
                         }
                         PlasmaComponents3.ToolButton {
-                            icon.name: "mail-attachment"
+                            icon.name: Icons.plasma.attach
                             text: i18n("Attach files…")
                             display: PlasmaComponents3.AbstractButton.IconOnly
                             onClicked: root.pickFiles(pane.host, "pane", pane.row ? pane.row.cwd || "" : pane.chat.cwd || "")
@@ -1998,7 +1999,7 @@ Window {
                             }
                         }
                         PlasmaComponents3.ToolButton {
-                            icon.name: "camera-photo"
+                            icon.name: Icons.plasma.screenshot
                             text: i18n("Screenshot…")
                             display: PlasmaComponents3.AbstractButton.IconOnly
                             onClicked: root.takeScreenshot(pane.host, "pane")
@@ -2022,14 +2023,14 @@ Window {
                         PlasmaComponents3.Button {
                             visible: pane.route === "terminal" || pane.askHow
                             enabled: replyBox.text.trim() !== "" && !pane.sending
-                            icon.name: "edit-copy"
+                            icon.name: Icons.plasma.copy
                             text: i18n("Copy and open its tab")
                             onClicked: pane.send("copy", false)
                         }
                         PlasmaComponents3.Button {
                             visible: pane.busy
                             enabled: replyBox.text.trim() !== "" && !pane.sending
-                            icon.name: "chronometer"
+                            icon.name: Icons.plasma.later
                             text: i18n("Send when this turn ends")
                             onClicked: pane.send(pane.route === "terminal" ? "background" : "auto", true)
 
@@ -2043,7 +2044,7 @@ Window {
                         PlasmaComponents3.Button {
                             enabled: replyBox.text.trim() !== "" && !pane.sending && !(pane.route === "terminal" && pane.busy)
                                      && !(pane.permission && pane.route === "tmux")
-                            icon.name: "document-send"
+                            icon.name: Icons.plasma.send
                             text: pane.sending ? i18n("Sending…") : pane.route === "terminal" || pane.askHow ? i18n("Send, go on in the background") : i18n("Send")
                             onClicked: pane.send(pane.route === "terminal" || pane.askHow ? "background" : "auto", false)
                         }
@@ -2102,7 +2103,7 @@ Window {
                             review: pane.row ? pane.row.review : (pane.review ? { tests: pane.review.tests } : null)
                         }
                         PlasmaComponents3.ToolButton {
-                            icon.name: "view-split-left-right"
+                            icon.name: Icons.plasma.sideBySide
                             checkable: true
                             checked: Plasmoid.configuration.diffSideBySide
                             display: PlasmaComponents3.AbstractButton.IconOnly
@@ -2181,7 +2182,7 @@ Window {
                                 }
                                 PlasmaComponents3.ToolButton {
                                     visible: !fileItem.file.unknown
-                                    icon.name: "edit-undo"
+                                    icon.name: Icons.plasma.undo
                                     display: PlasmaComponents3.AbstractButton.IconOnly
                                     text: i18n("Undo this file")
                                     onClicked: pane.undoAsk = fileItem.file.path
@@ -2265,7 +2266,7 @@ Window {
                     }
                     PlasmaComponents3.Button {
                         enabled: commitText.text.trim() !== "" && pane.reviewIsThis && pane.review.repos.length > 0
-                        icon.name: "vcs-commit"
+                        icon.name: Icons.plasma.commit
                         text: i18n("Commit")
                         onClicked: pane.run("commit", "--commit " + root.shellQuote(pane.chatId) + " --message "
                                             + root.shellQuote(commitText.text) + pane.paneArgs())
@@ -2286,7 +2287,7 @@ Window {
                 spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents3.ToolButton {
-                    icon.name: "view-refresh"
+                    icon.name: Icons.plasma.refresh
                     display: PlasmaComponents3.AbstractButton.IconOnly
                     text: i18n("Compare again")
                     onClicked: pane.loadReview()
@@ -2296,20 +2297,20 @@ Window {
                 }
                 PlasmaComponents3.Button {
                     enabled: pane.reviewIsThis && pane.review.files.length > 0
-                    icon.name: "edit-undo"
+                    icon.name: Icons.plasma.undo
                     text: i18n("Undo all…")
                     onClicked: pane.undoAsk = "*"
                 }
                 PlasmaComponents3.Button {
                     enabled: pane.reviewIsThis && pane.review.files.length > 0 && pane.review.repos.length > 0
-                    icon.name: "vcs-commit"
+                    icon.name: Icons.plasma.commit
                     text: i18n("Commit these files…")
                     onClicked: pane.commitOpen = !pane.commitOpen
                 }
                 PlasmaComponents3.Button {
                     // (by the mark itself: while the chat works it isn't "to review", nor reviewed)
                     readonly property bool marked: !!pane.row && !!pane.row.review && root.reviewSeen(pane.row, pane.host)
-                    icon.name: marked ? "checkmark" : "view-task"
+                    icon.name: marked ? Icons.plasma.reviewed : Icons.plasma.markReviewed
                     text: marked ? i18n("Reviewed") : i18n("Mark reviewed")
                     checkable: false
                     onClicked: pane.run("reviewed", "--reviewed " + root.shellQuote(pane.chatId) + (marked ? " --off" : "")

@@ -7,6 +7,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import org.kde.notification
 import "hub"
+import "icons.mjs" as Icons
 
 PlasmoidItem {
     id: root
@@ -667,7 +668,7 @@ PlasmoidItem {
         if (!root.notifier || !(Plasmoid.configuration.notifyWaiting || Plasmoid.configuration.notifyDone))
             return
         const first = waiting.length ? waiting[0] : null
-        notify("away-digest", first ? first.session : null, "digest", title, lines.join("\n"), "user-away", first ? first.host : "")
+        notify("away-digest", first ? first.session : null, "digest", title, lines.join("\n"), Icons.plasma.away, first ? first.host : "")
         queueSound(waiting.length ? "waiting" : awayEvents.some(e => ["failed", "limit", "login"].indexOf(e.kind) >= 0) ? "failed" : "done")
         playQueuedSound()
     }
@@ -771,43 +772,43 @@ PlasmoidItem {
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
             text: i18n("Refresh")
-            icon.name: "view-refresh"
+            icon.name: Icons.plasma.refresh
             onTriggered: root.refresh()
         },
         // what you hid, kind by kind (each only when some are hidden)
         PlasmaCore.Action {
             text: root.showHiddenText("chats", root.hiddenCount("chats", ""))
-            icon.name: "view-visible"
+            icon.name: Icons.plasma.showHidden
             visible: root.hiddenCount("chats", "") > 0
             onTriggered: root.showHidden("chats", "")
         },
         PlasmaCore.Action {
             text: root.showHiddenText("plans", root.hiddenCount("plans", ""))
-            icon.name: "view-visible"
+            icon.name: Icons.plasma.showHidden
             visible: root.hiddenCount("plans", "") > 0
             onTriggered: root.showHidden("plans", "")
         },
         PlasmaCore.Action {
             text: root.showHiddenText("memories", root.hiddenCount("memories", ""))
-            icon.name: "view-visible"
+            icon.name: Icons.plasma.showHidden
             visible: root.hiddenCount("memories", "") > 0
             onTriggered: root.showHidden("memories", "")
         },
         PlasmaCore.Action {
             text: root.showHiddenText("projects", root.hiddenCount("projects", ""))
-            icon.name: "view-visible"
+            icon.name: Icons.plasma.showHidden
             visible: root.hiddenCount("projects", "") > 0
             onTriggered: root.showHidden("projects", "")
         },
         PlasmaCore.Action {
             text: i18n("Go to the Chat That Needs You")
-            icon.name: "go-next"
+            icon.name: Icons.plasma.goTo
             visible: root.chatsNeedingYou().length > 0
             onTriggered: root.goToNextChat(root.chatsNeedingYou())
         },
         PlasmaCore.Action {
             text: i18n("Open Usage Page on claude.ai")
-            icon.name: "internet-web-browser"
+            icon.name: Icons.plasma.web
             onTriggered: Qt.openUrlExternally("https://claude.ai/settings/usage")
         },
         // The default account, as the settings' Accounts page makes it (up to four
@@ -959,7 +960,7 @@ PlasmoidItem {
             componentName: "plasma_workspace"
             eventId: "notification"
             hints: ({ "x-kde-display-appname": "Talpy Den" })
-            iconName: "view-calendar-week"
+            iconName: Icons.plasma.recap
             defaultAction: NotificationAction {
                 label: i18n("Open the Recap")
                 onActivated: root.openRecap()
@@ -2236,18 +2237,18 @@ PlasmoidItem {
             const target = (h.user ? h.user + "@" : "") + (h.hostname || h.name) + (h.jump ? " " + i18nc("ssh through a jump host", "via %1", h.jump) : "")
             items.push(hostItem.createObject(hostsMenu, {
                 text: target !== h.name ? h.name + "  (" + target + ")" : h.name,
-                icon: "network-server", checkable: true, checked: shownHosts.indexOf(h.name) >= 0, host: h.name
+                icon: Icons.plasma.host, checkable: true, checked: shownHosts.indexOf(h.name) >= 0, host: h.name
             }))
         }
         // picked hosts that aren't in ~/.ssh/config (any more)
         for (const host of shownHosts)
             if (!sshHosts.some(h => h.name === host))
-                items.push(hostItem.createObject(hostsMenu, { text: host, icon: "network-server", checkable: true,
+                items.push(hostItem.createObject(hostsMenu, { text: host, icon: Icons.plasma.host, checkable: true,
                                                               checked: true, host: host }))
         if (items.length === 1)
             items.push(hostItem.createObject(hostsMenu, { text: i18n("No hosts in ~/.ssh/config"), enabled: false }))
         items.push(hostItem.createObject(hostsMenu, { separator: true }))
-        items.push(hostItem.createObject(hostsMenu, { text: i18n("Reload ~/.ssh/config"), icon: "view-refresh", reload: true }))
+        items.push(hostItem.createObject(hostsMenu, { text: i18n("Reload ~/.ssh/config"), icon: Icons.plasma.refresh, reload: true }))
         for (const item of items)
             hostsMenu.addMenuItem(item)
         hostItems = items
@@ -2403,17 +2404,17 @@ PlasmoidItem {
                 continue
             items.push(shareItem.createObject(shareMenu, {
                 text: chat.shared ? i18n("Continue on %1", g.title) : i18n("Share and continue on %1", g.title),
-                icon: "system-switch-user", kind: "continue", chatId: chat.chatId, account: g, host: host
+                icon: Icons.plasma.continueOn, kind: "continue", chatId: chat.chatId, account: g, host: host
             }))
         }
         if (!chat.shared)
-            items.push(shareItem.createObject(shareMenu, { text: i18n("Share with all accounts"), icon: "document-share",
+            items.push(shareItem.createObject(shareMenu, { text: i18n("Share with all accounts"), icon: Icons.plasma.share,
                                                            kind: "share", chatId: chat.chatId, host: host }))
         else {
             items.push(shareItem.createObject(shareMenu, { separator: true }))
             for (const g of accounts)
                 items.push(shareItem.createObject(shareMenu, {
-                    text: i18n("Keep only on %1…", g.title), icon: "go-next", kind: "keeponly",
+                    text: i18n("Keep only on %1…", g.title), icon: Icons.plasma.moveTo, kind: "keeponly",
                     chatId: chat.chatId, chatName: chat.name, rowKey: rowKey, account: g, host: host
                 }))
         }
@@ -2573,7 +2574,7 @@ PlasmoidItem {
         PlasmaExtras.MenuItem {
             property string kind
             property string host
-            icon: "view-visible"
+            icon: Icons.plasma.showHidden
             onClicked: root.showHidden(kind, host)
         }
     }
@@ -3941,8 +3942,7 @@ PlasmoidItem {
 
     // A memory's icon by its kind (talpy_den.py: account_memories)
     function memoryIcon(type) {
-        return ({ user: "user-identity", feedback: "dialog-messages", project: "folder-documents", reference: "bookmarks",
-                  account: "configure" })[type] || "note"
+        return Icons.plasma[Icons.memoryMeaning(type)]
     }
 
     // One of Claude's memories: rendered to read, or (edit) its file, to change
@@ -4064,16 +4064,16 @@ PlasmoidItem {
         const items = [planItem.createObject(planMenu, { section: true, text: plan.title })]
         for (const g of accounts)
             if (g !== here)
-                items.push(planItem.createObject(planMenu, { text: i18n("Share with %1", g.title), icon: "document-share",
+                items.push(planItem.createObject(planMenu, { text: i18n("Share with %1", g.title), icon: Icons.plasma.share,
                                                             kind: "share", slug: plan.slug, from: plan.profileDir,
                                                             to: g.shareProfile, host: host }))
         if (accounts.length > 2)
-            items.push(planItem.createObject(planMenu, { text: i18n("Share with all accounts"), icon: "document-share",
+            items.push(planItem.createObject(planMenu, { text: i18n("Share with all accounts"), icon: Icons.plasma.share,
                                                         kind: "share", slug: plan.slug, from: plan.profileDir, to: "", host: host }))
         if (plan.shared) {
             items.push(planItem.createObject(planMenu, { separator: true }))
             for (const g of accounts)
-                items.push(planItem.createObject(planMenu, { text: i18n("Keep only on %1", g.title), icon: "go-next",
+                items.push(planItem.createObject(planMenu, { text: i18n("Keep only on %1", g.title), icon: Icons.plasma.moveTo,
                                                             kind: "keeponly", slug: plan.slug, from: plan.profileDir,
                                                             to: g.shareProfile, host: host }))
         }

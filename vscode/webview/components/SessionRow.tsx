@@ -38,6 +38,7 @@ import { toggleAgents, togglePeek, uiState } from "../util/ui";
 import { AgentTree } from "./AgentTree";
 import { AskBox, askKey } from "./AskBox";
 import { useView } from "./context";
+import { I } from "../util/icons";
 import { Elided } from "./Elided";
 import { IconButton } from "./IconButton";
 import { PeekPanel } from "./PeekPanel";
@@ -161,7 +162,8 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {s.overlaps?.length ? (
             <Tag
-              text="⚠ Same files"
+              icon={I.warning}
+              text="Same files"
               warning
               title={`${overlapText(s.overlaps)}\n\nTwo chats changing the same files can overwrite each other's work. Click to go to the other chat.`}
               onClick={() => post({ type: "openOverlap", chat })}
@@ -286,38 +288,47 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
             </button>
             ) : null}
             {goingOn ? (
-              <button
-                type="button"
-                class="link"
+              <IconButton
+                icon={I.goOnAt}
+                class="text-btn"
+                pressed
+                label={`Goes on at ${startText(goingOn.startAt, now)}`}
                 title={`Goes on by itself at ${startText(goingOn.startAt, now)}, in the background, telling Claude that the limit has reset.${ending} If it went on before then, nothing happens.\n\nClick to cancel it${kept ? ": then it doesn't keep going either" : ""}.`}
                 onClick={() => post({ type: "unqueue", id: goingOn.id })}
               >
-                ✓ Goes on at {startText(goingOn.startAt, now)}
-              </button>
+                Goes on at {startText(goingOn.startAt, now)}
+              </IconButton>
             ) : goOn ? (
-              <button
-                type="button"
-                class="link"
+              <IconButton
+                icon={I.goOnAt}
+                class="text-btn"
+                label={`Go on at ${startText(goOn, now)}`}
                 title={`At ${startText(goOn, now)}, a minute after the limit resets, the chat goes on in the background, telling Claude that the limit has reset.${ending} If it went on before then, nothing happens.\n\nThis happens once${host ? "" : ": to have it go on after later limits too, choose Keep going"}.`}
                 onClick={() => post({ type: "queueContinue", chat })}
               >
-                ⏱ Go on at {startText(goOn, now)}
-              </button>
+                Go on at {startText(goOn, now)}
+              </IconButton>
             ) : null}
             {goOn && !goingOn && !kept && !host ? (
-              <button
-                type="button"
-                class="link"
+              <IconButton
+                icon={I.keepGoing}
+                class="text-btn"
+                label="Keep going"
                 title={`Keep going until it's done: at ${startText(goOn, now)}, a minute after the limit resets, the chat goes on in the background, and again after each later limit that stops it, until a turn of it ends by itself.${ending}`}
                 onClick={() => post({ type: "queueContinue", chat, keep: true })}
               >
-                ↻ Keep going
-              </button>
+                Keep going
+              </IconButton>
             ) : null}
             {kept ? (
-              <button type="button" class="link" title={keptTitle(kept)} onClick={() => post({ type: "keepGoing", chat, on: false })}>
-                ↻ Keeps going{kept.error ? " (gave up)" : kept.note ? " (can't go on now)" : ""}
-              </button>
+              <Tag
+                icon={I.keepGoing}
+                text={"Keeps going" + (kept.error ? " (gave up)" : kept.note ? " (can't go on now)" : "")}
+                active={!kept.error}
+                warning={!!kept.error || !!kept.note}
+                title={keptTitle(kept)}
+                onClick={() => post({ type: "keepGoing", chat, on: false })}
+              />
             ) : null}
           </div>
         ) : null}
@@ -337,14 +348,14 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
         <div class="row-actions">
           {/* the other way to open it than a click on its name: its window, or its tab */}
           <IconButton
-            icon={paneFirst ? "external" : "chat"}
+            icon={paneFirst ? I.openWindow : I.openPane}
             label={paneFirst ? "Open its window" : "Open in a tab"}
             title={paneFirst ? openHint(s, host, reopenInCode) : "Open this chat in a tab: its conversation as it goes, a box to reply, and what it changed."}
             onClick={() => post(paneFirst ? { type: "openWindow", chat } : { type: "openPane", chat })}
           />
           {move ? (
             <IconButton
-              icon="move"
+              icon={I.moveTo}
               label="Move to a Claude Code panel…"
               title="Go on with this chat in a Claude Code panel: Claude quits in its terminal (the terminal stays open) and the chat reopens in a Claude Code panel. Asks first; a chat that's working or waiting for you is stopped only once you say so."
               onClick={() => post({ type: "moveToClaudeCode", chat })}
@@ -352,7 +363,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {s.starred ? null : (
             <IconButton
-              icon="star"
+              icon={I.star}
               label="Star"
               title="Star this chat: once it isn't listed here any more, it stays under Recent chats → Starred, however old it is."
               onClick={() => post({ type: "star", chat, on: true })}
@@ -360,7 +371,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           )}
           {canKeep ? (
             <IconButton
-              icon="repeat"
+              icon={I.keepGoing}
               label="Keep going after usage limits"
               title="Keep going until it's done: when a usage limit stops this chat, it goes on by itself in the background a minute after the limit resets, in the permission mode it had, and again after each later one, until a turn of it ends by itself. Claude here quits first then (its terminal stays open)."
               onClick={() => post({ type: "keepGoing", chat, on: true })}
@@ -368,24 +379,24 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
           ) : null}
           {share ? (
             <IconButton
-              icon="share"
+              icon={I.share}
               label="Continue on another account…"
               title={shareTitle(host)}
               onClick={() => post({ type: "share", chat })}
             />
           ) : null}
           {remove ? (
-            <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
+            <IconButton icon={I.delete} label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
               onClick={() => post({ type: "delete", kind: "chat", chat })} />
           ) : null}
           {remove ? (
-            <IconButton icon="close" label="Hide this chat" title={`Hide this chat\n${hideHint("chats", host)}`}
+            <IconButton icon={I.hide} label="Hide this chat" title={`Hide this chat\n${hideHint("chats", host)}`}
               onClick={() => post({ type: "dismiss", chat })} />
           ) : null}
           {stop ? (
             canEndChat(s) ? (
               <IconButton
-                icon="stop"
+                icon={I.stop}
                 label={hasTurn(s) ? "Interrupt or stop this chat…" : "Stop this chat…"}
                 title={
                   s.entrypoint === "claude-vscode"
@@ -398,7 +409,7 @@ export function SessionRow({ session: s, group, host, showProfile }: { session: 
               />
             ) : (
               <IconButton
-                icon="stop"
+                icon={I.stop}
                 label="Stop this background chat…"
                 title="Stop this background chat. Asks first; the conversation is kept and claude attach resumes it."
                 onClick={() => post({ type: "stop", chat })}

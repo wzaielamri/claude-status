@@ -1,5 +1,5 @@
 import { moreText, moreTitle } from "../../src/shared/model";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 
 // "Show N more" under a list that shows a page at a time (Recent chats,
 // ★ Starred chats and plans, an opened project's chats, plans and memories):
@@ -9,7 +9,7 @@ export function MoreButton({ shown, count, size, onClick }: { shown: number; cou
   if (shown >= count) return null;
   return (
     <button type="button" class="more-button small" title={moreTitle(shown, count)} onClick={onClick}>
-      <Icon name="more" />
+      <Icon name={I.more} />
       {moreText(shown, count, size)}
     </button>
   );

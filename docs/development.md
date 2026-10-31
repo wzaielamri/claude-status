@@ -35,6 +35,7 @@ package/                  the Plasma widget (what install.sh installs)
     │                     markdown_page.py (plans and runs as a web page), notify_sound.py
     ├── config/           settings schema and pages
     ├── ui/talpy/         Talpy, the pet: its parts, moods and actions (shared with GNOME and VS Code)
+    ├── ui/icons.mjs      the icon table: one icon per meaning for Plasma, VS Code and GNOME (tests/test_icons.py)
     └── pets/             Talpy's notification icons (made by tools/talpy_icons.mjs)
 gnome/                    the GNOME Shell extension: extension/ (GJS: indicator.js, logic.js, ui/, prefs.js), build.sh, tests/
 vscode/                   the VS Code extension (TypeScript: src/ the extension, webview/ its view); each build copies the

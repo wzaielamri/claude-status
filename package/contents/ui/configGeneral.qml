@@ -5,6 +5,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import org.kde.plasma.plasmoid
 import "hub"
+import "icons.mjs" as Icons
 
 KCM.SimpleKCM {
     id: page
@@ -512,7 +513,7 @@ KCM.SimpleKCM {
         QQC2.Button {
             visible: page.dictation !== null && page.dictation.canSetup
             enabled: page.dictationBusy === ""
-            icon.name: "download"
+            icon.name: Icons.plasma.download
             text: i18n("Set Up Dictation (about %1 MB)", page.dictation ? page.dictation.setupMb : 0)
             onClicked: page.runDictate(["--setup"])
             QQC2.ToolTip.visible: hovered
@@ -552,7 +553,7 @@ KCM.SimpleKCM {
                     QQC2.Button {
                         visible: !modelData.installed || modelData.deletable
                         enabled: page.dictationBusy === ""
-                        icon.name: modelData.installed ? "edit-delete" : "download"
+                        icon.name: modelData.installed ? Icons.plasma.erase : Icons.plasma.download
                         text: modelData.installed ? i18n("Delete") : i18n("Download")
                         onClicked: page.runDictate([modelData.installed ? "--delete-model" : "--get-model", modelData.name])
                         QQC2.ToolTip.visible: hovered
@@ -584,7 +585,7 @@ KCM.SimpleKCM {
             QQC2.Button {
                 visible: !page.removeAsking
                 enabled: page.dictationBusy === ""
-                icon.name: "edit-delete"
+                icon.name: Icons.plasma.erase
                 text: i18n("Remove faster-whisper…")
                 onClicked: page.removeAsking = true
             }
@@ -596,7 +597,7 @@ KCM.SimpleKCM {
             }
             QQC2.Button {
                 visible: page.removeAsking
-                icon.name: "edit-delete"
+                icon.name: Icons.plasma.erase
                 text: i18n("Delete")
                 onClicked: {
                     page.removeAsking = false
@@ -673,7 +674,7 @@ KCM.SimpleKCM {
             }
             QQC2.Button {
                 text: i18n("Send a test")
-                icon.name: "smartphone"
+                icon.name: Icons.plasma.phone
                 onClicked: {
                     page.phoneStatus = i18n("Sending…")
                     phoneHelper.connectSource(page.jumpCommand(["--phone", i18n("Talpy Den: this is how chats that need you will show up here."),
@@ -955,7 +956,7 @@ KCM.SimpleKCM {
                             page.history ? page.history.deletedChats : 0)
             }
             QQC2.Button {
-                icon.name: "edit-delete"
+                icon.name: Icons.plasma.erase
                 text: i18n("Stop Keeping It")
                 onClicked: {
                     page.historyOffAsking = false
@@ -987,7 +988,7 @@ KCM.SimpleKCM {
             QQC2.Button {
                 visible: !page.forgetAsking
                 enabled: page.history !== null && !!page.history.since
-                icon.name: "edit-delete"
+                icon.name: Icons.plasma.erase
                 text: i18n("Delete Saved History…")
                 onClicked: page.forgetAsking = true
             }
@@ -999,7 +1000,7 @@ KCM.SimpleKCM {
             }
             QQC2.Button {
                 visible: page.forgetAsking
-                icon.name: "edit-delete"
+                icon.name: Icons.plasma.erase
                 text: i18n("Delete")
                 onClicked: {
                     page.forgetAsking = false

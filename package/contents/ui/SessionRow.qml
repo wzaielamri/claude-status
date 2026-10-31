@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 RowLayout {
     id: row
@@ -441,7 +442,8 @@ RowLayout {
                             Tag {
                                 // another chat with a process changed some of the same files (talpy_den.py: note_overlaps)
                                 visible: !!row.session.overlaps && row.session.overlaps.length > 0
-                                text: i18nc("two chats changed the same files", "⚠ Same files")
+                                icon: Icons.plasma.warning
+                                text: i18nc("two chats changed the same files", "Same files")
                                 warning: true
                                 clickable: true
                                 onClicked: row.openOverlap()
@@ -571,7 +573,7 @@ RowLayout {
 
                     PlasmaComponents3.ToolButton {
                         // the other way to open it than a click on its name: its window, or the pane
-                        icon.name: Plasmoid.configuration.clickOpensPane ? "window" : "dialog-messages"
+                        icon.name: Plasmoid.configuration.clickOpensPane ? Icons.plasma.openWindow : Icons.plasma.openPane
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: Plasmoid.configuration.clickOpensPane ? i18n("Open its window") : i18n("Open in the chat pane")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -593,7 +595,7 @@ RowLayout {
                         // star it: once it isn't listed here any more, it stays under ★ Starred chats
                         // (a starred one has its ★ after its name)
                         visible: !!(row.session.chatId || row.session.sessionId) && !row.session.starred
-                        icon.name: "non-starred-symbolic"
+                        icon.name: Icons.plasma.star
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Star")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -613,7 +615,7 @@ RowLayout {
                     PlasmaComponents3.ToolButton {
                         // keep going until it's done: on by itself after each usage limit
                         visible: row.kept === null && root.canKeepGoing(row.session, row.remoteHost)
-                        icon.name: "media-playlist-repeat"
+                        icon.name: Icons.plasma.keepGoing
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Keep going after usage limits")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -633,7 +635,7 @@ RowLayout {
                     PlasmaComponents3.ToolButton {
                         id: shareButton
                         visible: row.canShare
-                        icon.name: "document-share"
+                        icon.name: Icons.plasma.share
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Share or continue on another account…")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -656,7 +658,7 @@ RowLayout {
                     PlasmaComponents3.ToolButton {
                         // Delete a finished chat: to the Trash, after a question (DeleteAsk under the row)
                         visible: row.session.state === "done" && !!(row.session.chatId || row.session.sessionId)
-                        icon.name: "user-trash"
+                        icon.name: Icons.plasma.delete
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Delete…")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -677,7 +679,7 @@ RowLayout {
                     PlasmaComponents3.ToolButton {
                         // Hide a finished chat here (nothing is deleted)
                         visible: row.session.state === "done"
-                        icon.name: "window-close"   // (an × in the text's color, as in VS Code and GNOME)
+                        icon.name: Icons.plasma.hide
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: i18n("Hide this chat")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -696,7 +698,7 @@ RowLayout {
                     }
                     PlasmaComponents3.ToolButton {
                         visible: row.canStop
-                        icon.name: "media-playback-stop"
+                        icon.name: Icons.plasma.stop
                         display: PlasmaComponents3.AbstractButton.IconOnly
                         text: row.canInterrupt ? i18n("Interrupt or stop…") : i18n("Stop…")
                         Layout.preferredHeight: rowButtons.buttonSize
@@ -860,7 +862,7 @@ RowLayout {
                 PlasmaComponents3.ToolButton {
                     id: handoverButton
                     visible: row.handover !== null
-                    icon.name: "system-switch-user"
+                    icon.name: Icons.plasma.continueOn
                     text: row.handover ? i18n("Continue on %1", row.handover.title) : ""
                     font: Kirigami.Theme.smallFont
                     Layout.preferredHeight: stepLabel.implicitHeight + Kirigami.Units.smallSpacing
@@ -884,7 +886,9 @@ RowLayout {
                 // or go on by itself once the limit resets (queued; again: cancelled)
                 PlasmaComponents3.ToolButton {
                     visible: row.goOnAt > 0 || row.goingOn !== null
-                    icon.name: row.goingOn ? "checkmark" : "chronometer"
+                    icon.name: Icons.plasma.goOnAt
+                    // (it goes on then: framed, as a toggle that's on, in plain colors; a click cancels it)
+                    flat: row.goingOn === null
                     text: row.goingOn ? i18n("Goes on at %1", root.startText(row.goingOn.startAt))
                                       : i18n("Go on at %1", root.startText(row.goOnAt))
                     font: Kirigami.Theme.smallFont
@@ -916,7 +920,7 @@ RowLayout {
                 // or go on then, and after each later limit too, until it's done
                 PlasmaComponents3.ToolButton {
                     visible: row.goOnAt > 0 && row.goingOn === null && row.kept === null && !row.remoteHost
-                    icon.name: "media-playlist-repeat"
+                    icon.name: Icons.plasma.keepGoing
                     text: i18n("Keep going")
                     font: Kirigami.Theme.smallFont
                     Layout.preferredHeight: stepLabel.implicitHeight + Kirigami.Units.smallSpacing
@@ -935,7 +939,8 @@ RowLayout {
                 // it keeps going: after each usage limit, on by itself (click: not any more)
                 Tag {
                     visible: row.kept !== null
-                    text: i18nc("a chat that goes on by itself after usage limits", "↻ Keeps going")
+                    icon: Icons.plasma.keepGoing
+                    text: i18nc("a chat that goes on by itself after usage limits", "Keeps going")
                     active: row.kept !== null && !row.kept.error
                     warning: row.kept !== null && (!!row.kept.error || !!row.kept.note)
                     clickable: true
@@ -945,7 +950,7 @@ RowLayout {
                 }
                 Kirigami.Icon {
                     visible: row.hasPeek
-                    source: row.showPeek ? "arrow-up" : "arrow-down"
+                    source: row.showPeek ? Icons.plasma.peekOpen : Icons.plasma.peekClosed
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Layout.preferredWidth
                     opacity: stepMouse.containsMouse ? 0.9 : 0.4
@@ -1173,7 +1178,7 @@ RowLayout {
                                         font: Kirigami.Theme.smallFont
                                     }
                                     Kirigami.Icon {
-                                        source: agentRow.open ? "arrow-up" : "arrow-down"
+                                        source: agentRow.open ? Icons.plasma.peekOpen : Icons.plasma.peekClosed
                                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                                         Layout.preferredHeight: Layout.preferredWidth
                                         opacity: agentMouse.containsMouse ? 0.9 : 0.4
@@ -1276,7 +1281,7 @@ RowLayout {
                                     font: Kirigami.Theme.smallFont
                                 }
                                 PlasmaComponents3.ToolButton {
-                                    icon.name: "document-preview"
+                                    icon.name: Icons.plasma.openRun
                                     text: i18n("Open the whole run")
                                     enabled: !!row.session.chatId
                                     onClicked: root.openAgentRun(row.session, agentRow.modelData.id, row.remoteHost)
@@ -1334,7 +1339,7 @@ RowLayout {
             actions: [
                 Kirigami.Action {
                     text: i18n("Interrupt")
-                    icon.name: "media-playback-pause"
+                    icon.name: Icons.plasma.interrupt
                     visible: row.canInterrupt
                     onTriggered: {
                         root.stopConfirmSession = ""
@@ -1346,13 +1351,13 @@ RowLayout {
                 },
                 Kirigami.Action {
                     text: i18n("Stop")
-                    icon.name: "media-playback-stop"
+                    icon.name: Icons.plasma.stop
                     onTriggered: row.stop(false)
                 },
                 Kirigami.Action {
                     // (Stop alone leaves Keep going on: it goes on after the next limit)
                     text: i18n("Stop and turn Keep going off")
-                    icon.name: "media-playback-stop"
+                    icon.name: Icons.plasma.stop
                     visible: row.kept !== null && !row.remoteHost
                     onTriggered: row.stop(true)
                 },

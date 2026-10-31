@@ -6,6 +6,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import * as Icons from './ui/icons.js';
 
 // The Recap tab's currencies (those of the European Central Bank's reference rates)
 const CURRENCIES = [['USD', 'US dollars'], ['EUR', 'Euros'], ['GBP', 'Pounds sterling'], ['CHF', 'Swiss francs'], ['JPY', 'Japanese yen'],
@@ -36,7 +37,7 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         const settings = this.getSettings();
         window._claudeSettings = settings;   // lives as long as the window
         window.set_default_size(620, 760);
-        const page = new Adw.PreferencesPage({title: 'Talpy Den', icon_name: 'preferences-system-symbolic'});
+        const page = new Adw.PreferencesPage({title: 'Talpy Den', icon_name: Icons.gnome.settings});
         window.add(page);
 
         const spin = (key, title, subtitle, min, max, step) => {
@@ -123,7 +124,7 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
     // host's through remote.py --accounts; port of the Plasma widget's
     // configAccounts.qml): add one, log in or out, remove one, the default one
     _accountsPage(window, settings) {
-        const page = new Adw.PreferencesPage({title: 'Accounts', icon_name: 'system-users-symbolic'});
+        const page = new Adw.PreferencesPage({title: 'Accounts', icon_name: Icons.gnome.accounts});
         const esc = text => GLib.markup_escape_text(text, -1);
         const state = {accounts: [], loaded: false, canCheck: true, linked: false, busy: '', confirm: '', rows: [], closed: false,
             host: '', loadedAt: 0};
@@ -555,12 +556,12 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         row.connect('destroy', () => settings.disconnect(changed));
         sync();
 
-        const play = new Gtk.Button({icon_name: 'media-playback-start-symbolic', valign: Gtk.Align.CENTER,
+        const play = new Gtk.Button({icon_name: Icons.gnome.startNow, valign: Gtk.Align.CENTER,
             tooltip_text: 'Play this sound', css_classes: ['flat']});
         play.connect('clicked', () => this._preview(settings, settings.get_string(key)));
         row.add_suffix(play);
         // (picking "Sound file…" again, with a file set, changes nothing in the list)
-        const file = new Gtk.Button({icon_name: 'document-open-symbolic', valign: Gtk.Align.CENTER,
+        const file = new Gtk.Button({icon_name: Icons.gnome.chooseFile, valign: Gtk.Align.CENTER,
             tooltip_text: 'Choose a sound file', css_classes: ['flat']});
         file.connect('clicked', choose);
         row.add_suffix(file);

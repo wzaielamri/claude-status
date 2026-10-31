@@ -1,7 +1,7 @@
 import { agentDetailKey, agentRunTitle, agentSummary, duration } from "../../src/shared/model";
 import type { Agent, ChatRef } from "../../src/shared/types";
 import { post } from "../env";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useStore } from "../util/store";
 import { toggleAgentDetail, uiState } from "../util/ui";
 
@@ -81,7 +81,7 @@ export function AgentTree({ tree, now, rowKey, chat, host }: { tree: Agent[]; no
                   <span class="agent-desc">{title}</span>
                   {a.description && a.type ? <span class="agent-type">{a.model ? `${a.type} · ${a.model}` : a.type}</span> : null}
                   <span class={"agent-status" + (a.status === "failed" ? " failed" : "")}>{statusText(a, now)}</span>
-                  <Icon name="chevron" class={open ? "open" : ""} />
+                  <Icon name={I.folded} class={open ? "open" : ""} />
                 </span>
                 {a.activity ? <span class="agent-activity">{a.activity}</span> : null}
               </button>

@@ -2,7 +2,7 @@ import { duration, hiddenCount } from "../../src/shared/model";
 import type { Group, HostState } from "../../src/shared/types";
 import { post } from "../env";
 import { groupKeyOf } from "../util/chat";
-import { Icon } from "../util/icons";
+import { I, Icon } from "../util/icons";
 import { useView } from "./context";
 import { GroupSection } from "./GroupSection";
 import { IconButton } from "./IconButton";
@@ -29,7 +29,7 @@ export function HostSection({ host: h, groups }: { host: HostState; groups: Grou
   return (
     <section class={"host" + (stale ? " stale" : "")} aria-label={`SSH host ${h.name}`}>
       <div class="host-head">
-        <Icon name="server" class="host-icon" />
+        <Icon name={I.host} class="host-icon" />
         <h2 class="host-name" title={h.name + (machine ? ` (${machine})` : "")}>
           {h.name}
         </h2>
@@ -44,7 +44,7 @@ export function HostSection({ host: h, groups }: { host: HostState; groups: Grou
         {updated ? <span class="host-updated small muted">{updated}</span> : null}
         {hidden > 0 ? (
           <IconButton
-            icon="eye"
+            icon={I.showHidden}
             label="Show hidden ones again…"
             title={`Show hidden ones again: the chats, plans or memories of ${h.name} you hid (${hidden})`}
             onClick={() => post({ type: "showHidden", host: h.name })}
@@ -52,21 +52,21 @@ export function HostSection({ host: h, groups }: { host: HostState; groups: Grou
         ) : null}
         {h.loggedIn ? (
           <IconButton
-            icon="logout"
+            icon={I.signOut}
             label={`Disconnect from ${h.name}`}
             title={`Disconnect from ${h.name}: closes the connection you logged in with. To check ${h.name} again, log in again.`}
             onClick={() => post({ type: "disconnectHost", host: h.name })}
           />
         ) : null}
         <IconButton
-          icon="refresh"
+          icon={I.refresh}
           label={`Refresh ${h.name}`}
           title={`Refresh ${h.name}` + (updated ? ` (${updated})` : "")}
           onClick={() => post({ type: "refresh", host: h.name })}
         />
         {!h.current ? (
           <IconButton
-            icon="close"
+            icon={I.hide}
             label={`Stop showing ${h.name}`}
             title={`Stop showing ${h.name}. Pick it again with the SSH hosts button.`}
             onClick={() => post({ type: "hideHost", host: h.name })}

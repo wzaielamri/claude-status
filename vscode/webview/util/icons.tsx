@@ -1,9 +1,13 @@
-// Small line icons drawn here: the webview loads nothing from outside (no
-// codicon font), and currentColor makes them follow every theme.
+// Small line icons drawn here, after the codicons of the same meaning: the
+// webview loads nothing from outside (no codicon font), and currentColor
+// makes them follow every theme. Which one stands for what is the widget's
+// icon table (icons.mjs, vendored), the same for Plasma and GNOME: the
+// components ask for a meaning, I.cancel, never for a shape by its name.
 
 import type { JSX } from "preact";
+import { memoryMeaning, vscode, type Meaning } from "../../vendor/icons.mjs";
 
-export type IconName = "refresh" | "remove" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear" | "task" | "user" | "bookmark" | "note" | "trash" | "more";
+export type IconName = "refresh" | "stop" | "close" | "share" | "chevron" | "server" | "eye" | "external" | "play" | "back" | "search" | "logout" | "edit" | "send" | "repeat" | "star" | "chat" | "move" | "filter" | "chart" | "shield" | "folder" | "mic" | "attach" | "camera" | "newChat" | "gear" | "task" | "user" | "bookmark" | "note" | "trash" | "more" | "eyeClosed" | "clock" | "starFull" | "warning" | "error";
 
 const shapes: Record<IconName, JSX.Element> = {
   repeat: (
@@ -20,7 +24,6 @@ const shapes: Record<IconName, JSX.Element> = {
       <path d="M12.4 1.4v3.2H9.2" />
     </>
   ),
-  remove: <path d="M2.75 8h10.5" />,
   stop: <rect x="3.75" y="3.75" width="8.5" height="8.5" rx="1.5" fill="currentColor" />,
   close: <path d="M4 4l8 8M12 4l-8 8" />,
   share: (
@@ -69,6 +72,36 @@ const shapes: Record<IconName, JSX.Element> = {
   send: <path d="M2.5 8l11-5.5-3.5 11-2.5-4.5zM7.5 9l6-6.5" />,
   move: <path d="M2.5 8h8M7.75 5.25L10.5 8l-2.75 2.75M13.25 3v10" />,
   star: <path d="M8 1.9l1.85 3.8 4.15.6-3 2.93.7 4.13L8 11.4l-3.7 1.96.7-4.13-3-2.93 4.15-.6z" />,
+  starFull: <path d="M8 1.9l1.85 3.8 4.15.6-3 2.93.7 4.13L8 11.4l-3.7 1.96.7-4.13-3-2.93 4.15-.6z" fill="currentColor" />,
+  // (an eye, struck out: hidden, nothing deleted)
+  eyeClosed: (
+    <>
+      <path d="M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" />
+      <circle cx="8" cy="8" r="2" />
+      <path d="M2.75 13.25l10.5-10.5" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="8" cy="8" r="5.75" />
+      <path d="M8 4.75V8l2.25 1.5" />
+    </>
+  ),
+  // (the two that say something is wrong: colored by their class, see styles.css)
+  warning: (
+    <>
+      <path d="M8 2.25l6 10.75H2z" />
+      <path d="M8 6.5v3" />
+      <path d="M8 11.4v.1" stroke-width="1.6" />
+    </>
+  ),
+  error: (
+    <>
+      <circle cx="8" cy="8" r="5.75" />
+      <path d="M8 4.9v3.6" />
+      <path d="M8 10.9v.1" stroke-width="1.6" />
+    </>
+  ),
   chat: <path d="M2.5 3.75c0-.7.55-1.25 1.25-1.25h8.5c.7 0 1.25.55 1.25 1.25v5.5c0 .7-.55 1.25-1.25 1.25H7l-3 2.75V10.5h-.25c-.7 0-1.25-.55-1.25-1.25z" />,
   // (a bubble with a plus: a new chat, not a new account)
   newChat: (
@@ -119,17 +152,20 @@ const shapes: Record<IconName, JSX.Element> = {
   trash: <path d="M2.75 4.25h10.5M6.25 4.25v-1.5h3.5v1.5M4 4.25l.75 9.25h6.5l.75-9.25M6.75 6.75v4.5M9.25 6.75v4.5" />,
 };
 
+// The icon of each meaning (only those VS Code has a button or mark for are
+// asked for: tests/test_icons.py)
+export const I = vscode as Readonly<Record<Meaning, IconName>>;
+
 // A memory's icon by its kind, as Plasma's: a note about you, feedback, a
 // project, a reference, the account's CLAUDE.md, else a note
 export function memoryIcon(type: string): IconName {
-  return type === "user" ? "user" : type === "feedback" ? "chat" : type === "project" ? "folder"
-    : type === "reference" ? "bookmark" : type === "account" ? "gear" : "note";
+  return I[memoryMeaning(type)];
 }
 
 export function Icon({ name, class: cls }: { name: IconName; class?: string }) {
   return (
     <svg
-      class={"icon" + (cls ? " " + cls : "")}
+      class={"icon" + (name === "warning" ? " icon-warning" : name === "error" ? " icon-error" : "") + (cls ? " " + cls : "")}
       viewBox="0 0 16 16"
       width="16"
       height="16"

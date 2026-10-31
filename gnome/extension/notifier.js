@@ -9,6 +9,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import {keyOfSource} from './logic.js';
+import * as Icons from './ui/icons.js';
 
 export class Notifier {
     constructor(petsDir) {
@@ -49,7 +50,7 @@ export class Notifier {
             source,
             title: n.title,
             body: n.body.trim(),
-            gicon: pose && poseFile ? this._icon(poseFile) : new Gio.ThemedIcon({name: n.icon}),
+            gicon: pose && poseFile ? this._icon(poseFile) : new Gio.ThemedIcon({name: Icons.gnome[n.icon] || n.icon}),
         });
         if (onOpen) {
             const open = () => {

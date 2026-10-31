@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // Where chats open: Terminal | VS Code, at the top of an account's new-chat
 // folders and of its recent chats (GroupSection.qml). One choice for both,
@@ -38,7 +39,7 @@ ColumnLayout {
         OpenInButton {
             available: openIn.terminalHere
             checked: openIn.terminalHere && !openIn.inVscode
-            iconName: "utilities-terminal"
+            iconName: Icons.plasma.terminal
             text: i18n("Terminal")
             tipTitle: !openIn.terminalHere ? i18n("No claude command")
                       : openIn.resuming ? i18n("Reopen chats in a terminal") : i18n("New chats in a terminal")
@@ -48,7 +49,7 @@ ColumnLayout {
         OpenInButton {
             available: openIn.vscodeHere
             checked: openIn.inVscode
-            iconName: "vscode"
+            iconName: Icons.plasma.vscodeApp
             text: i18n("Claude Code panel")
             tipTitle: !root.vscodeInstalled ? i18n("VS Code isn't installed")
                       : !openIn.vscodeHere ? i18n("Not on this account")

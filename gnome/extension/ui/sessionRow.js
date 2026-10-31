@@ -10,6 +10,7 @@ import St from 'gi://St';
 
 import * as L from '../logic.js';
 import {box, column, dot, iconButton, label, link, meter, nameLine, paragraph, showOnHover, tag, textButton} from './widgets.js';
+import * as Icons from './icons.js';
 
 export function buildSessionRow(ctx, session, {showProfile = false, remoteHost = ''} = {}) {
     const s = session;
@@ -113,7 +114,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
 
     const hoverButtons = [];
     if (canShare) {
-        const share = iconButton('emblem-shared-symbolic', () => ctx.toggleShareMenu(rowKey, {
+        const share = iconButton(Icons.gnome.share, () => ctx.toggleShareMenu(rowKey, {
             chatId: s.chatId, name: s.name, profileDir: s.profileDir,
             shared: !!s.shared && !s.shared.forkOf,
         }));
@@ -125,7 +126,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     const asksDelete = ctx.ui.deleteAsk?.key === rowKey;
     if (s.state === 'done' && (s.chatId || s.sessionId)) {
         // Delete a finished chat: to the Trash, after a question (under the row)
-        const del = iconButton('user-trash-symbolic',
+        const del = iconButton(Icons.gnome.delete,
             () => ctx.askDelete(rowKey, s.chatId || s.sessionId, s.profileDir, remoteHost));
         tips.add(del, ['Delete this chat…', L.DELETE_HINT]);
         if (!asksDelete)
@@ -134,14 +135,14 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
     }
     if (s.state === 'done') {
         // Hide a finished chat here (nothing is deleted)
-        const hide = iconButton('window-close-symbolic',   // (an ×, as Breeze draws Plasma's)
+        const hide = iconButton(Icons.gnome.hide,
             () => (remoteHost ? ctx.remoteDismiss(remoteHost, s.sessionId) : ctx.dismissSession(s.sessionId)));
         tips.add(hide, ['Hide this chat', L.hideHint(remoteHost)]);
         hoverButtons.push(hide);
         end.add_child(hide);
     }
     if (canStop) {
-        const stop = iconButton('media-playback-stop-symbolic',
+        const stop = iconButton(Icons.gnome.stop,
             () => ctx.setStopConfirm(confirmingStop ? '' : rowKey));
         tips.add(stop, L.stopTip(s));
         if (!confirmingStop)
@@ -204,7 +205,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
 
     if (confirmingStop && canStop) {
         const buttons = [
-            ['Stop', 'media-playback-stop-symbolic', () => {
+            ['Stop', Icons.gnome.stop, () => {
                 // stopped only if it's as the question says when you click (it
                 // follows the chat): an idle one that got busy since isn't
                 const busy = s.state !== 'idle';
@@ -219,7 +220,7 @@ export function buildSessionRow(ctx, session, {showProfile = false, remoteHost =
             ['Cancel', '', () => ctx.setStopConfirm('')],
         ];
         if (canInterrupt) {
-            buttons.unshift(['Interrupt', 'media-playback-pause-symbolic', () => {
+            buttons.unshift(['Interrupt', Icons.gnome.interrupt, () => {
                 ctx.setStopConfirm('');
                 if (remoteHost)
                     ctx.remoteInterrupt(remoteHost, s.sessionId, s.profileDir);
@@ -321,7 +322,7 @@ function buildAgentsTree(ctx, s, agents, rowKey, remoteHost) {
             ? L.fmt('running · %1', L.duration(ctx.now - (a.started || ctx.now)))
             : a.status === 'done' ? 'done' : a.status === 'failed' ? 'failed' : 'stopped',
             a.status === 'failed' ? 'claude-small claude-fg-bad' : 'claude-small claude-dim'));
-        top.add_child(new St.Icon({icon_name: open ? 'pan-down-symbolic' : 'pan-end-symbolic',
+        top.add_child(new St.Icon({icon_name: open ? Icons.gnome.unfolded : Icons.gnome.folded,
             style_class: 'claude-agent-chevron', y_align: Clutter.ActorAlign.CENTER}));
         col.add_child(top);
         if (a.activity)
@@ -357,7 +358,7 @@ function buildAgentDetail(ctx, s, a, remoteHost, indent) {
     if (a.status === 'done' && a.report)
         detail.add_child(paragraph(L.fmt('Report: %1', L.clampText(a.report, 12, 1500)), 'claude-small'));
     const run = textButton('Open the whole run', () => ctx.openAgentRun(s, a, remoteHost),
-        'claude-text-button claude-confirm-button', 'text-x-generic-symbolic');
+        'claude-text-button claude-confirm-button', Icons.gnome.openRun);
     ctx.tips.add(run, L.agentRunTooltip(remoteHost));
     detail.add_child(run);
     return detail;
@@ -405,15 +406,15 @@ export function buildShareMenu(ctx, chat, rowKey) {
         if (g === here)
             continue;
         menu.add_child(textButton(chat.shared ? L.fmt('Continue on %1', g.title) : L.fmt('Share and continue on %1', g.title),
-            () => ctx.shareAction('continue', chat.chatId, g.shareProfile), 'claude-menu-item', 'go-next-symbolic'));
+            () => ctx.shareAction('continue', chat.chatId, g.shareProfile), 'claude-menu-item', Icons.gnome.continueOn));
     }
     if (!chat.shared) {
         menu.add_child(textButton('Share with all accounts', () => ctx.shareAction('share', chat.chatId, ''),
-            'claude-menu-item', 'emblem-shared-symbolic'));
+            'claude-menu-item', Icons.gnome.share));
     } else {
         for (const g of ctx.shareAccounts) {
             menu.add_child(textButton(L.fmt('Keep only on %1…', g.title), () => ctx.askKeepOnly(rowKey, chat, g),
-                'claude-menu-item', 'go-next-symbolic'));
+                'claude-menu-item', Icons.gnome.moveTo));
         }
     }
     return menu;

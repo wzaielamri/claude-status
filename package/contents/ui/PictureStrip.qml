@@ -3,6 +3,7 @@ import QtQuick.Window
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import "icons.mjs" as Icons
 
 // The pictures a task or a reply names ([Image: /path], pasted in), small:
 // a click shows one, × takes it out (removeRequested). An SSH host's picture
@@ -83,7 +84,7 @@ Flow {
                 id: remove
                 anchors.top: parent.top
                 anchors.right: parent.right
-                icon.name: "edit-delete-remove"
+                icon.name: Icons.plasma.cancel
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: strip.removeText
                 implicitWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
