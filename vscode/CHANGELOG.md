@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Push Talpy into his burrow:** a drag that starts downward while he's in
+  his burrow pushes him in: he squashes and sinks as far as your hand goes;
+  let go and he stays down a moment, then peeks out (*hey!*, or a giggle).
+  If a chat needs you, he pops straight back up with his sign. Up or
+  sideways is the tug of before; the chats' pets too.
 - **Playful Talpy (`talpyDen.playfulTalpy`, on by default):** off, Talpy only
   shows what your chats do: his moods, his lamp and quiet moves (looking
   around, typing, thinking, sleeping); no prop tricks, no joke bubbles, no

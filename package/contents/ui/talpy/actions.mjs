@@ -425,6 +425,23 @@ export const TUG = {
         { depth: 'half', eyes: 'happy', mouth: 'smile', t: 500 }]
 };
 
+// Pushed down into its burrow (Talpy.push): it squashes (body 'push') and
+// sinks as far as your hand goes, with a dirt puff; let go, it stays down a
+// moment, then peeks out, hey! or a giggle, and is back to its mood (back);
+// with a chat that needs you it pops straight back up (needs)
+export const PUSH = {
+    start: () => ({ eyes: 'squint', mouth: 'o', plume: 'droop', body: 'push', fx: dirt(6, 12) }),
+    back: w => [
+        { depth: 'hidden', eyes: 'closed', mouth: 'small', body: '', plume: '', t: rnd(1000, 1600) },
+        { depth: 'peek', eyes: 'open', mouth: 'small', look: [-1.6, 0], t: 650 },
+        { depth: 'peek', look: [1.6, 0], t: 550 },
+        { depth: 'half', eyes: 'happy', mouth: 'open', plume: 'flick',
+          fx: [['text', 15, 24, { text: w(chance(0.5) ? 'hey!' : 'hihi'), size: 6.5, dx: -3, dy: -8, dur: 1.4 }]], t: 900 }],
+    needs: () => [
+        { depth: 'hidden', body: '', t: 120 },
+        { depth: 'high', body: 'jolt', eyes: 'wide', mouth: 'open', plume: 'up', fx: dirt(6), t: 450 }]
+};
+
 // Moods: how it looks between actions (base) and what it picks (pool); with
 // Playful Talpy off (Talpy.setPlayful), only what shows what the chats do and
 // quiet moves (calm): no props, no tricks, no jokes

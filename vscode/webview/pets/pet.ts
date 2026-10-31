@@ -113,6 +113,7 @@ export class Pet {
   lift = 0;
   held = false;
   private tugging = false; // you pull at it in its burrow: it hangs on (talpy.tug), then pops out
+  private pushing = false; // you push it down into its burrow (talpy.push): it sinks with your hand
   private pop = 1; // popping out into your hand: 0 in its burrow, 1 where you hold it
   private lastAt = { x: 0, y: 0 }; // where your hand is (pull, popOut)
   private arriving = false;
@@ -358,7 +359,7 @@ export class Pet {
     const leaving = !c;
     if (leaving !== this.leaving) {
       this.leaving = leaving;
-      if (leaving && !this.held && !this.tugging) this.goAway();
+      if (leaving && !this.held && !this.tugging && !this.pushing) this.goAway();
       else if (!leaving) this.arrive(); // its chat came back: it pops up again
     }
     this.changed();
@@ -377,8 +378,8 @@ export class Pet {
   setHome(x: number): void {
     if (x !== this.homeX) {
       this.homeX = x;
-      if (this.held || this.tugging || this.leaving) {
-        // stays: in your hand (put down, it digs back), or on its way out
+      if (this.held || this.tugging || this.pushing || this.leaving) {
+        // stays: in your hand (put down, it digs back), pushed down, or on its way out
       } else if (!this.stage.shownOnce() || this.arriving) {
         this.px = x; // not seen yet, or still underground: it's just there
       } else if (!this.lone) {
@@ -454,7 +455,7 @@ export class Pet {
   // Digs over to x (it dives in, tunnels across, pops up there); quick: its
   // spot moved (a new chat makes room), so it hurries
   private digTo(x: number, quick = false): void {
-    if (this.held || this.tugging || this.leaving || this.arriving) return;
+    if (this.held || this.tugging || this.pushing || this.leaving || this.arriving) return;
     this.travelTo = this.clampX(x);
     if (Math.abs(this.travelTo - this.px) < this.stage.bodyWidth * 0.3) {
       this.travelTo = -1;
@@ -565,6 +566,40 @@ export class Pet {
     this.holdAt(this.lastAt);
   }
 
+  // A drag that starts downward (within 45° of straight down) while it's in
+  // its burrow pushes it in (talpy.push): it squashes and sinks as far as your
+  // hand goes, with a dirt puff; with less motion it's down at once. False:
+  // it isn't in its burrow, and the drag picks it up as before.
+  private push(): boolean {
+    if (!this.talpy.push()) return false;
+    this.pushing = true;
+    this.stride.stop();
+    this.game?.picked(); // (it stops seeing to its cookie meanwhile)
+    if (reducedMotion()) this.talpy.pushTo(64);
+    this.changed();
+    return true;
+  }
+
+  // (as far down as your hand, p, went since the drag began)
+  private pushToward(p: { x: number; y: number }): void {
+    if (!this.pressedAt || reducedMotion()) return;
+    this.talpy.pushTo((p.y - this.pressedAt.y) / (this.stage.box / 64));
+    this.changed();
+  }
+
+  // Let go: it stays down a moment, then peeks out (hey!, or a giggle) and is
+  // back to its mood; a chat that needs you: it pops straight up with its sign
+  private pushed(): void {
+    this.pushing = false;
+    this.talpy.pushed(this.mood === "needs", (ok) => {
+      if (!ok || this.destroyed) return;
+      if (this.leaving) this.goAway(); // its chat left meanwhile: now it goes
+      else if (this.mood === "needs") this.talpy.react("sign");
+      else this.game?.landed();
+    });
+    this.changed();
+  }
+
   // (it leans towards your hand, p, as it hangs on)
   private tugToward(p: { x: number; y: number }): void {
     const unit = this.stage.box / 64;
@@ -666,7 +701,7 @@ export class Pet {
 
   // Something happened to its chat (or, for the hero, to an account)
   event(kind: string, text: string): void {
-    if (this.held || this.tugging || this.leaving) return; // (a reaction now would stop it digging away)
+    if (this.held || this.tugging || this.pushing || this.leaving) return; // (a reaction now would stop it digging away)
     if (!this.stage.live || this.cookieOn) {
       this.missed = { kind, text, at: Date.now() }; // (acted out when it shows, or has its cookie)
       return;
@@ -779,7 +814,13 @@ export class Pet {
       const p = (this.lastAt = this.stage.local(e));
       if (!this.dragging && Math.hypot(p.x - this.pressedAt.x, p.y - this.pressedAt.y) > this.stage.gu * 0.5) {
         this.dragging = true;
-        this.pull();
+        // (down, within 45° of straight down, while it's in its burrow: pushed in; else pulled out)
+        const dx = p.x - this.pressedAt.x,
+          dy = p.y - this.pressedAt.y;
+        if (dy > 0 && Math.abs(dx) <= dy && this.push()) this.pushToward(p);
+        else this.pull();
+      } else if (this.dragging && this.pushing) {
+        this.pushToward(p);
       } else if (this.dragging && this.held) {
         this.holdAt(p);
       } else if (this.dragging && this.tugging) {
@@ -789,7 +830,8 @@ export class Pet {
     // (put down, or let go of while it hung on)
     const release = (): void => {
       this.dragging = false;
-      if (this.tugging) this.letGo();
+      if (this.pushing) this.pushed();
+      else if (this.tugging) this.letGo();
       else if (this.held) this.drop();
     };
     g.addEventListener("pointerup", () => {
@@ -867,7 +909,7 @@ export class Pet {
     const gw = s.bodyWidth + LARGE,
       gh = s.bodyHeight + LARGE;
     this.put(this.grab, "grab", "transform", `translate(${px - gw / 2}px, ${ground - lift - gh}px)`);
-    this.put(this.grab, "cursor", "cursor", this.held || this.tugging ? "grabbing" : this.lone ? "grab" : "pointer");
+    this.put(this.grab, "cursor", "cursor", this.held || this.tugging || this.pushing ? "grabbing" : this.lone ? "grab" : "pointer");
     if (!this.leftHole.hidden) {
       this.put(this.leftHole, "hole", "transform", `translate(${Math.round(this.leftAt * 10) / 10 - s.canvasW / 2}px, ${ground - s.floorY}px)`);
       this.paintHole();
@@ -911,7 +953,7 @@ export class Pet {
   // live while you hold it, until it has landed.
   private draw(now: number): void {
     const f = this.film;
-    f.on = !this.landing && !this.tugging && !this.game?.chasing && !reducedMotion();
+    f.on = !this.landing && !this.tugging && !this.pushing && !this.game?.chasing && !reducedMotion();
     let changed = f.tick(now);
     if (this.paintSheets()) changed = true; // (drawn at once: shown at once)
     if (changed) this.compose();

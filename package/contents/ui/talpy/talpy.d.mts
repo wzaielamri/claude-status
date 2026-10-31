@@ -56,6 +56,11 @@ export class Talpy {
     setMood(mood: string): void;
     playful: boolean;
     setPlayful(on: boolean): void;
+    // pushed down into its burrow (a drag that starts downward): false if it isn't in it
+    pushing: boolean;
+    push(): boolean;
+    pushTo(down: number): void;
+    pushed(needs: boolean, done?: (ok: boolean) => void): void;
     react(name: string, done?: ((ok: boolean) => void) | null): void;
     // you pull at it: in its burrow it hangs on for a moment, then done(true) (take it: setHeld);
     // false: it isn't in its burrow, take it at once

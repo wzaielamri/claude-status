@@ -810,6 +810,98 @@ out.push(t.st.tunnel, t.tug());
 console.log(JSON.stringify(out));""")
         self.assertEqual(r, [False, "stand", False, "out", False, "1", False])
 
+    def test_pushed_down_it_sinks_with_your_hand_then_peeks_out(self):
+        # A drag that starts downward while it's in its burrow pushes it in:
+        # squashed, it sinks as far as your hand goes (no further than
+        # hidden); let go, it stays down a moment, peeks out and is back
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({});
+let now = 1000;
+t.tick(now);
+const run = (ms, until) => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); t.draw(ctx); if (until && until()) break; } };
+t.cancel();
+run(600);
+t.cancel();
+const from = t.v.depth;
+const began = t.push();
+const look = { body: t.st.body, eyes: t.st.eyes, fx: t.fx.filter(p => p.kind === 'clod').length > 0 };
+t.pushTo(8);
+run(100);
+const half = t.v.depth - from;
+t.pushTo(500);
+run(3000);
+const deep = { depth: t.v.depth, run: !!t.run, pushing: t.pushing };
+let back = null;
+const at = now;
+t.pushed(false, ok => { back = [ok, now - at]; });
+run(700);
+const down = t.v.depth;
+run(5000, () => back !== null);
+console.log(JSON.stringify({ began, look, half, deep, down, back, depth: t.st.depth, pushing: t.pushing }));""")
+        self.assertTrue(r["began"])
+        self.assertEqual(r["look"], {"body": "push", "eyes": "squint", "fx": True})   # (a dirt puff)
+        self.assertAlmostEqual(r["half"], 8, delta=0.01)        # as far as your hand went
+        self.assertEqual(r["deep"], {"depth": 42, "run": False, "pushing": True})   # hidden at most, and nothing else meanwhile
+        self.assertGreaterEqual(r["down"], 40)                   # let go: it stays down a moment
+        self.assertTrue(r["back"][0])
+        self.assertGreater(r["back"][1], 2500)                   # (down, peeks left and right, out)
+        self.assertEqual((r["depth"], r["pushing"]), ("half", False))
+
+    def test_pushed_down_while_a_chat_needs_you_it_pops_straight_up(self):
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({ brain: false });
+let now = 1000;
+t.tick(now);
+const run = (ms, until) => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); t.draw(ctx); if (until && until()) break; } };
+t.setMood('needs');
+run(600);
+t.push();
+t.pushTo(100);
+run(200);
+let back = null;
+const at = now;
+t.pushed(true, ok => { back = [ok, now - at]; });
+run(2000, () => back !== null);
+console.log(JSON.stringify({ back, depth: t.st.depth }));""")
+        self.assertTrue(r["back"][0])
+        self.assertLess(r["back"][1], 800)
+        self.assertEqual(r["depth"], "high")
+
+    def test_out_of_its_burrow_it_cant_be_pushed(self):
+        r = run_node(NULL_CANVAS + """
+const t = new Talpy({ brain: false });
+let now = 1000;
+t.tick(now);
+const run = ms => { for (const end = now + ms; now < end;) { now += 16; t.tick(now); } };
+run(600);
+const out = [];
+t.setHeld(true);
+out.push(t.push());
+t.land(0, () => { t.chase(); out.push(t.chased, t.push()); }, true);
+run(1500);
+t.eat('choc', false);
+run(12000);
+t.react('dig');
+run(1200);
+out.push(t.st.tunnel, t.push());
+console.log(JSON.stringify(out));""")
+        self.assertEqual(r, [False, "stand", False, "1", False])
+
+    def test_both_hosts_push_on_a_downward_drag_and_pull_on_any_other(self):
+        pet = (ROOT / "ui/Pet.qml").read_text()
+        ts = (ROOT.parent.parent / "vscode/webview/pets/pet.ts").read_text()
+        # within 45° of straight down, while it's in its burrow (push() says)
+        self.assertIn("p.y - pressedAt.y > 0 && Math.abs(p.x - pressedAt.x) <= p.y - pressedAt.y && pet.push()", pet)
+        self.assertIn("dy > 0 && Math.abs(dx) <= dy && this.push()", ts)
+        for text in (pet, ts):
+            self.assertRegex(text, r"talpy\.push\(\)")
+            self.assertRegex(text, r"talpy\.pushTo\(")
+            self.assertRegex(text, r'talpy\.pushed\((this\.)?mood === "needs"')
+            self.assertIn("pushTo(64)", text)                     # (less motion: down at once)
+            self.assertRegex(text, r'react\("sign"\)')             # (a chat needs you: its sign)
+        self.assertIn("live: pet.landing || pet.chasing || pet.tugging || pet.pushing", pet)
+        self.assertIn("!this.pushing", ts[ts.index("f.on ="):])
+
     def test_both_hosts_pull_and_let_go_through_it(self):
         # A drag that starts pulls (tug: false, it's taken at once); let go of
         # while it hangs on, it drops back in (letGo); drawn live meanwhile
@@ -1642,7 +1734,7 @@ class PetLifeTests(unittest.TestCase):
         # "then it waves and digs away" (PetStrip.qml): leaving plays Talpy's
         # leave, which waves before it digs in, and only then is the pet gone
         pet = (ROOT / "ui/Pet.qml").read_text()
-        self.assertRegex(pet, r"onLeavingChanged: \{\n\s+if \(leaving && !held && !tugging\)\n\s+goAway\(\)")
+        self.assertRegex(pet, r"onLeavingChanged: \{\n\s+if \(leaving && !held && !tugging && !pushing\)\n\s+goAway\(\)")
         self.assertRegex(pet, r'react\("leave", ok => \{\n\s+if \(ok && pet\.leaving\) \{\n\s+pet\.departed = true\n\s+Qt\.callLater\(pet\.gone\)')
         actions = (TALPY / "actions.mjs").read_text()
         leave = actions[actions.index("    leave: {"):]

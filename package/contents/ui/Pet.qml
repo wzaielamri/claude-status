@@ -98,6 +98,7 @@ Item {
     }
     property bool held: false
     property bool tugging: false        // you pull at it in its burrow: it hangs on (talpy.tug), then pops out
+    property bool pushing: false        // you push it down into its burrow (talpy.push): it sinks with your hand
     property real pop: 1                // popping out into your hand: 0 in its burrow, 1 where you hold it
     property bool landing: false        // picked up, until it has landed and dug in: drawn live
     property bool arriving: false
@@ -131,7 +132,7 @@ Item {
     // Digs over to x (it dives in, tunnels across, pops up there); quick: its
     // spot moved (a new chat makes room), so it hurries
     function digTo(x, quick) {
-        if (held || tugging || leaving || arriving || !talpy)
+        if (held || tugging || pushing || leaving || arriving || !talpy)
             return
         travelTo = clampX(x)
         if (Math.abs(travelTo - px) < bodyWidth * 0.3) {
@@ -194,9 +195,9 @@ Item {
     // The strip got narrower: back inside it
     onMaxXChanged: if (!held && px > maxX) digTo(maxX, true)
     onLeavingChanged: {
-        if (leaving && !held && !tugging)
+        if (leaving && !held && !tugging && !pushing)
             goAway()
-        else if (!leaving && !held && !tugging) {
+        else if (!leaving && !held && !tugging && !pushing) {
             departed = false   // its chat came back (also while it dug away): it pops up again
             arriving = true
             react("arrive", () => { pet.arriving = false })
@@ -325,6 +326,46 @@ Item {
         holdAt(grab.lastAt)
     }
 
+    // A drag that starts downward (within 45° of straight down) while it's in
+    // its burrow pushes it in (talpy.push): it squashes and sinks as far as
+    // your hand goes, with a dirt puff; with less motion it's down at once.
+    // False: it isn't in its burrow, and the drag picks it up as before.
+    function push() {
+        if (!talpy || !talpy.push())
+            return false
+        pushing = true
+        stride.stop()
+        if (game)
+            game.picked()   // (it stops seeing to its cookie meanwhile)
+        if (root.lessMotion)
+            talpy.pushTo(64)
+        return true
+    }
+
+    // (as far down as your hand, p, went since the drag began)
+    function pushToward(p) {
+        if (talpy && !root.lessMotion)
+            talpy.pushTo((p.y - grab.pressedAt.y) / unit)
+    }
+
+    // Let go: it stays down a moment, then peeks out (hey!, or a giggle) and is
+    // back to its mood; a chat that needs you: it pops straight up with its sign
+    function pushed() {
+        pushing = false
+        if (!talpy)
+            return
+        talpy.pushed(mood === "needs", ok => {
+            if (!ok)
+                return
+            if (pet.leaving)
+                pet.goAway()      // its chat left meanwhile: now it goes
+            else if (pet.mood === "needs")
+                pet.react("sign")
+            else if (pet.game)
+                pet.game.landed()
+        })
+    }
+
     // (it leans towards your hand, p, as it hangs on)
     function tugToward(p) {
         if (talpy)
@@ -439,7 +480,7 @@ Item {
 
     // Something happened to its chat (or, for the main pet, to an account)
     function event(kind, text) {
-        if (held || tugging || leaving)
+        if (held || tugging || pushing || leaving)
             return   // (a reaction now would stop it digging away)
         if (!playing || cookieOn) {
             missed = { kind: kind, text: text, at: Date.now() }   // (acted out when it can be seen, or has its cookie)
@@ -708,7 +749,7 @@ Item {
         // chat's pet: smaller, so a picture every other tick (30 a second in
         // the popup, 15 on the desktop: even steps, each picture as long),
         // pictures in between poses, still at rest.
-        live: pet.landing || pet.chasing || pet.tugging
+        live: pet.landing || pet.chasing || pet.tugging || pet.pushing
         sheets: pet.lone ? 36 : 32
         frameMs: pet.lone ? root.petFrameMs : 2 * root.petFrameMs
         maxFrames: 32
@@ -777,7 +818,7 @@ Item {
         width: pet.bodyWidth + Kirigami.Units.largeSpacing
         height: pet.bodyHeight + Kirigami.Units.largeSpacing
         visible: !pet.departed
-        cursorShape: pet.held || pet.tugging ? Qt.ClosedHandCursor : pet.lone ? Qt.OpenHandCursor : Qt.PointingHandCursor
+        cursorShape: pet.held || pet.tugging || pet.pushing ? Qt.ClosedHandCursor : pet.lone ? Qt.OpenHandCursor : Qt.PointingHandCursor
         preventStealing: true
         hoverEnabled: !pet.lone
 
@@ -792,7 +833,13 @@ Item {
             lastAt = p
             if (!dragging && Math.hypot(p.x - pressedAt.x, p.y - pressedAt.y) > pet.gu * 0.5) {
                 dragging = true
-                pet.pull()
+                // (down, within 45° of straight down, while it's in its burrow: pushed in; else pulled out)
+                if (!(p.y - pressedAt.y > 0 && Math.abs(p.x - pressedAt.x) <= p.y - pressedAt.y && pet.push()))
+                    pet.pull()
+                else
+                    pet.pushToward(p)
+            } else if (dragging && pet.pushing) {
+                pet.pushToward(p)
             } else if (dragging && pet.held) {
                 pet.holdAt(p)
             } else if (dragging && pet.tugging) {
@@ -800,14 +847,18 @@ Item {
             }
         }
         onReleased: {
-            if (dragging && pet.tugging)
+            if (dragging && pet.pushing)
+                pet.pushed()
+            else if (dragging && pet.tugging)
                 pet.letGo()
             else if (dragging)
                 pet.drop()
         }
         // (a press that ends without a release: the popup closed or the stage folded away under the mouse)
         onCanceled: {
-            if (dragging && pet.tugging)
+            if (dragging && pet.pushing)
+                pet.pushed()
+            else if (dragging && pet.tugging)
                 pet.letGo()
             else if (dragging && pet.held)
                 pet.drop()

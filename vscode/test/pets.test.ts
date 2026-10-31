@@ -322,6 +322,46 @@ test("a stage hidden while Talpy goes after a cookie draws him once and lets the
   stage.destroy();
 });
 
+// A drag that starts downward (within 45°) while he's in his burrow pushes him
+// in, drawn live meanwhile; let go, he's on his way back; up or sideways is the
+// tug of old
+test("a drag that starts downward pushes the hero into his burrow; sideways pulls him", () => {
+  const t = load();
+  const stage: Any = new t.Stage(new FakeEl("div"), true, "hero", { open() {} });
+  t.resize[0]([{ contentRect: { width: 400, height: 96 } }]);
+  t.intersect[0]([{ isIntersecting: true }]);
+  stage.update({
+    mood: "idle", headline: "", counts: { waiting: 0, working: 0, idle: 1, limit: 0, done: 0 }, highUsageText: "",
+    contextFullText: "", maxFiveHour: 0, agentsRunning: 0, waiting: null,
+  });
+  const hero = stage.pets[0];
+  const g = hero.grab;
+  const at = (x: number, y: number) => ({ button: 0, pointerId: 1, clientX: x, clientY: y, preventDefault() {} });
+  const from = hero.talpy.v.depth;
+  g.listeners.pointerdown[0](at(100, 40));
+  g.listeners.pointermove[0](at(106, 60)); // down, a little to the right
+  assert.equal(hero.pushing, true);
+  assert.equal(hero.held, false);
+  assert.ok(hero.talpy.v.depth > from, "it sinks as your hand goes");
+  stage.loop();
+  assert.equal(hero.film.on, false); // (drawn live while pushed)
+  g.listeners.pointermove[0](at(106, 90));
+  const deeper = hero.talpy.v.depth;
+  assert.ok(deeper > from + 10);
+  g.listeners.pointerup[0](at(106, 90));
+  assert.equal(hero.pushing, false);
+  assert.equal(hero.talpy.pushing, false);
+  assert.ok(hero.talpy.run, "it's on its way back up");
+  hero.talpy.cancel();
+  hero.talpy.apply({});
+  g.listeners.pointerdown[0](at(100, 40));
+  g.listeners.pointermove[0](at(130, 45)); // sideways: the tug, as before
+  assert.equal(hero.pushing, false);
+  assert.ok(hero.tugging || hero.held);
+  g.listeners.pointerup[0](at(130, 45));
+  stage.destroy();
+});
+
 // Playful Talpy off: no cookie, no joke bubbles; the pets' Talpys pick calm moves
 test("with Playful Talpy off the hero takes no cookie and tells no jokes", () => {
   const t = load();

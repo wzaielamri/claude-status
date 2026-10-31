@@ -73,7 +73,7 @@ Item {
         const words = {
             "achoo!": i18nc("Talpy sneezes", "achoo!"), "hic!": i18nc("Talpy has the hiccups", "hic!"),
             "pop!": i18nc("a balloon pops", "pop!"), "ta-da!": i18nc("Talpy pops out of hiding", "ta-da!"),
-            "boo!": i18nc("Talpy plays peekaboo", "boo!"), "a bug!": i18nc("Talpy spots a bug", "a bug!"),
+            "boo!": i18nc("Talpy plays peekaboo", "boo!"), "hey!": i18nc("Talpy peeks out after you pushed him into his burrow", "hey!"), "a bug!": i18nc("Talpy spots a bug", "a bug!"),
             "got it!": i18nc("Talpy caught a bug", "got it!"), "sigh": i18nc("Talpy is sad", "sigh"),
             "haha": i18nc("Talpy laughs", "haha"), "hihi": i18nc("Talpy giggles", "hihi"),
             "cheese!": i18nc("Talpy takes a selfie", "cheese!"), "yum!": i18nc("Talpy eats a cookie", "yum!"),
