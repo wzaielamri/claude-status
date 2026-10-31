@@ -522,11 +522,6 @@ export function demoWeek(now: number, back = 0, account = "", span: WeekSpan = "
     cacheSaved: 2290,
     trend: back >= 3 ? [null, null, week(0.5), week(0.75), week(1)] : [week(0.4), week(0.55), week(0.6), week(0.75), week(1)],
     spend: {
-      turns: [
-        { ...DEMO_CHATS[0], workedMs: 48 * MIN, cost: 14.8, prompts: 0, startedAt: days[3].start + 10 * HOUR, endedAt: days[3].start + 10.8 * HOUR },
-        { ...DEMO_CHATS[1], workedMs: 31 * MIN, cost: 9.6, prompts: 0, startedAt: days[4].start + 14 * HOUR, endedAt: days[4].start + 14.5 * HOUR },
-      ],
-      chats: DEMO_CHATS.slice(0, 2),
       cold: { count: 5, cost: 11.4, chats: [{ ...DEMO_CHATS[1], resumes: 3, cost: 7.1 }] },
     },
     work: {

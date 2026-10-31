@@ -99,7 +99,7 @@ FILES_KEPT = 100  # edited files a chat's hour remembers (to count them)
 EDIT_DIFF_LINES = 4000  # an edit bigger than this counts its lines without a diff
 COLD_MS = 60 * 60_000  # a reply this long after the chat's last one finds its cache gone (an hour on a plan)
 COLD_TOKENS = 20_000  # ...and writing this much of its context again is a cold resume
-TOP_PROJECTS, TOP_CHATS, TOP_DAY_CHATS, TOP_TURNS = 6, 5, 8, 5
+TOP_PROJECTS, TOP_CHATS, TOP_DAY_CHATS = 6, 5, 8
 TREND_WEEKS = 5  # the trend lines: these 7 days and the four weeks before (what the cache keeps)
 
 # What Claude Code's /usage lists as "contributing to your limits usage" (a
@@ -1437,7 +1437,7 @@ def recap(sources, back, account, now_ms, home, usage=None, added=(), span="week
         "chats": sorted(chat_rows, key=lambda r: (-r["workedMs"], -r["cost"]))[:TOP_CHATS],
         "models": sorted(models.values(), key=lambda m: -m["cost"]),
         "cacheSaved": round(saved, 2),
-        "spend": spending(chats, chat_rows, w0, w1, home),
+        "spend": spending(chats, w0, w1, home),
         "work": claude_did(chats, w0, w1),
         "plan": plan_windows_of(usage or [], account) if back == 0 else [],
         "prompts": permission_prompts(chats, w0, w1, home, added),
@@ -1474,22 +1474,10 @@ def chats_of(chats, stretches, lo, hi, home):
     return sorted(rows, key=lambda r: (-r["workedMs"], -r["cost"]))[:TOP_DAY_CHATS]
 
 
-def turn_cost(tokens):
-    return sum(request_cost(key, list(t[:6]) + [1]) for key, t in (tokens or {}).items())
-
-
-def spending(chats, chat_rows, lo, hi, home):
-    """Where the money went: the turns that cost most (their own replies, not
-    their subagents'), the chats, and coming back to a chat after its cache
-    let go (a cold resume: its context written again, at the price of cache
-    writes rather than reads)."""
-    turns = []
-    for c in chats:
-        for turn in c["turns"]:
-            if lo <= turn[1] < hi and len(turn) > 4:
-                cost = turn_cost(turn[4])
-                if cost >= 0.01:
-                    turns.append(dict(chat_row(c, home, turn[2], cost, 0), startedAt=turn[0], endedAt=turn[1]))
+def spending(chats, lo, hi, home):
+    """What coming back to a chat after its cache let go cost (a cold resume:
+    its context written again, at the price of cache writes rather than
+    reads): what could use less of your plan says it."""
     cold, cold_cost, by_chat = 0, 0.0, {}
     for c in chats:
         for h, agg in c["hours"].items():
@@ -1508,8 +1496,6 @@ def spending(chats, chat_rows, lo, hi, home):
     for b in by_chat.values():
         b["cost"] = round(b["cost"], 4)
     return {
-        "turns": sorted(turns, key=lambda t: -t["cost"])[:TOP_TURNS],
-        "chats": sorted(chat_rows, key=lambda r: -r["cost"])[:3],
         "cold": {"count": cold, "cost": round(cold_cost, 4),
                  "chats": sorted(by_chat.values(), key=lambda b: -b["cost"])[:3]},
     }

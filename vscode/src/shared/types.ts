@@ -821,8 +821,6 @@ export interface WeekRecap {
   models: WeekModel[];
   cacheSaved: number;
   spend: {
-    turns: WeekChat[]; // the turns that cost most
-    chats: WeekChat[]; // the chats that cost most
     cold: { count: number; cost: number; chats: WeekChat[] }; // coming back after a chat's cache expired
   };
   work: {

@@ -723,7 +723,7 @@ def day_hours(span):
 
 
 class SpendTests(Home):
-    def test_the_costliest_turns_and_cold_resumes(self):
+    def test_cold_resumes(self):
         t0, hour = self.t0, 3600_000
         tr = Transcript().prompt(t0).reply(t0 + 1000, "a", output=1000, read=0, write=100_000, hour_writes=True)
         tr.duration(t0 + 2000, 2000).prompt(t0 + 2 * hour)
@@ -732,11 +732,9 @@ class SpendTests(Home):
         tr.reply(t0 + 2 * hour + 61_000, "c", output=10, read=100_000).duration(t0 + 2 * hour + 62_000, 2000)
         self.write(tr)
         s = self.recap()["spend"]
-        self.assertEqual([round(t["cost"], 4) for t in s["turns"]], [0.82, 0.82, 0.0202])
-        self.assertEqual(s["turns"][0]["chatId"], "chat-a")
         self.assertEqual((s["cold"]["count"], s["cold"]["cost"]), (1, 0.78))  # (written again at 8, not read at 0.2)
         self.assertEqual(s["cold"]["chats"][0]["resumes"], 1)
-        self.assertEqual(round(s["chats"][0]["cost"], 2), 1.66)
+        self.assertEqual(set(s), {"cold"})  # (the costliest turns and chats went with the Recap's section)
 
 
 class WorkTests(Home):
