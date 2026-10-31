@@ -15,7 +15,6 @@ PlasmaComponents3.ToolButton {
     property int shown: 0              // how many of it show
     property int count: 0              // of how many
     readonly property int next: Math.min(root.pageSize, count - shown)
-    signal paged(int pages)            // (Show N more: now this many pages show)
 
     visible: open && shown < count
     Layout.leftMargin: Kirigami.Units.gridUnit
@@ -25,7 +24,7 @@ PlasmaComponents3.ToolButton {
     icon.height: Kirigami.Units.iconSizes.small
     text: i18np("Show %1 more", "Show %1 more", next)
     font: Kirigami.Theme.smallFont
-    onClicked: moreButton.paged(root.showMore(listKey))
+    onClicked: root.showMore(listKey)
 
     PlasmaCore.ToolTipArea {
         textFormat: Text.PlainText

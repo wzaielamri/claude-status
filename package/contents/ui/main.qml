@@ -1696,7 +1696,7 @@ PlasmoidItem {
     readonly property string recentArgs: " --recent " + (Plasmoid.configuration.recentChats > 0 ? 2 * Plasmoid.configuration.recentChats : 0)
                                          + " --plans 0 --memories 0"   // (only the starred plans, and CLAUDE.md: the rest is in the Projects tab)
     property var morePages: ({})    // a list's key -> how many pages past its first show
-    property var recentMore: ({})   // group key -> its recent chats as a check that listed more has them
+    property var recentMore: ({})   // group key -> {recent, asked}: its recent chats as a check that listed more has them
     property var recentFetches: ({})   // that check's command -> the group key and account id it's for
 
     function pagesShown(listKey) {
@@ -1719,7 +1719,7 @@ PlasmoidItem {
         const cmd = (host ? hostCommand(host) : command) + " --recent " + count + " --no-tokens --usage-refresh 0"
         if (cmd in recentFetches)
             return
-        recentFetches[cmd] = { groupKey: groupKey, groupId: groupId, host: host }
+        recentFetches[cmd] = { groupKey: groupKey, groupId: groupId, host: host, count: count }
         recentFetcher.connectSource(cmd)
     }
     Exec {
@@ -1744,7 +1744,7 @@ PlasmoidItem {
             }
             const g = result && result.groups ? result.groups.find(x => x.id === asked.groupId) : null
             if (g)
-                root.recentMore = Object.assign({}, root.recentMore, { [asked.groupKey]: g.recent || [] })
+                root.recentMore = Object.assign({}, root.recentMore, { [asked.groupKey]: { recent: g.recent || [], asked: asked.count } })
         }
     }
 

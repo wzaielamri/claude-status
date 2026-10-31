@@ -378,7 +378,7 @@ RowLayout {
                             // starred: a ★ (click: unstar it)
                             StarMark {
                                 visible: !!row.session.starred
-                                tooltip: i18n("Once it isn't listed here any more, it stays under Recent chats → Starred. Click to unstar it.")
+                                tooltip: i18n("Once it isn't listed here any more, it stays under ★ Starred chats. Click to unstar it.")
                                 onClicked: root.setStar("chats", row.session.chatId || row.session.sessionId, row.remoteHost, false)
                             }
                             Tag {
@@ -590,7 +590,7 @@ RowLayout {
                         }
                     }
                     PlasmaComponents3.ToolButton {
-                        // star it: once it isn't listed here any more, it stays under Recent chats → Starred
+                        // star it: once it isn't listed here any more, it stays under ★ Starred chats
                         // (a starred one has its ★ after its name)
                         visible: !!(row.session.chatId || row.session.sessionId) && !row.session.starred
                         icon.name: "non-starred-symbolic"
@@ -607,7 +607,7 @@ RowLayout {
                             textFormat: Text.PlainText
                             anchors.fill: parent
                             mainText: i18n("Star this chat")
-                            subText: i18n("Once it isn't listed here any more, a starred chat stays under Recent chats → Starred, however old it is.")
+                            subText: i18n("Once it isn't listed here any more, a starred chat stays under ★ Starred chats, however old it is.")
                         }
                     }
                     PlasmaComponents3.ToolButton {

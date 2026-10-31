@@ -113,7 +113,7 @@ class RowButtonsTests(unittest.TestCase):
 
     def test_every_line_with_buttons_shows_them_for_the_keyboard_and_a_finger(self):
         # a chat's row, a recent chat's, a plan's and a memory's line
-        rows = (UI / "SessionRow.qml").read_text() + (UI / "GroupSection.qml").read_text()
+        rows = "".join((UI / name).read_text() for name in ("SessionRow.qml", "RecentLine.qml", "PlanLine.qml", "MemoryLine.qml"))
         for name, buttons, mouse in (("nameLabel", "rowButtons", "nameMouse"), ("recentName", "recentButtons", "recentMouse"),
                                      ("planName", "planButtons", "planMouse"), ("memoryName", "memoryButtons", "memoryMouse")):
             with self.subTest(buttons):
@@ -129,16 +129,43 @@ class RowButtonsTests(unittest.TestCase):
         # Delete question, keep-only question, a plan's new-chat box and its
         # tags' pane tooltips at once: 30-50 ms a line (2026-10-30)
         ui = {name: (UI / name).read_text() for name in ("HoverButtons.qml", "DeleteAsk.qml", "KeepOnlyMessage.qml",
-                                                         "TipArea.qml", "GroupSection.qml", "SessionRow.qml")}
+                                                         "TipArea.qml", "RecentLine.qml", "PlanLine.qml", "SessionRow.qml")}
         self.assertIn("default property Component buttons", ui["HoverButtons.qml"])
         self.assertIn("active: hover.shown || hover.made", ui["HoverButtons.qml"])
         self.assertRegex(ui["DeleteAsk.qml"], r"\nLoader \{[^}]*active: itemKey !== \"\" && asked\.key === itemKey")
         self.assertRegex(ui["KeepOnlyMessage.qml"], r"\nLoader \{[^}]*active: shown")
         self.assertIn("visible: false", ui["KeepOnlyMessage.qml"])   # (made hidden, then shown: it fades in)
         self.assertIn("active: tip.inPane", ui["TipArea.qml"])
-        self.assertIn("sourceComponent: NewChatBox {\n                    visible: false", ui["GroupSection.qml"])
-        for name in ("GroupSection.qml", "SessionRow.qml"):
+        self.assertIn("sourceComponent: NewChatBox {\n            visible: false", ui["PlanLine.qml"])
+        for name in ("RecentLine.qml", "SessionRow.qml"):
             self.assertNotRegex(ui[name], r"KeepOnlyMessage \{[^}]*visible:", name)
+        # a line's rarely shown tags (Limit, ↻, To review, its tests, ↩ Send) and its account: made only when they show
+        for name, tags in (("RecentLine.qml", ("AccountTag {", "Tag {", "Tag {", "Tag {", "TestsBadge {")),
+                           ("PlanLine.qml", ("AccountTag {", "Tag {"))):
+            self.assertEqual(re.findall(r"sourceComponent: (\w*Tag \{|TestsBadge \{)", ui[name]), list(tags), name)
+            self.assertEqual(len(re.findall(r"\n        (Tag|TestsBadge|AccountTag) \{", ui[name])), 0, name)
+
+    def test_lists_grow_a_page_at_a_time_and_projects_make_their_lines_when_opened(self):
+        # The main tab's lists show a page at a time ("Show N more": only the
+        # new page's lines are made), the Plans and Memories folds left it for
+        # the Projects tab, where a project's lines are made when it opens
+        # (2026-10-31)
+        section = (UI / "GroupSection.qml").read_text()
+        projects = (UI / "ProjectsView.qml").read_text()
+        main = (UI / "main.qml").read_text()
+        for gone in ("togglePlans", "toggleMemories", "expandedPlans", "expandedMemories"):
+            self.assertNotIn(gone, section + main)
+        self.assertIn("ListModel {", (UI / "PageRows.qml").read_text())
+        for rows in ("recentRows", "starredRows", "starredPlanRows"):
+            self.assertIn("model: section.%s ? %s : 0" % ({"recentRows": "recentOpen", "starredRows": "starredOpen",
+                                                           "starredPlanRows": "starredPlansOpen"}[rows], rows), section)
+        self.assertEqual(section.count("MoreButton {"), 3)
+        self.assertIn("section.group.instructions", section)   # (CLAUDE.md, its own line)
+        self.assertIn('" --plans 0 --memories 0"', main)
+        self.assertRegex(projects, r"Loader \{\s+active: card\.unfolded")
+        self.assertIn("model: PageRows { size: inside.chatsShown }", projects)
+        self.assertIn("active: due", projects)   # (its plans and memories: the frame after)
+        self.assertIn("root.showProject(projectRow.project.path)", (UI / "WeekView.qml").read_text())
 
 
 if __name__ == "__main__":

@@ -23,20 +23,28 @@ ColumnLayout {
     readonly property real folderWidth: Kirigami.Units.gridUnit * 8
     readonly property var queued: root.queuedFor(group, remoteHost)
     // Recent chats: the status' (a page more than shows), then a bigger
-    // check's past those (root.fetchRecent), each once; how many show
+    // check's past those (root.fetchRecent), each once; how many show, and
+    // how many are wanted (a page more than show: asked for when they aren't there)
     readonly property var recent: group.recent || []
     readonly property bool recentOpen: !!root.expandedRecent[groupKey]
-    readonly property int recentCount: Math.max(group.recentCount || 0, recent.length)
+    readonly property var recentMore: recentOpen ? root.recentMore[groupKey] || null : null
     readonly property var recentAll: {
-        const more = recentOpen ? root.recentMore[groupKey] : null
-        if (!more)
+        if (!recentMore)
             return recent
         const listed = {}
         for (const c of recent)
             listed[c.sessionId] = true
-        return recent.concat(more.filter(c => !listed[c.sessionId]))
+        return recent.concat(recentMore.recent.filter(c => !listed[c.sessionId]))
     }
-    readonly property int recentShown: Math.min(recentCount, root.pageSize * root.pagesShown(groupKey + "|recent"))
+    // (a check that listed more got fewer than it asked for: that's all of them)
+    readonly property int recentCount: recentMore && recentMore.recent.length < recentMore.asked
+                                       ? recentAll.length : Math.max(group.recentCount || 0, recent.length)
+    readonly property int recentShown: Math.min(recentAll.length, root.pageSize * root.pagesShown(groupKey + "|recent"))
+    readonly property int recentWanted: recentOpen ? Math.min(recentCount, root.pageSize * (root.pagesShown(groupKey + "|recent") + 1)) : 0
+    onRecentWantedChanged: {
+        if (recentAll.length < recentWanted)
+            root.fetchRecent(groupKey, group.id, remoteHost, recentWanted)
+    }
     // the chats and plans you starred, however old: all of them in the status
     readonly property var starred: group.starred || []
     readonly property var starredPlans: group.starredPlans || []
@@ -623,12 +631,6 @@ ColumnLayout {
         listKey: section.groupKey + "|recent"
         shown: section.recentShown
         count: section.recentCount
-        onPaged: (pages) => {
-            // (one page ahead of what shows: the next one shows at once)
-            const need = root.pageSize * (pages + 1)
-            if (section.recentAll.length < Math.min(need, section.recentCount))
-                root.fetchRecent(section.groupKey, section.group.id, section.remoteHost, need)
-        }
     }
 
     // ★ Starred chats: the ones you starred (☆ on a chat), however old, a page at a time
