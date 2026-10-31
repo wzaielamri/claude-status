@@ -47,6 +47,10 @@ PlasmoidItem {
     readonly property var emptyPlan: ({ key: "", slug: "", title: "", path: "", profileDir: "", profile: "", updatedAt: 0,
                                         shared: false, chatId: null, chatProfileDir: null, cwd: "", cwdShort: "", edited: false,
                                         openCommand: null, starred: false })
+    readonly property var emptyRecent: ({ key: "", sessionId: "", name: "", cwd: "", cwdShort: "", lastActive: 0, profileDir: "",
+                                          profile: "", shared: false, openCommand: "", starred: false })
+    readonly property var emptyMemory: ({ key: "", name: "", description: "", type: "", path: "", folder: "", folderShort: "",
+                                          updatedAt: 0, folderGone: false })
     readonly property var emptyTask: ({ subject: "", status: "pending" })
     readonly property var emptyDay: ({ day: "", total: 0, output: 0, messages: 0, chats: 0, prompts: 0 })
     readonly property var emptyProject: ({ name: "", path: "", total: 0, output: 0, prompts: 0 })
@@ -389,7 +393,7 @@ PlasmoidItem {
         // (poll.py runs talpy_den.py with its compiled code cached)
         let cmd = "python3 -I " + shellQuote(codeDir + "poll.py") + configDirArgs
         cmd += " --done-hours " + Math.max(0, Plasmoid.configuration.keepDoneHours)
-        cmd += " --recent " + Math.max(0, Plasmoid.configuration.recentChats)
+        cmd += recentArgs
         if (!Plasmoid.configuration.showTokens)
             cmd += " --no-tokens"
         if (Plasmoid.configuration.usageCap > 0)
@@ -1671,6 +1675,77 @@ PlasmoidItem {
 
     function toggleRecent(groupKey, wasOpen) {
         expandedRecent = Object.assign({}, expandedRecent, { [groupKey]: !wasOpen })
+        if (wasOpen) {
+            firstPage(groupKey + "|recent")
+            if (groupKey in recentMore) {
+                const more = Object.assign({}, recentMore)
+                delete more[groupKey]
+                recentMore = more
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- lists a page at a time
+    // Recent chats, ★ Starred chats and plans, and a project's chats show
+    // pageSize at a time (the Recent chats setting), "Show N more" the next
+    // page (MoreButton.qml); folded again, a list shows its first page. The
+    // status lists a page more recent chats than show (so the next one is
+    // there at once) and counts them all (recentCount); past that a check
+    // that lists more is run once for the account (fetchRecent).
+    readonly property int pageSize: Plasmoid.configuration.recentChats > 0 ? Plasmoid.configuration.recentChats : 5
+    readonly property string recentArgs: " --recent " + (Plasmoid.configuration.recentChats > 0 ? 2 * Plasmoid.configuration.recentChats : 0)
+                                         + " --plans 0 --memories 0"   // (only the starred plans, and CLAUDE.md: the rest is in the Projects tab)
+    property var morePages: ({})    // a list's key -> how many pages past its first show
+    property var recentMore: ({})   // group key -> its recent chats as a check that listed more has them
+    property var recentFetches: ({})   // that check's command -> the group key and account id it's for
+
+    function pagesShown(listKey) {
+        return 1 + (morePages[listKey] || 0)
+    }
+    // (how many pages of it show now)
+    function showMore(listKey) {
+        morePages = Object.assign({}, morePages, { [listKey]: (morePages[listKey] || 0) + 1 })
+        return pagesShown(listKey)
+    }
+    function firstPage(listKey) {
+        if (listKey in morePages) {
+            const pages = Object.assign({}, morePages)
+            delete pages[listKey]
+            morePages = pages
+        }
+    }
+    // A check (this computer's or a host's) that lists count recent chats: for the account's next pages
+    function fetchRecent(groupKey, groupId, host, count) {
+        const cmd = (host ? hostCommand(host) : command) + " --recent " + count + " --no-tokens --usage-refresh 0"
+        if (cmd in recentFetches)
+            return
+        recentFetches[cmd] = { groupKey: groupKey, groupId: groupId, host: host }
+        recentFetcher.connectSource(cmd)
+    }
+    Exec {
+        id: recentFetcher
+        onNewData: (source, data) => {
+            disconnectSource(source)
+            const asked = root.recentFetches[source]
+            delete root.recentFetches[source]
+            if (!asked || !root.expandedRecent[asked.groupKey])
+                return   // (folded meanwhile: its first page shows)
+            let result = null
+            if (asked.host) {
+                const answer = root.helperResult(data)
+                if (answer.ok && answer.result)
+                    result = root.toLocalClock(answer.result, Date.now() - (answer.result.generatedAt || Date.now()))
+            } else {
+                try {
+                    result = JSON.parse(data.stdout)
+                } catch (e) {
+                    result = null
+                }
+            }
+            const g = result && result.groups ? result.groups.find(x => x.id === asked.groupId) : null
+            if (g)
+                root.recentMore = Object.assign({}, root.recentMore, { [asked.groupKey]: g.recent || [] })
+        }
     }
 
     // New chat: the + next to an account unfolds its folders under its name
@@ -2053,8 +2128,7 @@ PlasmoidItem {
 
     function hostCommand(host) {
         let cmd = "python3 -I " + shellQuote(codeDir + "remote.py") + " --status " + shellQuote(host)
-                  + " --done-hours " + Math.max(0, Plasmoid.configuration.keepDoneHours)
-                  + " --recent " + Math.max(0, Plasmoid.configuration.recentChats)
+                  + " --done-hours " + Math.max(0, Plasmoid.configuration.keepDoneHours) + recentArgs
         if (!Plasmoid.configuration.showTokens)
             cmd += " --no-tokens"
         cmd += " --usage-refresh " + Math.max(0, Math.round(Plasmoid.configuration.usageRefreshMinutes))
@@ -2484,8 +2558,8 @@ PlasmoidItem {
                 root.pollHost(what.host)
             else
                 root.refresh()
-            if (what.kind === "projects" && !what.host)
-                root.loadProjects()
+            if (!what.host && (what.kind === "projects" || root.projectsShown))
+                root.loadProjects()   // (a plan or memory there, or a project)
         }
     }
 
@@ -2615,6 +2689,8 @@ PlasmoidItem {
                 root.pollHost(what.host)
             else
                 root.refresh()
+            if (!what.host && root.projectsShown)
+                root.loadProjects()
         }
     }
 
@@ -3571,8 +3647,27 @@ PlasmoidItem {
     }
 
     // The Projects tab (ProjectsView.qml, week.py --projects): every project
-    // with its chats, time and cost; read when the tab opens and every 10
-    // minutes while it shows (what goes on now comes from the status)
+    // with all its chats, plans and memories; read when the tab opens and
+    // every 10 minutes while it shows (what goes on now comes from the
+    // status). Each project is folded until you open it (kept while
+    // Plasma runs); a project row of the Recap opens it here (showProject).
+    property var openProjects: ({})   // project folder -> unfolded
+    property string projectToShow: ""   // (opened from the Recap: scrolled to)
+    function toggleProject(path, wasOpen) {
+        openProjects = Object.assign({}, openProjects, { [path]: !wasOpen })
+        if (wasOpen)
+            for (const list of ["", "|plans", "|memories"])
+                firstPage("project|" + path + list)
+    }
+    function showProject(path) {
+        openProjects = Object.assign({}, openProjects, { [path]: true })
+        projectToShow = path
+        popupTab = "projects"
+    }
+    // The account (of this computer) a chat, plan or memory of a project is on
+    function groupOfProfile(profileDir) {
+        return groups.find(g => (g.profileKeys || []).indexOf(profileDir) >= 0) || groups[0] || emptyGroup
+    }
     property var projectsData: null
     property string projectsError: ""
     property bool projectsBusy: false
@@ -3775,26 +3870,24 @@ PlasmoidItem {
     }
 
     // ---------------------------------------------------------------- plans
-    // Each account's plans (<config>/plans/*.md, what chats in plan mode
-    // write): open one in your Markdown app, carry it out in a new chat,
-    // continue the chat that made it, or share it with your other accounts.
+    // Plans (<config>/plans/*.md, what chats in plan mode write), in their
+    // project (the Projects tab) and under ★ Starred plans: open one, carry
+    // it out in a new chat, continue the chat that made it, or share it with
+    // your other accounts.
 
-    property var expandedPlans: ({})   // accounts showing their plans
     property string planComposer: ""   // the plan whose "carry it out" box is open: [host|]plan key
-
-    function togglePlans(groupKey, wasOpen) {
-        expandedPlans = Object.assign({}, expandedPlans, { [groupKey]: !wasOpen })
-    }
 
     // ---------------------------------------------------------------- starred chats and plans
     // Chats and plans you star stay at hand: each account lists its starred
-    // ones under Recent chats and under Plans, however old they are (jump.py
-    // --star, kept in the widget's cache; an SSH host's too, kept here).
+    // ones under ★ Starred chats and ★ Starred plans, however old they are
+    // (jump.py --star, kept in Talpy Den's cache; an SSH host's too, kept here).
 
     property var expandedStarred: ({})   // groupKey + "|chats" or "|plans" -> unfolded
 
     function toggleStarred(key, wasOpen) {
         expandedStarred = Object.assign({}, expandedStarred, { [key]: !wasOpen })
+        if (wasOpen)
+            firstPage(key)
     }
 
     property var starRuns: ({})   // command -> the host whose chat or plan it stars ("": here)
@@ -3812,8 +3905,8 @@ PlasmoidItem {
 
     function starHint(kind, starred) {
         return starred ? i18n("Click to unstar it.")
-                       : kind === "plans" ? i18n("A starred plan stays listed under Plans → Starred, however old it is.")
-                                          : i18n("A starred chat stays listed under Recent chats → Starred, however old it is.")
+                       : kind === "plans" ? i18n("A starred plan stays listed under its account's ★ Starred plans, however old it is.")
+                                          : i18n("A starred chat stays listed under its account's ★ Starred chats, however old it is.")
     }
 
     Exec {
@@ -3831,19 +3924,15 @@ PlasmoidItem {
                 root.pollHost(host)
             else
                 root.refresh()
+            if (!host && root.projectsShown)
+                root.loadProjects()
         }
     }
-
-    property var expandedMemories: ({})   // accounts showing their memories
 
     // A memory's icon by its kind (talpy_den.py: account_memories)
     function memoryIcon(type) {
         return ({ user: "user-identity", feedback: "dialog-messages", project: "folder-documents", reference: "bookmarks",
                   account: "configure" })[type] || "note"
-    }
-
-    function toggleMemories(groupKey, wasOpen) {
-        expandedMemories = Object.assign({}, expandedMemories, { [groupKey]: !wasOpen })
     }
 
     // One of Claude's memories: rendered to read, or (edit) its file, to change

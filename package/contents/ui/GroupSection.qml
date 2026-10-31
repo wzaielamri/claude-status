@@ -17,25 +17,46 @@ ColumnLayout {
     property int accounts: 1          // how many accounts its machine has (the default one is marked)
 
     readonly property string groupKey: (remoteHost ? remoteHost + "/" : "") + group.id
-    // the folder and how long ago at the end of a recent chat's, a plan's or a
-    // memory's line: columns of one width in all three, so what's before them
+    // the folder and how long ago at the end of a recent chat's, a plan's or
+    // CLAUDE.md's line: columns of one width in all, so what's before them
     // lines up, and the folders and times too
     readonly property real folderWidth: Kirigami.Units.gridUnit * 8
-    readonly property real endWidth: folderWidth + Kirigami.Units.smallSpacing + root.agoWidth
+    readonly property var queued: root.queuedFor(group, remoteHost)
+    // Recent chats: the status' (a page more than shows), then a bigger
+    // check's past those (root.fetchRecent), each once; how many show
     readonly property var recent: group.recent || []
     readonly property bool recentOpen: !!root.expandedRecent[groupKey]
-    readonly property var plans: group.plans || []
-    readonly property var queued: root.queuedFor(group, remoteHost)
-    readonly property bool plansOpen: !!root.expandedPlans[groupKey]
-    // the chats and plans you starred, however old (listed first while unfolded)
+    readonly property int recentCount: Math.max(group.recentCount || 0, recent.length)
+    readonly property var recentAll: {
+        const more = recentOpen ? root.recentMore[groupKey] : null
+        if (!more)
+            return recent
+        const listed = {}
+        for (const c of recent)
+            listed[c.sessionId] = true
+        return recent.concat(more.filter(c => !listed[c.sessionId]))
+    }
+    readonly property int recentShown: Math.min(recentCount, root.pageSize * root.pagesShown(groupKey + "|recent"))
+    // the chats and plans you starred, however old: all of them in the status
     readonly property var starred: group.starred || []
     readonly property var starredPlans: group.starredPlans || []
     readonly property bool starredOpen: !!root.expandedStarred[groupKey + "|chats"]
     readonly property bool starredPlansOpen: !!root.expandedStarred[groupKey + "|plans"]
-    readonly property var starredShown: starredOpen ? starred : []
-    readonly property var starredPlansShown: starredPlansOpen ? starredPlans : []
-    readonly property var memories: group.memories || []
-    readonly property bool memoriesOpen: !!root.expandedMemories[groupKey]
+    readonly property int starredShown: Math.min(starred.length, root.pageSize * root.pagesShown(groupKey + "|chats"))
+    readonly property int starredPlansShown: Math.min(starredPlans.length, root.pageSize * root.pagesShown(groupKey + "|plans"))
+    // (their lines' models: a page more made, none taken away while they show; folded, a list has none)
+    PageRows {
+        id: recentRows
+        size: section.recentShown
+    }
+    PageRows {
+        id: starredRows
+        size: section.starredShown
+    }
+    PageRows {
+        id: starredPlanRows
+        size: section.starredPlansShown
+    }
 
     readonly property var tokens: group.tokens
     readonly property bool hasTokens: tokens !== null && tokens !== undefined
@@ -549,15 +570,17 @@ ColumnLayout {
         }
     }
 
-    // Recent chats: this account's latest other chats, to pick one up again
+    // Recent chats: this account's latest other chats, to pick one up
+    // again, a page at a time ("Show N more"; the status lists one page
+    // more than shows, a check for more is asked for past that)
     PlasmaComponents3.ToolButton {
-        visible: section.recent.length > 0 || section.starred.length > 0
+        visible: section.recentCount > 0
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
         icon.name: section.recentOpen ? "arrow-down" : "arrow-right"
-        // (none recent, only starred: named by what's in it)
-        text: section.recent.length > 0 || section.starred.length === 0 ? i18n("Recent chats (%1)", section.recent.length)
-              : i18nc("starred chats, how many", "Recent chats: ★ Starred (%1)", section.starred.length)
+        text: section.recentShown < section.recentCount
+              ? i18nc("recent chats: how many show, of how many", "Recent chats (%1 of %2)", section.recentShown, section.recentCount)
+              : i18n("Recent chats (%1)", section.recentCount)
         font: Kirigami.Theme.smallFont
         onClicked: root.toggleRecent(section.groupKey, section.recentOpen)
 
@@ -565,16 +588,17 @@ ColumnLayout {
             textFormat: Text.PlainText
             anchors.fill: parent
             mainText: i18n("Recent chats")
-            subText: Plasmoid.configuration.clickOpensPane
-                     ? i18n("This account's latest chats that aren't listed above, and the ones you starred. Click one to open it beside the popup; its reopen button (on hover) reopens it in a terminal or in VS Code (the switch at the top of the list).")
-                     : i18n("This account's latest chats that aren't listed above, and the ones you starred. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list).")
+            subText: (Plasmoid.configuration.clickOpensPane
+                      ? i18n("This account's latest chats that aren't listed above, newest first. Click one to open it beside the popup; its reopen button (on hover) reopens it in a terminal or in VS Code (the switch at the top of the list).")
+                      : i18n("This account's latest chats that aren't listed above, newest first. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list)."))
+                     + " " + i18n("Show more lists more of them; folded again, it lists the first ones again. Every chat of a project is in the Projects tab.")
         }
     }
 
     // Where they reopen: the same Terminal | VS Code choice as for new chats
+    // (under ★ Starred chats while Recent chats is folded)
     OpenInSwitch {
-        id: recentOpenIn
-        visible: section.recentOpen && (section.recent.length > 0 || section.starred.length > 0)
+        visible: section.recentOpen
         Layout.fillWidth: true
         Layout.leftMargin: Kirigami.Units.gridUnit
         Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -583,13 +607,39 @@ ColumnLayout {
         resuming: true
     }
 
-    // the chats you starred: unfolded, they come first (a step further in)
+    Repeater {
+        model: section.recentOpen ? recentRows : 0
+        delegate: RecentLine {
+            required property int index
+            Layout.leftMargin: Kirigami.Units.gridUnit
+            chat: section.recentAll[index] || root.emptyRecent
+            group: section.group
+            remoteHost: section.remoteHost
+            folderWidth: section.folderWidth
+        }
+    }
+    MoreButton {
+        open: section.recentOpen
+        listKey: section.groupKey + "|recent"
+        shown: section.recentShown
+        count: section.recentCount
+        onPaged: (pages) => {
+            // (one page ahead of what shows: the next one shows at once)
+            const need = root.pageSize * (pages + 1)
+            if (section.recentAll.length < Math.min(need, section.recentCount))
+                root.fetchRecent(section.groupKey, section.group.id, section.remoteHost, need)
+        }
+    }
+
+    // ★ Starred chats: the ones you starred (☆ on a chat), however old, a page at a time
     PlasmaComponents3.ToolButton {
-        visible: section.recentOpen && section.starred.length > 0
-        Layout.leftMargin: Kirigami.Units.gridUnit
+        visible: section.starred.length > 0
+        Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
         icon.name: section.starredOpen ? "arrow-down" : "arrow-right"
-        text: i18nc("starred chats, how many", "★ Starred (%1)", section.starred.length)
+        text: section.starredShown < section.starred.length
+              ? i18nc("starred chats: how many show, of how many", "★ Starred chats (%1 of %2)", section.starredShown, section.starred.length)
+              : i18nc("starred chats, how many", "★ Starred chats (%1)", section.starred.length)
         font: Kirigami.Theme.smallFont
         onClicked: root.toggleStarred(section.groupKey + "|chats", section.starredOpen)
 
@@ -600,346 +650,43 @@ ColumnLayout {
             subText: i18n("The chats of this account you starred (☆ next to a chat), newest first, however old they are; not the ones listed above. Click a chat's ★ to unstar it.")
         }
     }
-
+    OpenInSwitch {
+        visible: section.starredOpen && !section.recentOpen
+        Layout.fillWidth: true
+        Layout.leftMargin: Kirigami.Units.gridUnit
+        Layout.rightMargin: Kirigami.Units.smallSpacing
+        group: section.group
+        remoteHost: section.remoteHost
+        resuming: true
+    }
     Repeater {
-        model: section.recentOpen ? section.starredShown.length + section.recent.length : 0
-        delegate: ColumnLayout {
-            id: recentLine
-
+        model: section.starredOpen ? starredRows : 0
+        delegate: RecentLine {
             required property int index
-            readonly property bool inStarred: index < section.starredShown.length
-            readonly property var chat: (inStarred ? section.starredShown[index] : section.recent[index - section.starredShown.length])
-                                        || ({ key: "", sessionId: "", name: "", cwd: "", cwdShort: "", lastActive: 0, profileDir: "",
-                                              profile: "", shared: false, openCommand: "", starred: false })
-            readonly property string rowKey: (section.remoteHost ? section.remoteHost + "|" : "") + chat.key
-            readonly property bool canOpen: recentOpenIn.inVscode
-                                            || (recentOpenIn.terminalHere && (!section.remoteHost || !!chat.openCommand))
-
-            // a click on its name
-            function click() {
-                if (Plasmoid.configuration.clickOpensPane)
-                    root.openPane(chat, section.remoteHost, "chat")
-                else if (canOpen)
-                    open()
-            }
-
-            function open() {
-                if (section.remoteHost && recentOpenIn.inVscode)
-                    root.remoteResumeVscode(section.remoteHost, chat.sessionId, chat.cwd)
-                else if (section.remoteHost)
-                    root.remoteOpen(section.remoteHost, chat.openCommand)
-                else if (recentOpenIn.inVscode)
-                    root.resumeInVscode(chat.sessionId, chat.profileDir)
-                else
-                    root.jumpTo(chat.sessionId, chat.profileDir)
-            }
-
-            Layout.fillWidth: true
-            Layout.leftMargin: Kirigami.Units.gridUnit * (inStarred ? 2 : 1)
-            Layout.rightMargin: Kirigami.Units.smallSpacing
-            spacing: 0
-
-            HoverHandler {
-                id: recentHover
-            }
-            TouchHold {
-                buttons: recentButtons
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                PlasmaComponents3.Label {
-                    id: recentName
-                    textFormat: Text.PlainText
-                    text: recentLine.chat.name
-                    font.underline: recentMouse.containsMouse || activeFocus
-                    opacity: recentLine.canOpen || Plasmoid.configuration.clickOpensPane ? 1 : 0.6
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                    // (Tab: its buttons show; Enter: as a click)
-                    activeFocusOnTab: true
-                    Keys.onReturnPressed: recentLine.click()
-                    Keys.onEnterPressed: recentLine.click()
-
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        width: recentName.contentWidth
-                        height: parent.height
-                        mainText: recentLine.chat.name
-                        subText: (Plasmoid.configuration.clickOpensPane
-                                  ? i18n("Click to open it beside the popup: its conversation, a box to reply, and what it changed.")
-                                    + (recentLine.canOpen ? "\n" + i18n("The reopen button (on hover): %1", recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
-                                                                                                                                 : root.terminalHint(section.remoteHost, true)) : "")
-                                  : recentLine.canOpen ? (recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
-                                                                                : root.terminalHint(section.remoteHost, true))
-                                  : root.terminalHint(section.remoteHost, true) + "\n" + root.vscodeHint(section.group, section.remoteHost, true))
-                                 + (recentLine.chat.cwd ? "\n" + i18n("Folder: %1", (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd) : "")
-                                 + (recentLine.chat.shared ? "\n" + i18n("Shared between accounts; last used on %1.", recentLine.chat.profile) : "")
-                                 + (recentLine.chat.stopped ? "\n\n" + root.stopText(recentLine.chat.stopped) : "")
-                                 + (recentLine.chat.recap ? "\n\n" + i18n("Recap: %1", recentLine.chat.recap.text) : "")
-
-                        MouseArea {
-                            id: recentMouse
-                            anchors.fill: parent
-                            enabled: recentLine.canOpen || Plasmoid.configuration.clickOpensPane
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: if (!recentButtons.holding) recentLine.click()
-
-                            TouchHold {
-                                buttons: recentButtons
-                            }
-                        }
-                    }
-                }
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    visible: recentLine.chat.shared
-                    text: "⇄"
-                    opacity: 0.6
-                }
-                // a usage limit stopped it (talpy_den.py: limit_stop): until it resets;
-                // click: it goes on by itself then (queued; again: cancelled)
-                Tag {
-                    readonly property real goOnAt: root.goOnAt(recentLine.chat)
-                    readonly property var goingOn: root.queuedChat(recentLine.chat.sessionId, section.remoteHost)
-                    visible: goingOn !== null
-                             || (!!recentLine.chat.stopped && recentLine.chat.stopped.kind === "limit" && !recentLine.chat.stopped.over)
-                    text: goingOn ? i18nc("a chat that goes on by itself at this time", "⏱ %1", root.startText(goingOn.startAt))
-                                  : i18n("Limit")
-                    warning: goingOn === null
-                    active: goingOn !== null
-                    clickable: goingOn !== null || goOnAt > 0
-                    tooltipTitle: goingOn ? i18n("Goes on by itself at %1", root.startText(goingOn.startAt))
-                                          : i18n("A usage limit stopped it")
-                    tooltip: (goingOn ? i18n("In the background, in the permission mode it had, telling Claude that the limit has reset (if it didn't go on before then).")
-                              : (recentLine.chat.stopped ? recentLine.chat.stopped.text : "")
-                                + (goOnAt > 0 ? "\n\n" + i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, once.", root.startText(goOnAt))
-                                                + (section.remoteHost ? "" : " " + i18n("↻ beside it: after later limits too, until it's done.")) : ""))
-                             + (goingOn ? "\n\n" + i18n("Click to cancel it.")
-                                          + (root.keptChat(recentLine.chat.sessionId) !== null && !section.remoteHost
-                                             ? " " + i18n("It stops keeping going after usage limits too.") : "") : "")
-                    onClicked: {
-                        if (goingOn)
-                            root.unqueue(goingOn)
-                        else
-                            root.queueContinue(recentLine.chat, section.remoteHost, section.group.title, false)
-                    }
-                }
-                // it keeps going (click: not any more), or a limit stopped it and it can (click: it does)
-                Tag {
-                    readonly property var kept: section.remoteHost ? null : root.keptChat(recentLine.chat.sessionId)
-                    readonly property bool canKeep: kept === null && !section.remoteHost && root.goOnAt(recentLine.chat) > 0
-                                                    && root.queuedChat(recentLine.chat.sessionId, section.remoteHost) === null
-                    visible: kept !== null || canKeep
-                    text: i18nc("a chat that goes on by itself after usage limits", "↻")
-                    active: kept !== null && !kept.error
-                    warning: kept !== null && (!!kept.error || !!kept.note)
-                    clickable: true
-                    tooltipTitle: kept ? i18n("Keeps going until it's done") : i18n("Keep going until it's done")
-                    tooltip: kept ? root.keptText(kept)
-                                  : i18n("Click to have it go on by itself in the background at %1, a minute after the limit resets, in the permission mode it had, and again after each later limit that stops it, until a turn of it ends by itself.",
-                                         root.startText(root.goOnAt(recentLine.chat)))
-                    onClicked: {
-                        if (kept)
-                            root.keepGoing(recentLine.chat, false)
-                        else
-                            root.queueContinue(recentLine.chat, section.remoteHost, section.group.title, true)
-                    }
-                }
-                // it changed files: to review until you mark it reviewed (ChatPane.qml)
-                Tag {
-                    visible: root.reviewPending(recentLine.chat, section.remoteHost)
-                    text: i18nc("a finished chat's changes, not reviewed yet", "To review")
-                    active: true
-                    clickable: true
-                    onClicked: root.openPane(recentLine.chat, section.remoteHost, "review")
-                    tooltipTitle: i18n("Not reviewed yet")
-                    tooltip: i18n("It changed files. Click to see what it changed, against how the files were before the chat: undo it, commit only its files, or mark it reviewed.")
-                }
-                TestsBadge {
-                    review: root.reviewPending(recentLine.chat, section.remoteHost) ? recentLine.chat.review : null
-                }
-                // starred: a ★ (click: unstar it)
-                StarMark {
-                    visible: !!recentLine.chat.starred
-                    tooltip: root.starHint("chats", false) + " " + root.starHint("chats", true)
-                    onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, false)
-                }
-                // its folder and how long ago, at the line's end
-                CoveredEnd {
-                    id: recentEnd
-                    covered: recentButtons.covering
-                    Layout.preferredWidth: section.endWidth
-                    implicitHeight: recentFolder.implicitHeight
-
-                    RowLayout {
-                        width: recentEnd.width
-                        spacing: Kirigami.Units.smallSpacing
-
-                        PlasmaComponents3.Label {
-                            id: recentFolder
-                            Layout.preferredWidth: section.folderWidth
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: recentLine.chat.cwdShort || "~"
-                            opacity: 0.6
-                            font: Kirigami.Theme.smallFont
-                            elide: Text.ElideMiddle
-                            PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                active: !!recentLine.chat.cwd
-                                mainText: i18n("Folder")
-                                subText: (section.remoteHost ? section.remoteHost + ":" : "") + recentLine.chat.cwd
-                            }
-                        }
-                        PlasmaComponents3.Label {
-                            Layout.preferredWidth: root.agoWidth
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: root.ago(root.now - recentLine.chat.lastActive)
-                            opacity: 0.6
-                            font: Kirigami.Theme.smallFont
-                        }
-                    }
-                }
-                // on hover, over the line's end
-                HoverButtons {
-                    id: recentButtons
-                    lineHeight: recentName.implicitHeight
-                    shown: recentHover.hovered || recentName.activeFocus || recentButtons.focused || recentButtons.held
-                           || root.deleteAsk.key === recentLine.rowKey
-                    under: recentEnd
-
-                    RowLayout {   // (made the first time they show)
-                        spacing: 0
-
-                        PlasmaComponents3.ToolButton {
-                            // with clicks opening the pane: reopen the chat itself
-                            visible: Plasmoid.configuration.clickOpensPane && recentLine.canOpen
-                            icon.name: "window"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Reopen this chat")
-                            Layout.preferredHeight: recentButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: recentButtons.buttonWidth
-                            onClicked: recentLine.open()
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Reopen this chat")
-                                subText: recentOpenIn.inVscode ? root.vscodeHint(section.group, section.remoteHost, true)
-                                                               : root.terminalHint(section.remoteHost, true)
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            // star it: it stays listed under Starred (a starred one has its ★)
-                            visible: !recentLine.chat.starred
-                            icon.name: "non-starred-symbolic"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Star")
-                            Layout.preferredHeight: recentButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: recentButtons.buttonWidth
-                            onClicked: root.setStar("chats", recentLine.chat.sessionId, section.remoteHost, true)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Star this chat")
-                                subText: root.starHint("chats", false)
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            id: recentShare
-                            visible: root.shareAccountsOf(section.remoteHost).length >= 2
-                            icon.name: "document-share"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Share or continue on another account…")
-                            Layout.preferredHeight: recentButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: recentButtons.buttonWidth
-                            onClicked: root.openShareMenu(recentShare, {
-                                chatId: recentLine.chat.sessionId, name: recentLine.chat.name,
-                                profileDir: recentLine.chat.profileDir, shared: recentLine.chat.shared, host: section.remoteHost
-                            }, recentLine.rowKey)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Continue on another account")
-                                subText: root.shareHint(section.remoteHost)
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            // to the Trash, after a question (DeleteAsk under the line)
-                            icon.name: "user-trash"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Delete…")
-                            Layout.preferredHeight: recentButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: recentButtons.buttonWidth
-                            onClicked: root.askDelete(recentLine.rowKey, "chat", recentLine.chat.sessionId,
-                                                      recentLine.chat.profileDir, section.remoteHost, "")
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Delete this chat…")
-                                subText: root.deleteHint("chat")
-                            }
-                        }
-                    }
-                }
-            }
-
-            KeepOnlyMessage {
-                Layout.fillWidth: true
-                shown: root.shareConfirm.key === recentLine.rowKey
-            }
-            DeleteAsk {
-                Layout.fillWidth: true
-                itemKey: recentLine.rowKey
-            }
+            Layout.leftMargin: Kirigami.Units.gridUnit
+            chat: section.starred[index] || root.emptyRecent
+            group: section.group
+            remoteHost: section.remoteHost
+            folderWidth: section.folderWidth
         }
     }
+    MoreButton {
+        open: section.starredOpen
+        listKey: section.groupKey + "|chats"
+        shown: section.starredShown
+        count: section.starred.length
+    }
 
-    // Plans: what this account's chats in plan mode wrote (<config>/plans):
-    // open one, carry it out in a new chat, continue the chat that made it,
-    // or share it with your other accounts
+    // ★ Starred plans: the plans you starred, however old, a page at a time
+    // (every plan is in its project, in the Projects tab)
     PlasmaComponents3.ToolButton {
-        visible: section.plans.length > 0 || section.starredPlans.length > 0
+        visible: section.starredPlans.length > 0
         Layout.leftMargin: Kirigami.Units.smallSpacing
         flat: true
-        icon.name: section.plansOpen ? "arrow-down" : "arrow-right"
-        text: section.plans.length > 0 || section.starredPlans.length === 0 ? i18n("Plans (%1)", section.plans.length)
-              : i18nc("starred plans, how many", "Plans: ★ Starred (%1)", section.starredPlans.length)
-        font: Kirigami.Theme.smallFont
-        onClicked: root.togglePlans(section.groupKey, section.plansOpen)
-
-        PlasmaCore.ToolTipArea {
-            textFormat: Text.PlainText
-            anchors.fill: parent
-            mainText: i18n("Plans")
-            subText: i18n("The plans this account's chats wrote in plan mode, newest first, and the ones you starred. Click one to open it; carry it out in a new chat, go back to the chat that made it, or share it with your other accounts.")
-        }
-    }
-
-    // the plans you starred: unfolded, they come first (a step further in)
-    PlasmaComponents3.ToolButton {
-        visible: section.plansOpen && section.starredPlans.length > 0
-        Layout.leftMargin: Kirigami.Units.gridUnit
-        flat: true
         icon.name: section.starredPlansOpen ? "arrow-down" : "arrow-right"
-        text: i18nc("starred plans, how many", "★ Starred (%1)", section.starredPlans.length)
+        text: section.starredPlansShown < section.starredPlans.length
+              ? i18nc("starred plans: how many show, of how many", "★ Starred plans (%1 of %2)", section.starredPlansShown, section.starredPlans.length)
+              : i18nc("starred plans, how many", "★ Starred plans (%1)", section.starredPlans.length)
         font: Kirigami.Theme.smallFont
         onClicked: root.toggleStarred(section.groupKey + "|plans", section.starredPlansOpen)
 
@@ -947,536 +694,39 @@ ColumnLayout {
             textFormat: Text.PlainText
             anchors.fill: parent
             mainText: i18n("Starred plans")
-            subText: i18n("The plans of this account you starred (☆ next to a plan), newest first, however old they are. Click a plan's ★ to unstar it.")
+            subText: i18n("The plans of this account you starred (☆ next to a plan), newest first, however old they are. Click one to read it; carry it out in a new chat, go back to the chat that made it, or share it with your other accounts. Click a plan's ★ to unstar it. Every plan is in its project, in the Projects tab.")
         }
     }
-
     Repeater {
-        model: section.plansOpen ? section.starredPlansShown.length + section.plans.length : 0
-        delegate: ColumnLayout {
-            id: planLine
-
+        model: section.starredPlansOpen ? starredPlanRows : 0
+        delegate: PlanLine {
             required property int index
-            readonly property bool inStarred: index < section.starredPlansShown.length
-            readonly property var plan: (inStarred ? section.starredPlansShown[index] : section.plans[index - section.starredPlansShown.length])
-                                        || root.emptyPlan
-            readonly property string composerKey: (section.remoteHost ? section.remoteHost + "|" : "") + plan.key
-
-            Layout.fillWidth: true
-            Layout.leftMargin: Kirigami.Units.gridUnit * (inStarred ? 2 : 1)
-            Layout.rightMargin: Kirigami.Units.smallSpacing
-            spacing: Kirigami.Units.smallSpacing / 2
-
-            HoverHandler {
-                id: planHover
-            }
-            TouchHold {
-                buttons: planButtons
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                Kirigami.Icon {
-                    source: "view-task"
-                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                    Layout.preferredHeight: Layout.preferredWidth
-                    opacity: 0.7
-                }
-                PlasmaComponents3.Label {
-                    id: planName
-                    textFormat: Text.PlainText
-                    text: planLine.plan.title
-                    font.underline: planMouse.containsMouse || activeFocus
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                    // (Tab: its buttons show; Enter: as a click)
-                    activeFocusOnTab: true
-                    Keys.onReturnPressed: root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
-                    Keys.onEnterPressed: root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
-
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        width: planName.contentWidth
-                        height: parent.height
-                        mainText: planLine.plan.title
-                        subText: (section.remoteHost ? i18n("Click to read it: a copy, fetched from %1.", section.remoteHost)
-                                                     : i18n("Click to read it, rendered."))
-                                 + (!section.remoteHost || root.vscodeInstalled ? " " + i18n("To change it, the edit button next to it opens its file.") : "")
-                                 + (planLine.plan.cwd ? "\n" + i18n("Folder: %1", (section.remoteHost ? section.remoteHost + ":" : "") + planLine.plan.cwd) : "")
-                                 + (planLine.plan.shared ? "\n" + i18n("Shared with your other accounts.") : "")
-                                 + (planLine.plan.chatId ? "" : "\n" + i18n("The chat that made it isn't here any more."))
-
-                        MouseArea {
-                            id: planMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: if (!planButtons.holding) root.openPlan(planLine.plan.slug, planLine.plan.profileDir, section.remoteHost)
-
-                            TouchHold {
-                                buttons: planButtons
-                            }
-                        }
-                    }
-                }
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    visible: planLine.plan.shared
-                    text: "⇄"
-                    opacity: 0.6
-                }
-                // you changed it since Claude wrote it: send that to its chat (as in VS Code)
-                Tag {
-                    visible: !!planLine.plan.edited && !!planLine.plan.chatId && !section.remoteHost
-                    text: i18nc("send your changes to the plan to the chat", "↩ Send")
-                    active: true
-                    clickable: true
-                    tooltipTitle: i18n("Send your changes to Claude")
-                    tooltip: i18n("You changed this plan since Claude wrote it. Click to send what you changed (and notes you wrote into it) to the chat that made it: Claude revises the plan, in plan mode.")
-                    onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
-                }
-                // starred: a ★ (click: unstar it)
-                StarMark {
-                    visible: !!planLine.plan.starred
-                    tooltip: root.starHint("plans", false) + " " + root.starHint("plans", true)
-                    onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, false)
-                }
-                // its folder and how long ago, at the line's end
-                CoveredEnd {
-                    id: planEnd
-                    covered: planButtons.covering
-                    Layout.preferredWidth: section.endWidth
-                    implicitHeight: planWhen.implicitHeight
-
-                    RowLayout {
-                        width: planEnd.width
-                        spacing: Kirigami.Units.smallSpacing
-
-                        PlasmaComponents3.Label {
-                            id: planWhen
-                            Layout.preferredWidth: section.folderWidth
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: planLine.plan.cwdShort || ""
-                            opacity: 0.6
-                            font: Kirigami.Theme.smallFont
-                            elide: Text.ElideMiddle
-                            PlasmaCore.ToolTipArea {   // (the whole folder: the line may be cut short)
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                active: !!planLine.plan.cwd
-                                mainText: i18n("Folder")
-                                subText: (section.remoteHost ? section.remoteHost + ":" : "") + planLine.plan.cwd
-                            }
-                        }
-                        PlasmaComponents3.Label {
-                            Layout.preferredWidth: root.agoWidth
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: root.ago(root.now - planLine.plan.updatedAt)
-                            opacity: 0.6
-                            font: Kirigami.Theme.smallFont
-                        }
-                    }
-                }
-                // on hover (and while its new chat box is open), over the line's end
-                HoverButtons {
-                    id: planButtons
-                    lineHeight: planName.implicitHeight
-                    shown: planHover.hovered || planName.activeFocus || planButtons.focused || planButtons.held
-                           || root.planComposer === planLine.composerKey || root.deleteAsk.key === planLine.composerKey
-                    under: planEnd
-
-                    RowLayout {   // (made the first time they show)
-                        spacing: 0
-
-                        PlasmaComponents3.ToolButton {
-                            // star it: it stays listed under Starred (a starred one has its ★)
-                            visible: !planLine.plan.starred
-                            icon.name: "non-starred-symbolic"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Star")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.setStar("plans", planLine.plan.slug, section.remoteHost, true)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Star this plan")
-                                subText: root.starHint("plans", false)
-                            }
-                        }
-                        // the plan's Markdown file itself, to change it (an SSH host's: in VS Code, over Remote-SSH)
-                        PlasmaComponents3.ToolButton {
-                            visible: !section.remoteHost || root.vscodeInstalled
-                            icon.name: "document-edit"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Edit the plan")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.editPlan(planLine.plan, section.remoteHost)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Edit the plan")
-                                subText: section.remoteHost
-                                         ? i18n("Opens its Markdown file on %1 in VS Code (Remote - SSH). What you change there is the plan.", section.remoteHost)
-                                         : i18n("Opens its Markdown file in your text editor (VS Code, if the settings open plans there). What you change there is the plan.")
-                            }
-                        }
-                        // what you changed in it, to the chat that made it (main.qml: sendPlanFeedback)
-                        // (a plan whose chat is gone keeps this button's place, greyed out, so every line's buttons and time stay in the same columns)
-                        PlasmaComponents3.ToolButton {
-                            visible: !section.remoteHost
-                            enabled: !!planLine.plan.chatId
-                            icon.name: "mail-send"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Send your changes to Claude")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.sendPlanFeedback(planLine.plan.slug, planLine.plan.profileDir, planLine.plan.chatId)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Send your changes to Claude")
-                                subText: (planLine.plan.edited ? i18n("You changed this plan since Claude wrote it.") + " " : "")
-                                         + i18n("Sends what you changed in it (and notes you wrote into it) to the chat that made it: Claude revises the plan, in plan mode. In tmux it's typed in for you; else it goes to the clipboard and the chat comes up, to paste it there. A chat that isn't open reopens in plan mode with it.")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            id: planGo
-                            icon.name: "media-playback-start"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Carry it out…")
-                            checked: root.planComposer === planLine.composerKey
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.togglePlanComposer(planLine.composerKey)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Carry it out in a new chat")
-                                subText: i18n("A new chat starts with the plan as its first message: in a terminal, in VS Code or in the background, in the plan's folder or another one.")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "go-previous"
-                            enabled: !!planLine.plan.chatId
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Continue the chat that made it")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.continuePlanChat(planLine.plan, section.group, section.remoteHost)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Continue the chat that made it")
-                                subText: i18n("To change the plan with Claude: its chat comes up, or reopens (in a terminal or VS Code, as the switch of Recent chats says).")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            id: planShare
-                            visible: root.shareAccountsOf(section.remoteHost).length >= 2
-                            icon.name: "document-share"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Share it with another account…")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.openPlanMenu(planShare, planLine.plan, section.remoteHost)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Share this plan")
-                                subText: i18n("A shared plan is one file on each account: a change shows on all of them. Sharing a chat shares its plan too.")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            // to the Trash, after a question (DeleteAsk under the line)
-                            icon.name: "user-trash"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Delete…")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.askDelete(planLine.composerKey, "plan", planLine.plan.slug, planLine.plan.profileDir,
-                                                      section.remoteHost, "")
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Delete this plan…")
-                                subText: root.deleteHint("plan")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            // hide it here (nothing is deleted)
-                            icon.name: "window-close"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Hide this plan")
-                            Layout.preferredHeight: planButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: planButtons.buttonWidth
-                            onClicked: root.hideItem("plans", planLine.plan.slug, section.remoteHost)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Hide this plan")
-                                subText: root.hideHint("plans", section.remoteHost)
-                            }
-                        }
-                    }
-                }
-            }
-
-            DeleteAsk {
-                Layout.fillWidth: true
-                itemKey: planLine.composerKey
-            }
-            // (made only while it's open: one under every plan made the list
-            // slow to open; made hidden, then shown, it takes the task and
-            // the focus as it shows)
-            Loader {
-                id: planBox
-                readonly property bool shown: root.planComposer === planLine.composerKey
-                active: shown
-                visible: shown
-                Layout.fillWidth: true
-                onLoaded: item.visible = Qt.binding(() => planBox.shown)
-
-                sourceComponent: NewChatBox {
-                    visible: false
-                    group: section.group
-                    remoteHost: section.remoteHost
-                    plan: planLine.plan
-                }
-            }
-        }
-    }
-
-    // Memories: what Claude keeps about you and your projects on this account
-    // (<config>/projects/<folder>/memory): read one, or change it
-    PlasmaComponents3.ToolButton {
-        visible: section.memories.length > 0
-        Layout.leftMargin: Kirigami.Units.smallSpacing
-        flat: true
-        icon.name: section.memoriesOpen ? "arrow-down" : "arrow-right"
-        text: i18n("Memories (%1)", section.memories.length)
-        font: Kirigami.Theme.smallFont
-        onClicked: root.toggleMemories(section.groupKey, section.memoriesOpen)
-
-        PlasmaCore.ToolTipArea {
-            textFormat: Text.PlainText
-            anchors.fill: parent
-            mainText: i18n("Memories")
-            subText: i18n("What Claude keeps about you and your projects on this account, newest first: one note each, for the folder it was learned in. Claude reads them in new chats there. Click one to read it; the edit button changes it.")
-        }
-    }
-
-    Repeater {
-        model: section.memoriesOpen ? section.memories.length : 0
-        delegate: ColumnLayout {
-            id: memoryLine
-
-            required property int index
-            readonly property var memory: section.memories[index]
-                                          || ({ key: "", name: "", description: "", type: "", path: "", folder: "", folderShort: "", updatedAt: 0, folderGone: false })
-            // an SSH host's opens in VS Code (Remote-SSH), to change it
-            readonly property bool canOpen: !section.remoteHost || root.vscodeInstalled
-            readonly property string itemKey: memory.key ? (section.remoteHost ? section.remoteHost + "|" : "") + memory.key : ""
-
-            Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.gridUnit
-            Layout.rightMargin: Kirigami.Units.smallSpacing
-            spacing: 0
-
-            HoverHandler {
-                id: memoryHover
-            }
-            TouchHold {
-                buttons: memoryButtons
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                Kirigami.Icon {
-                    source: root.memoryIcon(memoryLine.memory.type)
-                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                    Layout.preferredHeight: Layout.preferredWidth
-                    opacity: 0.7
-                }
-                PlasmaComponents3.Label {
-                    id: memoryName
-                    textFormat: Text.PlainText
-                    text: memoryLine.memory.description || memoryLine.memory.name
-                    font.underline: memoryMouse.containsMouse || activeFocus
-                    opacity: memoryLine.canOpen ? 1 : 0.7
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                    // (Tab: its buttons show; Enter: as a click)
-                    activeFocusOnTab: true
-                    Keys.onReturnPressed: if (memoryLine.canOpen) root.openMemory(memoryLine.memory, section.remoteHost, false)
-                    Keys.onEnterPressed: if (memoryLine.canOpen) root.openMemory(memoryLine.memory, section.remoteHost, false)
-
-                    PlasmaCore.ToolTipArea {
-                        textFormat: Text.PlainText
-                        width: memoryName.contentWidth
-                        height: parent.height
-                        mainText: memoryLine.memory.name
-                        subText: (memoryLine.memory.description ? memoryLine.memory.description + "\n\n" : "")
-                                 + (memoryLine.memory.type ? i18n("Kind: %1", memoryLine.memory.type) + "\n" : "")
-                                 + (memoryLine.memory.folder ? (memoryLine.memory.folderGone ? i18n("Folder: %1 (not there any more)", (section.remoteHost ? section.remoteHost + ":" : "") + memoryLine.memory.folder)
-                                                                                             : i18n("Folder: %1", (section.remoteHost ? section.remoteHost + ":" : "") + memoryLine.memory.folder)) + "\n" : "")
-                                 + (section.remoteHost ? (memoryLine.canOpen ? i18n("Click to open its file on %1 in VS Code (Remote - SSH).", section.remoteHost)
-                                                                             : i18n("Needs VS Code (Remote - SSH) to open a memory on %1.", section.remoteHost))
-                                                       : i18n("Click to read it, rendered."))
-
-                        MouseArea {
-                            id: memoryMouse
-                            anchors.fill: parent
-                            enabled: memoryLine.canOpen
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: if (!memoryButtons.holding) root.openMemory(memoryLine.memory, section.remoteHost, false)
-
-                            TouchHold {
-                                buttons: memoryButtons
-                            }
-                        }
-                    }
-                }
-                // its folder and how long ago, at the line's end
-                CoveredEnd {
-                    id: memoryEnd
-                    covered: memoryButtons.covering
-                    Layout.preferredWidth: section.endWidth
-                    implicitHeight: memoryWhen.implicitHeight
-
-                    RowLayout {
-                        width: memoryEnd.width
-                        spacing: Kirigami.Units.smallSpacing
-
-                        PlasmaComponents3.Label {
-                            id: memoryWhen
-                            Layout.preferredWidth: section.folderWidth
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: memoryLine.memory.folderShort || (memoryLine.memory.type === "account" ? i18n("every folder") : "")
-                            opacity: 0.6
-                            font: Kirigami.Theme.smallFont
-                            elide: Text.ElideMiddle
-                        }
-                        PlasmaComponents3.Label {
-                            Layout.preferredWidth: root.agoWidth
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: root.ago(root.now - memoryLine.memory.updatedAt)
-                            opacity: 0.6
-                            font: Kirigami.Theme.smallFont
-                        }
-                    }
-                }
-                // on hover, over the line's end
-                HoverButtons {
-                    id: memoryButtons
-                    lineHeight: memoryName.implicitHeight
-                    shown: memoryHover.hovered || memoryName.activeFocus || memoryButtons.focused || memoryButtons.held
-                           || (memoryLine.itemKey !== "" && root.deleteAsk.key === memoryLine.itemKey)
-                    under: memoryEnd
-
-                    RowLayout {   // (made the first time they show)
-                        spacing: 0
-
-                        PlasmaComponents3.ToolButton {
-                            visible: !section.remoteHost   // (an SSH host's opens to change it with a click: VS Code)
-                            icon.name: "document-edit"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Edit this memory")
-                            Layout.preferredHeight: memoryButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: memoryButtons.buttonWidth
-                            onClicked: root.openMemory(memoryLine.memory, section.remoteHost, true)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Edit this memory")
-                                subText: i18n("Opens its file in your text editor (VS Code, if the settings open plans there). What you change there is what Claude remembers; Claude reads it in new chats in that folder.")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            // to the Trash, after a question (DeleteAsk under the line); not the account's CLAUDE.md
-                            visible: memoryLine.memory.type !== "account"
-                            icon.name: "user-trash"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Delete…")
-                            Layout.preferredHeight: memoryButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: memoryButtons.buttonWidth
-                            onClicked: root.askDelete(memoryLine.itemKey, "memory", memoryLine.memory.key, "", section.remoteHost,
-                                                      memoryLine.memory.folderShort)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Delete this memory…")
-                                subText: root.deleteHint("memory")
-                            }
-                        }
-                        PlasmaComponents3.ToolButton {
-                            // hide it here (nothing is deleted)
-                            icon.name: "window-close"
-                            display: PlasmaComponents3.AbstractButton.IconOnly
-                            text: i18n("Hide this memory")
-                            Layout.preferredHeight: memoryButtons.buttonSize
-                            icon.width: Kirigami.Units.iconSizes.small
-                            icon.height: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: memoryButtons.buttonWidth
-                            onClicked: root.hideItem("memories", memoryLine.memory.key, section.remoteHost)
-
-                            PlasmaCore.ToolTipArea {
-                                textFormat: Text.PlainText
-                                anchors.fill: parent
-                                mainText: i18n("Hide this memory")
-                                subText: root.hideHint("memories", section.remoteHost)
-                            }
-                        }
-                    }
-                }
-            }
-
-            DeleteAsk {
-                Layout.fillWidth: true
-                itemKey: memoryLine.itemKey
-            }
+            plan: section.starredPlans[index] || root.emptyPlan
+            group: section.group
+            remoteHost: section.remoteHost
+            folderWidth: section.folderWidth
         }
     }
+    MoreButton {
+        open: section.starredPlansOpen
+        listKey: section.groupKey + "|plans"
+        shown: section.starredPlansShown
+        count: section.starredPlans.length
+    }
+
+    // The account's CLAUDE.md: your instructions for every chat on it (read it, or edit it)
+    Repeater {
+        model: (section.group.instructions || []).length
+        delegate: MemoryLine {
+            required property int index
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            memory: section.group.instructions[index] || root.emptyMemory
+            remoteHost: section.remoteHost
+            folderWidth: section.folderWidth
+        }
+    }
+
 
     Kirigami.Separator {
         visible: !section.last

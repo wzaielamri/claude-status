@@ -6,91 +6,60 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 
 // The Projects tab: each project (a chat's git repository, else its folder),
-// newest first, with what goes on there now (its open chats), Claude's last
-// recap of it, how long Claude worked on it and what that cost (the last 7
-// days and everything kept), its chats, plans and memories, and a button for
-// a new chat there. The numbers come from week.py --projects (main.qml:
-// loadProjects), what goes on now from the status.
+// newest first, folded: its name, when Claude last worked there, a dot for
+// each of its open chats, a button for a new chat there. Opened (its lines
+// are made then): its open chats now, Claude's last recap of it, its chats
+// (a page at a time, as Recent chats), its plans and its memories, each
+// line as under an account, with the account it's on when the project is
+// on several. Everything of it comes from week.py --projects (main.qml:
+// loadProjects), what goes on now from the status. No time or money here:
+// the Recap has them, by project.
 PlasmaComponents3.ScrollView {
     id: view
 
     readonly property var projects: root.projectsData ? root.projectsData.projects || [] : []
-    readonly property real gu: Kirigami.Units.gridUnit
-    property var open: ({})        // project path -> unfolded (all folded at first)
+    readonly property real folderWidth: Kirigami.Units.gridUnit * 8
+    // the chats listed now (open, or kept for the record): not again under Chats
+    readonly property var listed: {
+        const ids = {}
+        for (const g of root.groups)
+            for (const s of g.sessions)
+                for (const id of [s.chatId, s.sessionId, s.jobSessionId])
+                    if (id)
+                        ids[id] = true
+        return ids
+    }
     contentWidth: availableWidth
     PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
     function under(folder, path) {
-        return !!folder && (folder === path || folder.startsWith(path + "/"))
+        return !!folder && !!path && (folder === path || folder.startsWith(path + "/"))
     }
-    // What the status has about a project now: its open chats, plans, memories, the last recap
-    function now(project) {
-        const sessions = [], plans = [], memories = [], recents = []
-        for (const g of root.groups) {
+    // What goes on there now: its open chats (the status')
+    function openChats(project) {
+        const out = []
+        for (const g of root.groups)
             for (const s of g.sessions)
                 if (under(s.cwd, project.path))
-                    sessions.push({ key: root.petKeyOf(s, ""), session: s, host: "", account: g.title })
-            for (const p of g.plans || [])
-                if (under(p.cwd, project.path))
-                    plans.push(p)
-            for (const m of g.memories || [])
-                if (m.folder && under(m.folder, project.path))
-                    memories.push(m)
-            for (const r of g.recent || [])
-                if (under(r.cwd, project.path) && r.recap && r.recap.text)
-                    recents.push(r)
-        }
-        recents.sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0))
-        plans.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-        memories.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-        return { sessions: sessions, plans: plans, memories: memories, recap: recents.length ? recents[0].recap.text : "" }
+                    out.push({ key: root.petKeyOf(s, ""), session: s, host: "", account: g.title })
+        return out
     }
-    function isOpen(project, index) {
-        return project.path in open ? open[project.path] : false
-    }
-    // (as the Recap shows money: its currency, symbol and rounding)
-    readonly property var currency: root.projectsData && root.projectsData.currency ? root.projectsData.currency : ({ code: "USD", rate: 1 })
-    readonly property var symbols: ({ USD: "$", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥", INR: "₹", KRW: "₩", ILS: "₪", TRY: "₺", PHP: "₱", THB: "฿" })
-    function money(usd) {
-        const amount = (usd || 0) * (currency.rate || 1)
-        const symbol = symbols[currency.code]
-        const put = text => symbol ? symbol + text : text + " " + currency.code
-        if (!amount)
-            return put("0")
-        const whole = amount >= 100 || ["JPY", "KRW", "HUF", "ISK", "IDR"].indexOf(currency.code) >= 0
-        if (amount < (whole ? 1 : 0.01))
-            return "<" + put(whole ? "1" : Number(0.01).toLocaleString(Qt.locale(), "f", 2))
-        return put(Number(amount).toLocaleString(Qt.locale(), "f", whole ? 0 : 2))
-    }
-    // (as the Recap shows worked time: 26h 5m, 45m)
-    function hours(ms) {
-        const m = Math.round(Math.max(0, ms) / 60000)
-        return m < 60 ? i18nc("duration in minutes", "%1m", m)
-                      : i18nc("duration in hours and minutes", "%1h %2m", Math.floor(m / 60), m % 60)
+    function isOpen(project) {
+        return !!root.openProjects[project.path]
     }
 
-    // A plan's or a memory's button, its title as it is (one with <tags> in it isn't drawn as markup)
-    component Chip: PlasmaComponents3.ToolButton {
-        id: chip
-        contentItem: RowLayout {
-            spacing: Kirigami.Units.smallSpacing
-            Kirigami.Icon {
-                source: chip.icon.name
-                Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                Layout.preferredHeight: Kirigami.Units.iconSizes.small
-            }
-            Text {
-                Layout.fillWidth: true
-                text: chip.text
-                textFormat: Text.PlainText
-                font: chip.font
-                color: Kirigami.Theme.textColor
-                elide: Text.ElideRight
-            }
-        }
+    // the title of an opened project's chats, plans, memories: small, as the folds of an account's lists
+    component SubTitle: PlasmaComponents3.Label {
+        textFormat: Text.PlainText
+        Layout.fillWidth: true
+        font.pointSize: Kirigami.Theme.smallFont.pointSize
+        font.weight: Font.DemiBold
+        opacity: 0.75
+        elide: Text.ElideRight
     }
 
     ColumnLayout {
+        id: list
         width: view.availableWidth
         spacing: Kirigami.Units.largeSpacing
 
@@ -125,9 +94,13 @@ PlasmaComponents3.ScrollView {
             delegate: ColumnLayout {
                 id: card
                 required property int index
-                readonly property var project: view.projects[index] || ({ name: "", path: "", short: "", chats: [], chatCount: 0 })
-                readonly property bool unfolded: view.isOpen(project, index)
-                readonly property var here: unfolded ? view.now(project) : ({ sessions: [], plans: [], memories: [], recap: "" })
+                readonly property var project: view.projects[index]
+                                               || ({ name: "", path: "", short: "", gone: false, lastAt: 0, accounts: [], chats: [],
+                                                     chatCount: 0, plans: [], memories: [], recap: null })
+                // (a plan whose chat is gone: its folder isn't known)
+                readonly property bool unfiled: project.path === ""
+                readonly property bool unfolded: view.isOpen(project)
+                readonly property var here: unfiled ? [] : view.openChats(project)
                 // its hide button: on hover, while the keyboard is on its line
                 // (Tab), or after a press and hold with a finger (TouchHold.qml)
                 readonly property bool buttonsShown: cardHover.hovered || projectName.activeFocus || newHere.visualFocus
@@ -142,7 +115,24 @@ PlasmaComponents3.ScrollView {
                     }
                 }
                 function fold() {
-                    view.open = Object.assign({}, view.open, { [project.path]: !unfolded })
+                    root.toggleProject(project.path, unfolded)
+                }
+                // (opened from the Recap: brought into view)
+                function bringUp() {
+                    if (root.projectToShow !== "" && root.projectToShow === project.path) {
+                        root.projectToShow = ""
+                        Qt.callLater(() => {
+                            const flick = view.contentItem
+                            flick.contentY = Math.max(0, Math.min(card.y, flick.contentHeight - flick.height))
+                        })
+                    }
+                }
+                Component.onCompleted: bringUp()
+                Connections {
+                    target: root
+                    function onProjectToShowChanged() {
+                        card.bringUp()
+                    }
                 }
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
@@ -179,7 +169,7 @@ PlasmaComponents3.ScrollView {
                             level: 4
                             textFormat: Text.PlainText
                             Layout.fillWidth: true
-                            text: card.project.name
+                            text: card.unfiled ? i18n("Plans whose chat is gone") : card.project.name
                             elide: Text.ElideRight
                             // (Tab: its hide button shows; Enter: folds it open or shut, as a click)
                             activeFocusOnTab: true
@@ -190,22 +180,41 @@ PlasmaComponents3.ScrollView {
                         PlasmaComponents3.Label {
                             textFormat: Text.PlainText
                             Layout.fillWidth: true
-                            text: card.project.short + " · " + i18n("last at work %1 ago", root.duration(Math.max(60000, root.now - card.project.lastAt)))
+                            text: card.unfiled ? i18n("Their folder isn't known any more")
+                                  : (card.project.gone ? i18n("%1 (not there any more)", card.project.short) : card.project.short)
+                                    + " · " + i18n("last at work %1 ago", root.duration(Math.max(60000, root.now - card.project.lastAt)))
                             font: Kirigami.Theme.smallFont
                             opacity: 0.65
                             elide: Text.ElideMiddle
                         }
-                        PlasmaComponents3.Label {
+                    }
+                    // a dot for each of its open chats, in its state's color
+                    Row {
+                        Layout.alignment: Qt.AlignTop
+                        Layout.topMargin: Math.max(0, (projectName.implicitHeight - Kirigami.Units.smallSpacing * 2) / 2)
+                        visible: card.here.length > 0
+                        spacing: Kirigami.Units.smallSpacing / 2
+                        Repeater {
+                            model: card.here.length
+                            delegate: Rectangle {
+                                required property int index
+                                width: Kirigami.Units.smallSpacing * 2
+                                height: width
+                                radius: width / 2
+                                color: root.stateColor(card.here[index] ? card.here[index].session.state : "idle")
+                            }
+                        }
+                        PlasmaCore.ToolTipArea {
                             textFormat: Text.PlainText
-                            Layout.fillWidth: true
-                            text: i18n("7 days: %1", view.hours(card.project.weekMs)) + " · " + i18n("all: %1 · %2", view.hours(card.project.workedMs), view.money(card.project.cost))
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.65
-                            elide: Text.ElideRight
+                            width: parent.width
+                            height: parent.height
+                            mainText: i18np("%1 open chat", "%1 open chats", card.here.length)
+                            subText: card.here.map(c => c.session.name + ": " + root.stateText(c.session)).join("\n")
                         }
                     }
                     PlasmaComponents3.ToolButton {
                         id: newHere
+                        visible: !card.unfiled
                         Layout.alignment: Qt.AlignTop
                         icon.source: root.iconDir + "chat-new-symbolic.svg"   // (as an account's: at 16 px)
                         icon.width: Kirigami.Units.iconSizes.small
@@ -224,6 +233,7 @@ PlasmaComponents3.ScrollView {
                     // on hover: hide it here (nothing is deleted; its chats, plans and memories stay in their lists)
                     PlasmaComponents3.ToolButton {
                         id: hideHere
+                        visible: !card.unfiled
                         Layout.alignment: Qt.AlignTop
                         opacity: card.buttonsShown ? 1 : 0
                         enabled: card.buttonsShown
@@ -246,84 +256,145 @@ PlasmaComponents3.ScrollView {
                     }
                 }
 
-                // What goes on there now
-                Repeater {
-                    model: card.here.sessions.length
-                    delegate: FocusLine {
-                        required property int index
-                        Layout.fillWidth: true
-                        item: card.here.sessions[index] || null
-                    }
-                }
-                // Claude's last recap of it (its own, in the chat)
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
+                // Opened: what's in it (made only then)
+                Loader {
+                    active: card.unfolded
+                    visible: active
                     Layout.fillWidth: true
-                    Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-                    visible: card.unfolded && card.here.recap !== ""
-                    text: "“" + card.here.recap + "”"
-                    font.italic: true
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 4
-                    elide: Text.ElideRight
-                    opacity: 0.8
-                }
-                // Its chats, newest first (click: brings it up)
-                Repeater {
-                    model: card.unfolded ? Math.min(5, card.project.chats.length) : 0
-                    delegate: WeekChatLine {
-                        required property int index
-                        readonly property var c: card.project.chats[index] || ({ id: "", name: "", profileDir: "", cwd: "", lastAt: 0, workedMs: 0, cost: 0 })
-                        chat: ({ name: c.name, chatId: c.id, host: "", profileDir: c.profileDir, folder: "", cwd: c.cwd })
-                        where: i18n("%1 ago", root.duration(Math.max(60000, root.now - c.lastAt)))
-                        numbers: view.hours(c.workedMs) + " · " + view.money(c.cost)
-                        indent: Kirigami.Units.iconSizes.small
-                    }
-                }
-                PlasmaComponents3.Label {
-                    textFormat: Text.PlainText
-                    Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
-                    visible: card.unfolded && card.project.chatCount > 5
-                    text: i18np("and %1 more chat", "and %1 more chats", card.project.chatCount - 5)
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.6
-                }
-                // Its plans and memories
-                Flow {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-                    visible: card.unfolded && (card.here.plans.length + card.here.memories.length) > 0
-                    spacing: Kirigami.Units.smallSpacing
-                    Repeater {
-                        model: Math.min(4, card.here.plans.length)
-                        delegate: Chip {
-                            required property int index
-                            readonly property var plan: card.here.plans[index]
-                            icon.name: "view-task"
-                            text: plan ? plan.title : ""
-                            onClicked: if (plan) root.openPlan(plan.slug, plan.profileDir, "")
+                    sourceComponent: ColumnLayout {
+                        id: inside
+                        readonly property var project: card.project
+                        readonly property bool tagged: (project.accounts || []).length > 1
+                        readonly property var chats: (project.chats || []).filter(c => !view.listed[c.sessionId])
+                        readonly property string pageKey: "project|" + project.path
+                        readonly property int chatsShown: Math.min(chats.length, root.pageSize * root.pagesShown(pageKey))
+                        readonly property var plans: project.plans || []
+                        readonly property int plansShown: Math.min(plans.length, root.pageSize * root.pagesShown(pageKey + "|plans"))
+                        readonly property var memories: project.memories || []
+                        readonly property int memoriesShown: Math.min(memories.length, root.pageSize * root.pagesShown(pageKey + "|memories"))
+                        spacing: Kirigami.Units.smallSpacing
+
+                        // What goes on there now
+                        Repeater {
+                            model: card.here.length
+                            delegate: FocusLine {
+                                required property int index
+                                Layout.fillWidth: true
+                                item: card.here[index] || null
+                            }
                         }
-                    }
-                    Repeater {
-                        model: Math.min(4, card.here.memories.length)
-                        delegate: Chip {
-                            required property int index
-                            readonly property var memory: card.here.memories[index]
-                            icon.name: root.memoryIcon(memory ? memory.type : "")   // (as under its account)
-                            text: memory ? memory.name : ""
-                            onClicked: if (memory) root.openMemory(memory, "", false)
+                        // Claude's last recap of it (its own, in the chat)
+                        PlasmaComponents3.Label {
+                            textFormat: Text.PlainText
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                            visible: !!inside.project.recap && !!inside.project.recap.text
+                            text: visible ? "“" + inside.project.recap.text + "”" : ""
+                            font.italic: true
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 4
+                            elide: Text.ElideRight
+                            opacity: 0.8
                         }
-                    }
-                    PlasmaComponents3.Label {
-                        textFormat: Text.PlainText
-                        visible: card.here.plans.length > 4 || card.here.memories.length > 4
-                        height: implicitHeight * 2
-                        verticalAlignment: Text.AlignVCenter
-                        text: [card.here.plans.length > 4 ? i18np("%1 more plan", "%1 more plans", card.here.plans.length - 4) : "",
-                               card.here.memories.length > 4 ? i18np("%1 more memory", "%1 more memories", card.here.memories.length - 4) : ""]
-                              .filter(t => t).join(" · ") + " " + i18n("(under its account in Chats)")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.6
+
+                        // Its chats, newest first, a page at a time
+                        SubTitle {
+                            visible: inside.chats.length > 0
+                            Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                            text: inside.chatsShown < inside.chats.length
+                                  ? i18nc("a project's chats: how many show, of how many", "Chats (%1 of %2)", inside.chatsShown, inside.chats.length)
+                                  : i18n("Chats (%1)", inside.chats.length)
+                        }
+                        Repeater {
+                            model: PageRows { size: inside.chatsShown }
+                            delegate: RecentLine {
+                                required property int index
+                                Layout.leftMargin: Kirigami.Units.gridUnit
+                                chat: inside.chats[index] || root.emptyRecent
+                                group: root.groupOfProfile(chat.profileDir)
+                                accountTag: inside.tagged ? chat.account || "" : ""
+                                folderWidth: view.folderWidth
+                            }
+                        }
+                        MoreButton {
+                            open: true
+                            listKey: inside.pageKey
+                            shown: inside.chatsShown
+                            count: inside.chats.length
+                        }
+
+                        // Its plans and its memories, newest first, a page at a time too
+                        // (made once its chats show, a frame later: the project opens at once)
+                        Loader {
+                            id: rest
+                            property bool due: false
+                            Connections {
+                                target: rest.Window.window
+                                enabled: !rest.due
+                                function onFrameSwapped() {
+                                    restTimer.start()   // (not in the frame's own signal: after it)
+                                }
+                            }
+                            Timer {
+                                id: restTimer
+                                interval: 0
+                                onTriggered: rest.due = true
+                            }
+                            active: due
+                            visible: active
+                            Layout.fillWidth: true
+                            sourceComponent: ColumnLayout {
+                                spacing: Kirigami.Units.smallSpacing
+
+                                SubTitle {
+                                    visible: inside.plans.length > 0
+                                    Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                                    text: inside.plansShown < inside.plans.length
+                                          ? i18nc("a project's plans: how many show, of how many", "Plans (%1 of %2)", inside.plansShown, inside.plans.length)
+                                          : i18n("Plans (%1)", inside.plans.length)
+                                }
+                                Repeater {
+                                    model: PageRows { size: inside.plansShown }
+                                    delegate: PlanLine {
+                                        required property int index
+                                        Layout.leftMargin: Kirigami.Units.gridUnit
+                                        plan: inside.plans[index] || root.emptyPlan
+                                        group: root.groupOfProfile(plan.profileDir)
+                                        accountTag: inside.tagged ? plan.account || "" : ""
+                                        folderWidth: view.folderWidth
+                                    }
+                                }
+                                MoreButton {
+                                    open: true
+                                    listKey: inside.pageKey + "|plans"
+                                    shown: inside.plansShown
+                                    count: inside.plans.length
+                                }
+                                SubTitle {
+                                    visible: inside.memories.length > 0
+                                    Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                                    text: inside.memoriesShown < inside.memories.length
+                                          ? i18nc("a project's memories: how many show, of how many", "Memories (%1 of %2)", inside.memoriesShown, inside.memories.length)
+                                          : i18n("Memories (%1)", inside.memories.length)
+                                }
+                                Repeater {
+                                    model: PageRows { size: inside.memoriesShown }
+                                    delegate: MemoryLine {
+                                        required property int index
+                                        Layout.leftMargin: Kirigami.Units.gridUnit
+                                        memory: inside.memories[index] || root.emptyMemory
+                                        accountTag: inside.tagged ? memory.account || "" : ""
+                                        folderWidth: view.folderWidth
+                                    }
+                                }
+                                MoreButton {
+                                    open: true
+                                    listKey: inside.pageKey + "|memories"
+                                    shown: inside.memoriesShown
+                                    count: inside.memories.length
+                                }
+                            }
+                        }
                     }
                 }
             }
