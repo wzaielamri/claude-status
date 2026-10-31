@@ -65,7 +65,8 @@ export default class TalpyDenPreferences extends ExtensionPreferences {
         dirs.connect('apply', () => settings.set_string('extra-config-dirs', dirs.text));
         sessions.add(dirs);
         sessions.add(spin('keep-done-hours', 'Keep finished background jobs', 'hours; 0 hides them right away', 0, 168, 1));
-        sessions.add(spin('recent-chats', 'Recent chats per account', '0 hides the list', 0, 20, 1));
+        sessions.add(spin('recent-chats', 'Recent chats per account',
+            'How many show at a time (Show N more for the next ones), also under ★ Starred chats; 0 hides Recent chats', 0, 20, 1));
         page.add(sessions);
 
         const notify = new Adw.PreferencesGroup({title: 'Notifications'});
