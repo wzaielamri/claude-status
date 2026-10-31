@@ -1502,14 +1502,14 @@ export function weekTiles(recap) {
             tip: "Claude's own count of its turns (its “Worked for …”), all chats added up: chats working at the same time each " +
                 `count. On the clock it worked ${hoursText(s.busyMs)}, and it waited ${hoursText(s.waitMs)} for your answers.` +
                 before(p ? p.workedMs : 0, 'time') + weeks('workedMs', 'time')},
-        {label: 'At API prices', value: moneyText(s.cost, cur), delta: weekDeltaText(s.cost, p ? p.cost : null, 'money', cur),
-            trend: weekTrend(recap, 'cost'),
-            tip: `What the same tokens would cost on Claude's API, at its list prices of ${dateText(recap.prices.asOf)}. ` +
-                "Your plan isn't billed this way: this is the value of what you used." + before(p ? p.cost : 0, 'money') + weeks('cost', 'money')},
         {label: 'Prompts', value: String(s.prompts), delta: weekDeltaText(s.prompts, p ? p.prompts : null, 'count'),
             trend: weekTrend(recap, 'prompts'),
             tip: `${plural(s.chats, 'In %1 chat', 'In %1 chats')} · ${plural(s.turns, "%1 turn of Claude's", "%1 turns of Claude's")}` +
                 before(p ? p.prompts : 0, 'count') + weeks('prompts', 'count')},
+        {label: 'At API prices', value: moneyText(s.cost, cur), delta: weekDeltaText(s.cost, p ? p.cost : null, 'money', cur),
+            trend: weekTrend(recap, 'cost'),
+            tip: `What the same tokens would cost on Claude's API, at its list prices of ${dateText(recap.prices.asOf)}. ` +
+                "Your plan isn't billed this way: this is the value of what you used." + before(p ? p.cost : 0, 'money') + weeks('cost', 'money')},
     ];
 }
 
@@ -1641,12 +1641,6 @@ export function weekColdText(recap) {
           `${moneyText(cold.cost, cur)} more than reading it from the cache.`
         : `You came back to chats after their cache had expired (an hour without a reply) ${cold.count} times: writing their ` +
           `context again cost ${moneyText(cold.cost, cur)} more than reading it from the cache.`) + (most ? ` Most in: ${most}.` : '');
-}
-
-export function weekCostliestText(recap) {
-    const chats = recap.spend ? recap.spend.chats : [];
-    const cur = weekCurrency(recap);
-    return chats.length ? `Costliest chats: ${chats.map(c => `${c.name} ${moneyText(c.cost, cur)}`).join(' · ')}` : '';
 }
 
 export function weekFootText(recap) {

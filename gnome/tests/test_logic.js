@@ -697,7 +697,7 @@ test("the week's days, tiles and facts", () => {
     eq([L.weekRowDay('2026-10-19'), L.weekRowDay('2026-10-19', true)], ['Mon 19', '19 Oct']);
     const tiles = L.weekTiles(r);
     eq(tiles.map(t => [t.label, t.value, t.delta]), [['You', '18h 0m', '+4h 44m'], ['Claude worked', '32h 6m', '+17h 6m'],
-        ['At API prices', '$906', '+$509'], ['Prompts', '219', '+16']]);
+        ['Prompts', '219', '+16'], ['At API prices', '$906', '+$509']]);
     eq(L.weekTiles({...r, previous: {youMs: 0, workedMs: 0, prompts: 0, cost: 0}})[0].delta, '');
     eq(L.weekFactsText(r.sum), 'longest turn 1h 13m (startup hang) · up to 3 chats at once · busiest day Tuesday · usage limits stopped you 2 times');
     eq(L.weekFootText(r).split('\n')[1], "lab couldn't be read: no answer");
@@ -724,7 +724,7 @@ test('amounts in another currency, at the rate week.py sends', () => {
     eq([L.moneyText(941, eur), L.moneyText(23.8, eur), L.moneyText(0.004, eur), L.moneyText(12, {code: 'JPY', rate: 152.3}),
         L.moneyText(12, {code: 'CHF', rate: 0.8})], ['€841', '€21.26', '<€0.01', '¥1,828', '9.60 CHF']);
     const r = weekRecap({currency: {code: 'EUR', rate: 0.9, date: '2026-10-23', error: ''}});
-    eq(L.weekTiles(r)[2].value, '€816');
+    eq(L.weekTiles(r)[3].value, '€816');
     eq(L.weekFootText(r).split('\n')[1], "Amounts in EUR at the European Central Bank's rate of 23 Oct 2026: 1 USD = 0.9000 EUR.");
     const failed = weekRecap({currency: {code: 'USD', rate: 1, date: '', error: 'no EUR rate from the European Central Bank yet'}});
     eq(L.weekCurrency(failed).code, 'USD');
@@ -738,7 +738,7 @@ test('trend lines, what Claude did, where the money went, the prompts you answer
     const week = k => ({youMs: k * HOUR, workedMs: 2 * k * HOUR, busyMs: 0, waitMs: 0, prompts: 10 * k, cost: 100 * k, start: 0});
     const r = weekRecap({trend: [null, week(1), week(2), week(3), week(4)]});
     eq(L.weekTiles(r)[1].trend, [null, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR]);
-    eq(L.weekTiles(r)[3].tip.split('\n').pop(), 'Week by week, these 7 days last: ? · 10 · 20 · 30 · 40');
+    eq(L.weekTiles(r)[2].tip.split('\n').pop(), 'Week by week, these 7 days last: ? · 10 · 20 · 30 · 40');
     eq(L.weekWorkText({toolCalls: 3184, commands: 1410, edits: 699, files: 143, linesAdded: 9412, linesRemoved: 2210, subagents: 1,
         webSearches: 0, webFetches: 0, compactions: 2, tools: [['Bash', 1410]]}),
     '3,184 tool calls · 1,410 commands run · 699 edits in 143 files (+9,412 −2,210) · 1 subagent started · 2 compactions');
@@ -746,7 +746,6 @@ test('trend lines, what Claude did, where the money went, the prompts you answer
     const spend = {turns: [], chats: [{name: 'a', cost: 12}], cold: {count: 2, cost: 3.5, chats: [{name: 'b', resumes: 2, cost: 3.5}]}};
     eq(L.weekColdText(weekRecap({spend})), 'You came back to chats after their cache had expired (an hour without a reply) 2 times: writing ' +
         'their context again cost $3.50 more than reading it from the cache. Most in: b (2×, $3.50).');
-    eq(L.weekCostliestText(weekRecap({spend})), 'Costliest chats: a $12.00');
     eq(L.weekPromptsText({answered: 1, refused: 0, waitMs: 2 * HOUR}), 'You answered 1 permission prompt. They waited for your answer 2h 0m in all.');
     const rule = {kind: 'dir', value: '/h/lib', project: '/h/app', count: 3, waitMs: 30000, example: '~/lib/x', id: 'a1b2c3d4e5f6'};
     eq(L.weekRuleMeta(rule), '3 prompts · e.g. ~/lib/x');

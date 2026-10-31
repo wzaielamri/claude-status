@@ -1,9 +1,10 @@
 // The popup's Recap tab: your last 7 days with Claude (week.py, which the
-// indicator runs only while this tab is open). How long you were at it and
-// how long Claude worked, a day per row on a timeline (drawn with Cairo),
-// what the same work would cost at API prices, where it went, and what would
-// use less of your plan (the rules of Claude Code's own /usage). No tokens
-// used: it's all read from the chats' transcripts.
+// indicator runs only while this tab is open), as a story: how long you were
+// at it and how long Claude worked, what it did, a day per row on a timeline
+// (drawn with Cairo), your plan's limits, where it worked and on which chats,
+// what the same work would cost at API prices, and what would use less of
+// your plan (the rules of Claude Code's own /usage). No tokens used: it's
+// all read from the chats' transcripts.
 
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
@@ -109,6 +110,17 @@ export function buildWeekView(ctx) {
     if (facts)
         view.add_child(paragraph(facts, 'claude-small claude-dim'));
 
+    // Then as a story: what Claude did, when (the days, your plan's limits),
+    // where, the chats, the money and what could use less of your plan
+    const did = L.weekWorkText(recap.work);
+    if (did) {
+        const work = column('claude-week-section', {x_expand: true});
+        work.add_child(heading('What Claude did'));
+        work.add_child(paragraph(did, ''));
+        if (L.weekToolsText(recap.work))
+            work.add_child(paragraph(L.weekToolsText(recap.work), 'claude-small claude-dim'));
+        view.add_child(work);
+    }
     view.add_child(buildTimeline(ctx, recap, cur));
     view.add_child(buildPlan(ctx, recap));
     view.add_child(buildProjects(ctx, recap, cur));
@@ -119,15 +131,6 @@ export function buildWeekView(ctx) {
             chats.add_child(chatLine(ctx, c, cur));
         view.add_child(chats);
     }
-    const did = L.weekWorkText(recap.work);
-    if (did) {
-        const work = column('claude-week-section', {x_expand: true});
-        work.add_child(heading('What Claude did'));
-        work.add_child(paragraph(did, ''));
-        if (L.weekToolsText(recap.work))
-            work.add_child(paragraph(L.weekToolsText(recap.work), 'claude-small claude-dim'));
-        view.add_child(work);
-    }
     const models = buildBars(ctx, 'At API prices', recap.models.map(m => ({
         name: m.model, share: m.share, value: `${L.moneyText(m.cost, cur)} · ${L.weekShareText(m.share)}`, color: 'none',
         tip: `${m.model}: ${L.moneyText(m.cost, cur)} · ${m.requests} requests`,
@@ -136,7 +139,6 @@ export function buildWeekView(ctx) {
     if (cache)
         models.add_child(paragraph(cache, 'claude-small claude-dim'));
     view.add_child(models);
-    view.add_child(buildSpend(ctx, recap, cur));
     view.add_child(buildTips(ctx, recap));
     view.add_child(paragraph(L.weekFootText(recap), 'claude-small claude-dim claude-week-foot'));
     return view;
@@ -418,7 +420,7 @@ function buildProjects(ctx, recap, cur) {
         button.connect('clicked', () => ctx.weekUnfold(key));
         ctx.tips.add(button, [(p.host ? `${p.host}: ` : '') + p.path,
             `Claude worked ${L.hoursText(p.workedMs)} · ${L.moneyText(p.cost, cur)} at API prices\n` +
-            `${p.prompts} prompts · ${p.chatCount !== undefined ? p.chatCount : chats.length} chats\nClick for its chats`]);
+            `${p.prompts} prompts · ${p.chatCount !== undefined ? p.chatCount : chats.length} chats\n\nClick for its chats.`]);
         section.add_child(button);
         if (open) {
             for (const c of chats)
@@ -447,30 +449,13 @@ function buildBars(ctx, title, rows) {
     return section;
 }
 
-// Where the money went: the turns that cost most, the chats, and coming
-// back to chats whose cache had expired
-function buildSpend(ctx, recap, cur) {
-    const section = column('claude-week-section', {x_expand: true});
-    const spend = recap.spend;
-    if (!spend || (!spend.turns.length && !spend.cold.count))
-        return section;
-    if (spend.turns.length) {
-        section.add_child(heading('Turns that cost the most'));
-        for (const t of spend.turns)
-            section.add_child(chatLine(ctx, t, cur, t.startedAt ? L.weekWhenText(t.startedAt) : ''));
-    }
-    for (const text of [L.weekCostliestText(recap), L.weekColdText(recap)]) {
-        if (text)
-            section.add_child(paragraph(text, 'claude-small claude-dim'));
-    }
-    return section;
-}
-
-// What would use less of your plan (Claude Code's /usage rules)
+// What would use less of your plan (Claude Code's /usage rules), and what
+// coming back to chats whose cache had expired cost
 function buildTips(ctx, recap) {
     const section = column('claude-week-section', {x_expand: true});
     section.add_child(heading('What could use less of your plan'));
-    if (!recap.tips.length)
+    const cold = L.weekColdText(recap);
+    if (!recap.tips.length && !cold)
         section.add_child(paragraph('Nothing stands out: no habit takes a tenth of the usage shown.', 'claude-dim'));
     for (const t of recap.tips) {
         const line = box('claude-week-tip', {x_expand: true});
@@ -494,5 +479,7 @@ function buildTips(ctx, recap) {
         }
         section.add_child(line);
     }
+    if (cold)
+        section.add_child(paragraph(cold, 'claude-small claude-dim'));
     return section;
 }
