@@ -39,6 +39,18 @@ Window {
     // Chat (your messages and Claude's replies), Steps (its tool calls too)
     // and Review; its screen is in its window (Open its window)
     property string tab: "chat"
+    // its task list (when it has one, the row's): a strip under the header, folded (tasksOpen: unfolded)
+    readonly property var tasks: row && row.tasks && row.tasks.total > 0 ? row.tasks : null
+    property bool tasksOpen: false
+    readonly property string nextTask: {
+        for (const t of tasks ? tasks.items : [])
+            if (t.status !== "completed")
+                return t.subject
+        return ""
+    }
+    // (its subagents, the running ones first, when the strip is unfolded)
+    readonly property var taskAgents: !tasksOpen || !row || !row.agents ? []
+        : row.agents.tree.filter(a => a.status === "running").concat(row.agents.tree.filter(a => a.status !== "running"))
     readonly property bool conversationTab: tab === "chat" || tab === "steps"
     // Where it runs (the tag under its name): "background" (a background
     // session), "closed" (no process: a reply goes
@@ -194,6 +206,7 @@ Window {
     }
 
     function reset() {
+        tasksOpen = false
         offers = null
         offersAt = 0
         suggestions = []
@@ -1183,6 +1196,122 @@ Window {
                     font.pointSize: pane.pt * 0.85
                     color: pane.mutedColor
                     elide: Text.ElideMiddle
+                }
+            }
+
+            // Its tasks, when it has a task list: a progress bar and "3/7 · what it's on", folded; unfolded,
+            // the tasks (✓ done, ▸ the one it's on, ○ to do) and its subagents with what each does now, made
+            // only then (the window opens as quickly)
+            ColumnLayout {
+                visible: pane.tasks !== null
+                Layout.fillWidth: true
+                spacing: 0
+
+                MouseArea {
+                    id: tasksFold
+                    Layout.fillWidth: true
+                    implicitHeight: tasksLine.implicitHeight + Kirigami.Units.smallSpacing
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    activeFocusOnTab: true
+                    onClicked: pane.tasksOpen = !pane.tasksOpen
+                    Keys.onReturnPressed: pane.tasksOpen = !pane.tasksOpen
+                    Keys.onSpacePressed: pane.tasksOpen = !pane.tasksOpen
+                    Accessible.role: Accessible.Button
+                    Accessible.name: tasksText.text
+
+                    RowLayout {
+                        id: tasksLine
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            source: pane.tasksOpen ? Icons.plasma.unfolded : Icons.plasma.folded
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                            Layout.preferredHeight: Layout.preferredWidth
+                            opacity: 0.7
+                        }
+                        Rectangle {
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 5
+                            Layout.preferredHeight: Math.round(Kirigami.Units.gridUnit * 0.3)
+                            radius: height / 2
+                            color: pane.mix(pane.textColor, 0.15)
+
+                            Rectangle {
+                                width: parent.width * (pane.tasks ? pane.tasks.done / Math.max(1, pane.tasks.total) : 0)
+                                height: parent.height
+                                radius: parent.radius
+                                color: Kirigami.Theme.positiveTextColor
+                            }
+                        }
+                        PlasmaComponents3.Label {
+                            id: tasksText
+                            Layout.fillWidth: true
+                            textFormat: Text.PlainText
+                            text: !pane.tasks ? ""
+                                  : i18nc("tasks done/total · the one it's on", "%1/%2 · %3", pane.tasks.done, pane.tasks.total,
+                                          pane.tasks.current || (pane.tasks.done >= pane.tasks.total ? i18n("all done") : i18n("next: %1", pane.nextTask)))
+                            font.pointSize: pane.pt * 0.9
+                            font.underline: tasksFold.containsMouse || tasksFold.activeFocus
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+                Loader {
+                    active: pane.tasksOpen && pane.tasks !== null
+                    visible: active
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                    sourceComponent: ColumnLayout {
+                        spacing: 0
+                        Repeater {
+                            model: pane.tasks ? pane.tasks.items.length : 0
+                            delegate: PlasmaComponents3.Label {
+                                required property int index
+                                readonly property var task: (pane.tasks && pane.tasks.items[index]) || root.emptyTask
+                                Layout.fillWidth: true
+                                text: (task.status === "completed" ? "✓ " : task.status === "in_progress" ? "▸ " : "○ ") + task.subject
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                opacity: task.status === "completed" ? 0.6 : 0.9
+                                font.pointSize: pane.pt * 0.85
+                                font.bold: task.status === "in_progress"
+                            }
+                        }
+                        // its subagents: what each does now (the ones still running first)
+                        Repeater {
+                            model: pane.taskAgents.length
+                            delegate: RowLayout {
+                                required property int index
+                                readonly property var agent: pane.taskAgents[index] || ({ status: "", description: "", type: "", activity: "" })
+                                Layout.fillWidth: true
+                                Layout.topMargin: index === 0 ? Kirigami.Units.smallSpacing : 0
+                                spacing: Kirigami.Units.smallSpacing
+                                Rectangle {
+                                    Layout.preferredWidth: Math.round(Kirigami.Units.gridUnit * 0.4)
+                                    Layout.preferredHeight: Layout.preferredWidth
+                                    radius: width / 2
+                                    // (as the row's subagents: SessionRow.qml)
+                                    color: agent.status === "running" ? Kirigami.Theme.focusColor
+                                         : agent.status === "done" ? Kirigami.Theme.positiveTextColor
+                                         : agent.status === "failed" ? Kirigami.Theme.negativeTextColor : pane.mix(pane.textColor, 0.35)
+                                }
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: (agent.description || agent.type)
+                                          + (agent.status === "running" ? (agent.activity ? ": " + agent.activity : "")
+                                             : " · " + (agent.status === "done" ? i18n("done") : agent.status === "failed" ? i18n("failed")
+                                                        : i18n("stopped")))
+                                    elide: Text.ElideRight
+                                    opacity: agent.status === "running" ? 0.9 : 0.6
+                                    font.pointSize: pane.pt * 0.85
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

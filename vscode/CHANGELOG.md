@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A chat's tasks in its tab:** under the header, a slim strip with a
+  progress bar and *3/7 · what it's on*, folded; a click unfolds the tasks
+  (✓ done, ▸ the one it's on, ○ to do) and its subagents with what each
+  does now, the running ones first. Only a chat with a task list has it,
+  and the list is made only when unfolded.
 - **The tabs in the order you go to them: Talpy Den, Projects,
   Permissions, Recap.** A project's dots stand at the top right of its
   line, which is a little taller: **New chat here** and **Hide** show on

@@ -920,6 +920,98 @@ button:focus-visible {
   pointer-events: auto;
 }
 
+/* A chat's tasks in its tab, under the header (chat.tsx TaskStrip): folded,
+   a progress bar and "3/7 · what it's on"; unfolded, the tasks and its
+   subagents (as in Plasma's chat window) */
+.pane-tasks {
+  margin: 2px 0 0;
+}
+
+.pane-tasks-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pane-tasks-line:hover .pane-tasks-now,
+.pane-tasks-line:focus-visible .pane-tasks-now {
+  text-decoration: underline;
+}
+
+.pane-tasks-line .chevron {
+  opacity: 0.7;
+  transition: transform 0.15s;
+}
+
+.pane-tasks-line .chevron.open {
+  transform: rotate(90deg);
+}
+
+.pane-tasks-bar {
+  flex: none;
+  width: calc(var(--cs-gu) * 5);
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--cs-fg) 15%, transparent);
+  overflow: hidden;
+}
+
+.pane-tasks-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--cs-idle);
+}
+
+.pane-tasks-now {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-tasks-list {
+  margin: 0 0 2px calc(16px + 6px);
+  padding: 0;
+  list-style: none;
+  font-size: 0.85em;
+}
+
+.pane-tasks-list > li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-task.done,
+.pane-agent:not(.running) {
+  opacity: 0.6;
+}
+
+.pane-task.now {
+  font-weight: 600;
+}
+
+.pane-agent:first-of-type.pane-agent,
+.pane-task + .pane-agent {
+  margin-top: 4px;
+}
+
+.pane-agent .focus-dot {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 /* Continue on another account, under a chat a usage limit stopped */
 .handover {
   display: flex;

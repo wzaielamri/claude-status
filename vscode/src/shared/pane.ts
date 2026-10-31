@@ -90,6 +90,7 @@ export interface PaneChat {
   mode: string;
   plan: { title: string } | null;
   agents: Session["agents"];
+  tasks: Session["tasks"]; // its task list (the strip under the header), or null
 }
 
 // Where a chat runs (the tag under its name, the same words as the rows'):

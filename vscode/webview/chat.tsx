@@ -74,6 +74,43 @@ function ToolLine({ item, open, onToggle, asking, going, gap, split, onSplit }: 
 }
 
 // More room before your prompt (a new turn) than between the steps of a turn
+// Its tasks, when it has a task list: a progress bar and "3/7 · what it's on",
+// folded; unfolded, the tasks (✓ done, ▸ the one it's on, ○ to do) and its
+// subagents with what each does now, the running ones first (made only then)
+function TaskStrip({ tasks, agents }: { tasks: NonNullable<PaneChat["tasks"]>; agents: PaneChat["agents"] }) {
+  const [open, setOpen] = useState(false);
+  const next = tasks.items.find((t) => t.status !== "completed")?.subject ?? "";
+  const now = tasks.current || (tasks.done >= tasks.total ? "all done" : `next: ${next}`);
+  const tree = open && agents ? [...agents.tree.filter((a) => a.status === "running"), ...agents.tree.filter((a) => a.status !== "running")] : [];
+  return (
+    <div class="pane-tasks">
+      <button type="button" class="pane-tasks-line" aria-expanded={open} onClick={() => setOpen(!open)}
+        title={open ? "Fold its tasks" : "Its tasks and subagents"}>
+        <Icon name={I.folded} class={"chevron" + (open ? " open" : "")} />
+        <span class="pane-tasks-bar" aria-hidden="true">
+          <span style={{ width: `${Math.round((tasks.done / Math.max(1, tasks.total)) * 100)}%` }} />
+        </span>
+        <span class="pane-tasks-now">{tasks.done}/{tasks.total} · {now}</span>
+      </button>
+      {open ? (
+        <ul class="pane-tasks-list">
+          {tasks.items.map((t, i) => (
+            <li key={i} class={"pane-task " + (t.status === "completed" ? "done" : t.status === "in_progress" ? "now" : "todo")}>
+              {(t.status === "completed" ? "✓ " : t.status === "in_progress" ? "▸ " : "○ ") + t.subject}
+            </li>
+          ))}
+          {tree.map((a) => (
+            <li key={a.id} class={"pane-agent " + a.status}>
+              <span class={`focus-dot st-${a.status === "running" ? "working" : a.status === "done" ? "done" : a.status === "failed" ? "failed" : "stopped"}`} aria-hidden="true" />
+              {(a.description || a.type) + (a.status === "running" ? (a.activity ? `: ${a.activity}` : "") : ` · ${a.status}`)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function gapOf(kind: PaneItem["kind"], prev: PaneItem["kind"] | undefined): string {
   if (!prev) return "first";
   if (kind === "you") return "turn";
@@ -559,6 +596,7 @@ function ChatApp() {
         ) : null}
         <span class="pane-path">{(chat?.host ? chat.host + ":" : "") + (chat?.cwd ?? "")}</span>
       </div>
+      {chat?.tasks ? <TaskStrip key={chat.chatId} tasks={chat.tasks} agents={chat.agents} /> : null}
       <div class="pane-tabs" role="tablist">
         {(["chat", "steps"] as const).map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => showTab(t)}>

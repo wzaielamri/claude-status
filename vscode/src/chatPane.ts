@@ -357,6 +357,7 @@ class Pane implements vscode.Disposable {
       mode: session?.peek?.mode ?? "",
       plan: session?.plan ? { title: session.plan.title } : null,
       agents: session?.agents ?? null,
+      tasks: session?.tasks && session.tasks.total > 0 ? session.tasks : null,
     };
     this.panel.title = chat.name || this.chatId.slice(0, 8);
     if (this.ready) this.post({ type: "chat", chat });

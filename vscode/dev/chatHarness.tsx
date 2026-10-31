@@ -62,7 +62,24 @@ const chat: PaneChat = {
   shared: params.get("shared") === "1" ? { profiles: ["work", "personal"], forkOf: null } as unknown as PaneChat["shared"] : null,
   mode: "auto",
   plan: { title: "Fix the week numbers" },
-  agents: { running: 1, done: 2, stopped: 0, total: 3, tree: [] },
+  agents: {
+    running: 1, done: 2, stopped: 0, total: 3,
+    tree: [
+      { id: "a1", parent: null, depth: 0, type: "Explore", description: "Find where weeks are computed", status: "done", activity: "", started: now - 380_000, updated: now - 330_000 },
+      { id: "a2", parent: null, depth: 0, type: "general-purpose", description: "Check the other date helpers", status: "running", activity: "Grep: weeksInYear", started: now - 200_000, updated: now - 5_000 },
+      { id: "a3", parent: null, depth: 0, type: "Explore", description: "Look for week tests", status: "done", activity: "", started: now - 380_000, updated: now - 300_000 },
+    ],
+  },
+  // ?tasks=0: no task list (no strip); ?tasks=open: the strip unfolded
+  tasks: params.get("tasks") === "0" ? null : {
+    done: 2, total: 4, current: "Running the parser tests",
+    items: [
+      { subject: "Find why week 53 becomes week 1", status: "completed" },
+      { subject: "Fix isoWeek for long years", status: "completed" },
+      { subject: "Run the parser tests", status: "in_progress" },
+      { subject: "Add a test for 2026-12-31", status: "pending" },
+    ],
+  },
 };
 
 const items: PaneItem[] = [
