@@ -40,6 +40,9 @@ off: then it keeps only what the transcripts still have.
                   that would have let them through, and the permissions you
                   gave (every rule and mode that lets chats go without asking)
     --revoke ID   takes one of those permissions out of its file
+    --projects    the Projects tab instead: every project (a chat's git
+                  repository, else its folder) with all its chats, plans and
+                  memories, newest first, and Claude's last recap of it
     --host HOST   (with --permissions) an SSH host's too; --on HOST: an
                   --allow, --undo or --revoke there
 
@@ -2362,45 +2365,119 @@ def host_chats(host, back, span="week", since=None, until=None):
 
 # ---------------------------------------------------------------- projects
 #
-# The Projects tab: each project (a chat's git repository, else its folder)
-# with how long Claude worked on it and what it cost, all of it and the last
-# 7 days, when it was last at work there, and its chats (newest first). The
-# front ends add what's going on now from the status (open chats, plans,
-# memories, Claude's last recap).
+# The Projects tab: each project (a chat's git repository, else its folder),
+# newest first, with everything of it: its chats (all of them, newest first),
+# the plans its chats wrote and the memories Claude keeps for it, and Claude's
+# last recap of it. No time or money: the Recap has those, by project. The
+# front ends add what goes on there now from the status (its open chats).
 
-PROJECT_CHATS = 40
+PROJECT_RECAP_CHATS = 3  # how many of a project's newest chats are read for Claude's last recap of it
 
 
-def projects(chats, now_ms, home):
-    week_ago = now_ms - 7 * 86400_000
-    out, seen = {}, set()
+def projects(chats, now_ms, home, plans=(), memories=(), accounts=None, starred=frozenset(), there=None):
+    """The Projects tab's rows, the newest first: [{"name", "path", "short",
+    "gone" (its folder isn't there any more), "lastAt", "accounts" (the names
+    of the accounts it has something on), "chatCount", "chats", "plans",
+    "memories"}]. A chat is listed as the status lists a recent chat (and
+    starred: its id in starred), plans and memories as the status lists them
+    (talpy_den.py: account_plans, account_memories), each with its
+    "account"; a plan by the folder of the chat that made it, a memory by its
+    folder, both by that folder's git repository as a chat. A plan whose chat
+    is gone is in the row of path "" (last). accounts: {profile key: account
+    name}; there: the ids of the chats whose transcript is still here (a
+    deleted one's numbers stay in the Recap's history: not listed)."""
+    accounts = accounts or {}
+    out, roots = {}, {}
+
+    def row(folder):
+        p = out.get(folder)
+        if p is None:
+            p = out[folder] = {"name": project_name(folder, home) if folder else "", "path": folder,
+                               "short": cs.short_path(folder, home) if folder else "",
+                               "gone": bool(folder) and not os.path.isdir(folder), "lastAt": 0, "accounts": [],
+                               "chats": [], "plans": [], "memories": []}
+        return p
+
+    def on(p, profile):
+        name = accounts.get(profile)
+        if name and name not in p["accounts"]:
+            p["accounts"].append(name)
+
     for c in chats:
         folder = c.get("project") or c.get("folder") or ""
-        if not folder:
+        if not folder or (there is not None and c["id"] not in there):
             continue
-        cost = sum(request_cost(key, t) for agg in c["hours"].values() for key, t in agg["t"].items())
-        # (a fork, or a chat continued in another folder, starts with a copy of the turns before: counted once, as recap does)
-        turns = [t for t in c["turns"] if first_time(seen, (c.get("host"), "turn", t[1], t[2]))]
-        worked = sum(t[2] for t in turns)
-        recent = sum(t[2] for t in turns if t[1] >= week_ago)
         last = max([t[1] for t in c["turns"]] + c["prompts"] + [0])
         if not last:
             continue
-        p = out.setdefault(folder, {"name": project_name(folder, home), "path": folder, "short": cs.short_path(folder, home),
-                                    "workedMs": 0, "weekMs": 0, "cost": 0.0, "lastAt": 0, "chats": []})
-        p["workedMs"] += worked
-        p["weekMs"] += recent
-        p["cost"] += cost
+        p = row(folder)
         p["lastAt"] = max(p["lastAt"], last)
-        p["chats"].append({"id": c["id"], "name": chat_label(c) or c["id"][:8], "profileDir": c["profiles"][0] if c["profiles"] else "",
-                           "cwd": c.get("folder") or "", "lastAt": last, "workedMs": int(worked), "cost": round(cost, 4)})
-    rows = sorted(out.values(), key=lambda p: -p["lastAt"])
-    for p in rows:
-        p["chats"].sort(key=lambda c: -c["lastAt"])
+        profile = c["profiles"][0] if c["profiles"] else ""
+        cwd = c.get("folder") or ""
+        p["chats"].append({"key": "{}/{}/project".format(profile, c["id"]), "sessionId": c["id"],
+                           "name": chat_label(c) or c["id"][:8], "cwd": cwd,
+                           "cwdShort": cs.short_path(cwd, home) if cwd else "", "lastActive": last,
+                           "profileDir": profile, "profile": accounts.get(profile, ""),
+                           "account": accounts.get(profile, ""), "shared": len(c["profiles"]) > 1,
+                           "starred": c["id"] in starred})
+        for q in c["profiles"]:
+            on(p, q)
+    for kind, items, place in (("plans", plans, "cwd"), ("memories", memories, "folder")):
+        for item in items:
+            folder = item.get(place) or ""
+            p = row(project_of(folder, home, roots) if folder else "")
+            p[kind].append(dict(item, account=accounts.get(item.get("profileDir"), "")))
+            on(p, item.get("profileDir"))
+    for p in out.values():   # (worked on last: its newest chat, else its newest plan or memory)
+        if not p["lastAt"]:
+            p["lastAt"] = max([i["updatedAt"] for i in p["plans"] + p["memories"]] + [0])
+        p["chats"].sort(key=lambda c: -c["lastActive"])
         p["chatCount"] = len(p["chats"])
-        p["chats"] = p["chats"][:PROJECT_CHATS]
-        p["workedMs"], p["weekMs"], p["cost"] = int(p["workedMs"]), int(p["weekMs"]), round(p["cost"], 2)
-    return rows
+        for kind in ("plans", "memories"):
+            p[kind].sort(key=lambda i: -i["updatedAt"])
+    return sorted(out.values(), key=lambda p: (not p["path"], -p["lastAt"]))
+
+
+def project_items(home, cache_root, profiles, now_ms):
+    """What the Projects tab lists besides the chats: {"accounts": {profile
+    key: account name}, "plans", "memories" (every one but the ones you hid
+    and the accounts' CLAUDE.md), "starred": the starred chat ids, "there":
+    the ids of the chats whose transcript is here, "paths": {chat id: its
+    transcript}}, with the context read (its caches: save them)."""
+    ctx = cs.Context(home=home, profiles=profiles, now_ms=now_ms, links=cs.LinkCache(cache_root / "links.json"),
+                     slugs=cs.SlugCache(cache_root / "plans.json"), chats=cs.ChatCache(cache_root / "chats.json"))
+    starred = cs.starred_of(cs.load_stars(cache_root))
+    hidden = cs.load_hidden(cache_root)
+    names, plans, memories, seen = {}, [], [], set()
+    for _gid, members in cs.group_profiles(profiles):
+        named = next((p for p in members if not p.is_default), members[0])
+        for p in members:
+            names[p.key] = named.label
+        group = {"profileKeys": [p.key for p in members]}
+        for item in cs.account_plans(group, ctx, 1 << 30, starred["plans"], hidden["plans"]) \
+                + [m for m in cs.account_memories(group, ctx, 1 << 30, hidden["memories"]) if m["type"] != "account"]:
+            real = os.path.realpath(item["path"])   # (one shared with another account: listed once)
+            if real not in seen:
+                seen.add(real)
+                (plans if "slug" in item else memories).append(item)
+    paths = {}
+    for _t, _p, f, _st in cs.all_transcripts(ctx):
+        paths.setdefault(f.stem, f)
+    return ctx, {"accounts": names, "plans": plans, "memories": memories, "starred": starred["chats"],
+                 "there": set(paths), "paths": paths}
+
+
+def project_recaps(rows, ctx, paths):
+    """Claude's last recap of each project ({"text", "at"} or None): of its
+    newest chat that ends with one, of the few newest."""
+    for p in rows:
+        p["recap"] = None
+        for c in p["chats"][:PROJECT_RECAP_CHATS]:
+            path = paths.get(c["sessionId"])
+            peek = ctx.chats.peek(path) if path is not None else None
+            if peek and peek.get("recap"):
+                p["recap"] = peek["recap"]
+                break
 
 
 # ---------------------------------------------------------------- the Monday recap
@@ -2530,18 +2607,22 @@ def main(argv=None):
         except Exception as exc:
             result = {"ok": False, "message": "{}: {}".format(type(exc).__name__, exc)}
         return emit(result)
-    if projects_asked:   # (the Projects tab: every chat the cache has, by project)
+    if projects_asked:   # (the Projects tab: every chat the cache has, plan and memory, by project)
         try:
             profiles = cs.discover_profiles(home, config_dirs)
             cache = updated_cache(cache_root, profiles, now_ms)
             chats = chats_between(cache, profiles, 0, now_ms + 1, home)
             for cid, c in chats.items():
                 c["id"] = cid
-            rows = projects(list(chats.values()), now_ms, home)
+            ctx, items = project_items(home, cache_root, profiles, now_ms)
+            rows = projects(list(chats.values()), now_ms, home, items["plans"], items["memories"], items["accounts"],
+                            items["starred"], items["there"])
             hidden = cs.load_hidden(cache_root)["projects"]  # (the ones you hid: jump.py --hide projects FOLDER)
-            result = {"ok": True, "generatedAt": now_ms, "projects": [p for p in rows if p["path"] not in hidden],
-                      "hidden": sum(p["path"] in hidden for p in rows),
-                      "currency": currency_of(currency, cache_root, now_ms / 1000)}
+            rows, left_out = [p for p in rows if p["path"] not in hidden], sum(p["path"] in hidden for p in rows)
+            project_recaps(rows, ctx, items["paths"])
+            for saved in (ctx.links, ctx.slugs, ctx.chats):
+                saved.save()
+            result = {"ok": True, "generatedAt": now_ms, "projects": rows, "hidden": left_out}
         except Exception as exc:
             result = {"ok": False, "error": "{}: {}".format(type(exc).__name__, exc)}
         return emit(result)

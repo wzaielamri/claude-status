@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -594,6 +595,34 @@ class RecentChatTests(World):
         got = self.recent(recent=3)
         self.assertEqual(got["work"], [("c4", "about c4"), ("c3", "about c3"), ("c2", "about c2")])
         self.assertEqual(self.recent(recent=0), {"personal": [], "work": []})
+
+    def test_all_recent_chats_are_counted(self):
+        # (for "Show N more" and "Recent chats (3 of 5)": the first page listed, all of them counted)
+        for i, age in enumerate([50, 400, 300, 200, 100, 600]):
+            self.chat("work", f"c{i}", age)
+        self.chat("personal", "p0", 70)
+        self.job("work", "c0", age=10)  # listed as a session: not counted
+        self.transcript("work", "empty", [{"type": "ai-title", "aiTitle": "nothing said"}], age=30)  # no messages: neither
+        groups = {g["name"]: g for g in self.collect(recent=3)["groups"]}
+        self.assertEqual((len(groups["work"]["recent"]), groups["work"]["recentCount"]), (3, 5))
+        self.assertEqual((len(groups["personal"]["recent"]), groups["personal"]["recentCount"]), (1, 1))
+        # a copy of a chat (its first entry the same) counts once, as it's listed once
+        self.chat("work", "c4copy", 20, [user("c4-u", self.now - 100, "c4", text="about c4"), reply("x-a", self.now - 20, "x")])
+        work = next(g for g in self.collect(recent=10)["groups"] if g["name"] == "work")
+        self.assertEqual([c["sessionId"] for c in work["recent"]], ["c4copy", "c3", "c2", "c1", "c5"])
+        self.assertEqual(work["recentCount"], 5)
+        # none asked for: none counted
+        self.assertEqual(next(g for g in self.collect(recent=0)["groups"] if g["name"] == "work")["recentCount"], 0)
+
+    def test_past_the_checked_ones_chats_are_counted_by_their_files(self):
+        for i in range(6):
+            self.chat("work", f"c{i}", 50 + i * 10)
+        self.transcript("work", "empty", [{"type": "ai-title", "aiTitle": "nothing said"}], age=500)
+        with mock.patch.object(cs, "RECENT_CHECKED", 2):
+            work = next(g for g in self.collect(recent=2)["groups"] if g["name"] == "work")
+        self.assertEqual(([c["sessionId"] for c in work["recent"]], work["recentCount"]), (["c0", "c1"], 7))
+        work = next(g for g in self.collect(recent=2)["groups"] if g["name"] == "work")
+        self.assertEqual(work["recentCount"], 6)
 
     def test_starred_chats_stay_listed_however_old(self):
         for i, age in enumerate([50, 400, 300, 200, 100, 600]):

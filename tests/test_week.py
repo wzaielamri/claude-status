@@ -1236,6 +1236,9 @@ class OutputTests(Home):
             return json.loads(out.getvalue())
         result = projects()
         self.assertEqual((len(result["projects"]), result["hidden"]), (1, 0))
+        row = result["projects"][0]
+        self.assertEqual(([c["sessionId"] for c in row["chats"]], row["accounts"], row["recap"], row["plans"]),
+                         (["chat-a"], ["work"], None, []))
         cs.hide_item(cs.cache_dir(self.home), "projects", result["projects"][0]["path"])
         result = projects()
         self.assertEqual((result["projects"], result["hidden"]), ([], 1))
@@ -1282,25 +1285,45 @@ class LaneTests(unittest.TestCase):
 
 
 class ProjectTests(unittest.TestCase):
-    """The Projects tab (week.projects): chats by project, newest first."""
+    """The Projects tab (week.projects): chats, plans and memories by project, newest first."""
 
-    def test_projects_with_their_chats_newest_first(self):
+    def test_projects_with_their_chats_plans_and_memories_newest_first(self):
         now = 100 * 86400_000
-        chat = lambda cid, project, name, turns, prompts=(): {
-            "id": cid, "project": project, "folder": project and project + "/sub", "name": name, "profiles": [".claude"], "hours": {},
-            "turns": turns, "prompts": list(prompts)}
-        chats = [chat("a" * 8, "/r/app", "fix it", [[now - 2 * 86400_000, now - 2 * 86400_000 + 3600_000, 3600_000, [], {}]]),
-                 chat("b" * 8, "/r/app", "old one", [[now - 30 * 86400_000, now - 30 * 86400_000 + 600_000, 600_000, [], {}]]),
-                 chat("c" * 8, "/r/web", "today", [[now - 3600_000, now - 60_000, 1800_000, [], {}]]),
+        home = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(home))
+        app, web = home / "r/app", home / "r/web"
+        (app / ".git").mkdir(parents=True)
+        (app / "sub").mkdir()
+        chat = lambda cid, project, name, turns, prompts=(), profiles=(".claude-work",): {
+            "id": cid, "project": project, "folder": project and project + "/sub", "name": name, "profiles": list(profiles),
+            "hours": {}, "turns": turns, "prompts": list(prompts)}
+        chats = [chat("a" * 8, str(app), "fix it", [[now - 2 * 86400_000, now - 2 * 86400_000 + 3600_000, 3600_000, [], {}]]),
+                 chat("b" * 8, str(app), "old one", [[now - 30 * 86400_000, now - 30 * 86400_000 + 600_000, 600_000, [], {}]],
+                      profiles=(".claude-personal",)),
+                 chat("c" * 8, str(web), "today", [[now - 3600_000, now - 60_000, 1800_000, [], {}]]),
                  chat("d" * 8, "", "nowhere", [[now - 60_000, now, 60_000, [], {}]]),
-                 chat("e" * 8, "/r/empty", "never", [])]
-        rows = week.projects(chats, now, Path("/home/x"))
-        self.assertEqual([p["name"] for p in rows], ["web", "app"])
-        app = rows[1]
-        self.assertEqual((app["workedMs"], app["weekMs"], app["chatCount"]), (4200_000, 3600_000, 2))
-        self.assertEqual([c["name"] for c in app["chats"]], ["fix it", "old one"])
-        self.assertEqual(app["chats"][0]["cwd"], "/r/app/sub")
-        # a fork starts with a copy of the turns before it: counted once, as the Recap counts them
-        fork = chat("f" * 8, "/r/app", "fix it (fork)", chats[0]["turns"] + [[now - 60_000, now, 100_000, [], {}]])
-        app = week.projects(chats + [fork], now, Path("/home/x"))[0]
-        self.assertEqual((app["workedMs"], app["weekMs"]), (4300_000, 3700_000))
+                 chat("e" * 8, "/r/empty", "never", []),
+                 chat("g" * 8, str(web), "deleted since", [[now - 60_000, now, 60_000, [], {}]])]
+        plans = [{"slug": "p1", "title": "Plan one", "cwd": str(app / "sub"), "profileDir": ".claude-work", "updatedAt": now - 10},
+                 {"slug": "p2", "title": "Plan two", "cwd": "", "profileDir": ".claude-work", "updatedAt": now - 20}]
+        memories = [{"key": "m1", "name": "notes", "folder": str(app), "profileDir": ".claude-work", "updatedAt": now - 30},
+                     {"key": "m2", "name": "gone", "folder": str(home / "r/gone"), "profileDir": ".claude-work",
+                      "updatedAt": now - 40 * 86400_000}]
+        accounts = {".claude-work": "work", ".claude-personal": "personal"}
+        there = {"a" * 8, "b" * 8, "c" * 8, "d" * 8, "e" * 8}
+        rows = week.projects(chats, now, home, plans, memories, accounts, starred={"b" * 8}, there=there)
+        self.assertEqual([p["name"] for p in rows], ["web", "app", "gone", ""])   # (a plan whose chat is gone: last)
+        web_row, app_row, gone, nowhere = rows
+        self.assertEqual(([c["name"] for c in web_row["chats"]], web_row["chatCount"]), (["today"], 1))  # (not the deleted one)
+        self.assertEqual(([c["name"] for c in app_row["chats"]], app_row["chatCount"]), (["fix it", "old one"], 2))
+        first, second = app_row["chats"]
+        self.assertEqual({k: first[k] for k in ("sessionId", "cwd", "cwdShort", "profileDir", "account", "starred")},
+                         {"sessionId": "a" * 8, "cwd": str(app / "sub"), "cwdShort": "~/r/app/sub",
+                          "profileDir": ".claude-work", "account": "work", "starred": False})
+        self.assertEqual((second["account"], second["starred"]), ("personal", True))
+        self.assertEqual(sorted(app_row["accounts"]), ["personal", "work"])      # (its lines get an account tag)
+        self.assertEqual(([p["slug"] for p in app_row["plans"]], [m["key"] for m in app_row["memories"]]), (["p1"], ["m1"]))
+        self.assertEqual(app_row["plans"][0]["account"], "work")
+        self.assertNotIn("workedMs", app_row)                                     # (no time or money: the Recap has them)
+        self.assertEqual((gone["gone"], gone["lastAt"], gone["chatCount"], app_row["gone"]), (True, now - 40 * 86400_000, 0, False))
+        self.assertEqual(([p["slug"] for p in nowhere["plans"]], nowhere["path"]), (["p2"], ""))

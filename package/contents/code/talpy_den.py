@@ -3018,10 +3018,10 @@ class LinkCache:
         self._keep("transcripts", key, rec)
         return rec
 
-    def first_uuid(self, path):
+    def first_uuid(self, path, st=None):
         """uuid of the first entry that has one ('' if none in the first 256 KB)."""
         try:
-            st = path.stat()
+            st = path.stat() if st is None else st
         except OSError:
             return ""
         key = file_key(st)
@@ -3468,6 +3468,7 @@ def lock_holder(session_id, all_profiles):
 # ---------------------------------------------------------------- recent chats
 
 RECENT_CHATS = 5
+RECENT_CHECKED = 200  # past an account's first page, how many more of its chats are counted one by one (then by file)
 TITLE_READ_BYTES = 65536
 TITLE_KINDS = (("custom-title", "customTitle"), ("agent-name", "agentName"), ("ai-title", "aiTitle"),
                ("summary", "summary"))
@@ -3518,22 +3519,30 @@ def read_chat_info(path, size):
 
 def recent_chats(groups, ctx, limit=RECENT_CHATS, starred=frozenset()):
     """Each account's latest chats that aren't listed as a session already
-    (group["recent"]), and of those its starred ones (ids in starred),
-    however old (group["starred"]). A chat shared across accounts shows up
-    under the one it was used on last; of a chat and its copies (same first
-    entry), only the newest; a shared chat that moved on to a listed copy,
-    not at all."""
+    (group["recent"]: the first limit of them; group["recentCount"]: how many
+    there are, for "Show N more"), and of those its starred ones (ids in
+    starred), however old (group["starred"]). A chat shared across accounts
+    shows up under the one it was used on last; of a chat and its copies
+    (same first entry), only the newest; a shared chat that moved on to a
+    listed copy, not at all. Past the first limit the chats are only
+    counted: the next RECENT_CHECKED of an account by the same rules (what's
+    read of them is kept in links.json), the ones after those by their
+    files, so a check stays as quick with thousands of chats (the count of
+    an account with that many may only be a little high)."""
     listed = {i for g in groups for s in g["sessions"] for i in (s["sessionId"], s.get("chatId"), s.get("jobSessionId")) if i}
     listed |= getattr(ctx, "moved_on", set())
     by_key = {p.key: p for p in ctx.profiles}
     group_of = {key: g for g in groups for key in g["profileKeys"]}
-    candidates = [c for c in all_transcripts(ctx) if c[1].key in group_of and c[2].stem not in listed]
+    # (each one's id once: past the first page, every bit of work per chat counts)
+    candidates = [(t, p, f, st, sid) for t, p, f, st in all_transcripts(ctx)
+                  for sid in (f.stem,) if p.key in group_of and sid not in listed]
     for g in groups:
-        g["recent"], g["starred"] = [], []
+        g["recent"], g["starred"], g["recentCount"] = [], [], 0
     wanted = set(starred)  # (starred chats not found yet)
     if limit <= 0 and not wanted:
         return
     seen, firsts = set(), set()
+    checked = {id(g): limit + RECENT_CHECKED for g in groups}
     # A listed chat's older copies (they start with the same entry) are that
     # chat, e.g. one that moved on to a background session listed now
     for g in groups:
@@ -3543,42 +3552,44 @@ def recent_chats(groups, ctx, limit=RECENT_CHATS, starred=frozenset()):
             first = ctx.links.first_uuid(path) if path is not None else ""
             if first:
                 firsts.add(first)
-    for t, p, f, st in candidates:
-        full = all(len(g["recent"]) >= limit for g in groups)
-        if full and not wanted:
-            break
-        star = f.stem in wanted
-        if full and not star:
+    for t, p, f, st, sid in candidates:
+        star = sid in wanted
+        if limit <= 0 and not star:
             continue
         inode = (st.st_dev, st.st_ino)
         if inode in seen:
             continue
         seen.add(inode)
+        if not star and group_of[p.key]["recentCount"] >= checked[id(group_of[p.key])]:
+            group_of[p.key]["recentCount"] += 1  # (by its file)
+            continue
         name, cwd, messages = ctx.links.chat_info(f, st)
         if not messages:
             continue
-        first = ctx.links.first_uuid(f)
+        first = ctx.links.first_uuid(f, st)
         if first and first in firsts:  # an older copy of a chat already listed
             continue
         firsts.add(first)
-        shared = st.st_nlink > 1 and shared_info(f.stem, p, ctx.profiles)
-        if shared and moved_to(f.stem, ctx) in listed:
+        shared = st.st_nlink > 1 and shared_info(sid, p, ctx.profiles)
+        if shared and moved_to(sid, ctx) in listed:
             continue  # it moved on to a session listed already
         home = p
         if shared:  # under the account that used it last
-            seen_at = chat_activity(f.stem, [], ctx)
+            seen_at = chat_activity(sid, [], ctx)
             if seen_at:
                 home = max(seen_at, key=lambda q: seen_at[q])
                 if home.key not in group_of:
                     home = p
         g = group_of[home.key]
+        if limit > 0:
+            g["recentCount"] += 1
         room = len(g["recent"]) < limit
         if not room and not star:
             continue
         chat = {
-            "key": f"{home.key}/{f.stem}/recent",
-            "sessionId": f.stem,
-            "name": name or f.stem[:8],
+            "key": f"{home.key}/{sid}/recent",
+            "sessionId": sid,
+            "name": name or sid[:8],
             "cwd": cwd,
             "cwdShort": short_path(cwd, ctx.home),
             "lastActive": int(t * 1000),
@@ -3591,8 +3602,8 @@ def recent_chats(groups, ctx, limit=RECENT_CHATS, starred=frozenset()):
         if room:
             g["recent"].append(chat)
         if star:
-            wanted.discard(f.stem)
-            g["starred"].append(dict(chat, key=f"{home.key}/{f.stem}/starred"))
+            wanted.discard(sid)
+            g["starred"].append(dict(chat, key=f"{home.key}/{sid}/starred"))
 
 
 def recent_extras(ctx, path, group, cwd=""):
@@ -7149,7 +7160,8 @@ class Context:
 
 
 def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_done_hours=KEEP_DONE_HOURS,
-            recent=RECENT_CHATS, plans=PLANS_LISTED, usage_cap=0, starred=None, usage_refresh=0):
+            recent=RECENT_CHATS, plans=PLANS_LISTED, usage_cap=0, starred=None, usage_refresh=0,
+            memories=MEMORIES_LISTED):
     """starred: {"chats", "plans"} starred here (starred_of), else this
     computer's from the cache. usage_refresh: have Claude Code fetch the plan
     usage of an account whose numbers are older than this many minutes while
@@ -7358,10 +7370,12 @@ def collect(home, cache_root, extra_dirs=(), with_tokens=True, now=None, keep_do
             errors.append(f"{g['title']}: plans: {exc}")
             g["plans"], g["starredPlans"] = [], []
         try:
-            g["memories"] = account_memories(g, ctx, hidden=hidden["memories"], left_out=left_out["memories"])
+            g["memories"] = account_memories(g, ctx, memories, hidden["memories"], left_out["memories"])
+            # its CLAUDE.md: your instructions for every chat on it (its own line, hidden or not)
+            g["instructions"] = account_instructions(g, ctx)
         except Exception as exc:
             errors.append(f"{g['title']}: memories: {exc}")
-            g["memories"] = []
+            g["memories"], g["instructions"] = [], []
     for g in groups:
         for s in g["sessions"]:
             counts[s["state"]] += 1
@@ -7951,7 +7965,7 @@ def add_found_commands(result, home, extra_dirs=()):
         c["openCommand"] = in_folder(c["cwd"], resume_command(p, c["sessionId"], home, c["cwd"], claude)) if p else None
 
 
-USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent N] [--plans N] [--no-tokens] [--pretty] [--remote [--local]]
+USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent N] [--plans N] [--memories N] [--no-tokens] [--pretty] [--remote [--local]]
                     [--usage-refresh N]
        talpy_den.py --fetch-usage [--config-dir DIR]...
        talpy_den.py --dismiss SESSION_ID | --undismiss-all
@@ -7968,8 +7982,10 @@ USAGE = """usage: talpy_den.py [--config-dir DIR]... [--done-hours H] [--recent 
        talpy_den.py --continue-chat CHAT_ID --profile PROFILE [--folder F] [--prompt TEXT] [--remote]
   --config-dir DIR  extra Claude config dir (repeatable)
   --done-hours H    keep finished background jobs listed for H hours (default 24, 0 = never)
-  --recent N        list each account's N latest other chats (default 5, 0 = none)
-  --plans N         list each account's N latest plans (default 8, 0 = none)
+  --recent N        list each account's N latest other chats (default 5, 0 = none) and count them all
+  --plans N         list each account's N latest plans (default 8, 0 = none; the starred ones always)
+  --memories N      list each account's N latest memories (default 30, 0 = none; its CLAUDE.md always,
+                    as "instructions")
   --find QUERY      the chats with every word of QUERY in their name, folder or your prompts
   --start-task F    start a background session in folder F with the prompt (and plan)
   --task-command F  the shell command that starts a chat in folder F with the prompt (and plan)
@@ -8011,6 +8027,7 @@ def main(argv=None):
     hide_kind, hide_id, show_kind = None, None, None
     end, interrupt, profile_key, busy, instance, interval_ms = None, None, None, False, None, 2000
     agent_run_id, chat_id, plans, find, find_limit = None, None, PLANS_LISTED, None, FIND_LIMIT
+    memories = MEMORIES_LISTED
     task_folder, task_action, prompt, plan_slug, plan_profile, plan_text = None, None, "", None, None, None
     continue_id, continue_folder = None, None
     vscode_account, vscode_server = None, VSCODE_SERVERS["Code"]
@@ -8072,7 +8089,7 @@ def main(argv=None):
                 done_hours = max(0.0, float(args.pop(0)))
             except ValueError:
                 sys.exit(USAGE)
-        elif arg in ("--recent", "--plans", "--limit") and args:
+        elif arg in ("--recent", "--plans", "--memories", "--limit") and args:
             try:
                 n = max(0, int(args.pop(0)))
             except ValueError:
@@ -8081,6 +8098,8 @@ def main(argv=None):
                 recent = n
             elif arg == "--plans":
                 plans = n
+            elif arg == "--memories":
+                memories = n
             else:
                 find_limit = max(1, n)
         elif arg == "--remote":
@@ -8179,7 +8198,8 @@ def main(argv=None):
     else:
         try:
             result = collect(home, cache_root, config_dirs, with_tokens=with_tokens, keep_done_hours=done_hours,
-                             recent=recent, plans=plans, usage_cap=usage_cap if not remote or local else 0,
+                             recent=recent, plans=plans, memories=memories,
+                             usage_cap=usage_cap if not remote or local else 0,
                              # (on an SSH host: the host's stars, from the computer that asks)
                              starred={"chats": starred_chats, "plans": starred_plans} if remote and not local else None,
                              usage_refresh=usage_refresh)
