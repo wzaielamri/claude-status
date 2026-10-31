@@ -295,6 +295,36 @@ test('new chat folders', () => {
         [{path: '', short: '~', newChatCommand: 'claude'}], 'an SSH host keeps its home folder');
 });
 
+test('recent and starred chats show a page at a time', () => {
+    eq([L.pageSize(10), L.pageSize(0)], [10, 5]);
+    // the status lists a page more than shows; no plans or memories but the starred ones and CLAUDE.md
+    eq(L.recentArgs(5), ['--recent', '10', '--plans', '0', '--memories', '0']);
+    eq(L.recentArgs(0)[1], '0', '0 hides the list');
+    const chat = id => ({sessionId: id, name: id});
+    const ids = n => Array.from({length: n}, (_, i) => `c${i}`);
+    const g = {recent: ids(10).map(chat), recentCount: 23};
+    let p = L.recentPage(g, null, 5, 1, true);
+    eq([p.all.length, p.count, p.shown, p.fetch], [10, 23, 5, 0], 'the next page is there at once');
+    eq(L.pagedTitle('Recent chats', p.shown, p.count), 'Recent chats (5 of 23)');
+    eq(L.showMoreTip(5, p.shown, p.count), ['Show 5 more', '5 of 23 show. Folded again, the list shows its first ones again.']);
+    p = L.recentPage(g, null, 5, 2, true);
+    eq([p.shown, p.fetch], [10, 15], 'past the status: a check that lists 15');
+    eq(L.recentPage(g, null, 5, 2, false).fetch, 0, 'folded: nothing asked for');
+    // the check's chats past the status' (the ones listed already once)
+    const more = {recent: ids(15).map(chat), asked: 15};
+    p = L.recentPage(g, more, 5, 2, true);
+    eq([p.all.length, p.count, p.shown, p.fetch], [15, 23, 10, 0]);
+    p = L.recentPage(g, more, 5, 3, true);
+    eq([p.shown, p.fetch], [15, 20]);
+    // a check that has fewer than it asked for: that's all of them
+    p = L.recentPage(g, {recent: ids(18).map(chat), asked: 20}, 5, 4, true);
+    eq([p.count, p.shown, p.fetch], [18, 18, 0]);
+    eq(L.pagedTitle('Recent chats', p.shown, p.count), 'Recent chats (18)');
+    eq(L.showMoreText(5, 20, 23), 'Show 3 more');
+    eq(L.pagedTitle('★ Starred chats', 3, 3), '★ Starred chats (3)');
+    eq(L.starHint(false), "A starred chat stays listed under its account's ★ Starred chats, however old it is.");
+});
+
 test('new chat in VS Code: only on the account VS Code runs on', () => {
     const status = {vscode: {installed: true, on: 'work'}};
     eq(L.vscodeHint({vscodeHere: true, title: 'work'}, '', status), 'Opens the folder in VS Code with a new chat in its Claude Code panel.');

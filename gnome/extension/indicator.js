@@ -58,8 +58,12 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this._polling = false;
         this._timers = {};
         // Popup state kept by row key (rows are rebuilt with new data)
-        this.ui = {expandedAgents: {}, expandedAgent: {}, expandedRecent: {}, expandedPeek: {}, expandedStats: {}, stopConfirm: '',
-            shareConfirm: null, deleteAsk: null, openMenu: null, tab: 'chats'};
+        // (morePages: a paged list's key -> how many pages past its first show;
+        // recentMore: group key -> {recent, asked}, an account's recent chats as
+        // a check that listed more has them)
+        this.ui = {expandedAgents: {}, expandedAgent: {}, expandedRecent: {}, expandedStarred: {}, expandedPeek: {}, expandedStats: {},
+            morePages: {}, recentMore: {}, stopConfirm: '', shareConfirm: null, deleteAsk: null, openMenu: null, tab: 'chats'};
+        this._recentAsked = {};   // group key -> how many recent chats a check was asked for (till it's folded)
         // The Recap tab's days and what week.py said of them (it runs only
         // while that tab is open: setTab, loadWeek)
         // (span: day, week or all; open: the day or project whose chats are unfolded)
@@ -173,7 +177,7 @@ class TalpyDenIndicator extends PanelMenu.Button {
 
     get _listArgs() {
         const args = ['--done-hours', String(Math.max(0, this._settings.get_int('keep-done-hours'))),
-            '--recent', String(Math.max(0, this._settings.get_int('recent-chats')))];
+            ...L.recentArgs(this._settings.get_int('recent-chats'))];
         if (!this._settings.get_boolean('show-tokens'))
             args.push('--no-tokens');
         // (here and on hosts: an account's plan usage this old is fetched while a chat works)
@@ -777,9 +781,80 @@ class TalpyDenIndicator extends PanelMenu.Button {
         this.rerender();
     }
 
+    // Recent chats and ★ Starred chats: a page at a time (L.recentPage);
+    // folded again, a list shows its first page
+    get pageSize() {
+        return L.pageSize(this._settings.get_int('recent-chats'));
+    }
+
+    pagesShown(listKey) {
+        return 1 + (this.ui.morePages[listKey] || 0);
+    }
+
+    showMore(listKey) {
+        this.ui.morePages[listKey] = (this.ui.morePages[listKey] || 0) + 1;
+        this.rerender();
+    }
+
     toggleRecent(groupKey, wasOpen) {
         this.ui.expandedRecent[groupKey] = !wasOpen;
+        if (wasOpen) {
+            delete this.ui.morePages[`${groupKey}|recent`];
+            delete this.ui.recentMore[groupKey];
+            delete this._recentAsked[groupKey];
+        }
         this.rerender();
+    }
+
+    toggleStarred(groupKey, wasOpen) {
+        this.ui.expandedStarred[groupKey] = !wasOpen;
+        if (wasOpen)
+            delete this.ui.morePages[`${groupKey}|starred`];
+        this.rerender();
+    }
+
+    // The account's recent chats past the status' (its next pages): a check
+    // (this computer's or the host's) that lists count of them, once for each
+    // page wanted (one that failed isn't run again till the list is folded)
+    async fetchRecent(groupKey, groupId, host, count) {
+        if ((this._recentAsked[groupKey] || 0) >= count)
+            return;
+        this._recentAsked[groupKey] = count;
+        const args = [...this._listArgs, '--recent', String(count), '--no-tokens', '--usage-refresh', '0'];
+        const out = host ? await this._runner.run('remote.py', ['--status', host, ...args], {poll: true})
+            : await this._runner.run('poll.py', [...this._configDirArgs, ...args], {poll: true});
+        if (this._destroyed || out.cancelled || this._recentAsked[groupKey] !== count)
+            return;   // (folded meanwhile: its first page shows; or a bigger one's on its way)
+        let result = null;
+        if (host) {
+            const answer = L.helperResult(out.stdout, out.stderr);
+            if (answer.ok && answer.result)
+                result = L.toLocalClock(answer.result, Date.now() - (answer.result.generatedAt || Date.now()));
+        } else {
+            const status = L.statusResult(out.stdout, out.stderr);
+            result = status.error ? null : status.status;
+        }
+        const g = result && result.groups ? result.groups.find(x => x.id === groupId) : null;
+        if (!g)
+            return;
+        this.ui.recentMore[groupKey] = {recent: g.recent || [], asked: count};
+        this.rerender();
+    }
+
+    // ☆ on a chat stars it: it stays listed under its account's ★ Starred
+    // chats, however old (jump.py --star, kept in Talpy Den's cache; an SSH
+    // host's too, kept here); its ★ unstars it
+    async setStar(chatId, host, on) {
+        const result = await this._helper('jump.py', [on ? '--star' : '--unstar', chatId,
+            ...host ? ['--host', host] : [], ...this._configDirArgs]);
+        if (this._destroyed)
+            return;
+        if (!result.ok)
+            this._showError(L.fmt("Couldn't star it: %1", result.message));
+        if (host)
+            this.pollHost(host);
+        else
+            this.refresh();
     }
 
     setStopConfirm(rowKey) {

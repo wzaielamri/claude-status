@@ -91,6 +91,10 @@
 .claude-agent-chevron { icon-size: 12px; color: rgba(154, 153, 150, 1); }
 .claude-agent-detail { margin-top: 1px; margin-bottom: 3px; }
 .claude-recent { padding-left: 14px; }
+.claude-more { margin-left: 14px; }   /* ("Show N more" under a list) */
+.claude-more .claude-button-icon { icon-size: 12px; }
+.claude-star-mark { color: #e0a800; padding: 0 3px; border-radius: 4px; }   /* (a starred chat's ★: click to unstar) */
+.claude-star-mark:hover, .claude-star-mark:focus { background-color: rgba(127, 127, 127, 0.2); }
 .claude-peek-line { border-radius: 4px; }
 .claude-peek-line:hover { background-color: rgba(127, 127, 127, 0.15); }
 .claude-peek {

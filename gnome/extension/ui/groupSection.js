@@ -1,6 +1,6 @@
 // One Claude account (port of the Plasma widget's GroupSection.qml): plan
 // limits, token totals, its sessions (from every config dir logged into it),
-// chats shared with it that run elsewhere, and recent chats. With remoteHost
+// chats shared with it that run elsewhere, recent chats and starred chats. With remoteHost
 // set, the account is on that SSH host and its actions run there.
 
 import Clutter from 'gi://Clutter';
@@ -127,28 +127,70 @@ export function buildGroupSection(ctx, group, {last = false, remoteHost = '', ac
     for (const chat of group.sharedHere || [])
         section.add_child(buildSharedLine(ctx, chat, remoteHost));
 
-    // Recent chats: this account's latest other chats, to pick one up again
-    const recent = group.recent || [];
-    if (recent.length > 0) {
-        const isOpen = !!ctx.ui.expandedRecent[groupKey];
-        const toggle = textButton(L.fmt('Recent chats (%1)', recent.length), () => ctx.toggleRecent(groupKey, isOpen),
-            'claude-text-button claude-small claude-expander', isOpen ? 'pan-down-symbolic' : 'pan-end-symbolic');
+    // Recent chats: this account's latest other chats, to pick one up
+    // again, a page at a time ("Show N more"; the status lists one page
+    // more than shows, a check for more is asked for past that)
+    const size = ctx.pageSize;
+    const recentOpen = !!ctx.ui.expandedRecent[groupKey];
+    const recent = L.recentPage(group, recentOpen ? ctx.ui.recentMore[groupKey] || null : null, size,
+        ctx.pagesShown(`${groupKey}|recent`), recentOpen);
+    if (recent.fetch)
+        ctx.fetchRecent(groupKey, group.id, remoteHost, recent.fetch);
+    if (recent.count > 0) {
+        const toggle = textButton(L.pagedTitle('Recent chats', recent.shown, recent.count), () => ctx.toggleRecent(groupKey, recentOpen),
+            'claude-text-button claude-small claude-expander', recentOpen ? 'pan-down-symbolic' : 'pan-end-symbolic');
         tips.add(toggle, ['Recent chats',
-            "This account's latest chats that aren't listed above. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list)."]);
+            "This account's latest chats that aren't listed above, newest first. Click one to reopen it, in a terminal or in VS Code (the switch at the top of the list). " +
+            'Show more lists more of them; folded again, it lists the first ones again.']);
         section.add_child(toggle);
-        if (isOpen) {
+        if (recentOpen) {
             // Where they reopen: the same Terminal | VS Code choice as for new chats
             const openIn = openInSwitch(ctx, group, remoteHost, true);
             openIn.add_style_class_name('claude-indent');
             section.add_child(openIn);
-            for (const chat of recent)
+            for (const chat of recent.all.slice(0, recent.shown))
                 section.add_child(buildRecentLine(ctx, group, chat, remoteHost));
+            if (recent.shown < recent.count)
+                section.add_child(moreButton(ctx, `${groupKey}|recent`, recent.shown, recent.count));
+        }
+    }
+
+    // ★ Starred chats: the ones you starred (☆ on a chat), however old, a page at a time
+    const starred = group.starred || [];
+    if (starred.length > 0) {
+        const starredOpen = !!ctx.ui.expandedStarred[groupKey];
+        const shown = Math.min(starred.length, size * ctx.pagesShown(`${groupKey}|starred`));
+        const toggle = textButton(L.pagedTitle('★ Starred chats', shown, starred.length), () => ctx.toggleStarred(groupKey, starredOpen),
+            'claude-text-button claude-small claude-expander', starredOpen ? 'pan-down-symbolic' : 'pan-end-symbolic');
+        tips.add(toggle, ['Starred chats',
+            "The chats of this account you starred (☆ next to a chat), newest first, however old they are; not the ones listed above. Click a chat's ★ to unstar it."]);
+        section.add_child(toggle);
+        if (starredOpen) {
+            if (!recentOpen) {   // (the switch is under Recent chats while that's unfolded)
+                const openIn = openInSwitch(ctx, group, remoteHost, true);
+                openIn.add_style_class_name('claude-indent');
+                section.add_child(openIn);
+            }
+            for (const chat of starred.slice(0, shown))
+                section.add_child(buildRecentLine(ctx, group, chat, remoteHost));
+            if (shown < starred.length)
+                section.add_child(moreButton(ctx, `${groupKey}|starred`, shown, starred.length));
         }
     }
 
     if (!last)
         section.add_child(separator());
     return section;
+}
+
+// "Show N more" under a list that shows a page at a time (Recent chats,
+// ★ Starred chats): the next page of it. Folded again, the list shows its first page.
+function moreButton(ctx, listKey, shown, count) {
+    const size = ctx.pageSize;
+    const more = textButton(L.showMoreText(size, shown, count), () => ctx.showMore(listKey),
+        'claude-text-button claude-small claude-more', 'go-bottom-symbolic');
+    ctx.tips.add(more, L.showMoreTip(size, shown, count));
+    return more;
 }
 
 // The account's last days: tokens per day as bars (today's in the working
@@ -334,11 +376,25 @@ function buildRecentLine(ctx, group, chat, remoteHost) {
     line.add_child(name);
     if (chat.shared)
         line.add_child(label('⇄', 'claude-dim'));
+    // starred: a ★ (click: unstar it)
+    if (chat.starred) {
+        const mark = textButton('★', () => ctx.setStar(chat.sessionId, remoteHost, false), 'claude-star-mark');
+        mark.y_align = Clutter.ActorAlign.CENTER;
+        ctx.tips.add(mark, ['Starred', L.starHint(true)]);
+        line.add_child(mark);
+    }
     const when = label(L.fmt('%1 · %2', chat.cwdShort || '~', L.ago(ctx.now - chat.lastActive)),
         'claude-small claude-dim claude-side');
     when.clutter_text.ellipsize = 1;   // Pango.EllipsizeMode.START
     line.add_child(when);
     const hoverButtons = [];
+    // star it: it stays listed under ★ Starred chats (a starred one has its ★)
+    if (!chat.starred) {
+        const star = iconButton('non-starred-symbolic', () => ctx.setStar(chat.sessionId, remoteHost, true));
+        ctx.tips.add(star, ['Star this chat', L.starHint(false)]);
+        hoverButtons.push(star);
+        line.add_child(star);
+    }
     if (ctx.canShareChats && !remoteHost && ctx.shareAccounts.length >= 2) {
         const share = iconButton('emblem-shared-symbolic', () => ctx.toggleShareMenu(rowKey, {
             chatId: chat.sessionId, name: chat.name, profileDir: chat.profileDir, shared: chat.shared,

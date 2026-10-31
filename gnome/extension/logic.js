@@ -772,6 +772,58 @@ export function newChatFolders(group, host) {
     return folders;
 }
 
+// Recent chats and ★ Starred chats show a page at a time (the Recent chats
+// setting; 5 when it's 0), "Show N more" the next page; folded again, a list
+// shows its first page. The status lists a page more recent chats than show
+// (so the next one is there at once) and counts them all (recentCount); only
+// the starred plans and CLAUDE.md of the plans and memories (Plasma lists the
+// rest in its Projects tab).
+export function pageSize(recentChats) {
+    return recentChats > 0 ? recentChats : 5;
+}
+
+export function recentArgs(recentChats) {
+    return ['--recent', String(recentChats > 0 ? 2 * recentChats : 0), '--plans', '0', '--memories', '0'];
+}
+
+// An account's Recent chats as they show, pages of size: the status' and,
+// past those, the ones a check that listed more has (more: {recent, asked};
+// fewer than it asked for: that's all of them). all: the chats there are,
+// count: of how many, shown: how many show; fetch: how many a check should
+// list now (unfolded and a page more than show wanted but not there), else 0.
+export function recentPage(group, more, size, pages, open) {
+    const recent = group.recent || [];
+    let all = recent;
+    if (more) {
+        const listed = new Set(recent.map(c => c.sessionId));
+        all = recent.concat(more.recent.filter(c => !listed.has(c.sessionId)));
+    }
+    const count = more && more.recent.length < more.asked ? all.length : Math.max(group.recentCount || 0, recent.length);
+    const shown = Math.min(all.length, size * pages);
+    const wanted = open ? Math.min(count, size * (pages + 1)) : 0;
+    return {all, count, shown, fetch: all.length < wanted ? wanted : 0};
+}
+
+// A paged list's title: "Recent chats (5 of 23)", all shown "Recent chats (23)"
+export function pagedTitle(title, shown, count) {
+    return shown < count ? fmt('%1 (%2 of %3)', title, shown, count) : fmt('%1 (%2)', title, count);
+}
+
+// "Show N more" under a list, and its tooltip
+export function showMoreText(size, shown, count) {
+    return fmt('Show %1 more', Math.min(size, count - shown));
+}
+
+export function showMoreTip(size, shown, count) {
+    return [showMoreText(size, shown, count), fmt('%1 of %2 show. Folded again, the list shows its first ones again.', shown, count)];
+}
+
+// What a chat's ☆ / ★ says
+export function starHint(starred) {
+    return starred ? "A starred chat stays listed under its account's ★ Starred chats, however old it is. Click to unstar it."
+        : "A starred chat stays listed under its account's ★ Starred chats, however old it is.";
+}
+
 // The pets of an account's stage: one per chat, the ones that need you or
 // work first
 export function stageChats(group, host) {
