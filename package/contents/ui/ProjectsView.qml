@@ -328,6 +328,7 @@ PlasmaComponents3.ScrollView {
                                 chat: inside.chats[index] || root.emptyRecent
                                 group: root.groupOfProfile(chat.profileDir)
                                 accountTag: inside.tagged ? chat.account || "" : ""
+                                project: inside.project.path
                                 folderWidth: view.folderWidth
                             }
                         }
@@ -376,6 +377,7 @@ PlasmaComponents3.ScrollView {
                                         plan: inside.plans[index] || root.emptyPlan
                                         group: root.groupOfProfile(plan.profileDir)
                                         accountTag: inside.tagged ? plan.account || "" : ""
+                                        project: inside.project.path
                                         folderWidth: view.folderWidth
                                     }
                                 }
@@ -399,6 +401,7 @@ PlasmaComponents3.ScrollView {
                                         Layout.leftMargin: Kirigami.Units.gridUnit
                                         memory: inside.memories[index] || root.emptyMemory
                                         accountTag: inside.tagged ? memory.account || "" : ""
+                                        project: inside.project.path
                                         folderWidth: view.folderWidth
                                     }
                                 }

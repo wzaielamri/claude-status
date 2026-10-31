@@ -3664,6 +3664,16 @@ PlasmoidItem {
         projectToShow = path
         popupTab = "projects"
     }
+    // A line's folder in a project: only its part below the project's folder
+    // ("server" for ~/repos/api/server in ~/repos/api), nothing for the
+    // project's folder itself; outside a project (or its folder), short
+    function folderIn(folder, project, short) {
+        if (!project || !folder)
+            return short
+        if (folder === project)
+            return ""
+        return folder.startsWith(project + "/") ? folder.slice(project.length + 1) : short
+    }
     // The account (of this computer) a chat, plan or memory of a project is on
     function groupOfProfile(profileDir) {
         return groups.find(g => (g.profileKeys || []).indexOf(profileDir) >= 0) || groups[0] || emptyGroup

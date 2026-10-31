@@ -18,6 +18,7 @@ ColumnLayout {
     property var group: root.emptyGroup
     property string remoteHost: ""
     property string accountTag: ""   // (in a project on several accounts: the one it's on)
+    property string project: ""   // (in a project: its folder; the line's folder says only the part below it)
     // the folder and how long ago at the line's end: columns of one width in
     // every list, so what's before them lines up, and the folders and times too
     property real folderWidth: Kirigami.Units.gridUnit * 8
@@ -221,7 +222,7 @@ ColumnLayout {
                     Layout.preferredWidth: recentLine.folderWidth
                     horizontalAlignment: Text.AlignRight
                     textFormat: Text.PlainText
-                    text: recentLine.chat.cwdShort || "~"
+                    text: root.folderIn(recentLine.chat.cwd, recentLine.project, recentLine.chat.cwdShort || "~")
                     opacity: 0.6
                     font: Kirigami.Theme.smallFont
                     elide: Text.ElideMiddle

@@ -17,6 +17,7 @@ ColumnLayout {
     property var group: root.emptyGroup
     property string remoteHost: ""
     property string accountTag: ""   // (in a project on several accounts: the one it's on)
+    property string project: ""   // (in a project: its folder; the line's folder says only the part below it)
     property real folderWidth: Kirigami.Units.gridUnit * 8
     readonly property real endWidth: folderWidth + Kirigami.Units.smallSpacing + root.agoWidth
     readonly property string composerKey: (planLine.remoteHost ? planLine.remoteHost + "|" : "") + plan.key
@@ -128,7 +129,7 @@ ColumnLayout {
                     Layout.preferredWidth: planLine.folderWidth
                     horizontalAlignment: Text.AlignRight
                     textFormat: Text.PlainText
-                    text: planLine.plan.cwdShort || ""
+                    text: root.folderIn(planLine.plan.cwd, planLine.project, planLine.plan.cwdShort || "")
                     opacity: 0.6
                     font: Kirigami.Theme.smallFont
                     elide: Text.ElideMiddle

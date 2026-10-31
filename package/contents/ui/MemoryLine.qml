@@ -16,6 +16,7 @@ ColumnLayout {
     property var memory: ({ key: "", name: "", description: "", type: "", path: "", folder: "", folderShort: "", updatedAt: 0, folderGone: false })
     property string remoteHost: ""
     property string accountTag: ""   // (in a project on several accounts: the one it's on)
+    property string project: ""   // (in a project: its folder; the line's folder says only the part below it)
     property real folderWidth: Kirigami.Units.gridUnit * 8
     readonly property real endWidth: folderWidth + Kirigami.Units.smallSpacing + root.agoWidth
     // an SSH host's opens in VS Code (Remote-SSH), to change it
@@ -106,7 +107,8 @@ ColumnLayout {
                     Layout.preferredWidth: memoryLine.folderWidth
                     horizontalAlignment: Text.AlignRight
                     textFormat: Text.PlainText
-                    text: memoryLine.memory.folderShort || (memoryLine.memory.type === "account" ? i18n("every folder") : "")
+                    text: memoryLine.memory.type === "account" ? i18n("every folder")
+                          : root.folderIn(memoryLine.memory.folder, memoryLine.project, memoryLine.memory.folderShort || "")
                     opacity: 0.6
                     font: Kirigami.Theme.smallFont
                     elide: Text.ElideMiddle
