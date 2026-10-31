@@ -16,6 +16,7 @@ import { post } from "../env";
 import { pets } from "../pets";
 import { chatRefOf, hideHint } from "../util/chat";
 import { Icon } from "../util/icons";
+import { useAfterFrame } from "../util/lazy";
 import { useViewVisible } from "../util/petStage";
 import { useStore } from "../util/store";
 import { projectsAnswer } from "../util/stores";
@@ -126,6 +127,8 @@ function ProjectDetails({ p, here, now }: { p: ProjectRow; here: Session[]; now:
   const groupOf = (profileDir: string): Group | undefined => groupOfProfile(view.status, profileDir) ?? groups[0];
   const howOf = (g: Group): Reopen => hows.get(g.id) ?? hows.set(g.id, reopenOf(view, g)).get(g.id)!;
   const tag = (account: string) => (lists.tagged ? account : undefined);
+  // (its plans and memories a frame after its chats: the project opens at once)
+  const rest = useAfterFrame();
   return (
     <div class="project-details">
       {here.map((s) => {
@@ -155,7 +158,7 @@ function ProjectDetails({ p, here, now }: { p: ProjectRow; here: Session[]; now:
           <MoreButton shown={lists.chatsShown} count={lists.chats.length} size={size} onClick={() => showMore(projectListKey(p.path, "chats"))} />
         </>
       ) : null}
-      {lists.plans.length ? (
+      {rest && lists.plans.length ? (
         <>
           <div class="project-list small">{pagedTitle("Plans", lists.plansShown, lists.plans.length)}</div>
           <ul class="recent-list">
@@ -167,7 +170,7 @@ function ProjectDetails({ p, here, now }: { p: ProjectRow; here: Session[]; now:
           <MoreButton shown={lists.plansShown} count={lists.plans.length} size={size} onClick={() => showMore(projectListKey(p.path, "plans"))} />
         </>
       ) : null}
-      {lists.memories.length ? (
+      {rest && lists.memories.length ? (
         <>
           <div class="project-list small">{pagedTitle("Memories", lists.memoriesShown, lists.memories.length)}</div>
           <ul class="recent-list">

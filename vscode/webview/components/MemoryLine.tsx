@@ -3,6 +3,7 @@ import type { Group, Memory } from "../../src/shared/types";
 import { post } from "../env";
 import { deleteHint, hideHint } from "../util/chat";
 import { Icon, memoryIcon } from "../util/icons";
+import { useWoken } from "../util/lazy";
 import { useView } from "./context";
 import { Elided } from "./Elided";
 import { IconButton } from "./IconButton";
@@ -18,6 +19,7 @@ import { Tag } from "./Tag";
 // project is on several.
 export function MemoryLine({ memory: m, group, project, accountTag }: { memory: Memory; group: Group; project?: string; accountTag?: string }) {
   const view = useView();
+  const [woken, wake] = useWoken(); // (its buttons: made the first time they show)
   const host = group.host;
   const elsewhere = !!host && host !== view.hosts.find((h) => h.current)?.name;
   const account = m.type === "account";
@@ -25,7 +27,7 @@ export function MemoryLine({ memory: m, group, project, accountTag }: { memory: 
   // (in a project: only the part of its folder below the project's)
   const folder = account ? "every folder" : project !== undefined ? folderIn(m.folder, project, m.folderShort) : m.folderShort || m.folder;
   return (
-    <li class={"recent-item" + (elsewhere ? " unavailable" : "")}>
+    <li class={"recent-item" + (elsewhere ? " unavailable" : "")} {...wake}>
       <Icon name={memoryIcon(m.type)} class="line-icon" />
       <button
         type="button"
@@ -49,31 +51,33 @@ export function MemoryLine({ memory: m, group, project, accountTag }: { memory: 
         <span class="recent-folder" title={m.folder || undefined} />
       )}
       <span class="recent-ago small muted nowrap">{ago(view.now - m.updatedAt)}</span>
-      <div class="row-actions">
-        {elsewhere ? null : account ? (
-          <IconButton
-            icon="edit"
-            label="Edit your instructions"
-            title="Edit your instructions: its CLAUDE.md opens in an editor tab. Claude reads it in every new chat on this account."
-            onClick={() => post(ref(true))}
-          />
-        ) : (
-          <IconButton
-            icon="edit"
-            label="Edit this memory"
-            title="Edit this memory: its file opens in an editor tab. What you change there is what Claude remembers; it reads it in new chats in that folder."
-            onClick={() => post(ref(true))}
-          />
-        )}
-        {account ? null : (
-          <IconButton icon="trash" label="Delete this memory…" title={`Delete this memory…\n${deleteHint("memory")}`}
-            onClick={() => post({ type: "delete", kind: "memory", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
-        )}
-        {account ? null : (
-          <IconButton icon="close" label="Hide this memory" title={`Hide this memory\n${hideHint("memories", host)}`}
-            onClick={() => post({ type: "hide", kind: "memories", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
-        )}
-      </div>
+      {woken ? (
+        <div class="row-actions">
+          {elsewhere ? null : account ? (
+            <IconButton
+              icon="edit"
+              label="Edit your instructions"
+              title="Edit your instructions: its CLAUDE.md opens in an editor tab. Claude reads it in every new chat on this account."
+              onClick={() => post(ref(true))}
+            />
+          ) : (
+            <IconButton
+              icon="edit"
+              label="Edit this memory"
+              title="Edit this memory: its file opens in an editor tab. What you change there is what Claude remembers; it reads it in new chats in that folder."
+              onClick={() => post(ref(true))}
+            />
+          )}
+          {account ? null : (
+            <IconButton icon="trash" label="Delete this memory…" title={`Delete this memory…\n${deleteHint("memory")}`}
+              onClick={() => post({ type: "delete", kind: "memory", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
+          )}
+          {account ? null : (
+            <IconButton icon="close" label="Hide this memory" title={`Hide this memory\n${hideHint("memories", host)}`}
+              onClick={() => post({ type: "hide", kind: "memories", groupId: group.id, ...(host ? { host } : {}), id: m.key })} />
+          )}
+        </div>
+      ) : null}
     </li>
   );
 }

@@ -18,6 +18,7 @@ import { reviewPending, testsText } from "../../src/shared/pane";
 import type { Group, RecentChat, ViewState } from "../../src/shared/types";
 import { post } from "../env";
 import { canShareRecent, deleteHint, recentRef, shareTitle } from "../util/chat";
+import { useWoken } from "../util/lazy";
 import { useView } from "./context";
 import { Elided } from "./Elided";
 import { IconButton } from "./IconButton";
@@ -59,6 +60,7 @@ export function reopenOf(view: ViewState, group: Group): Reopen {
 export function RecentLine({ chat: c, group, how, project, accountTag }:
     { chat: RecentChat; group: Group; how: Reopen; project?: string; accountTag?: string }) {
   const view = useView();
+  const [woken, wake] = useWoken(); // (its buttons: made the first time they show)
   const chat = recentRef(c, group.host);
   const { canOpen, inCode, reopen, share } = how;
   const goOn = goOnAt(c);
@@ -74,7 +76,7 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
   // (in a project: only the part of its folder below the project's)
   const folder = project !== undefined ? folderIn(c.cwd, project, c.cwdShort || "~") : c.cwdShort || "~";
   return (
-    <li class={"recent-item" + (canOpen || paneFirst ? "" : " unavailable")}>
+    <li class={"recent-item" + (canOpen || paneFirst ? "" : " unavailable")} {...wake}>
       <button
         type="button"
         class="link recent-name"
@@ -145,29 +147,31 @@ export function RecentLine({ chat: c, group, how, project, accountTag }:
       ) : null}
       {folder ? <Elided text={folder} class="recent-folder small muted" title={c.cwd} /> : <span class="recent-folder" title={c.cwd} />}
       <span class="recent-ago small muted nowrap">{ago(view.now - c.lastActive)}</span>
-      <div class="row-actions">
-        {paneFirst && canOpen ? (
-          <IconButton icon="external" label="Reopen this chat" title={reopen} onClick={reopenIt} />
-        ) : null}
-        {c.starred ? null : (
-          <IconButton
-            icon="star"
-            label="Star"
-            title="Star this chat: it stays listed under its account's ★ Starred chats, however old it is."
-            onClick={() => post({ type: "star", chat, on: true })}
-          />
-        )}
-        {share ? (
-          <IconButton
-            icon="share"
-            label="Continue on another account…"
-            title={shareTitle(group.host)}
-            onClick={() => post({ type: "share", chat })}
-          />
-        ) : null}
-        <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
-          onClick={() => post({ type: "delete", kind: "chat", chat })} />
-      </div>
+      {woken ? (
+        <div class="row-actions">
+          {paneFirst && canOpen ? (
+            <IconButton icon="external" label="Reopen this chat" title={reopen} onClick={reopenIt} />
+          ) : null}
+          {c.starred ? null : (
+            <IconButton
+              icon="star"
+              label="Star"
+              title="Star this chat: it stays listed under its account's ★ Starred chats, however old it is."
+              onClick={() => post({ type: "star", chat, on: true })}
+            />
+          )}
+          {share ? (
+            <IconButton
+              icon="share"
+              label="Continue on another account…"
+              title={shareTitle(group.host)}
+              onClick={() => post({ type: "share", chat })}
+            />
+          ) : null}
+          <IconButton icon="trash" label="Delete this chat…" title={`Delete this chat…\n${deleteHint("chat")}`}
+            onClick={() => post({ type: "delete", kind: "chat", chat })} />
+        </div>
+      ) : null}
     </li>
   );
 }
