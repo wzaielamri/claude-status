@@ -200,28 +200,31 @@ PlasmaComponents3.ScrollView {
                             elide: Text.ElideMiddle
                         }
                     }
-                    // a dot for each of its open chats, in its state's color
-                    Row {
+                    // a dot for each of its open chats, in its state's color (made only for a project that has some)
+                    Loader {
+                        active: card.here.length > 0
+                        visible: active
                         Layout.alignment: Qt.AlignTop
                         Layout.topMargin: Math.max(0, (projectName.implicitHeight - Kirigami.Units.smallSpacing * 2) / 2)
-                        visible: card.here.length > 0
-                        spacing: Kirigami.Units.smallSpacing / 2
-                        Repeater {
-                            model: card.here.length
-                            delegate: Rectangle {
-                                required property int index
-                                width: Kirigami.Units.smallSpacing * 2
-                                height: width
-                                radius: width / 2
-                                color: root.stateColor(card.here[index] ? card.here[index].session.state : "idle")
+                        sourceComponent: Row {
+                            spacing: Kirigami.Units.smallSpacing / 2
+                            Repeater {
+                                model: card.here.length
+                                delegate: Rectangle {
+                                    required property int index
+                                    width: Kirigami.Units.smallSpacing * 2
+                                    height: width
+                                    radius: width / 2
+                                    color: root.stateColor(card.here[index] ? card.here[index].session.state : "idle")
+                                }
                             }
-                        }
-                        PlasmaCore.ToolTipArea {
-                            textFormat: Text.PlainText
-                            width: parent.width
-                            height: parent.height
-                            mainText: i18np("%1 open chat", "%1 open chats", card.here.length)
-                            subText: card.here.map(c => c.session.name + ": " + root.stateText(c.session)).join("\n")
+                            PlasmaCore.ToolTipArea {
+                                textFormat: Text.PlainText
+                                width: parent.width
+                                height: parent.height
+                                mainText: i18np("%1 open chat", "%1 open chats", card.here.length)
+                                subText: card.here.map(c => c.session.name + ": " + root.stateText(c.session)).join("\n")
+                            }
                         }
                     }
                     PlasmaComponents3.ToolButton {
