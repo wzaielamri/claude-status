@@ -8,7 +8,7 @@ import type { Actions } from "./actions";
 import type { ChatPanes } from "./chatPane";
 import { setReopenIn, settings } from "./config";
 import type { Dashboard } from "./dashboard";
-import { findChatRef, findMemory, findPlan, findProjectMemory, findProjectPlan, goOnAt, machineStatus, shareAccounts } from "./shared/model";
+import { badgeOf, findChatRef, findMemory, findPlan, findProjectMemory, findProjectPlan, goOnAt, machineStatus, shareAccounts } from "./shared/model";
 import { answersOf, askShownOf } from "./shared/pane";
 import { permsHost, weekAsked, weekRevokeAsked, weekRuleAsked } from "./shared/week";
 import type { ChatRef, Group, HostMessage, Memory, PlanItem, WebviewMessage } from "./shared/types";
@@ -21,10 +21,18 @@ const TIP_COMMAND = /^\/[a-z][a-z-]{0,30}( [a-z0-9-]{1,30})?$/; // what a Recap 
 
 export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = "talpyDen.view";
+  static readonly badgeId = "talpyDen.badge";
   private webviews = new Set<vscode.Webview>();
   private visibleCount = 0;
   private panel: vscode.WebviewPanel | undefined;
   private view: vscode.WebviewView | undefined;
+  // The Activity Bar badge's: a tree view nobody sees (package.json: when
+  // talpyDen.never) badges the container from startup; a webview view's badge
+  // shows only once the view was opened. Once the view is there, the badge is
+  // its own (the tree's cleared: a container adds up its views' numbers), so
+  // it follows the view wherever you dragged it.
+  private badgeTree: vscode.TreeView<never>;
+  private badge: vscode.ViewBadge | undefined;
   private disposables: vscode.Disposable[] = [];
   panes?: ChatPanes; // the chats' tabs (set once they're there)
 
@@ -33,7 +41,9 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     private dash: Dashboard,
     private actions: Actions,
   ) {
+    this.badgeTree = vscode.window.createTreeView<never>(ViewHost.badgeId, { treeDataProvider: { getTreeItem: (e) => e, getChildren: () => [] } });
     this.disposables.push(
+      this.badgeTree,
       dash.onState((state) => this.broadcast({ type: "state", state })),
       dash.onPetEvent((e) => this.broadcast({ type: "petEvent", kind: e.kind, text: e.text, key: e.key })),
       // (each step between checks: only what the chats do now, not the whole state)
@@ -48,6 +58,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
+    this.showBadge();
     this.setUp(view.webview, false);
     let visible = view.visible;
     if (visible) this.visibleCount++;
@@ -62,6 +73,7 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
       this.webviews.delete(view.webview);
       this.projectsShown.delete(view.webview);
       this.view = undefined;
+      this.showBadge();
       this.dash.setVisible(this.visibleCount > 0);
     });
     this.dash.setVisible(this.visibleCount > 0);
@@ -98,9 +110,18 @@ export class ViewHost implements vscode.WebviewViewProvider, vscode.Disposable {
     this.dash.setVisible(this.visibleCount > 0);
   }
 
-  // The waiting count on the Activity Bar icon
-  setBadge(waiting: number): void {
-    if (this.view) this.view.badge = waiting ? { value: waiting, tooltip: `${waiting} chat${waiting === 1 ? " needs" : "s need"} you` } : undefined;
+  // The count on the Activity Bar icon: chats that need you, else chats that
+  // finished since you last looked (model.badgeOf)
+  setBadge(waiting: number, finished: number): void {
+    const badge = badgeOf(waiting, finished);
+    if (badge?.value === this.badge?.value && badge?.tooltip === this.badge?.tooltip) return;
+    this.badge = badge;
+    this.showBadge();
+  }
+
+  private showBadge(): void {
+    if (this.view) this.view.badge = this.badge;
+    this.badgeTree.badge = this.view ? undefined : this.badge;
   }
 
   private visibilityChanged(webview: vscode.Webview, visible: boolean): void {

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as vscode from "vscode";
 import { demoProjects, demoState } from "../src/shared/demo";
-import { chatRefOf, findProjectChat } from "../src/shared/model";
+import { badgeOf, chatRefOf, findProjectChat } from "../src/shared/model";
 import type { ViewState } from "../src/shared/types";
 import { ViewHost } from "../src/view";
 
@@ -45,6 +45,43 @@ function setup(state: ViewState = demoState(NOW), projects = demoProjects(NOW)) 
     html: (webview: unknown, editorTab = false) => priv.html(webview, editorTab),
   };
 }
+
+// The Activity Bar badge: chats that need you, else chats that finished since
+// you last looked, as the Plasma panel's; on a tree view nobody sees until
+// the view is there (a webview's badge shows only once it was opened), then on
+// the view itself, so it follows the view to another container (a container
+// adds up its views' numbers: never both)
+test("the badge counts what needs you, else what finished, and its tooltip says which", () => {
+  assert.equal(badgeOf(0, 0), undefined);
+  assert.deepEqual(badgeOf(2, 3), { value: 2, tooltip: "2 chats need you" });
+  assert.deepEqual(badgeOf(1, 0), { value: 1, tooltip: "1 chat needs you" });
+  assert.deepEqual(badgeOf(0, 3), { value: 3, tooltip: "3 chats finished" });
+  assert.deepEqual(badgeOf(0, 1), { value: 1, tooltip: "1 chat finished" });
+});
+
+test("the badge is on the hidden tree from startup, on the view once it's there, and back when it's gone", () => {
+  const dash = { onState: () => ({ dispose() {} }), onPetEvent: () => ({ dispose() {} }), onLive: () => ({ dispose() {} }), state: () => demoState(NOW), setVisible() {} };
+  const host = new ViewHost(vscode.Uri.file("/ext") as never, dash as never, {} as never);
+  const tree = (vscode as unknown as { recorded: { treeViews: Map<string, { badge: unknown }> } }).recorded.treeViews.get("talpyDen.badge")!;
+  host.setBadge(0, 2);
+  assert.deepEqual(tree.badge, { value: 2, tooltip: "2 chats finished" });
+  let dispose = () => {};
+  const view = {
+    badge: undefined as unknown,
+    webview: { options: {}, html: "", postMessage: async () => true, onDidReceiveMessage: () => ({ dispose() {} }), asWebviewUri: (u: unknown) => u, cspSource: "" },
+    visible: false, onDidChangeVisibility: () => ({}), onDidDispose: (f: () => void) => ((dispose = f), {}),
+  };
+  host.resolveWebviewView(view as never);
+  assert.deepEqual(view.badge, { value: 2, tooltip: "2 chats finished" });
+  assert.equal(tree.badge, undefined);
+  host.setBadge(1, 2);
+  assert.deepEqual(view.badge, { value: 1, tooltip: "1 chat needs you" });
+  assert.equal(tree.badge, undefined);
+  dispose();
+  assert.deepEqual(tree.badge, { value: 1, tooltip: "1 chat needs you" });
+  host.setBadge(0, 0);
+  assert.equal(tree.badge, undefined);
+});
 
 // "Open the Recap" (the Monday notification): the view's page shows it now
 // if it's loaded, else once it is; a page that loads later starts on Chats

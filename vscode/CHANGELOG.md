@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **The Talpy Den icon has its badge from startup,** like Source
+  Control's: the chats that need you, else the chats that finished since you
+  last looked (as the Plasma panel counts them), its tooltip saying which
+  (*2 chats need you*, *3 chats finished*). It showed only the chats that
+  need you, and only once you had opened the view in that window: a tree
+  view nobody sees carries it until the view is there. Dragged to another
+  container, the view takes its badge along.
 - **A chat's tasks in its tab:** under the header, a slim strip with a
   progress bar and *3/7 · what it's on*, folded; a click unfolds the tasks
   (✓ done, ▸ the one it's on, ○ to do) and its subagents with what each

@@ -137,13 +137,17 @@ export function activate(context: vscode.ExtensionContext): void {
     dash.onState((state) => {
       statusBar.update(state);
       account.update(state);
-      view.setBadge(countStates(allGroups(state.status, state.hosts)).waiting);
+      view.setBadge(countStates(allGroups(state.status, state.hosts)).waiting, dash.unseenCount());
       // (Show Hidden … Again shows only when something of that kind is hidden here or on a host shown)
       for (const kind of ["chats", "plans", "memories", "projects"] as HiddenKind[]) {
         const n = hiddenCount(state.status, kind) + state.hosts.reduce((sum, h) => sum + hiddenCount(h.result, kind), 0);
         if (n !== hiddenShown.get(kind)) void vscode.commands.executeCommand("setContext", `talpyDen.hidden.${kind}`, n > 0);
         hiddenShown.set(kind, n);
       }
+    }),
+    dash.onUnseen(() => {
+      const state = dash.state();
+      view.setBadge(countStates(allGroups(state.status, state.hosts)).waiting, dash.unseenCount());
     }),
     review,
     vscode.commands.registerCommand("talpyDen.planComment.add", (reply: vscode.CommentReply) => review.add(reply)),

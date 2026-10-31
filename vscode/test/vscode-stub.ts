@@ -7,6 +7,7 @@ const disposable = () => ({ dispose() {} });
 export const recorded = {
   commands: new Map<string, (...args: unknown[]) => unknown>(),
   viewProviders: new Map<string, unknown>(),
+  treeViews: new Map<string, { badge: unknown }>(),
   uriHandlers: [] as unknown[],
   statusBarItems: [] as { text: string; tooltip: unknown; backgroundColor: unknown; show(): void; dispose(): void }[],
   messages: [] as string[],
@@ -62,6 +63,12 @@ export const window = {
     const item = { text: "", tooltip: undefined as unknown, backgroundColor: undefined as unknown, show() {}, hide() {}, dispose() {} };
     recorded.statusBarItems.push(item);
     return item;
+  },
+  // a tree view: its badge is kept (recorded.treeViews, by id)
+  createTreeView: (id: string) => {
+    const tree = { badge: undefined as unknown, dispose() {} };
+    recorded.treeViews.set(id, tree);
+    return tree;
   },
   registerWebviewViewProvider: (id: string, provider: unknown) => {
     recorded.viewProviders.set(id, provider);

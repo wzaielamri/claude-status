@@ -64,6 +64,9 @@ export class Dashboard implements vscode.Disposable {
   private away: AwayWatch;
   private digest: DigestCard | null = null;
   private readonly onStateEmitter = new vscode.EventEmitter<ViewState>();
+  private readonly onUnseenEmitter = new vscode.EventEmitter<void>();
+  // (what finished unseen changed: the Activity Bar badge's count)
+  readonly onUnseen = this.onUnseenEmitter.event;
   private readonly onPetEventEmitter = new vscode.EventEmitter<PetEvent>();
   private readonly onLiveEmitter = new vscode.EventEmitter<{ live: Record<string, LiveView>; changed: string[] }>();
   readonly onState = this.onStateEmitter.event;
@@ -99,9 +102,10 @@ export class Dashboard implements vscode.Disposable {
       this.onLiveEmitter,
       // looking at the view: what finished is seen
       vscode.window.onDidChangeWindowState((s) => {
-        if (s.focused && this.visible) this.unseen.clear();
+        if (s.focused && this.visible) this.clearUnseen();
       }),
       this.onStateEmitter,
+      this.onUnseenEmitter,
       this.onPetEventEmitter,
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (!e.affectsConfiguration("talpyDen")) return;
@@ -232,7 +236,7 @@ export class Dashboard implements vscode.Disposable {
     this.visible = visible;
     // Just opened: show fresh numbers now, then poll at the faster pace
     if (visible) this.scheduleLocal(0);
-    if (visible && vscode.window.state.focused) this.unseen.clear();
+    if (visible && vscode.window.state.focused) this.clearUnseen();
   }
 
   isVisible(): boolean {
@@ -552,8 +556,29 @@ export class Dashboard implements vscode.Disposable {
       if (f.stop) this.finishedUnopened.delete(f.id);
       else if (f.took >= min && !this.lookingAt(f.id)) this.finishedUnopened.set(f.id, f.at);
     }
-    if (this.visible && vscode.window.state.focused) return;
-    for (const f of changes.finished) if (!f.stop && f.took >= min) this.unseen.set(f.id, f.at);
+    if (!(this.visible && vscode.window.state.focused))
+      for (const f of changes.finished) if (!f.stop && f.took >= min) this.unseen.set(f.id, f.at);
+    if (changes.finished.length) this.onUnseenEmitter.fire();
+  }
+
+  private clearUnseen(): void {
+    if (!this.unseen.size) return;
+    this.unseen.clear();
+    this.onUnseenEmitter.fire();
+  }
+
+  // How many chats finished since you last looked (and still sit finished):
+  // the badge's count when none needs you
+  unseenCount(): number {
+    const st = this.state();
+    const states = new Map<string, string>();
+    for (const g of allGroups(st.status, st.hosts)) for (const s of g.sessions) states.set(trackKey(s, g.host), s.state);
+    let n = 0;
+    for (const id of this.unseen.keys()) {
+      const state = states.get(id);
+      if (state === "idle" || state === "done") n++;
+    }
+    return n;
   }
 
   // You opened a chat: it's looked at
@@ -589,7 +614,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   seen(id: string): void {
-    this.unseen.delete(id);
+    if (this.unseen.delete(id)) this.onUnseenEmitter.fire();
   }
 
   // Back at VS Code after a while: what happened, in one notification

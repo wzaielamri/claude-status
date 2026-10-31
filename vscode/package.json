@@ -57,6 +57,11 @@
           "type": "webview",
           "id": "talpyDen.view",
           "name": "Talpy Den"
+        },
+        {
+          "id": "talpyDen.badge",
+          "name": "Talpy Den",
+          "when": "talpyDen.never"
         }
       ]
     },

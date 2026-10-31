@@ -1117,6 +1117,14 @@ export interface ChatSpot {
 // The chats that need you, most urgent first: the waiting ones (the one
 // waiting longest first), then the ones that finished a turn you haven't
 // looked at yet (unseen: trackKey -> when; newest first)
+// The Activity Bar badge, as the Plasma panel's: the chats that need you,
+// else the ones that finished since you last looked; its tooltip says which
+export function badgeOf(waiting: number, finished: number): { value: number; tooltip: string } | undefined {
+  if (waiting > 0) return { value: waiting, tooltip: `${waiting} chat${waiting === 1 ? " needs" : "s need"} you` };
+  if (finished > 0) return { value: finished, tooltip: `${finished} chat${finished === 1 ? "" : "s"} finished` };
+  return undefined;
+}
+
 export function chatsNeedingYou(groups: Group[], unseen: ReadonlyMap<string, number>): ChatSpot[] {
   const waiting: ChatSpot[] = [];
   const finished: { spot: ChatSpot; at: number }[] = [];
